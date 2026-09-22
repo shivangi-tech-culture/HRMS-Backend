@@ -1,0 +1,395 @@
+{
+  "info": {
+    "name": "HRMS API",
+    "description": "HRMS Express API\n\n**Seed logins** (officialEmail)\n- Super Admin: shivangi@techculture.ai / 123456 (detailsApproval=Approved)\n- Employee: shivig5964@gmail.com / 123456 (Unapproved)\n\n**detailsApproval default:** Super Admin → Approved | HR / Manager / Employee → Unapproved\n\n**Create User mapping**\n- officialEmail → personal.officialEmail\n- mobileNo → personal.mobileNo\n- company, department → official\n- city, state, country → personal.permanentAddress\n\n**Employee update phones** (while Unapproved/Rejected)\nPUT /api/employees/{id} → personal.mobileNo, workPhone, workExt",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:9001" },
+    { "key": "token", "value": "" },
+    { "key": "userId", "value": "" },
+    { "key": "roleId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1 Auth",
+      "item": [
+        {
+          "name": "Login Super Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var j = pm.response.json();",
+                  "if (j.token) pm.collectionVariables.set('token', j.token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"officialEmail\": \"shivangi@techculture.ai\",\n  \"password\": \"123456\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/login",
+            "description": "Sets {{token}}. Login with officialEmail. Returns permissions + menu + lastLogin."
+          }
+        },
+        {
+          "name": "Login Employee",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var j = pm.response.json();",
+                  "if (j.token) pm.collectionVariables.set('token', j.token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"officialEmail\": \"shivig5964@gmail.com\",\n  \"password\": \"123456\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/login"
+          }
+        },
+        {
+          "name": "Me",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/auth/me",
+            "description": "Current user + permissions + menu"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 Permissions",
+      "item": [
+        {
+          "name": "Permissions Catalog",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/permissions/modules",
+            "description": "Full catalog from permissions.js (admin + ESS trees)"
+          }
+        },
+        {
+          "name": "My Permissions",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/permissions/my",
+            "description": "Logged-in role permissions + filtered menu"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3 Roles",
+      "item": [
+        {
+          "name": "Create Role",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var j = pm.response.json();",
+                  "if (j.role && j.role.id) pm.collectionVariables.set('roleId', j.role.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Custom Role\",\n  \"description\": \"Test role\",\n  \"status\": \"Active\"\n}"
+            },
+            "url": "{{baseUrl}}/api/roles"
+          }
+        },
+        {
+          "name": "List Roles",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/roles"
+          }
+        },
+        {
+          "name": "Get Role Permissions",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/roles/{{roleId}}/permissions"
+          }
+        },
+        {
+          "name": "Update Role",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Updated description\",\n  \"status\": \"Active\"\n}"
+            },
+            "url": "{{baseUrl}}/api/roles/{{roleId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4 Employees (Users)",
+      "description": "Access & Control Create User + profile CRUD.\nRoles enforced on routes via authorize middleware.",
+      "item": [
+        {
+          "name": "Create User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var j = pm.response.json();",
+                  "if (j.employee && j.employee._id) pm.collectionVariables.set('userId', j.employee._id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ananya Iyer\",\n  \"officialEmail\": \"ananya@techculture.ai\",\n  \"mobileNo\": \"9810044556\",\n  \"password\": \"123456\",\n  \"role\": \"Employee\",\n  \"company\": \"TechCulture Solutions Private Limited\",\n  \"department\": \"Finance\",\n  \"city\": \"Noida\",\n  \"state\": \"DELHI\",\n  \"country\": \"India\",\n  \"status\": \"Active\"\n}"
+            },
+            "url": "{{baseUrl}}/api/employees",
+            "description": "Super Admin / HR Manager only.\n\nSaves:\n- officialEmail → personal.officialEmail\n- mobileNo → personal.mobileNo\n- company, department → official\n- city, state, country → personal.permanentAddress\n- detailsApproval = Approved if Super Admin, else Unapproved"
+          }
+        },
+        {
+          "name": "List Users",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/employees",
+            "description": "Admin → all | Employee → self only"
+          }
+        },
+        {
+          "name": "Get User by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/employees/{{userId}}",
+            "description": "Admin any id | Employee own id only"
+          }
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"personal\": {\n    \"gender\": \"Female\",\n    \"panNo\": \"ABCDE1234F\",\n    \"mobileNo\": \"9810044556\",\n    \"workPhone\": \"\",\n    \"workExt\": \"\",\n    \"permanentAddress\": {\n      \"city\": \"Noida\",\n      \"state\": \"DELHI\",\n      \"country\": \"India\"\n    }\n  },\n  \"official\": {\n    \"designation\": \"Finance Executive\",\n    \"grade\": \"G4\",\n    \"company\": \"TechCulture Solutions Private Limited\",\n    \"department\": \"Finance\"\n  }\n}"
+            },
+            "url": "{{baseUrl}}/api/employees/{{userId}}",
+            "description": "Admin: full nested update (personal + official).\nEmployee: personal only — can set mobileNo, workPhone, workExt (omit official{}).\nLocked if detailsApproval = Approved."
+          }
+        },
+        {
+          "name": "Update Phones (Employee)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"personal\": {\n    \"mobileNo\": \"9810044556\",\n    \"workPhone\": \"0120-4000000\",\n    \"workExt\": \"204\"\n  }\n}"
+            },
+            "url": "{{baseUrl}}/api/employees/{{userId}}",
+            "description": "Employee self-update (Login Employee first).\nUpdates personal.mobileNo, workPhone, workExt.\nWorks while detailsApproval is Unapproved or Rejected."
+          }
+        },
+        {
+          "name": "Upload Education Document",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "document",
+                  "type": "file",
+                  "src": [],
+                  "description": "PDF, JPG, PNG or DOC (certificate / marksheet)"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/employees/{{userId}}/education/document",
+            "description": "Upload to Cloudinary (PDF/JPG/PNG/DOC).\nNeeds CLOUDINARY_* in .env.\nUse returned document (URL) + documentName in PUT education[]."
+          }
+        },
+        {
+          "name": "Approve Details",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"detailsApproval\": \"Approved\"\n}"
+            },
+            "url": "{{baseUrl}}/api/employees/{{userId}}",
+            "description": "Super Admin / HR Manager / Manager only.\nValues: Unapproved | Approved | Rejected"
+          }
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\": \"newpass123\"\n}"
+            },
+            "url": "{{baseUrl}}/api/employees/{{userId}}",
+            "description": "Super Admin / HR Manager only"
+          }
+        },
+        {
+          "name": "Delete User",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/employees/{{userId}}",
+            "description": "Super Admin / HR Manager / Manager. Cannot delete self."
+          }
+        }
+      ]
+    },
+    {
+      "name": "5 Attendance",
+      "item": [
+        {
+          "name": "Punch In (web)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source\": \"web\"\n}"
+            },
+            "url": "{{baseUrl}}/api/attendance/punch-in",
+            "description": "Self punch-in. source = web | mobile | biometric"
+          }
+        },
+        {
+          "name": "Punch In (mobile)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source\": \"mobile\"\n}"
+            },
+            "url": "{{baseUrl}}/api/attendance/punch-in",
+            "description": "Mobile app / fingerprint button → source mobile"
+          }
+        },
+        {
+          "name": "Punch Out (web)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source\": \"web\"\n}"
+            },
+            "url": "{{baseUrl}}/api/attendance/punch-out",
+            "description": "Self punch-out. Same source values as punch-in.\nSee record.punchInSource + record.punchOutSource."
+          }
+        },
+        {
+          "name": "Mark Attendance (manual)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"employeeId\": \"{{userId}}\",\n  \"punchType\": \"in\",\n  \"time\": \"09:30\",\n  \"reason\": \"Forgot to punch\",\n  \"remarks\": \"Approved by HR\"\n}"
+            },
+            "url": "{{baseUrl}}/api/attendance/manual",
+            "description": "Admin only — when employee missed punch.\nEmployees cannot use manual.\nDate always today. Set {{userId}} to target employee."
+          }
+        },
+        {
+          "name": "My Today",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/attendance/today"
+          }
+        },
+        {
+          "name": "List Attendance",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/attendance",
+            "description": "Optional query: ?date=2026-09-22&source=web"
+          }
+        }
+      ]
+    }
+  ]
+}
