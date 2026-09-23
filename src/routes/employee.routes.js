@@ -208,7 +208,7 @@ const router = express.Router();
 router.post(
   "/",
   protect,
-  authorize("Super Admin", "HR Manager"),
+  authorize("Super Admin", "HR Manager" , "Manager"),
   validate(createUserSchema),
   createEmployee
 );
@@ -220,14 +220,52 @@ router.post(
  *     tags: [Employees]
  *     summary: List users
  *     description: |
- *       **Who:** Super Admin, HR Manager, Manager, Employee
- *       - Admin roles → all users
- *       - Employee → only self
+ *       One list for Access & Control and Employee Management.
+ *       Response is only the table columns. Open one person with `GET /api/employees/{id}`.
+ *
+ *       **Who:** Super Admin, HR Manager, Manager see every user.
+ *       Employee search and filters apply only to their own record.
+ *
+ *       **Columns:** name, email, role, department, lastLogin, status,
+ *       employeeCode, gender, designation, branch.
+ *
+ *       **Query:** search (name, code, or email), role, status, department,
+ *       designation, gender, branch (company), page (default 1), limit (default 10, max 100).
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: search
+ *         schema: { type: string, example: Rahul }
+ *         description: Matches name, employee code, or email
+ *       - in: query
+ *         name: role
+ *         schema: { type: string, example: Employee }
+ *       - in: query
+ *         name: status
+ *         schema: { type: string, enum: [Active, Inactive] }
+ *       - in: query
+ *         name: department
+ *         schema: { type: string, example: Engineering }
+ *       - in: query
+ *         name: designation
+ *         schema: { type: string, example: HR Executive }
+ *       - in: query
+ *         name: gender
+ *         schema: { type: string, example: Male }
+ *       - in: query
+ *         name: branch
+ *         schema: { type: string }
+ *         description: Matches official.company
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1, example: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 10, example: 10 }
  *     responses:
  *       200:
- *         description: List of employees with count
+ *         description: Page of employees plus total, page, limit, from, to
  */
 // LIST USERS — admin: all | employee: self
 router.get(
@@ -262,7 +300,7 @@ router.get(
  *               document:
  *                 type: string
  *                 format: binary
- *                 description: PDF, JPG, PNG or DOC — max 5MB
+ *                 description: PDF, image, Word, or Excel — max 5MB
  *               type:
  *                 type: string
  *                 enum: [education, account]
@@ -277,10 +315,8 @@ router.get(
  *               message: File uploaded
  *               type: account
  *               folder: hrms/account
- *               url: https://res.cloudinary.com/demo/image/upload/v1/hrms/account/passbook.pdf
+ *               url: https://res.cloudinary.com/demo/raw/upload/v1/hrms/account/passbook.pdf
  *               fileName: passbook.pdf
- *               document: https://res.cloudinary.com/demo/image/upload/v1/hrms/account/passbook.pdf
- *               documentName: passbook.pdf
  *       400:
  *         description: Missing file, bad type, or invalid file
  *       500:

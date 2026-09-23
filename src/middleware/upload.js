@@ -11,7 +11,9 @@
  *     Settings → Security → check "Allow delivery of PDF and ZIP files" → Save
  *   Then re-upload (or wait for CDN cache). Old blocked URLs may stay broken briefly.
  *
- * PDF upload: resource_type "image" + format pdf (Cloudinary recommended for viewable PDFs)
+ * A real PDF is stored as an image so the browser can open it.
+ * Word and Excel are stored as raw files.
+ * The file bytes are checked. A .pdf that is not actually a PDF is rejected.
  *
  * Env:
  *   CLOUDINARY_CLOUD_NAME / API_KEY / API_SECRET
@@ -32,8 +34,13 @@ const allowed = new Set([
   "image/jpeg",
   "image/jpg",
   "image/png",
+  "image/webp",
+  "image/gif",
   "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/octet-stream",
 ]);
 
 /** Allowed attachment kinds. Folder on Cloudinary is hrms/<type>. */
@@ -44,7 +51,7 @@ const uploadFile = multer({
   storage: multer.memoryStorage(),
   fileFilter: (_req, file, cb) => {
     if (allowed.has(file.mimetype)) cb(null, true);
-    else cb(new Error("Only PDF, JPG, PNG or DOC files are allowed"), false);
+    else cb(new Error("Only PDF, image, Word, or Excel files are allowed"), false);
   },
   limits: { fileSize: 5 * 1024 * 1024 },
 }).single("document");
@@ -57,10 +64,42 @@ const safeBaseName = (originalName) =>
     .slice(0, 80) || "file";
 
 /**
- * Upload options per file type.
- * PDF → image + format pdf → opens in browser, URL ends with .pdf once
- * DOC → raw + extension in public_id (download only)
- * JPG/PNG → image
+ * What the bytes actually are. Extension alone is not trusted.
+ * Returns pdf | jpg | png | gif | webp | doc | docx | xls | xlsx, or null.
+ */
+const detectKind = (file) => {
+  const buf = file.buffer || Buffer.alloc(0);
+  const name = String(file.originalname || "").toLowerCase();
+  if (buf.slice(0, 4).toString() === "%PDF") return "pdf";
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return "jpg";
+  if (buf.slice(0, 4).toString("hex") === "89504e47") return "png";
+  if (buf.slice(0, 3).toString() === "GIF") return "gif";
+  if (buf.slice(0, 4).toString() === "RIFF" && buf.slice(8, 12).toString() === "WEBP") {
+    return "webp";
+  }
+  // Old Word / Excel (OLE)
+  if (buf.slice(0, 4).toString("hex") === "d0cf11e0") {
+    return name.endsWith(".xls") ? "xls" : "doc";
+  }
+  // New Word / Excel are zip files
+  if (buf[0] === 0x50 && buf[1] === 0x4b) {
+    if (name.endsWith(".xlsx") || name.endsWith(".xls")) return "xlsx";
+    return "docx";
+  }
+  return null;
+};
+
+const rejectFile = (message) => {
+  const err = new Error(message);
+  err.statusCode = 400;
+  return err;
+};
+
+/**
+ * Upload options per real file type.
+ * PDF → image, so the browser can open it.
+ * Word / Excel → raw download.
+ * JPG / PNG / GIF / WEBP → image.
  */
 /** hrms/education stays hrms/education; account uses the same root. */
 const folderFor = (type) => {
@@ -72,44 +111,35 @@ const folderFor = (type) => {
 const uploadOptionsFor = (file, type = "education") => {
   const folder = folderFor(type);
   const baseId = `${Date.now()}-${safeBaseName(file.originalname)}`;
-  const mime = file.mimetype;
+  const kind = detectKind(file);
 
-  if (mime === "application/pdf") {
+  if (!kind) {
+    throw rejectFile(
+      "This file is not a valid PDF, image, Word, or Excel file"
+    );
+  }
+
+  if (kind === "pdf") {
     return {
       folder,
       resource_type: "image",
       public_id: baseId,
       format: "pdf",
-      pages: true,
       use_filename: false,
       unique_filename: false,
     };
   }
 
-  if (mime === "application/msword") {
+  if (kind === "doc" || kind === "docx" || kind === "xls" || kind === "xlsx") {
     return {
       folder,
       resource_type: "raw",
-      public_id: `${baseId}.doc`,
+      public_id: `${baseId}.${kind}`,
       use_filename: false,
       unique_filename: false,
     };
   }
 
-  if (
-    mime ===
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-  ) {
-    return {
-      folder,
-      resource_type: "raw",
-      public_id: `${baseId}.docx`,
-      use_filename: false,
-      unique_filename: false,
-    };
-  }
-
-  // jpg / png
   return {
     folder,
     resource_type: "image",
@@ -133,7 +163,12 @@ const uploadToCloudinary = (file, type = "education") => {
       );
     }
 
-    const options = uploadOptionsFor(file, type);
+    let options;
+    try {
+      options = uploadOptionsFor(file, type);
+    } catch (err) {
+      return reject(err);
+    }
     const stream = cloudinary.uploader.upload_stream(options, (err, result) => {
       if (err) return reject(err);
       resolve({

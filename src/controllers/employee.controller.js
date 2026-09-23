@@ -245,24 +245,91 @@ const createEmployee = async (req, res) => {
   }
 };
 
+/** Keep user text out of regex so search cannot break the query */
+const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** Case-insensitive exact match for dropdown filters */
+const exact = (value) => new RegExp(`^${escapeRegex(String(value).trim())}$`, "i");
+
 // =============================================================================
 // LIST USERS — GET /api/employees
-// Admin sees all; Employee sees only self
+// Super Admin / HR / Manager → all users, with search, filters, pagination
+// Employee → only their own record, same query params
 // =============================================================================
 const listEmployees = async (req, res) => {
   try {
-    const filter = {};
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100);
+    const skip = (page - 1) * limit;
+    const and = [];
+
+    // Employee can search and filter only inside their own profile
     if (!hasAllAccess(req.user)) {
-      filter._id = req.user._id;
+      and.push({ _id: req.user._id });
     }
 
-    const employees = await User.find(filter)
-      .select("-password")
-      .sort({ createdAt: -1 });
+    const search = String(req.query.search || "").trim();
+    if (search) {
+      const rx = new RegExp(escapeRegex(search), "i");
+      and.push({
+        $or: [
+          { name: rx },
+          { "official.employeeCode": rx },
+          { "official.officialEmail": rx },
+        ],
+      });
+    }
+
+    if (req.query.role) and.push({ role: exact(req.query.role) });
+    if (req.query.status) and.push({ status: exact(req.query.status) });
+    if (req.query.department) {
+      and.push({ "official.department": exact(req.query.department) });
+    }
+    if (req.query.designation) {
+      and.push({ "official.designation": exact(req.query.designation) });
+    }
+    if (req.query.gender) and.push({ "personal.gender": exact(req.query.gender) });
+
+    const branch = req.query.branch || req.query.company;
+    if (branch) and.push({ "official.company": exact(branch) });
+
+    const filter = and.length ? { $and: and } : {};
+    const [total, rows] = await Promise.all([
+      User.countDocuments(filter),
+      User.find(filter)
+        .select(
+          "name role status lastLogin official.officialEmail official.employeeCode official.department official.designation official.company personal.gender"
+        )
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+    ]);
+
+    // Both screens share this list. Full profile is GET /api/employees/:id
+    const employees = rows.map((row) => ({
+      _id: row._id,
+      name: row.name || "",
+      email: row.official?.officialEmail || "",
+      role: row.role || "",
+      department: row.official?.department || "",
+      lastLogin: row.lastLogin || null,
+      status: row.status || "",
+      employeeCode: row.official?.employeeCode || "",
+      gender: row.personal?.gender || "",
+      designation: row.official?.designation || "",
+      branch: row.official?.company || "",
+    }));
 
     return res.json({
       count: employees.length,
-      employees: employees.map(safeUser),
+      total,
+      page,
+      limit,
+      pages: Math.max(Math.ceil(total / limit), 1),
+      from: total === 0 ? 0 : skip + 1,
+      to: skip + employees.length,
+      employees,
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -504,8 +571,12 @@ const uploadAttachment = async (req, res) => {
 
     if (!req.file) {
       return res.status(400).json({
-        message: "Please choose a file (PDF, JPG, PNG or DOC — max 5MB)",
+        message: "Please choose a file (PDF, image, Word, or Excel — max 5MB)",
       });
+    }
+
+    if (!req.file.buffer) {
+      return res.status(400).json({ message: "File could not be read. Select a file, not a folder." });
     }
 
     const uploaded = await uploadToCloudinary(req.file, type);
@@ -517,11 +588,11 @@ const uploadAttachment = async (req, res) => {
       folder: uploaded.folder,
       url: uploaded.url,
       fileName: uploaded.originalName,
-      document: uploaded.url,
-      documentName: uploaded.originalName,
     });
   } catch (err) {
-    return res.status(500).json({ message: err.message });
+    const status = err.statusCode || 500;
+    if (status >= 500) console.error("Upload failed:", err.message || err);
+    return res.status(status).json({ message: err.message || "Upload failed" });
   }
 };
 

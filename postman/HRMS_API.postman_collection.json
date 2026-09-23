@@ -755,8 +755,23 @@
                 "value": "Bearer {{token}}"
               }
             ],
-            "url": "{{baseUrl}}/api/employees",
-            "description": "Admin → all | Employee → self only"
+            "url": {
+              "raw": "{{baseUrl}}/api/employees?search=&role=&status=&department=&designation=&gender=&branch=&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "employees"],
+              "query": [
+                { "key": "search", "value": "", "description": "Name, employee code, or email" },
+                { "key": "role", "value": "", "description": "Exact role" },
+                { "key": "status", "value": "", "description": "Active or Inactive" },
+                { "key": "department", "value": "", "description": "Exact department" },
+                { "key": "designation", "value": "", "description": "Exact designation" },
+                { "key": "gender", "value": "", "description": "Male, Female, or Other" },
+                { "key": "branch", "value": "", "description": "Company / branch" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            },
+            "description": "One list API for Access & Control and All Employees.\n\nReturns only table columns: _id, name, email, role, department, lastLogin, status, employeeCode, gender, designation, branch.\nFull profile is GET /api/employees/{{userId}}.\n\nSuper Admin, HR Manager, Manager → all users.\nEmployee → only their own row.\n\nQuery: search, role, status, department, designation, gender, branch, page, limit."
           }
         },
         {
@@ -839,8 +854,10 @@
                 {
                   "key": "document",
                   "type": "file",
-                  "src": [],
-                  "description": "PDF, JPG, PNG or DOC — max 5MB"
+                  "src": [
+                    "C:\\Users\\owner\\Postman\\files\\EZ_Wealth_Portfolio_10L.pdf"
+                  ],
+                  "description": "PDF, JPG, PNG or DOC. File must be a real file, not a folder."
                 }
               ]
             },
