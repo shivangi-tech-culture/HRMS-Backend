@@ -5,8 +5,12 @@
  *   Rejects unknown fields and wrong types before the controller runs.
  *   unknown(false) → extra keys in the body return HTTP 400.
  *
- * CREATE (flat fields):
- *   officialEmail, employeeCode, mobileNo, company, department, city, …
+ * CREATE:
+ *   Required account fields stay flat: name, officialEmail, password, role,
+ *   company, department, status.
+ *   Optional flat: employeeCode, mobileNo, city, state, country.
+ *   Optional nested (same shape as update): personal, official, other,
+ *   education, accounts, family, nominees, experience, visas, payroll.
  *
  * UPDATE (nested objects only):
  *   personal{}, official{}, other{}, education[], accounts[], family[],
@@ -191,7 +195,8 @@ const payroll = only({
 /**
  * CREATE USER body
  * Required: name, officialEmail, password, role, company, department, status
- * Optional: employeeCode, mobileNo, city, state, country
+ * Optional flat: employeeCode, mobileNo, city, state, country
+ * Optional nested: full profile in one request (personal, official, payroll, …)
  */
 const createUserSchema = Joi.object({
   name: Joi.string().trim().min(2).max(100).required(),
@@ -206,6 +211,16 @@ const createUserSchema = Joi.object({
   city: Joi.string().trim().allow("").optional(),
   state: Joi.string().trim().allow("").optional(),
   country: Joi.string().trim().allow("").optional(),
+  personal: personal.optional(),
+  official: official.optional(),
+  other: other.optional(),
+  education: Joi.array().items(educationItem).optional(),
+  accounts: Joi.array().items(accountItem).optional(),
+  family: Joi.array().items(familyItem).optional(),
+  nominees: Joi.array().items(nomineeItem).optional(),
+  experience: Joi.array().items(experienceItem).optional(),
+  visas: Joi.array().items(visaItem).optional(),
+  payroll: payroll.optional(),
 }).unknown(false);
 
 /**

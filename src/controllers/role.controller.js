@@ -12,8 +12,23 @@ const {
   countPermissions,
   ALL_SUBS,
   ADMIN_TREE,
+  ESS_TREE,
   normalizePermissions,
 } = require("../config/permissions");
+
+const SUPER_ADMIN = "Super Admin";
+
+const isSuperAdminRole = (role) => role.name === SUPER_ADMIN;
+
+/** Super Admin always keeps the full admin matrix. */
+async function forceSuperAdminAccess(role) {
+  const full = permissionsForRole(SUPER_ADMIN);
+  if (countPermissions(role.permissions) !== countPermissions(full)) {
+    role.permissions = full;
+    await role.save();
+  }
+  return role;
+}
 
 const permLabel = (role) =>
   `${countPermissions(role.permissions)} of ${totalForRole(role.name)}`;
@@ -101,7 +116,7 @@ const getRole = async (req, res) => {
   }
 };
 
-/** PUT /api/roles/:id — update name, description, or status */
+/** PUT /api/roles/:id — description or status only. Name never changes. Super Admin is blocked. */
 const updateRole = async (req, res) => {
   try {
     const role = await Role.findById(req.params.id);
@@ -109,15 +124,10 @@ const updateRole = async (req, res) => {
       return res.status(404).json({ message: "Role not found" });
     }
 
-    if (req.body.name && req.body.name.trim() !== role.name) {
-      const newName = req.body.name.trim();
-      const exists = await Role.findOne({ name: newName });
-      if (exists) {
-        return res.status(400).json({ message: "Role name already exists" });
-      }
-      // Keep users in sync when role name changes
-      await User.updateMany({ role: role.name }, { role: newName });
-      role.name = newName;
+    if (isSuperAdminRole(role)) {
+      return res.status(403).json({
+        message: "Super Admin role cannot be edited.",
+      });
     }
 
     if (req.body.description !== undefined) role.description = req.body.description;
@@ -130,12 +140,18 @@ const updateRole = async (req, res) => {
   }
 };
 
-/** DELETE /api/roles/:id — blocked if any users still use this role */
+/** DELETE /api/roles/:id — Super Admin is blocked. Others delete when no user has the role. */
 const deleteRole = async (req, res) => {
   try {
     const role = await Role.findById(req.params.id);
     if (!role) {
       return res.status(404).json({ message: "Role not found" });
+    }
+
+    if (isSuperAdminRole(role)) {
+      return res.status(403).json({
+        message: "Super Admin role cannot be deleted.",
+      });
     }
 
     const users = await User.countDocuments({ role: role.name });
@@ -157,6 +173,8 @@ const getPermissions = async (req, res) => {
     if (!role) {
       return res.status(404).json({ message: "Role not found" });
     }
+
+    if (isSuperAdminRole(role)) await forceSuperAdminAccess(role);
 
     const byModule = {};
     for (const m of [...new Set(ADMIN_TREE.map((x) => x.module))]) {
@@ -189,8 +207,16 @@ const savePermissions = async (req, res) => {
       return res.status(404).json({ message: "Role not found" });
     }
 
-    // Merge with full tree; missing = false
-    role.permissions = normalizePermissions(req.body.permissions);
+    if (isSuperAdminRole(role)) {
+      await forceSuperAdminAccess(role);
+      return res.status(403).json({
+        message: "Super Admin always has full access. Permissions cannot be changed.",
+      });
+    }
+
+    // Employee uses the ESS catalog. HR, Manager, and custom roles use the admin catalog.
+    const tree = role.name === "Employee" ? ESS_TREE : ADMIN_TREE;
+    role.permissions = normalizePermissions(req.body.permissions, tree);
     await role.save();
 
     return res.json({

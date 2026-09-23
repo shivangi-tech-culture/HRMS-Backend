@@ -13,12 +13,15 @@
  *   official{}  → Super Admin / HR Manager / Manager only
  *   payroll{}   → admin only
  *
- * CREATE USER (flat body → nested save):
+ * CREATE USER:
+ *   Flat account fields plus optional nested profile in one POST.
  *   officialEmail  → official.officialEmail
  *   employeeCode   → official.employeeCode
  *   mobileNo       → personal.mobileNo
  *   company/dept   → official
  *   city/state/country → personal.permanentAddress
+ *   personal / official / other / education / accounts / family /
+ *   nominees / experience / visas / payroll → saved as sent
  *
  * UNIQUE WHEN NOT EMPTY:
  *   officialEmail, employeeCode, mobileNo, personalEmail,
@@ -228,7 +231,7 @@ const userSchema = new mongoose.Schema(
     ],
 
     // =========================================================================
-    // PAYROLL — admin only (not filled on Create User)
+    // PAYROLL — admin only (optional on Create User)
     // =========================================================================
     payroll: {
       salaryGroup: { type: String, default: "" },

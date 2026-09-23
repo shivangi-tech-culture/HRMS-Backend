@@ -15,12 +15,11 @@
  *   List / Get / Update  → Super Admin, HR Manager, Manager, Employee
  *   Delete               → Super Admin, HR Manager, Manager
  *
- * CREATE BODY MAPPING (see controller):
- *   officialEmail → official.officialEmail
- *   employeeCode  → official.employeeCode
- *   mobileNo      → personal.mobileNo
- *   company/dept  → official
- *   city/state/country → personal.permanentAddress
+ * CREATE BODY:
+ *   Required flat: name, officialEmail, password, role, company, department, status
+ *   Optional flat: employeeCode, mobileNo, city, state, country
+ *   Optional nested (same request): personal, official, other, education,
+ *   accounts, family, nominees, experience, visas, payroll
  *
  * UPDATE:
  *   One PUT for all objects (personal, official, education, …).
@@ -63,13 +62,13 @@ const router = express.Router();
  *       **Who:** Super Admin, HR Manager
  *
  *       **Required:** name, officialEmail, password, role, company, department, status
- *       **Optional:** employeeCode, mobileNo, city, state, country
+ *       **Optional flat:** employeeCode, mobileNo, city, state, country
+ *       **Optional nested (same request):** personal, official, other, education,
+ *       accounts, family, nominees, experience, visas, payroll
  *
- *       **Saved as:** officialEmail → official.officialEmail |
- *       employeeCode → official.employeeCode | mobileNo → personal.mobileNo |
- *       company/department → official |
- *       city/state/country → personal.permanentAddress |
- *       detailsApproval = Approved (Super Admin only) | Unapproved (HR / Manager / Employee)
+ *       Flat fields fill official / personal when the nested object omits them.
+ *       Top-level officialEmail is always the login id.
+ *       detailsApproval = Approved (Super Admin only) | Unapproved (everyone else)
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -109,6 +108,48 @@ const router = express.Router();
  *                 state: DELHI
  *                 country: India
  *                 status: Active
+ *             fullProfile:
+ *               summary: Create with full profile
+ *               value:
+ *                 name: Ananya Iyer
+ *                 officialEmail: ananya.full@techculture.ai
+ *                 password: "123456"
+ *                 role: Employee
+ *                 company: TechCulture Solutions Private Limited
+ *                 department: Finance
+ *                 status: Active
+ *                 personal:
+ *                   dateOfBirth: "1996-04-12"
+ *                   aadhaarNo: "123412341234"
+ *                   panNo: ABCDE1234F
+ *                   gender: Female
+ *                   fatherOrHusbandName: Ramesh Iyer
+ *                   maritalStatus: Single
+ *                   personalEmail: ananya.personal@gmail.com
+ *                   languageKnown: English, Hindi
+ *                   emergencyContact1: "9810011122"
+ *                   emergencyContact2: "9810033344"
+ *                   drivingLicenseNo: DL-0420110012345
+ *                   licenseValidUpto: "2030-04-12"
+ *                   passportNo: J8765432
+ *                   presentAddress:
+ *                     address: Sector 62
+ *                     country: India
+ *                     state: DELHI
+ *                     city: Noida
+ *                     pincode: "201301"
+ *                 official:
+ *                   employeeCode: EMP-1024
+ *                   designation: Finance Executive
+ *                   dateOfJoining: "2024-01-15"
+ *                   grade: G4
+ *                 education:
+ *                   - courseName: B.Com
+ *                     courseLevel: Graduation
+ *                     instituteName: ABC College
+ *                 payroll:
+ *                   basic: 40000
+ *                   paymentMode: Bank
  *     responses:
  *       201: { description: User created (emailSent true/false) }
  *       400: { description: Validation failed / unique field conflict }

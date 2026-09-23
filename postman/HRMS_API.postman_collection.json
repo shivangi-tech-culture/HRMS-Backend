@@ -614,6 +614,28 @@
           }
         },
         {
+          "name": "Update Role Permissions",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"permissions\": [\n    {\n      \"module\": \"Dashboard\",\n      \"heading\": \"Overview\",\n      \"subModules\": [\n        {\n          \"name\": \"Attendance Summary\",\n          \"view\": true,\n          \"create\": false,\n          \"edit\": false,\n          \"delete\": false,\n          \"approve\": false,\n          \"reject\": false,\n          \"download\": false,\n          \"export\": true,\n          \"import\": false,\n          \"upload\": false,\n          \"print\": false,\n          \"email\": false,\n          \"share\": false,\n          \"cancel\": false,\n          \"assign\": false\n        }\n      ]\n    }\n  ]\n}"
+            },
+            "url": "{{baseUrl}}/api/roles/{{roleId}}/permissions",
+            "description": "Updates permissions for Employee, HR Manager, Manager, and custom roles.\nSuper Admin is rejected — that role always has full access.\nSet {{roleId}} to the role you want to edit, not Super Admin.\nMissing pages are saved as false."
+          }
+        },
+        {
           "name": "Update Role",
           "request": {
             "method": "PUT",
@@ -632,7 +654,21 @@
               "raw": "{\n  \"description\": \"{{roleUpdateDescription}}\",\n  \"status\": \"{{roleStatus}}\"\n}"
             },
             "url": "{{baseUrl}}/api/roles/{{roleId}}",
-            "description": "Updates {{roleId}}. Vars: roleUpdateDescription, roleStatus"
+            "description": "Description or status only. Role name cannot be changed.\nSuper Admin cannot be edited.\nDo not send name."
+          }
+        },
+        {
+          "name": "Delete Role",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/roles/{{roleId}}",
+            "description": "Super Admin cannot be deleted.\nEmployee, HR Manager, Manager, and custom roles can be deleted when no user has that role.\nLogin as Super Admin. Set {{roleId}} to the role to delete."
           }
         }
       ]
@@ -672,7 +708,41 @@
               "raw": "{\n  \"name\": \"{{newUserName}}\",\n  \"officialEmail\": \"{{newUserEmail}}\",\n  \"employeeCode\": \"{{employeeCode}}\",\n  \"mobileNo\": \"{{mobileNo}}\",\n  \"password\": \"{{password}}\",\n  \"role\": \"{{userRole}}\",\n  \"company\": \"{{company}}\",\n  \"department\": \"{{department}}\",\n  \"city\": \"{{city}}\",\n  \"state\": \"{{state}}\",\n  \"country\": \"{{country}}\",\n  \"status\": \"{{userStatus}}\"\n}"
             },
             "url": "{{baseUrl}}/api/employees",
-            "description": "Super Admin / HR Manager only.\n\nMaps:\n- officialEmail → official.officialEmail\n- employeeCode → official.employeeCode\n- mobileNo → personal.mobileNo\n- company, department → official\n- city, state, country → personal.permanentAddress\n\nSets {{userId}} from response."
+            "description": "Super Admin / HR Manager only.\n\nMaps:\n- officialEmail → official.officialEmail\n- employeeCode → official.employeeCode\n- mobileNo → personal.mobileNo\n- company, department → official\n- city, state, country → personal.permanentAddress\n\nSets {{userId}} from response.\n\nFull profile in one call: use Create Employee (full profile)."
+          }
+        },
+        {
+          "name": "Create Employee (full profile)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var j = pm.response.json();",
+                  "if (j.employee && j.employee._id) pm.collectionVariables.set('userId', j.employee._id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"{{newUserName}}\",\n  \"officialEmail\": \"{{newUserEmail}}\",\n  \"password\": \"{{password}}\",\n  \"role\": \"{{userRole}}\",\n  \"company\": \"{{company}}\",\n  \"department\": \"{{department}}\",\n  \"status\": \"{{userStatus}}\",\n  \"personal\": {\n    \"dateOfBirth\": \"1996-04-12\",\n    \"aadhaarNo\": \"\",\n    \"panNo\": \"\",\n    \"gender\": \"Female\",\n    \"fatherOrHusbandName\": \"\",\n    \"maritalStatus\": \"Single\",\n    \"spouseName\": \"\",\n    \"personalEmail\": \"\",\n    \"languageKnown\": \"English, Hindi\",\n    \"emergencyContact1\": \"\",\n    \"emergencyContact2\": \"\",\n    \"drivingLicenseNo\": \"\",\n    \"licenseValidUpto\": null,\n    \"passportNo\": \"\",\n    \"mobileNo\": \"{{mobileNo}}\",\n    \"presentAddress\": {\n      \"address\": \"Sector 62\",\n      \"country\": \"{{country}}\",\n      \"state\": \"{{state}}\",\n      \"city\": \"{{city}}\",\n      \"pincode\": \"201301\"\n    }\n  },\n  \"official\": {\n    \"employeeCode\": \"{{employeeCode}}\",\n    \"designation\": \"Finance Executive\",\n    \"reportingHead1\": \"\",\n    \"reportingHead2\": \"\",\n    \"jobRole\": \"Executive\",\n    \"dateOfJoining\": \"2024-01-15\",\n    \"grade\": \"G4\"\n  },\n  \"other\": {\n    \"bloodGroup\": \"B+\"\n  },\n  \"education\": [\n    {\n      \"courseName\": \"B.Com\",\n      \"courseLevel\": \"Graduation\",\n      \"instituteName\": \"ABC College\"\n    }\n  ],\n  \"accounts\": [],\n  \"family\": [],\n  \"nominees\": [],\n  \"experience\": [],\n  \"visas\": [],\n  \"payroll\": {\n    \"basic\": 40000,\n    \"paymentMode\": \"Bank\",\n    \"bankName\": \"HDFC Bank\",\n    \"bankAccount\": \"\",\n    \"ifsc\": \"\"\n  }\n}"
+            },
+            "url": "{{baseUrl}}/api/employees",
+            "description": "Same POST /api/employees. Login as Super Admin or HR Manager.\n\nSends the Add Employee form in one body:\npersonal (name stays top-level), official, other, education, accounts, family, nominees, experience, visas, payroll.\n\nLeave unique fields empty (\"\") when you do not have a value. A filled PAN, Aadhaar, personal email, license, or passport must be unique.\nChange {{newUserEmail}} and {{employeeCode}} before each create."
           }
         },
         {

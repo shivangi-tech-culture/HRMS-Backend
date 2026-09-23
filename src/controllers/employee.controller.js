@@ -9,12 +9,14 @@
  *   DELETE /api/employees/:id          → delete user
  *   POST   /api/employees/:id/education/document → upload certificate to Cloudinary
  *
- * Create mapping (flat body → nested document):
- *   officialEmail → official.officialEmail (login id)
- *   employeeCode  → official.employeeCode
- *   mobileNo      → personal.mobileNo
- *   company/dept  → official
- *   city/state/country → personal.permanentAddress
+ * Create mapping:
+ *   Required flat: name, officialEmail, password, role, company, department, status
+ *   Optional flat: employeeCode, mobileNo, city, state, country
+ *   Optional nested (saved in the same request):
+ *     personal, official, other, education, accounts, family,
+ *     nominees, experience, visas, payroll
+ *   Flat fields fill official / personal when the nested object omits them.
+ *   officialEmail (top level) is always the login id.
  *
  * Update rules:
  *   Employee  → personal, other, education, accounts, family, nominees, experience, visas
@@ -46,6 +48,14 @@ const PROFILE_KEYS = [
   "experience",
   "visas",
 ];
+
+/** Drop client _id so Mongo assigns new ids on create */
+const withoutIds = (rows) =>
+  (rows || []).map((row) => {
+    const copy = { ...row };
+    delete copy._id;
+    return copy;
+  });
 
 /** Copy only known profile keys from the request body */
 const pickProfile = (body = {}) => {
@@ -120,7 +130,7 @@ const isProfileLocked = (req, employee) => {
 // =============================================================================
 const createEmployee = async (req, res) => {
   try {
-    // Flat fields from Access & Control form
+    // Account fields stay flat. Profile sections are optional on the same body.
     const {
       name,
       officialEmail,
@@ -136,16 +146,42 @@ const createEmployee = async (req, res) => {
       status,
     } = req.body;
 
-    // Clean values before save / unique checks
     const email = String(officialEmail).toLowerCase().trim();
     const code = employeeCode ? String(employeeCode).trim().toUpperCase() : "";
     const mobile = mobileNo ? String(mobileNo).trim() : "";
 
-    // Stop early if email / code / mobile already used
+    const officialIn = { ...(req.body.official || {}) };
+    const personalIn = { ...(req.body.personal || {}) };
+    delete personalIn.anniversaryDate;
+
+    const permanentAddress = { ...(personalIn.permanentAddress || {}) };
+    if (city && !permanentAddress.city) permanentAddress.city = city;
+    if (state && !permanentAddress.state) permanentAddress.state = state;
+    if (country && !permanentAddress.country) permanentAddress.country = country;
+
+    const official = normalizeSectionUniques("official", {
+      ...officialIn,
+      officialEmail: email,
+      employeeCode: code || officialIn.employeeCode || "",
+      company: company || officialIn.company || "",
+      department: department || officialIn.department || "",
+    });
+
+    const personal = normalizeSectionUniques("personal", {
+      ...personalIn,
+      mobileNo: mobile || personalIn.mobileNo || "",
+      permanentAddress,
+    });
+
     const createConflict = await findUniqueConflict({
-      "official.officialEmail": email,
-      "official.employeeCode": code,
-      "personal.mobileNo": mobile,
+      "official.officialEmail": official.officialEmail,
+      "official.employeeCode": official.employeeCode,
+      "personal.mobileNo": personal.mobileNo,
+      "personal.personalEmail": personal.personalEmail,
+      "personal.panNo": personal.panNo,
+      "personal.aadhaarNo": personal.aadhaarNo,
+      "personal.drivingLicenseNo": personal.drivingLicenseNo,
+      "personal.passportNo": personal.passportNo,
     });
     if (createConflict) {
       return res.status(400).json({ message: createConflict });
@@ -163,30 +199,22 @@ const createEmployee = async (req, res) => {
       return res.status(403).json({ message: "Only Super Admin can create Super Admin" });
     }
 
-    // Nested official block
-    const official = {
-      officialEmail: email,
-      employeeCode: code,
-      company: company || "",
-      department: department || "",
-    };
-
-    // Create user (password hashed)
     const employee = await User.create({
       name,
       password: await bcrypt.hash(password, 10),
       role: roleName,
       status: status || "Active",
       detailsApproval: defaultDetailsApproval(roleName),
-      personal: {
-        mobileNo: mobile,
-        permanentAddress: {
-          city: city || "",
-          state: state || "",
-          country: country || "",
-        },
-      },
+      personal,
       official,
+      ...(req.body.other ? { other: req.body.other } : {}),
+      ...(req.body.education ? { education: withoutIds(req.body.education) } : {}),
+      ...(req.body.accounts ? { accounts: withoutIds(req.body.accounts) } : {}),
+      ...(req.body.family ? { family: withoutIds(req.body.family) } : {}),
+      ...(req.body.nominees ? { nominees: withoutIds(req.body.nominees) } : {}),
+      ...(req.body.experience ? { experience: withoutIds(req.body.experience) } : {}),
+      ...(req.body.visas ? { visas: withoutIds(req.body.visas) } : {}),
+      ...(req.body.payroll ? { payroll: req.body.payroll } : {}),
     });
 
     // Welcome mail is best-effort (user is still created if mail fails)

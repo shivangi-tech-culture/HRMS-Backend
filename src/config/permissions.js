@@ -472,10 +472,10 @@ function menuForPermissions(perms) {
  * - An action can be true only if the catalog allows it
  * - Missing values become false
  */
-function normalizePermissions(incoming) {
+function normalizePermissions(incoming, tree = ADMIN_TREE) {
   const result = [];
 
-  for (const block of ADMIN_TREE) {
+  for (const block of tree) {
     // Find matching block from the request body (if any)
     const fromClient =
       (incoming || []).find(

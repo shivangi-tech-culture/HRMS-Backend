@@ -12,7 +12,9 @@ const createRoleSchema = Joi.object({
 });
 
 const updateRoleSchema = Joi.object({
-  name: Joi.string().trim().min(2).max(100),
+  name: Joi.any().forbidden().messages({
+    "any.unknown": "Role name cannot be changed",
+  }),
   description: Joi.string().trim().allow(""),
   status: Joi.string().valid("Active", "Inactive"),
 }).min(1);
@@ -45,7 +47,7 @@ const subModuleSchema = Joi.object({
 // Flat block: module + heading + subModules[]
 const permissionBlockSchema = Joi.object({
   module: Joi.string().trim().required(),
-  heading: Joi.string().trim().required(),
+  heading: Joi.string().trim().allow("").required(),
   subModules: Joi.array().items(subModuleSchema).default([]),
 });
 

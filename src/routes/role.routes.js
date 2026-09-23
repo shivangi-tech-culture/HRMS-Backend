@@ -99,10 +99,12 @@ router.get(
  * /api/roles/{id}/permissions:
  *   put:
  *     tags: [Permissions]
- *     summary: Save permissions
+ *     summary: Update permissions
  *     description: |
- *       Flat block per heading:
- *       { module, heading, subModules: [ { name, view, create, … } ] }
+ *       One API for Employee, HR Manager, Manager, and custom roles.
+ *       Super Admin is rejected — that role always keeps full access.
+ *       Employee is saved against the employee catalog. Others use the admin catalog.
+ *       Body: { permissions: [ { module, heading, subModules: [ { name, view, create, … } ] } ] }
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -165,7 +167,11 @@ router.get(
  * /api/roles/{id}:
  *   put:
  *     tags: [Roles]
- *     summary: Update role
+ *     summary: Update role description or status
+ *     description: |
+ *       Role name cannot be changed.
+ *       Super Admin cannot be edited.
+ *       Employee, HR Manager, Manager, and custom roles can update description or status.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -193,6 +199,9 @@ router.put(
  *   delete:
  *     tags: [Roles]
  *     summary: Delete role
+ *     description: |
+ *       Super Admin cannot be deleted.
+ *       Employee, HR Manager, Manager, and custom roles can be deleted when no user still has that role.
  *     security:
  *       - bearerAuth: []
  *     parameters:

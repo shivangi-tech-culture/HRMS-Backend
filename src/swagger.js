@@ -17,10 +17,11 @@ const description = [
   "**Quick start**",
   "1. `POST /api/auth/login` with `officialEmail` + `password`",
   "2. Use token on protected APIs",
-  "3. Create user → fill profile with `PUT /api/employees/{id}`",
+  "3. `POST /api/employees` creates the user and the full profile in one request",
   "4. Education file → upload API → put URL in `education[]` on Submit",
   "",
-  "**Roles:** Super Admin · HR Manager · Manager · Employee",
+  "**Roles:** name cannot change. Super Admin cannot be edited or deleted and always has full access.",
+  "Permission update (`PUT /api/roles/{id}/permissions`) works for Employee, HR Manager, Manager, and custom roles.",
   "",
   "**Tip:** Open each endpoint below for request body examples.",
 ].join("\n");
@@ -442,7 +443,7 @@ module.exports = swaggerJsdoc({
         Payroll: {
           type: "object",
           additionalProperties: false,
-          description: "Admin only — not on Create User",
+          description: "Admin only. Optional on Create User and on update.",
           properties: {
             salaryGroup: { type: "string" },
             salaryDate: { type: "string" },
@@ -525,6 +526,34 @@ module.exports = swaggerJsdoc({
               enum: ["Active", "Inactive"],
               example: "Active",
             },
+            personal: { $ref: "#/components/schemas/Personal" },
+            official: { $ref: "#/components/schemas/Official" },
+            other: { $ref: "#/components/schemas/Other" },
+            education: {
+              type: "array",
+              items: { $ref: "#/components/schemas/EducationItem" },
+            },
+            accounts: {
+              type: "array",
+              items: { $ref: "#/components/schemas/AccountItem" },
+            },
+            family: {
+              type: "array",
+              items: { $ref: "#/components/schemas/FamilyItem" },
+            },
+            nominees: {
+              type: "array",
+              items: { $ref: "#/components/schemas/NomineeItem" },
+            },
+            experience: {
+              type: "array",
+              items: { $ref: "#/components/schemas/ExperienceItem" },
+            },
+            visas: {
+              type: "array",
+              items: { $ref: "#/components/schemas/VisaItem" },
+            },
+            payroll: { $ref: "#/components/schemas/Payroll" },
           },
         },
         UpdateUserBody: {
@@ -632,8 +661,8 @@ module.exports = swaggerJsdoc({
         },
         UpdateRoleBody: {
           type: "object",
+          description: "Name cannot be changed. Super Admin cannot be updated.",
           properties: {
-            name: { type: "string", example: "Team Lead" },
             description: { type: "string", example: "Team tasks" },
             status: {
               type: "string",
