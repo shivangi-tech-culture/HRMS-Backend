@@ -266,28 +266,28 @@ app.use("/api/attendance", attendanceRoutes); // punch in/out + manual mark
 // =============================================================================
 // START SERVER (colored chalk banners)
 // =============================================================================
-const PORT = process.env.PORT || 9001;
+const { PORT, API_BASE_URL, NODE_ENV } = require("./config/env");
 
 connectDB().then(() => {
   app.listen(PORT, () => {
-    const pad = (s, n = 56) => s.padEnd(n);
+    const pad = (s, n = 72) => s.padEnd(n);
     console.log("");
     console.log(
-      chalk.bgGreen.black.bold(pad("  ✓  HRMS API is running"))
+      chalk.bgGreen.black.bold(pad(`  ✓  HRMS API is running (${NODE_ENV})`))
     );
     console.log(
       chalk.bgCyan.black(
-        pad(`  →  API      http://localhost:${PORT}`)
+        pad(`  →  API      ${API_BASE_URL}`)
       )
     );
     console.log(
       chalk.bgBlue.white(
-        pad(`  →  Swagger  http://localhost:${PORT}/api-docs`)
+        pad(`  →  Swagger  ${API_BASE_URL}/api-docs`)
       )
     );
     console.log(
       chalk.bgWhite.black(
-        pad(`  →  Health   http://localhost:${PORT}/api/health`)
+        pad(`  →  Health   ${API_BASE_URL}/api/health`)
       )
     );
     console.log(

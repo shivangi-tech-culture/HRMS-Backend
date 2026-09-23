@@ -483,6 +483,8 @@ Swagger includes path params, attendance query params, and full Create / Update 
 | Variable | Required? | Purpose |
 |----------|-----------|---------|
 | `PORT` | No (default 9001) | Server port |
+| `NODE_ENV` | No (default development) | `development` uses localhost; `production` uses `API_BASE_URL` |
+| `API_BASE_URL` | No | Public API URL in production (`https://hrms-backend-py1t.onrender.com`) |
 | `MONGODB_URI` | Yes | MongoDB connection string |
 | `JWT_SECRET` | Yes | Signs / verifies tokens |
 | `JWT_EXPIRES_IN` | No (default 7d) | Token lifetime |

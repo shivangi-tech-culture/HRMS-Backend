@@ -5,6 +5,7 @@
  * Keep in sync with: User.js, Joi validators, Postman collection variables.
  */
 const swaggerJsdoc = require("swagger-jsdoc");
+const { API_BASE_URL, isProduction, DEV_API_URL, PROD_API_URL } = require("./config/env");
 
 /** Guide shown above the endpoint list. Tables scan better than a wall of inline code. */
 const description = [
@@ -12,7 +13,8 @@ const description = [
   "",
   "| Setting | Value |",
   "| --- | --- |",
-  "| **Base URL** | `http://localhost:9001` |",
+  `| **Base URL** | \`${API_BASE_URL}\` |`,
+  `| **Environment** | \`${isProduction ? "production" : "development"}\` |`,
   "| **Auth** | `Authorization: Bearer <token>` on protected routes |",
   "",
   "### Roles",
@@ -93,9 +95,15 @@ module.exports = swaggerJsdoc({
       version: "3.3.3",
       description,
     },
-    servers: [
-      { url: "http://localhost:9001", description: "Local backend (PORT 9001)" },
-    ],
+    servers: isProduction
+      ? [
+          { url: PROD_API_URL, description: "Production (Render)" },
+          { url: DEV_API_URL, description: "Local development" },
+        ]
+      : [
+          { url: DEV_API_URL, description: "Local development" },
+          { url: PROD_API_URL, description: "Production (Render)" },
+        ],
     tags: [
       { name: "Health", description: "API + MongoDB health check (no auth)" },
       { name: "Auth", description: "Login and current user" },
