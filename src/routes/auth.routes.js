@@ -1,8 +1,10 @@
 /**
  * Auth routes → /api/auth
  *
- * Public: login
- * Protected: me (current user)
+ * Public:  POST /login  (no token)
+ * Private: GET  /me     (needs Bearer token)
+ *
+ * Flow: validate(Joi) → controller
  */
 const express = require("express");
 const { login, me } = require("../controllers/auth.controller");
@@ -12,12 +14,11 @@ const { loginSchema } = require("../validators/user.validation");
 
 const router = express.Router();
 
-
 /**
  * @swagger
  * tags:
  *   - name: Auth
- *     description: Login, current user
+ *     description: Login and current user (no duplicate menu in responses)
  */
 
 /**
@@ -26,20 +27,28 @@ const router = express.Router();
  *   post:
  *     tags: [Auth]
  *     summary: Login
- *     description: Login with officialEmail + password. Returns JWT + permissions menu. Updates lastLogin.
+ *     description: |
+ *       Login with `officialEmail` + `password`.
+ *       Login ID = `official.officialEmail` on User.
+ *       Returns JWT + user.permissions (single list — **no menu**).
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required: [officialEmail, password]
- *             properties:
- *               officialEmail: { type: string, example: shivangi@techculture.ai }
- *               password: { type: string, example: "123456" }
+ *             $ref: '#/components/schemas/LoginBody'
+ *           example:
+ *             officialEmail: shivangi@techculture.ai
+ *             password: "123456"
  *     responses:
- *       200: { description: Login ok }
- *       401: { description: Invalid credentials }
+ *       200:
+ *         description: Login ok
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/LoginResponse'
+ *       401:
+ *         description: Invalid credentials or inactive account
  */
 router.post("/login", validate(loginSchema), login);
 
@@ -49,10 +58,14 @@ router.post("/login", validate(loginSchema), login);
  *   get:
  *     tags: [Auth]
  *     summary: Current logged-in user
+ *     description: Returns user + permissions (single list — no menu)
  *     security:
  *       - bearerAuth: []
  *     responses:
- *       200: { description: Profile + permissions + menu }
+ *       200:
+ *         description: Profile + permissions
+ *       401:
+ *         description: Missing or invalid token
  */
 router.get("/me", protect, me);
 

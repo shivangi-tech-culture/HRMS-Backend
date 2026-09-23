@@ -35,12 +35,14 @@ const seed = async () => {
     }
   }
 
-  // Drop legacy unique index on removed top-level "email" field
-  try {
-    await User.collection.dropIndex("email_1");
-    console.log("Dropped legacy index: email_1");
-  } catch (_) {
-    // index may not exist
+  // Drop legacy unique indexes (top-level email / personal.officialEmail)
+  for (const idx of ["email_1", "personal.officialEmail_1"]) {
+    try {
+      await User.collection.dropIndex(idx);
+      console.log(`Dropped legacy index: ${idx}`);
+    } catch (_) {
+      // index may not exist
+    }
   }
 
   console.log("Old data cleared");
@@ -84,7 +86,7 @@ const seed = async () => {
     );
   }
 
-  // Seed users — nested shape (no contact module)
+  // Seed users — nested shape (officialEmail + employeeCode under official)
   const users = [
     {
       name: "Shivangi Gupta",
@@ -92,7 +94,6 @@ const seed = async () => {
       role: "Super Admin",
       status: "Active",
       personal: {
-        officialEmail: "shivangi@techculture.ai",
         mobileNo: "9876543210",
         permanentAddress: {
           city: "Noida",
@@ -101,6 +102,8 @@ const seed = async () => {
         },
       },
       official: {
+        employeeCode: "EMP-1001",
+        officialEmail: "shivangi@techculture.ai",
         company: "TechCulture Solutions Private Limited",
         department: "Administration",
       },
@@ -111,7 +114,6 @@ const seed = async () => {
       role: "Employee",
       status: "Active",
       personal: {
-        officialEmail: "shivig5964@gmail.com",
         mobileNo: "9876500001",
         permanentAddress: {
           city: "Noida",
@@ -120,6 +122,8 @@ const seed = async () => {
         },
       },
       official: {
+        employeeCode: "EMP-1002",
+        officialEmail: "shivig5964@gmail.com",
         company: "TechCulture Solutions Private Limited",
         department: "Engineering",
       },
@@ -128,7 +132,7 @@ const seed = async () => {
 
   for (const u of users) {
     const hashed = await bcrypt.hash(u.password, 10);
-    const email = String(u.personal.officialEmail).toLowerCase().trim();
+    const email = String(u.official.officialEmail).toLowerCase().trim();
 
     await User.create({
       name: u.name,
@@ -136,8 +140,8 @@ const seed = async () => {
       role: u.role,
       status: u.status,
       detailsApproval: u.role === "Super Admin" ? "Approved" : "Unapproved",
-      personal: { ...u.personal, officialEmail: email },
-      official: u.official,
+      personal: u.personal,
+      official: { ...u.official, officialEmail: email },
     });
 
     console.log(`User → ${email} / ${u.password} (${u.role})`);

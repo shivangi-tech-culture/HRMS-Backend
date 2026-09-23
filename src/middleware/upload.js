@@ -3,13 +3,20 @@
  *
  * Flow: multer (memory) → upload stream to Cloudinary → return secure URL
  *
- * Env (add your credentials in .env):
- *   CLOUDINARY_CLOUD_NAME=
- *   CLOUDINARY_API_KEY=
- *   CLOUDINARY_API_SECRET=
- *   CLOUDINARY_FOLDER=hrms/education   (optional)
+ * IMPORTANT — PDF not opening in browser?
+ *   Cloudinary FREE plans block PDF delivery by default.
+ *   Fix (one-time in Cloudinary Console):
+ *     Settings → Security → check "Allow delivery of PDF and ZIP files" → Save
+ *   Then re-upload (or wait for CDN cache). Old blocked URLs may stay broken briefly.
+ *
+ * PDF upload: resource_type "image" + format pdf (Cloudinary recommended for viewable PDFs)
+ *
+ * Env:
+ *   CLOUDINARY_CLOUD_NAME / API_KEY / API_SECRET
+ *   CLOUDINARY_FOLDER=hrms/education
  */
 const multer = require("multer");
+const path = require("path");
 const { v2: cloudinary } = require("cloudinary");
 
 cloudinary.config({
@@ -37,6 +44,69 @@ const uploadEducationDoc = multer({
   limits: { fileSize: 5 * 1024 * 1024 },
 }).single("document");
 
+/** Base name only — never put .pdf here for image-type uploads */
+const safeBaseName = (originalName) =>
+  path
+    .parse(originalName || "file")
+    .name.replace(/[^a-zA-Z0-9._-]/g, "_")
+    .slice(0, 80) || "file";
+
+/**
+ * Upload options per file type.
+ * PDF → image + format pdf → opens in browser, URL ends with .pdf once
+ * DOC → raw + extension in public_id (download only)
+ * JPG/PNG → image
+ */
+const uploadOptionsFor = (file) => {
+  const folder = process.env.CLOUDINARY_FOLDER || "hrms/education";
+  const baseId = `${Date.now()}-${safeBaseName(file.originalname)}`;
+  const mime = file.mimetype;
+
+  if (mime === "application/pdf") {
+    return {
+      folder,
+      resource_type: "image",
+      public_id: baseId,
+      format: "pdf",
+      pages: true,
+      use_filename: false,
+      unique_filename: false,
+    };
+  }
+
+  if (mime === "application/msword") {
+    return {
+      folder,
+      resource_type: "raw",
+      public_id: `${baseId}.doc`,
+      use_filename: false,
+      unique_filename: false,
+    };
+  }
+
+  if (
+    mime ===
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  ) {
+    return {
+      folder,
+      resource_type: "raw",
+      public_id: `${baseId}.docx`,
+      use_filename: false,
+      unique_filename: false,
+    };
+  }
+
+  // jpg / png
+  return {
+    folder,
+    resource_type: "image",
+    public_id: baseId,
+    use_filename: false,
+    unique_filename: false,
+  };
+};
+
 /**
  * Upload a multer file buffer to Cloudinary.
  * @returns {{ url, publicId, originalName }}
@@ -51,22 +121,15 @@ const uploadToCloudinary = (file) => {
       );
     }
 
-    const folder = process.env.CLOUDINARY_FOLDER || "hrms/education";
-    const stream = cloudinary.uploader.upload_stream(
-      {
-        folder,
-        resource_type: "auto",
-        public_id: `${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_")}`,
-      },
-      (err, result) => {
-        if (err) return reject(err);
-        resolve({
-          url: result.secure_url,
-          publicId: result.public_id,
-          originalName: file.originalname,
-        });
-      }
-    );
+    const options = uploadOptionsFor(file);
+    const stream = cloudinary.uploader.upload_stream(options, (err, result) => {
+      if (err) return reject(err);
+      resolve({
+        url: result.secure_url,
+        publicId: result.public_id,
+        originalName: file.originalname,
+      });
+    });
     stream.end(file.buffer);
   });
 };

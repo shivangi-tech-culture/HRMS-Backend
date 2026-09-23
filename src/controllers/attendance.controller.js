@@ -151,7 +151,7 @@ const markManual = async (req, res) => {
     record.markedBy = req.user._id;
     await record.save();
 
-    await record.populate("employee", "name role personal.officialEmail official.department");
+    await record.populate("employee", "name role official.officialEmail official.employeeCode official.department");
     await record.populate("markedBy", "name role");
 
     return res.status(201).json({
@@ -195,7 +195,7 @@ const listAttendance = async (req, res) => {
     }
 
     const records = await Attendance.find(filter)
-      .populate("employee", "name role personal.officialEmail official.department")
+      .populate("employee", "name role official.officialEmail official.employeeCode official.department")
       .populate("markedBy", "name role")
       .sort({ date: -1 });
 

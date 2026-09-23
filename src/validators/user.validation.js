@@ -1,18 +1,29 @@
 /**
  * User / employee request validation (Joi)
  *
- * Create: flat fields mapped into personal / official (mobileNo → personal.mobileNo)
- * Update: nested objects only — no contact module, no flat city/company
+ * WHY THIS FILE:
+ *   Rejects unknown fields and wrong types before the controller runs.
+ *   unknown(false) → extra keys in the body return HTTP 400.
+ *
+ * CREATE (flat fields):
+ *   officialEmail, employeeCode, mobileNo, company, department, city, …
+ *
+ * UPDATE (nested objects only):
+ *   personal{}, official{}, other{}, education[], accounts[], family[],
+ *   nominees[], experience[], visas[], payroll{}
  */
 const Joi = require("joi");
 
-const str = () => Joi.string().allow("").optional();
+// Small helpers so schemas stay short and consistent
+const str = () => Joi.string().allow("").optional(); // optional string (empty ok)
 const num = () => Joi.number().optional();
 const bool = () => Joi.boolean().optional();
 const date = () => Joi.date().allow(null).optional();
 
+/** Object that only allows the listed keys (no extra junk) */
 const only = (keys) => Joi.object(keys).unknown(false);
 
+/** Address shape used inside personal.presentAddress / permanentAddress */
 const address = only({
   address: str(),
   country: str(),
@@ -21,33 +32,35 @@ const address = only({
   pincode: str(),
 });
 
+/** personal{} — employee may update (phones + IDs + addresses) */
 const personal = only({
-  employeeCode: str(),
   dateOfBirth: date(),
-  aadhaarNo: str(),
-  panNo: str(),
+  aadhaarNo: str(), // unique in DB when not empty
+  panNo: str(), // unique in DB when not empty
   gender: str(),
   fatherOrHusbandName: str(),
   maritalStatus: str(),
   spouseName: str(),
-  anniversaryDate: date(),
-  personalEmail: Joi.string().trim().email().allow("").optional(),
-  officialEmail: Joi.string().trim().email().allow("").optional(),
+  anniversaryDate: date(), // ignored in controller (auto-calculated)
+  personalEmail: Joi.string().trim().email().allow("").optional(), // unique when set
   languageKnown: str(),
   emergencyContact1: str(),
   emergencyContact2: str(),
-  drivingLicenseNo: str(),
+  drivingLicenseNo: str(), // unique when set
   licenseValidUpto: date(),
-  passportNo: str(),
+  passportNo: str(), // unique when set
   remarks: str(),
   presentAddress: address.optional(),
   permanentAddress: address.optional(),
-  mobileNo: str(),
+  mobileNo: str(), // unique when set
   workPhone: str(),
   workExt: str(),
 });
 
+/** official{} — admin only in controller (employee gets 403) */
 const official = only({
+  employeeCode: str(), // unique when set
+  officialEmail: Joi.string().trim().email().allow("").optional(), // login id
   company: str(),
   department: str(),
   designation: str(),
@@ -66,7 +79,7 @@ const other = only({
 });
 
 const educationItem = only({
-  _id: str(),
+  _id: str(), // optional when updating an existing row
   courseType: str(),
   courseLevel: str(),
   courseName: str(),
@@ -77,7 +90,7 @@ const educationItem = only({
   major: str(),
   minor: str(),
   percentageOrGrade: str(),
-  document: str(),
+  document: str(), // Cloudinary URL
   documentName: str(),
   remarks: str(),
 });
@@ -175,10 +188,15 @@ const payroll = only({
   ifsc: str(),
 });
 
-// CREATE USER — city/state/country optional; mobileNo → personal.mobileNo
+/**
+ * CREATE USER body
+ * Required: name, officialEmail, password, role, company, department, status
+ * Optional: employeeCode, mobileNo, city, state, country
+ */
 const createUserSchema = Joi.object({
   name: Joi.string().trim().min(2).max(100).required(),
   officialEmail: Joi.string().trim().email().required(),
+  employeeCode: Joi.string().trim().allow("").optional(),
   mobileNo: Joi.string().trim().min(8).max(20).optional(),
   password: Joi.string().min(6).max(50).required(),
   role: Joi.string().trim().required(),
@@ -190,7 +208,11 @@ const createUserSchema = Joi.object({
   country: Joi.string().trim().allow("").optional(),
 }).unknown(false);
 
-// UPDATE — only nested objects for profile fields (no flat city/company…)
+/**
+ * UPDATE USER body
+ * At least one field required. Only nested objects for profile data.
+ * Flat phone/city/company here → 400 (use nested personal / official instead).
+ */
 const updateUserSchema = Joi.object({
   name: Joi.string().trim().min(2).max(100).optional(),
   password: Joi.string().min(6).max(50).optional(),
@@ -213,6 +235,7 @@ const updateUserSchema = Joi.object({
   .min(1)
   .unknown(false);
 
+/** LOGIN body */
 const loginSchema = Joi.object({
   officialEmail: Joi.string().trim().email().required(),
   password: Joi.string().required(),

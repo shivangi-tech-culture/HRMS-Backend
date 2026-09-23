@@ -1,54 +1,71 @@
 /**
- * Auth controller
+ * Auth controller — login and current user
  *
- * login — officialEmail + password → JWT + permissions + menu
- * me    — current user profile with role permissions
+ * POST /api/auth/login  → check official email + password → JWT + permissions
+ * GET  /api/auth/me     → return logged-in user (needs Bearer token)
+ *
+ * Login ID is stored at: official.officialEmail
  */
-const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs"); // compare hashed passwords
+const jwt = require("jsonwebtoken"); // create access tokens
 const User = require("../models/User");
 const Role = require("../models/Role");
-const { countPermissions, totalForRole, menuForPermissions } = require("../config/permissions");
+const {
+  countPermissions,
+  totalForRole,
+} = require("../config/permissions");
 
-/** Human-readable permission count, e.g. "42 of 120" */
+/** Build a short label like "42 of 120" for the UI */
 const permLabel = (roleDoc) => {
   if (!roleDoc) return "0 of 0";
   return `${countPermissions(roleDoc.permissions)} of ${totalForRole(roleDoc.name)}`;
 };
 
-/** Create a JWT for the given user id */
+/** Create a signed JWT for this user id (used after login) */
 const makeToken = (userId) => {
   return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN || "7d",
   });
 };
 
-/** Find user by official email (login ID) */
+/** Find one user by login email (case-insensitive) */
 const findByOfficialEmail = (officialEmail) =>
-  User.findOne({ "personal.officialEmail": String(officialEmail).toLowerCase().trim() });
+  User.findOne({
+    "official.officialEmail": String(officialEmail).toLowerCase().trim(),
+  });
 
-/** POST /api/auth/login — returns JWT, permissions, and menu */
+/**
+ * POST /api/auth/login
+ * Body: { officialEmail, password }
+ * Returns: token + user + permissions (one list — no duplicate menu)
+ */
 const login = async (req, res) => {
   try {
     const { officialEmail, password } = req.body;
 
+    // 1) Find account by official email
     const user = await findByOfficialEmail(officialEmail);
     if (!user) {
+      // Same message for "not found" and "wrong password" (safer)
       return res.status(401).json({ message: "Invalid official email or password" });
     }
 
+    // 2) Check password against stored hash
     const ok = await bcrypt.compare(password, user.password);
     if (!ok) {
       return res.status(401).json({ message: "Invalid official email or password" });
     }
 
+    // 3) Block inactive accounts
     if (user.status !== "Active") {
       return res.status(401).json({ message: "Account is inactive" });
     }
 
+    // 4) Remember last login time
     user.lastLogin = new Date();
     await user.save();
 
+    // 5) Load role permissions (single list for sidebar + access checks)
     const roleDoc = await Role.findOne({ name: user.role });
     const token = makeToken(user._id);
 
@@ -58,15 +75,14 @@ const login = async (req, res) => {
       user: {
         id: user._id,
         name: user.name,
-        officialEmail: user.personal?.officialEmail || "",
+        officialEmail: user.official?.officialEmail || "",
         role: user.role,
         department: user.official?.department || "",
         company: user.official?.company || "",
         status: user.status,
         lastLogin: user.lastLogin,
-        permissions: roleDoc ? roleDoc.permissions : [],
         permissionCount: permLabel(roleDoc),
-        menu: roleDoc ? menuForPermissions(roleDoc.permissions) : [],
+        permissions: roleDoc ? roleDoc.permissions : [],
       },
     });
   } catch (err) {
@@ -74,15 +90,18 @@ const login = async (req, res) => {
   }
 };
 
-/** GET /api/auth/me — current user + role permissions */
+/**
+ * GET /api/auth/me
+ * Requires: Authorization Bearer token (protect middleware sets req.user)
+ * Returns permissions once (no duplicate menu)
+ */
 const me = async (req, res) => {
   try {
     const roleDoc = await Role.findOne({ name: req.user.role });
     return res.json({
       user: req.user,
-      permissions: roleDoc ? roleDoc.permissions : [],
       permissionCount: permLabel(roleDoc),
-      menu: roleDoc ? menuForPermissions(roleDoc.permissions) : [],
+      permissions: roleDoc ? roleDoc.permissions : [],
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });

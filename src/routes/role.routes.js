@@ -42,12 +42,7 @@ const ADMIN = ["Super Admin", "HR Manager", "Manager"];
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required: [name]
- *             properties:
- *               name: { type: string, example: Team Lead }
- *               description: { type: string, example: Team tasks }
- *               status: { type: string, enum: [Active, Inactive], example: Active }
+ *             $ref: '#/components/schemas/CreateRoleBody'
  *     responses:
  *       201: { description: Role created }
  *       400: { description: Validation failed }
@@ -88,10 +83,7 @@ router.get(
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema: { type: string }
+ *       - $ref: '#/components/parameters/RoleId'
  *     responses:
  *       200: { description: Permission matrix }
  */
@@ -114,10 +106,7 @@ router.get(
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema: { type: string }
+ *       - $ref: '#/components/parameters/RoleId'
  *     requestBody:
  *       required: true
  *       content:
@@ -137,13 +126,7 @@ router.get(
  *                     subModules:
  *                       type: array
  *                       items:
- *                         type: object
- *                         properties:
- *                           name: { type: string, example: Attendance Summary }
- *                           view: { type: boolean }
- *                           create: { type: boolean }
- *                           edit: { type: boolean }
- *                           delete: { type: boolean }
+ *                         $ref: '#/components/schemas/PermissionActionFlags'
  *     responses:
  *       200: { description: Saved }
  *       400: { description: Validation failed }
@@ -166,10 +149,7 @@ router.put(
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema: { type: string }
+ *       - $ref: '#/components/parameters/RoleId'
  *     responses:
  *       200: { description: Role }
  */
@@ -189,19 +169,12 @@ router.get(
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema: { type: string }
+ *       - $ref: '#/components/parameters/RoleId'
  *     requestBody:
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *               name: { type: string }
- *               description: { type: string }
- *               status: { type: string, enum: [Active, Inactive] }
+ *             $ref: '#/components/schemas/UpdateRoleBody'
  *     responses:
  *       200: { description: Updated }
  */
@@ -223,10 +196,7 @@ router.put(
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema: { type: string }
+ *       - $ref: '#/components/parameters/RoleId'
  *     responses:
  *       200: { description: Deleted }
  */

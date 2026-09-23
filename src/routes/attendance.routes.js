@@ -44,13 +44,7 @@ const router = express.Router();
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required: [source]
- *             properties:
- *               source:
- *                 type: string
- *                 enum: [web, mobile, biometric]
- *                 example: web
+ *             $ref: '#/components/schemas/PunchBody'
  *     responses:
  *       201:
  *         description: Punched in successfully
@@ -74,13 +68,7 @@ router.post("/punch-in", protect, validate(punchSchema), punchIn);
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required: [source]
- *             properties:
- *               source:
- *                 type: string
- *                 enum: [web, mobile, biometric]
- *                 example: web
+ *             $ref: '#/components/schemas/PunchBody'
  *     responses:
  *       200:
  *         description: Punched out successfully
@@ -106,14 +94,7 @@ router.post("/punch-out", protect, validate(punchSchema), punchOut);
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required: [employeeId, punchType, time, reason]
- *             properties:
- *               employeeId: { type: string, example: "665f1a2b3c4d5e6f7a8b9c0d" }
- *               punchType: { type: string, enum: [in, out], example: in }
- *               time: { type: string, example: "09:30", description: HH:mm 24h }
- *               reason: { type: string, example: "Forgot to punch" }
- *               remarks: { type: string, example: "Approved by manager" }
+ *             $ref: '#/components/schemas/ManualAttendanceBody'
  *     responses:
  *       201:
  *         description: Manual attendance saved
@@ -157,12 +138,8 @@ router.get("/today", protect, myToday);
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: query
- *         name: date
- *         schema: { type: string }
- *       - in: query
- *         name: source
- *         schema: { type: string, enum: [web, mobile, biometric, manual] }
+ *       - $ref: '#/components/parameters/AttendanceDate'
+ *       - $ref: '#/components/parameters/AttendanceSource'
  *     responses:
  *       200:
  *         description: Attendance list

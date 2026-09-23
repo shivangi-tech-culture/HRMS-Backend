@@ -1,23 +1,39 @@
 /**
- * User / Employee model
+ * User / Employee model (MongoDB / Mongoose)
  *
- * Login ID = personal.officialEmail (unique).
- * No contact module — addresses + phones are under personal.
- * Emails only in personal (not duplicated elsewhere).
+ * WHAT THIS FILE IS:
+ *   One document = one person in the HRMS (login account + full profile).
  *
- * Create User mapping:
- *   officialEmail → personal.officialEmail
- *   mobileNo      → personal.mobileNo (optional on create)
- *   company/department → official
+ * LOGIN:
+ *   User signs in with official.officialEmail + password.
+ *   That email must be unique (empty values are ignored by the index).
+ *
+ * WHO CAN EDIT WHAT:
+ *   personal{}  → employee can update (if detailsApproval is not Approved)
+ *   official{}  → Super Admin / HR Manager / Manager only
+ *   payroll{}   → admin only
+ *
+ * CREATE USER (flat body → nested save):
+ *   officialEmail  → official.officialEmail
+ *   employeeCode   → official.employeeCode
+ *   mobileNo       → personal.mobileNo
+ *   company/dept   → official
  *   city/state/country → personal.permanentAddress
+ *
+ * UNIQUE WHEN NOT EMPTY:
+ *   officialEmail, employeeCode, mobileNo, personalEmail,
+ *   panNo, aadhaarNo, drivingLicenseNo, passportNo
  */
 const mongoose = require("mongoose");
 const { nextWorkAnniversary } = require("../utils/anniversary");
 
-/** Shared address shape (present + permanent) */
+/**
+ * Address block reused for present + permanent address.
+ * _id: false → do not create a separate id for each address object.
+ */
 const addressSchema = new mongoose.Schema(
   {
-    address: { type: String, default: "" },
+    address: { type: String, default: "" }, // street / line 1
     country: { type: String, default: "" },
     state: { type: String, default: "" },
     city: { type: String, default: "" },
@@ -28,82 +44,93 @@ const addressSchema = new mongoose.Schema(
 
 const userSchema = new mongoose.Schema(
   {
-    // -------------------------------------------------------------------------
-    // ACCOUNT (login)
-    // -------------------------------------------------------------------------
-    name: { type: String, default: "", trim: true },
-    password: { type: String, default: "" }, // hashed
-    role: { type: String, default: "Employee", trim: true }, // Super Admin | HR Manager | Manager | Employee
-    status: { type: String, default: "Active" }, // Active | Inactive
-    lastLogin: { type: Date, default: null }, // set on successful login
+    // =========================================================================
+    // ACCOUNT — used for login and access control
+    // =========================================================================
+    name: { type: String, default: "", trim: true }, // display name
+    password: { type: String, default: "" }, // always store hashed (bcrypt), never plain text
+    role: {
+      type: String,
+      default: "Employee",
+      trim: true,
+    }, // Super Admin | HR Manager | Manager | Employee
+    status: { type: String, default: "Active" }, // Active = can login | Inactive = blocked
+    lastLogin: { type: Date, default: null }, // updated on every successful login
 
-    // Profile review — Super Admin / HR Manager / Manager set this
-    // Unapproved → employee can edit | Approved → employee edit locked | Rejected
-    // Super Admin → Approved by default | HR / Manager / Employee → Unapproved
+    /**
+     * Profile review status (set by admin).
+     * Unapproved / Rejected → employee may edit own profile
+     * Approved              → employee own-profile edit is locked
+     * Super Admin users start as Approved; others start as Unapproved
+     */
     detailsApproval: {
       type: String,
       enum: ["Unapproved", "Approved", "Rejected"],
       default: "Unapproved",
     },
 
-    // -------------------------------------------------------------------------
-    // 1. PERSONAL DETAILS (emails + addresses + phones)
-    // -------------------------------------------------------------------------
+    // =========================================================================
+    // 1. PERSONAL — employee can update (phones, emails, addresses, IDs)
+    // =========================================================================
     personal: {
-      employeeCode: { type: String, default: "" }, // admin only
       dateOfBirth: { type: Date, default: null },
-      aadhaarNo: { type: String, default: "" },
-      panNo: { type: String, default: "" },
+      aadhaarNo: { type: String, default: "" }, // unique when set
+      panNo: { type: String, default: "" }, // unique when set
       gender: { type: String, default: "" },
       fatherOrHusbandName: { type: String, default: "" },
       maritalStatus: { type: String, default: "" },
       spouseName: { type: String, default: "" },
-      anniversaryDate: { type: Date, default: null }, // auto from dateOfJoining
-      personalEmail: { type: String, default: "" },
-      officialEmail: { type: String, default: "", lowercase: true, trim: true },
+      // Filled automatically from official.dateOfJoining (do not trust client value)
+      anniversaryDate: { type: Date, default: null },
+      personalEmail: { type: String, default: "" }, // unique when set (not login id)
       languageKnown: { type: String, default: "" },
       emergencyContact1: { type: String, default: "" },
       emergencyContact2: { type: String, default: "" },
-      drivingLicenseNo: { type: String, default: "" },
+      drivingLicenseNo: { type: String, default: "" }, // unique when set
       licenseValidUpto: { type: Date, default: null },
-      passportNo: { type: String, default: "" },
+      passportNo: { type: String, default: "" }, // unique when set
       remarks: { type: String, default: "" },
-      // Addresses
       presentAddress: { type: addressSchema, default: () => ({}) },
       permanentAddress: { type: addressSchema, default: () => ({}) },
-      // Phones (Personal Details UI)
-      mobileNo: { type: String, default: "" },
-      workPhone: { type: String, default: "" },
-      workExt: { type: String, default: "" },
+      mobileNo: { type: String, default: "" }, // unique when set
+      workPhone: { type: String, default: "" }, // not unique
+      workExt: { type: String, default: "" }, // not unique
     },
 
-    // -------------------------------------------------------------------------
-    // 2. OFFICIAL DETAILS — admin only (employee cannot update)
-    // -------------------------------------------------------------------------
+    // =========================================================================
+    // 2. OFFICIAL — admin only (employee cannot change these)
+    // =========================================================================
     official: {
+      employeeCode: { type: String, default: "" }, // unique when set (e.g. EMP-1024)
+      officialEmail: {
+        type: String,
+        default: "",
+        lowercase: true,
+        trim: true,
+      }, // LOGIN ID — unique when set
       company: { type: String, default: "" },
       department: { type: String, default: "" },
       designation: { type: String, default: "" },
       reportingHead1: { type: String, default: "" },
       reportingHead2: { type: String, default: "" },
       jobRole: { type: String, default: "" },
-      dateOfJoining: { type: Date, default: null },
+      dateOfJoining: { type: Date, default: null }, // also drives anniversaryDate
       calculateSalaryFrom: { type: Date, default: null },
       dateOfRetirement: { type: Date, default: null },
       grade: { type: String, default: "" },
     },
 
-    // -------------------------------------------------------------------------
-    // 3. OTHER DETAILS
-    // -------------------------------------------------------------------------
+    // =========================================================================
+    // 3. OTHER
+    // =========================================================================
     other: {
       bloodGroup: { type: String, default: "" },
       passportExpiry: { type: Date, default: null },
     },
 
-    // -------------------------------------------------------------------------
-    // 4. EDUCATION (array)
-    // -------------------------------------------------------------------------
+    // =========================================================================
+    // 4. EDUCATION — list of courses (array)
+    // =========================================================================
     education: [
       {
         courseType: { type: String, default: "" },
@@ -116,16 +143,15 @@ const userSchema = new mongoose.Schema(
         major: { type: String, default: "" },
         minor: { type: String, default: "" },
         percentageOrGrade: { type: String, default: "" },
-        // Upload Document — Cloudinary URL (PDF, JPG, PNG, DOC)
-        document: { type: String, default: "" },
-        documentName: { type: String, default: "" },
+        document: { type: String, default: "" }, // Cloudinary file URL
+        documentName: { type: String, default: "" }, // original file name
         remarks: { type: String, default: "" },
       },
     ],
 
-    // -------------------------------------------------------------------------
-    // 5. BANK ACCOUNTS (array)
-    // -------------------------------------------------------------------------
+    // =========================================================================
+    // 5. BANK ACCOUNTS — list (array)
+    // =========================================================================
     accounts: [
       {
         bankName: { type: String, default: "" },
@@ -140,9 +166,9 @@ const userSchema = new mongoose.Schema(
       },
     ],
 
-    // -------------------------------------------------------------------------
-    // 6. FAMILY (array)
-    // -------------------------------------------------------------------------
+    // =========================================================================
+    // 6. FAMILY — list (array)
+    // =========================================================================
     family: [
       {
         name: { type: String, default: "" },
@@ -156,12 +182,12 @@ const userSchema = new mongoose.Schema(
       },
     ],
 
-    // -------------------------------------------------------------------------
-    // 7. NOMINEES (array)
-    // -------------------------------------------------------------------------
+    // =========================================================================
+    // 7. NOMINEES — list (array)
+    // =========================================================================
     nominees: [
       {
-        nominateFor: { type: String, default: "" },
+        nominateFor: { type: String, default: "" }, // e.g. PF, Gratuity
         nomineeName: { type: String, default: "" },
         relation: { type: String, default: "" },
         dob: { type: Date, default: null },
@@ -171,9 +197,9 @@ const userSchema = new mongoose.Schema(
       },
     ],
 
-    // -------------------------------------------------------------------------
-    // 8. EXPERIENCE / JOB HISTORY (array)
-    // -------------------------------------------------------------------------
+    // =========================================================================
+    // 8. EXPERIENCE — previous jobs (array)
+    // =========================================================================
     experience: [
       {
         organization: { type: String, default: "" },
@@ -187,9 +213,9 @@ const userSchema = new mongoose.Schema(
       },
     ],
 
-    // -------------------------------------------------------------------------
-    // 9. VISAS (array)
-    // -------------------------------------------------------------------------
+    // =========================================================================
+    // 9. VISAS — list (array)
+    // =========================================================================
     visas: [
       {
         countryName: { type: String, default: "" },
@@ -201,9 +227,9 @@ const userSchema = new mongoose.Schema(
       },
     ],
 
-    // -------------------------------------------------------------------------
-    // PAYROLL — admin update only (not set on Create User)
-    // -------------------------------------------------------------------------
+    // =========================================================================
+    // PAYROLL — admin only (not filled on Create User)
+    // =========================================================================
     payroll: {
       salaryGroup: { type: String, default: "" },
       salaryDate: { type: String, default: "" },
@@ -239,10 +265,13 @@ const userSchema = new mongoose.Schema(
       ifsc: { type: String, default: "" },
     },
   },
-  { timestamps: true }
+  { timestamps: true } // adds createdAt + updatedAt automatically
 );
 
-// Before save: refresh work anniversary from date of joining
+/**
+ * Before every save:
+ * If date of joining exists, set personal.anniversaryDate to the next work anniversary.
+ */
 userSchema.pre("save", function (next) {
   if (this.official?.dateOfJoining) {
     this.personal = this.personal || {};
@@ -251,13 +280,28 @@ userSchema.pre("save", function (next) {
   next();
 });
 
-// Login ID — unique official email (ignore empty values)
-userSchema.index(
-  { "personal.officialEmail": 1 },
+/**
+ * Helper: unique index that ignores empty strings.
+ * Many users can have "" — but two users cannot share the same non-empty value.
+ */
+const uniquePartial = (path) => [
+  { [path]: 1 },
   {
     unique: true,
-    partialFilterExpression: { "personal.officialEmail": { $type: "string", $gt: "" } },
-  }
-);
+    partialFilterExpression: { [path]: { $type: "string", $gt: "" } },
+  },
+];
 
+// Login email must be unique
+userSchema.index(...uniquePartial("official.officialEmail"));
+// Other unique identity fields
+userSchema.index(...uniquePartial("official.employeeCode"));
+userSchema.index(...uniquePartial("personal.mobileNo"));
+userSchema.index(...uniquePartial("personal.personalEmail"));
+userSchema.index(...uniquePartial("personal.panNo"));
+userSchema.index(...uniquePartial("personal.aadhaarNo"));
+userSchema.index(...uniquePartial("personal.drivingLicenseNo"));
+userSchema.index(...uniquePartial("personal.passportNo"));
+
+// Export model so controllers can use User.find / User.create / …
 module.exports = mongoose.model("User", userSchema);

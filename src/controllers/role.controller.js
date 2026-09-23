@@ -13,7 +13,6 @@ const {
   ALL_SUBS,
   ADMIN_TREE,
   normalizePermissions,
-  menuForPermissions,
 } = require("../config/permissions");
 
 const permLabel = (role) =>
@@ -95,7 +94,6 @@ const getRole = async (req, res) => {
         users,
         permissions: role.permissions,
         permissionCount: permLabel(role),
-        menu: menuForPermissions(role.permissions),
       },
     });
   } catch (err) {
@@ -200,7 +198,6 @@ const savePermissions = async (req, res) => {
       roleName: role.name,
       permissionCount: permLabel(role),
       permissions: role.permissions,
-      menu: menuForPermissions(role.permissions),
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });

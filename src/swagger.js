@@ -2,133 +2,387 @@
  * OpenAPI / Swagger definition
  *
  * Served at http://localhost:9001/api-docs
- * Schemas match User.js and Joi validators (unknown keys rejected on update).
+ * Keep in sync with: User.js, Joi validators, Postman collection variables.
  */
 const swaggerJsdoc = require("swagger-jsdoc");
+
+/** Guide shown above the endpoint list. Tables scan better than a wall of inline code. */
+const description = [
+  "Express + MongoDB HRMS with JWT and role-based access.",
+  "",
+  "| Setting | Value |",
+  "| --- | --- |",
+  "| **Base URL** | `http://localhost:9001` |",
+  "| **Auth** | `Authorization: Bearer <token>` on protected routes |",
+  "",
+  "### Roles",
+  "",
+  "| Role | Access | Profile |",
+  "| --- | --- | --- |",
+  "| **Super Admin** | Full access | `detailsApproval` starts as Approved |",
+  "| **HR Manager / Manager** | Same admin access | Starts Unapproved |",
+  "| **Employee** | Own profile | Starts Unapproved. Locked once Approved |",
+  "",
+  "### Login",
+  "",
+  "| Step | Detail |",
+  "| --- | --- |",
+  "| **Body** | `officialEmail` + `password` |",
+  "| **Login ID** | `official.officialEmail` |",
+  "| **Returns** | `token` and `user` with permissions only |",
+  "",
+  "### Create user mapping",
+  "",
+  "| Request field | Stored as | Rule |",
+  "| --- | --- | --- |",
+  "| `officialEmail` | `official.officialEmail` | Login ID, unique |",
+  "| `employeeCode` | `official.employeeCode` | Optional, unique |",
+  "| `mobileNo` | `personal.mobileNo` | Optional, unique |",
+  "| `company`, `department` | `official` | |",
+  "| `city`, `state`, `country` | `personal.permanentAddress` | |",
+  "",
+  "### Update (one PUT)",
+  "",
+  "Nested objects: personal, official, other, education, accounts, family, nominees, experience, visas, payroll.",
+  "",
+  "| Who | Can change |",
+  "| --- | --- |",
+  "| **Employee** | `personal` (including phones), `other`, and arrays |",
+  "| **Admin** | `official`, `payroll`, `detailsApproval`, `role`, `status` |",
+  "| **Super Admin / HR Manager** | `password` |",
+  "",
+  "### Unique when non-empty",
+  "",
+  "| Field | Location |",
+  "| --- | --- |",
+  "| `officialEmail` | official |",
+  "| `employeeCode` | official |",
+  "| `mobileNo` | personal |",
+  "| `personalEmail` | personal |",
+  "| `panNo` | personal |",
+  "| `aadhaarNo` | personal |",
+  "| `drivingLicenseNo` | personal |",
+  "| `passportNo` | personal |",
+  "",
+  "### Permissions catalog",
+  "",
+  "| Method | Path | Response |",
+  "| --- | --- | --- |",
+  "| GET | `/api/permissions/modules` | `actions`, `count: 2`, `data` as `{ side, modules }` for admin and employee |",
+  "| GET | `/api/permissions/my` | `role`, `side`, `permissionCount`, `count`, `data` (no menu) |",
+  "",
+  "### Attendance",
+  "",
+  "| Action | Detail |",
+  "| --- | --- |",
+  "| Punch | `source` is `web`, `mobile`, or `biometric` |",
+  "| Admin manual | `POST /api/attendance/manual` (always manual) |",
+  "",
+  "### Health",
+  "",
+  "| Method | Path | Notes |",
+  "| --- | --- | --- |",
+  "| GET | `/api/health` | Public. Checks API and MongoDB |",
+].join("\n");
 
 module.exports = swaggerJsdoc({
   definition: {
     openapi: "3.0.0",
     info: {
       title: "HRMS API",
-      version: "3.2.0",
-      description:
-        "## Overview\n" +
-        "Express + MongoDB HRMS with JWT and role-based access.\n\n" +
-        "## Roles\n" +
-        "- **Super Admin** — full access; `detailsApproval` = Approved by default\n" +
-        "- **HR Manager / Manager** — same admin access as Super Admin; profile starts Unapproved\n" +
-        "- **Employee** — own profile; starts Unapproved (locked if Approved)\n\n" +
-        "## Create User mapping\n" +
-        "- `officialEmail` → `personal.officialEmail` (login ID)\n" +
-        "- `mobileNo` → `personal.mobileNo`\n" +
-        "- `company`, `department` → `official`\n" +
-        "- `city`, `state`, `country` (optional) → `personal.permanentAddress`\n" +
-        "- Personal phones: `mobileNo`, `workPhone`, `workExt`\n" +
-        "- **Employee update:** `PUT /api/employees/{id}` with `personal.mobileNo` / `workPhone` / `workExt` (locked if Approved)\n\n" +
-        "## Update validation\n" +
-        "Joi allows **only** listed keys inside `personal`, `official`, `education`, etc. Fake fields → 400.\n\n" +
-        "## Education document (Cloudinary)\n" +
-        "`POST /api/employees/{id}/education/document` → Cloudinary URL in `document`.\n" +
-        "Env: CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET\n\n" +
-        "## Attendance punch source\n" +
-        "- Self punch: `source` = `web` | `mobile` | `biometric`\n" +
-        "- Stored as `punchInSource` / `punchOutSource` (no duplicate verification field)\n" +
-        "- Admin Mark Attendance: always `manual` via `POST /api/attendance/manual`",
+      version: "3.3.3",
+      description,
     },
-    servers: [{ url: "http://localhost:9001", description: "Local backend" }],
+    servers: [
+      { url: "http://localhost:9001", description: "Local backend (PORT 9001)" },
+    ],
+    tags: [
+      { name: "Health", description: "API + MongoDB health check (no auth)" },
+      { name: "Auth", description: "Login and current user" },
+      { name: "Permissions", description: "Catalog + my permissions" },
+      { name: "Roles", description: "Role CRUD + permission matrix" },
+      { name: "Employees", description: "Create user + profile CRUD" },
+      { name: "Attendance", description: "Punch in/out + manual mark" },
+    ],
     components: {
       securitySchemes: {
         bearerAuth: {
           type: "http",
           scheme: "bearer",
           bearerFormat: "JWT",
-          description: "Token from Login",
+          description: "Paste token from POST /api/auth/login",
         },
       },
       schemas: {
+        RootResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            status: { type: "string", example: "ok" },
+            message: { type: "string", example: "HRMS API is working" },
+            name: { type: "string", example: "HRMS API" },
+            version: { type: "string", example: "1.0.0" },
+          },
+        },
+        HealthResponse: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            status: {
+              type: "string",
+              enum: ["ok", "down"],
+              example: "ok",
+            },
+            message: { type: "string", example: "HRMS API is healthy" },
+            mongodb: {
+              type: "string",
+              example: "connected",
+              description: "connected | disconnected",
+            },
+          },
+        },
+        LoginBody: {
+          type: "object",
+          required: ["officialEmail", "password"],
+          properties: {
+            officialEmail: {
+              type: "string",
+              example: "shivangi@techculture.ai",
+              description: "Must match official.officialEmail",
+            },
+            password: { type: "string", example: "123456" },
+          },
+        },
+        LoginResponse: {
+          type: "object",
+          properties: {
+            message: { type: "string", example: "Login successful" },
+            token: { type: "string", description: "JWT — use as Bearer token" },
+            user: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                name: { type: "string", example: "Shivangi Gupta" },
+                officialEmail: { type: "string", example: "shivangi@techculture.ai" },
+                role: { type: "string", example: "Super Admin" },
+                department: { type: "string" },
+                company: { type: "string" },
+                status: { type: "string", example: "Active" },
+                lastLogin: { type: "string", format: "date-time" },
+                permissionCount: { type: "string", example: "254 of 254" },
+                permissions: {
+                  type: "array",
+                  description: "Single list — no separate menu field",
+                  items: { $ref: "#/components/schemas/PermissionBlock" },
+                },
+              },
+            },
+          },
+        },
+        PermissionActionFlags: {
+          type: "object",
+          description: "true/false flags on a page (stored on Role)",
+          properties: {
+            name: { type: "string", example: "General Info" },
+            view: { type: "boolean" },
+            create: { type: "boolean" },
+            edit: { type: "boolean" },
+            delete: { type: "boolean" },
+            approve: { type: "boolean" },
+            reject: { type: "boolean" },
+            cancel: { type: "boolean" },
+            assign: { type: "boolean" },
+            download: { type: "boolean" },
+            export: { type: "boolean" },
+            import: { type: "boolean" },
+            upload: { type: "boolean" },
+            print: { type: "boolean" },
+            email: { type: "boolean" },
+            share: { type: "boolean" },
+          },
+        },
+        PermissionBlock: {
+          type: "object",
+          properties: {
+            module: { type: "string", example: "Self" },
+            heading: { type: "string", example: "" },
+            subModules: {
+              type: "array",
+              items: { $ref: "#/components/schemas/PermissionActionFlags" },
+            },
+          },
+        },
+        CatalogSubModule: {
+          type: "object",
+          properties: {
+            name: { type: "string", example: "Attendance Summary" },
+            actions: {
+              type: "array",
+              items: { type: "string" },
+              example: ["view", "export", "download", "print"],
+            },
+          },
+        },
+        CatalogModule: {
+          type: "object",
+          properties: {
+            module: { type: "string", example: "Dashboard" },
+            heading: { type: "string", example: "Overview" },
+            subModules: {
+              type: "array",
+              items: { $ref: "#/components/schemas/CatalogSubModule" },
+            },
+          },
+        },
+        PermissionsCatalogResponse: {
+          type: "object",
+          description: "side once per group — 2 items in data",
+          properties: {
+            actions: {
+              type: "array",
+              items: { type: "string" },
+              example: [
+                "view",
+                "create",
+                "edit",
+                "delete",
+                "approve",
+                "reject",
+                "download",
+                "export",
+                "import",
+                "upload",
+                "print",
+                "email",
+                "share",
+                "cancel",
+                "assign",
+              ],
+            },
+            count: { type: "integer", example: 2 },
+            data: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  side: {
+                    type: "string",
+                    enum: ["admin", "employee"],
+                    example: "admin",
+                  },
+                  modules: {
+                    type: "array",
+                    items: { $ref: "#/components/schemas/CatalogModule" },
+                  },
+                },
+              },
+            },
+          },
+        },
+        MyPermissionsResponse: {
+          type: "object",
+          description: "One permissions list — no menu",
+          properties: {
+            role: { type: "string", example: "Employee" },
+            side: { type: "string", enum: ["admin", "employee"] },
+            permissionCount: { type: "string", example: "57 of 57" },
+            count: { type: "integer", example: 5 },
+            data: {
+              type: "array",
+              items: { $ref: "#/components/schemas/PermissionBlock" },
+            },
+          },
+        },
         Address: {
           type: "object",
           additionalProperties: false,
           properties: {
-            address: { type: "string" },
-            country: { type: "string" },
-            state: { type: "string" },
-            city: { type: "string" },
-            pincode: { type: "string" },
+            address: { type: "string", example: "Sector 62" },
+            country: { type: "string", example: "India" },
+            state: { type: "string", example: "DELHI" },
+            city: { type: "string", example: "Noida" },
+            pincode: { type: "string", example: "201301" },
           },
         },
         Personal: {
           type: "object",
           additionalProperties: false,
-          description: "Personal details + addresses + phones (emails only here)",
+          description:
+            "Unique when set: mobileNo, personalEmail, panNo, aadhaarNo, drivingLicenseNo, passportNo",
           properties: {
-            employeeCode: {
-              type: "string",
-              description: "Admin only — employees cannot edit",
-            },
-            dateOfBirth: { type: "string", format: "date", nullable: true },
-            aadhaarNo: { type: "string" },
-            panNo: { type: "string" },
-            gender: { type: "string", example: "Male" },
-            fatherOrHusbandName: { type: "string" },
-            maritalStatus: { type: "string" },
+            dateOfBirth: { type: "string", format: "date", nullable: true, example: "1995-06-15" },
+            aadhaarNo: { type: "string", example: "123456789012", description: "Unique when set" },
+            panNo: { type: "string", example: "ABCDE1234F", description: "Unique when set" },
+            gender: { type: "string", example: "Female" },
+            fatherOrHusbandName: { type: "string", example: "Ramesh Iyer" },
+            maritalStatus: { type: "string", example: "Single" },
             spouseName: { type: "string" },
             anniversaryDate: {
               type: "string",
               format: "date",
               nullable: true,
-              description:
-                "Auto: next work anniversary from official.dateOfJoining (read-only)",
+              description: "Auto from official.dateOfJoining — read-only",
             },
-            officialEmail: {
+            personalEmail: {
               type: "string",
-              example: "ananya@techculture.ai",
-              description: "Login ID",
+              example: "ananya.personal@gmail.com",
+              description: "Unique when set",
             },
-            personalEmail: { type: "string" },
-            languageKnown: { type: "string" },
-            emergencyContact1: { type: "string" },
+            languageKnown: { type: "string", example: "Hindi, English" },
+            emergencyContact1: { type: "string", example: "Neha - 9876543210" },
             emergencyContact2: { type: "string" },
-            drivingLicenseNo: { type: "string" },
+            drivingLicenseNo: {
+              type: "string",
+              example: "DL-0420110012345",
+              description: "Unique when set",
+            },
             licenseValidUpto: { type: "string", format: "date", nullable: true },
-            passportNo: { type: "string" },
+            passportNo: {
+              type: "string",
+              example: "J8765432",
+              description: "Unique when set",
+            },
             remarks: { type: "string" },
             presentAddress: { $ref: "#/components/schemas/Address" },
             permanentAddress: { $ref: "#/components/schemas/Address" },
             mobileNo: {
               type: "string",
               example: "9810044556",
-              description: "Employee can update via PUT personal{}",
+              description: "Unique — employee can update",
             },
-            workPhone: {
-              type: "string",
-              example: "",
-              description: "Employee can update via PUT personal{}",
-            },
-            workExt: {
-              type: "string",
-              example: "",
-              description: "Employee can update via PUT personal{}",
-            },
+            workPhone: { type: "string", example: "0120-4000000" },
+            workExt: { type: "string", example: "204" },
           },
         },
         Official: {
           type: "object",
           additionalProperties: false,
-          description: "Admin only — employees cannot update any official field",
+          description: "Admin only — Super Admin / HR Manager / Manager",
           properties: {
-            company: { type: "string" },
-            department: { type: "string" },
+            employeeCode: {
+              type: "string",
+              example: "EMP-1024",
+              description: "Unique when set",
+            },
+            officialEmail: {
+              type: "string",
+              example: "ananya@techculture.ai",
+              description: "Login ID — unique",
+            },
+            company: {
+              type: "string",
+              example: "TechCulture Solutions Private Limited",
+            },
+            department: { type: "string", example: "Finance" },
             designation: { type: "string", example: "Finance Executive" },
-            reportingHead1: { type: "string" },
+            reportingHead1: { type: "string", example: "Shivangi Gupta" },
             reportingHead2: { type: "string" },
-            jobRole: { type: "string" },
+            jobRole: { type: "string", example: "Executive" },
             dateOfJoining: {
               type: "string",
               format: "date",
               nullable: true,
-              description: "Sets personal.anniversaryDate automatically",
+              example: "2024-01-15",
             },
             calculateSalaryFrom: { type: "string", format: "date", nullable: true },
             dateOfRetirement: { type: "string", format: "date", nullable: true },
@@ -140,13 +394,17 @@ module.exports = swaggerJsdoc({
           additionalProperties: false,
           properties: {
             bloodGroup: { type: "string", example: "B+" },
-            passportExpiry: { type: "string", format: "date", nullable: true },
+            passportExpiry: {
+              type: "string",
+              format: "date",
+              nullable: true,
+              example: "2030-12-31",
+            },
           },
         },
         EducationItem: {
           type: "object",
           additionalProperties: false,
-          description: "Add Education History — Upload Document supported",
           properties: {
             courseType: { type: "string", example: "Full Time" },
             courseLevel: { type: "string", example: "Graduation" },
@@ -160,14 +418,10 @@ module.exports = swaggerJsdoc({
             percentageOrGrade: { type: "string", example: "8.2 CGPA" },
             document: {
               type: "string",
-              example: "https://res.cloudinary.com/demo/raw/upload/v1/hrms/education/marksheet.pdf",
-              description: "Cloudinary secure URL from upload API",
+              example:
+                "https://res.cloudinary.com/demo/raw/upload/v1/hrms/education/marksheet.pdf",
             },
-            documentName: {
-              type: "string",
-              example: "marksheet.pdf",
-              description: "Original file name",
-            },
+            documentName: { type: "string", example: "marksheet.pdf" },
             remarks: { type: "string" },
           },
         },
@@ -175,28 +429,28 @@ module.exports = swaggerJsdoc({
           type: "object",
           additionalProperties: false,
           properties: {
-            bankName: { type: "string" },
-            accountNo: { type: "string" },
-            accountHolderName: { type: "string" },
-            ifscCode: { type: "string" },
-            location: { type: "string" },
+            bankName: { type: "string", example: "HDFC Bank" },
+            accountNo: { type: "string", example: "50100123456789" },
+            accountHolderName: { type: "string", example: "Ananya Iyer" },
+            ifscCode: { type: "string", example: "HDFC0001234" },
+            location: { type: "string", example: "Noida" },
             remarks: { type: "string" },
             attachment: { type: "string" },
-            active: { type: "boolean" },
-            salaryAccount: { type: "boolean" },
+            active: { type: "boolean", example: true },
+            salaryAccount: { type: "boolean", example: true },
           },
         },
         FamilyItem: {
           type: "object",
           additionalProperties: false,
           properties: {
-            name: { type: "string" },
-            relation: { type: "string", example: "Spouse" },
+            name: { type: "string", example: "Ramesh Iyer" },
+            relation: { type: "string", example: "Father" },
             dob: { type: "string", format: "date", nullable: true },
-            occupation: { type: "string" },
+            occupation: { type: "string", example: "Business" },
             education: { type: "string" },
             aadhaarNo: { type: "string" },
-            mobileNo: { type: "string" },
+            mobileNo: { type: "string", example: "9876501234" },
             mediclaim: { type: "boolean" },
           },
         },
@@ -205,10 +459,10 @@ module.exports = swaggerJsdoc({
           additionalProperties: false,
           properties: {
             nominateFor: { type: "string", example: "PF" },
-            nomineeName: { type: "string" },
-            relation: { type: "string" },
+            nomineeName: { type: "string", example: "Neha Iyer" },
+            relation: { type: "string", example: "Sister" },
             dob: { type: "string", format: "date", nullable: true },
-            amountPercent: { type: "number" },
+            amountPercent: { type: "number", example: 100 },
             address: { type: "string" },
             remarks: { type: "string" },
           },
@@ -217,12 +471,12 @@ module.exports = swaggerJsdoc({
           type: "object",
           additionalProperties: false,
           properties: {
-            organization: { type: "string" },
-            designation: { type: "string" },
-            location: { type: "string" },
-            fromDate: { type: "string", format: "date", nullable: true },
-            toDate: { type: "string", format: "date", nullable: true },
-            lastSalaryDrawn: { type: "string" },
+            organization: { type: "string", example: "Previous Corp" },
+            designation: { type: "string", example: "Analyst" },
+            location: { type: "string", example: "Noida" },
+            fromDate: { type: "string", format: "date", example: "2020-07-01" },
+            toDate: { type: "string", format: "date", example: "2023-12-31" },
+            lastSalaryDrawn: { type: "string", example: "45000" },
             description: { type: "string" },
             remarks: { type: "string" },
           },
@@ -231,11 +485,11 @@ module.exports = swaggerJsdoc({
           type: "object",
           additionalProperties: false,
           properties: {
-            countryName: { type: "string" },
-            visaType: { type: "string" },
-            visaNumber: { type: "string" },
-            fromDate: { type: "string", format: "date", nullable: true },
-            toDate: { type: "string", format: "date", nullable: true },
+            countryName: { type: "string", example: "USA" },
+            visaType: { type: "string", example: "B1/B2" },
+            visaNumber: { type: "string", example: "V1234567" },
+            fromDate: { type: "string", format: "date", example: "2025-01-01" },
+            toDate: { type: "string", format: "date", example: "2025-12-31" },
             remarks: { type: "string" },
           },
         },
@@ -247,13 +501,13 @@ module.exports = swaggerJsdoc({
             salaryGroup: { type: "string" },
             salaryDate: { type: "string" },
             appraisalDuration: { type: "string" },
-            basic: { type: "number" },
-            annualCtc: { type: "number" },
+            basic: { type: "number", example: 40000 },
+            annualCtc: { type: "number", example: 600000 },
             grossSalary: { type: "number" },
             totalEarning: { type: "number" },
             totalDeduction: { type: "number" },
             appraisalDate: { type: "string", format: "date", nullable: true },
-            paymentMode: { type: "string" },
+            paymentMode: { type: "string", example: "Bank" },
             ot1Rate: { type: "number" },
             ot2Rate: { type: "number" },
             remarks: { type: "string" },
@@ -273,9 +527,9 @@ module.exports = swaggerJsdoc({
             ptApply: { type: "boolean" },
             tdsApply: { type: "boolean" },
             taxRegime: { type: "string", example: "New" },
-            bankName: { type: "string" },
-            bankAccount: { type: "string" },
-            ifsc: { type: "string" },
+            bankName: { type: "string", example: "HDFC Bank" },
+            bankAccount: { type: "string", example: "50100123456789" },
+            ifsc: { type: "string", example: "HDFC0001234" },
           },
         },
         CreateUserBody: {
@@ -294,12 +548,17 @@ module.exports = swaggerJsdoc({
             officialEmail: {
               type: "string",
               example: "ananya@techculture.ai",
-              description: "→ personal.officialEmail (login ID)",
+              description: "→ official.officialEmail",
+            },
+            employeeCode: {
+              type: "string",
+              example: "EMP-1024",
+              description: "→ official.employeeCode (optional)",
             },
             mobileNo: {
               type: "string",
               example: "9810044556",
-              description: "→ personal.mobileNo",
+              description: "→ personal.mobileNo (optional)",
             },
             password: { type: "string", example: "123456" },
             role: {
@@ -315,17 +574,22 @@ module.exports = swaggerJsdoc({
             city: { type: "string", example: "Noida" },
             state: { type: "string", example: "DELHI" },
             country: { type: "string", example: "India" },
-            status: { type: "string", enum: ["Active", "Inactive"] },
+            status: {
+              type: "string",
+              enum: ["Active", "Inactive"],
+              example: "Active",
+            },
           },
         },
         UpdateUserBody: {
           type: "object",
           description:
-            "Nested profile update. Employee may set personal.mobileNo, workPhone, workExt (and other personal fields) while Unapproved/Rejected. official{} = admin only.",
+            "All nested objects. Admin: full. Employee: personal/other/arrays only (no official/payroll).",
           properties: {
-            name: { type: "string" },
+            name: { type: "string", example: "Ananya Iyer" },
             password: {
               type: "string",
+              example: "newpass123",
               description: "Super Admin / HR Manager only",
             },
             role: { type: "string" },
@@ -334,11 +598,12 @@ module.exports = swaggerJsdoc({
               type: "string",
               enum: ["Unapproved", "Approved", "Rejected"],
               description: "Admin only",
+              example: "Approved",
             },
             personal: { $ref: "#/components/schemas/Personal" },
             official: {
               allOf: [{ $ref: "#/components/schemas/Official" }],
-              description: "Admin only — full object",
+              description: "Admin only",
             },
             other: { $ref: "#/components/schemas/Other" },
             education: {
@@ -367,6 +632,103 @@ module.exports = swaggerJsdoc({
             },
             payroll: { $ref: "#/components/schemas/Payroll" },
           },
+        },
+        PunchBody: {
+          type: "object",
+          required: ["source"],
+          properties: {
+            source: {
+              type: "string",
+              enum: ["web", "mobile", "biometric"],
+              example: "web",
+              description: "Self punch only — manual not allowed here",
+            },
+          },
+        },
+        ManualAttendanceBody: {
+          type: "object",
+          required: ["employeeId", "punchType", "time", "reason"],
+          properties: {
+            employeeId: {
+              type: "string",
+              example: "665f1a2b3c4d5e6f7a8b9c0d",
+              description: "Target employee MongoDB ObjectId (24 hex)",
+            },
+            punchType: { type: "string", enum: ["in", "out"], example: "in" },
+            time: {
+              type: "string",
+              example: "09:30",
+              description: "HH:mm 24h",
+              pattern: "^([01]\\d|2[0-3]):([0-5]\\d)$",
+            },
+            reason: { type: "string", example: "Forgot to punch" },
+            remarks: { type: "string", example: "Approved by HR" },
+          },
+        },
+        MongoId: {
+          type: "string",
+          pattern: "^[a-fA-F0-9]{24}$",
+          example: "665f1a2b3c4d5e6f7a8b9c0d",
+          description: "MongoDB ObjectId",
+        },
+        CreateRoleBody: {
+          type: "object",
+          required: ["name"],
+          properties: {
+            name: { type: "string", example: "Team Lead" },
+            description: { type: "string", example: "Team tasks" },
+            status: {
+              type: "string",
+              enum: ["Active", "Inactive"],
+              example: "Active",
+            },
+          },
+        },
+        UpdateRoleBody: {
+          type: "object",
+          properties: {
+            name: { type: "string", example: "Team Lead" },
+            description: { type: "string", example: "Team tasks" },
+            status: {
+              type: "string",
+              enum: ["Active", "Inactive"],
+              example: "Active",
+            },
+          },
+        },
+      },
+      parameters: {
+        UserId: {
+          in: "path",
+          name: "id",
+          required: true,
+          schema: { $ref: "#/components/schemas/MongoId" },
+          description: "User / employee id (from login or create)",
+        },
+        RoleId: {
+          in: "path",
+          name: "id",
+          required: true,
+          schema: { $ref: "#/components/schemas/MongoId" },
+          description: "Role id (from create / list roles)",
+        },
+        AttendanceDate: {
+          in: "query",
+          name: "date",
+          required: false,
+          schema: { type: "string", format: "date", example: "2026-09-23" },
+          description: "Filter by date YYYY-MM-DD",
+        },
+        AttendanceSource: {
+          in: "query",
+          name: "source",
+          required: false,
+          schema: {
+            type: "string",
+            enum: ["web", "mobile", "biometric", "manual"],
+            example: "web",
+          },
+          description: "Matches punchInSource or punchOutSource",
         },
       },
     },

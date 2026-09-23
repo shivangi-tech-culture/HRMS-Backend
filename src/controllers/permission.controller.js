@@ -4,50 +4,80 @@
  * - Catalog of modules / actions (from config/permissions.js)
  * - Current user's permissions + sidebar menu
  * - checkPermission() middleware for route-level action checks
+ *
+ * Catalog returns 2 records in data[]:
+ *   { side: "admin", modules: [...] }
+ *   { side: "employee", modules: [...] }
  */
 const Role = require("../models/Role");
 const {
-  MODULE_TREE,
   ADMIN_TREE,
   ESS_TREE,
-  MODULES,
   ACTIONS,
-  TOTAL_PERMISSIONS,
   totalForRole,
   countPermissions,
   findAction,
-  menuForPermissions,
 } = require("../config/permissions");
 
 /**
  * GET /api/permissions/modules
- * Returns the full permission catalog (admin + ESS trees).
+ *
+ * Two records only (side once each — not on every module):
+ *
+ * {
+ *   actions: [...],
+ *   count: 2,
+ *   data: [
+ *     { side: "admin", modules: [ { module, heading, subModules }, ... ] },
+ *     { side: "employee", modules: [ { module, heading, subModules }, ... ] }
+ *   ]
+ * }
  */
 const listModules = async (req, res) => {
+  const data = [
+    {
+      side: "admin", // Super Admin / HR Manager / Manager — once
+      modules: ADMIN_TREE,
+    },
+    {
+      side: "employee", // Employee ESS — once
+      modules: ESS_TREE,
+    },
+  ];
+
   return res.json({
-    modules: MODULES,
     actions: ACTIONS,
-    adminModules: [...new Set(ADMIN_TREE.map((b) => b.module))],
-    essModules: [...new Set(ESS_TREE.map((b) => b.module))],
-    total: TOTAL_PERMISSIONS,
-    tree: MODULE_TREE,
+    count: data.length, // 2
+    data,
   });
 };
 
 /**
  * GET /api/permissions/my
- * Returns the logged-in role's permission flags and filtered menu.
+ *
+ * One list only — no separate `menu` (that was the same data twice).
+ *
+ * {
+ *   role, side, permissionCount, count,
+ *   data: [ { module, heading, subModules: [ { name, view, create, ... } ] } ]
+ * }
+ *
+ * Sidebar: use pages where view === true from data.
  */
 const myPermissions = async (req, res) => {
   try {
     const role = await Role.findOne({ name: req.user.role });
     if (!role) return res.status(404).json({ message: "Role not found for user" });
 
+    const data = role.permissions || [];
+    const side = role.name === "Employee" ? "employee" : "admin";
+
     return res.json({
       role: role.name,
-      permissions: role.permissions,
-      permissionCount: `${countPermissions(role.permissions)} of ${totalForRole(role.name)}`,
-      menu: menuForPermissions(role.permissions),
+      side,
+      permissionCount: `${countPermissions(data)} of ${totalForRole(role.name)}`,
+      count: data.length,
+      data,
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });

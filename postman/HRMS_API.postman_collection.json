@@ -1,16 +1,441 @@
 {
   "info": {
     "name": "HRMS API",
-    "description": "HRMS Express API\n\n**Seed logins** (officialEmail)\n- Super Admin: shivangi@techculture.ai / 123456 (detailsApproval=Approved)\n- Employee: shivig5964@gmail.com / 123456 (Unapproved)\n\n**detailsApproval default:** Super Admin → Approved | HR / Manager / Employee → Unapproved\n\n**Create User mapping**\n- officialEmail → personal.officialEmail\n- mobileNo → personal.mobileNo\n- company, department → official\n- city, state, country → personal.permanentAddress\n\n**Employee update phones** (while Unapproved/Rejected)\nPUT /api/employees/{id} → personal.mobileNo, workPhone, workExt",
+    "description": "HRMS Express API — ALL requests use {{vars}} like Login Super Admin.\n\n**baseUrl = http://localhost:9001**\n\nOpen Collection → Variables to edit any value.\nLogin Super Admin sets {{token}} + {{userId}}.\nCreate Role sets {{roleId}}. Create User sets {{userId}}.\n\nAuth: {{adminEmail}} / {{employeeEmail}} / {{password}}\nRoles: {{roleName}}, {{roleDescription}}, {{roleStatus}}\nCreate user: {{newUserName}}, {{newUserEmail}}, {{userRole}}, {{userStatus}}, …\nUpdate profile: personal/official/other/education/accounts/family/nominees/experience/visas/payroll vars\nAttendance: {{punchSource}}, {{punchType}}, {{punchTime}}, …",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:9001" },
-    { "key": "token", "value": "" },
-    { "key": "userId", "value": "" },
-    { "key": "roleId", "value": "" }
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:9001"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "userId",
+      "value": ""
+    },
+    {
+      "key": "roleId",
+      "value": ""
+    },
+    {
+      "key": "adminEmail",
+      "value": "shivangi@techculture.ai"
+    },
+    {
+      "key": "employeeEmail",
+      "value": "shivig5964@gmail.com"
+    },
+    {
+      "key": "password",
+      "value": "123456"
+    },
+    {
+      "key": "newPassword",
+      "value": "newpass123"
+    },
+    {
+      "key": "newUserName",
+      "value": "Ananya Iyer"
+    },
+    {
+      "key": "newUserEmail",
+      "value": "ananya@techculture.ai"
+    },
+    {
+      "key": "employeeCode",
+      "value": "EMP-1024"
+    },
+    {
+      "key": "company",
+      "value": "TechCulture Solutions Private Limited"
+    },
+    {
+      "key": "department",
+      "value": "Finance"
+    },
+    {
+      "key": "designation",
+      "value": "Finance Executive"
+    },
+    {
+      "key": "grade",
+      "value": "G4"
+    },
+    {
+      "key": "jobRole",
+      "value": "Executive"
+    },
+    {
+      "key": "reportingHead1",
+      "value": "Shivangi Gupta"
+    },
+    {
+      "key": "reportingHead2",
+      "value": ""
+    },
+    {
+      "key": "dateOfJoining",
+      "value": "2024-01-15"
+    },
+    {
+      "key": "gender",
+      "value": "Female"
+    },
+    {
+      "key": "maritalStatus",
+      "value": "Single"
+    },
+    {
+      "key": "fatherOrHusbandName",
+      "value": "Ramesh Iyer"
+    },
+    {
+      "key": "dateOfBirth",
+      "value": "1995-06-15"
+    },
+    {
+      "key": "personalEmail",
+      "value": "ananya.personal@gmail.com"
+    },
+    {
+      "key": "mobileNo",
+      "value": "9810044556"
+    },
+    {
+      "key": "workPhone",
+      "value": "0120-4000000"
+    },
+    {
+      "key": "workExt",
+      "value": "204"
+    },
+    {
+      "key": "panNo",
+      "value": "ABCDE1234F"
+    },
+    {
+      "key": "aadhaarNo",
+      "value": "123456789012"
+    },
+    {
+      "key": "drivingLicenseNo",
+      "value": "DL-0420110012345"
+    },
+    {
+      "key": "passportNo",
+      "value": "J8765432"
+    },
+    {
+      "key": "languageKnown",
+      "value": "Hindi, English"
+    },
+    {
+      "key": "emergencyContact1",
+      "value": "Neha - 9876543210"
+    },
+    {
+      "key": "emergencyContact2",
+      "value": ""
+    },
+    {
+      "key": "address",
+      "value": "Sector 62"
+    },
+    {
+      "key": "city",
+      "value": "Noida"
+    },
+    {
+      "key": "state",
+      "value": "DELHI"
+    },
+    {
+      "key": "country",
+      "value": "India"
+    },
+    {
+      "key": "pincode",
+      "value": "201301"
+    },
+    {
+      "key": "bloodGroup",
+      "value": "B+"
+    },
+    {
+      "key": "passportExpiry",
+      "value": "2030-12-31"
+    },
+    {
+      "key": "eduCourseType",
+      "value": "Full Time"
+    },
+    {
+      "key": "eduCourseLevel",
+      "value": "Graduation"
+    },
+    {
+      "key": "eduCourseName",
+      "value": "B.Tech"
+    },
+    {
+      "key": "eduInstitute",
+      "value": "ABC College"
+    },
+    {
+      "key": "eduFromYear",
+      "value": "2016"
+    },
+    {
+      "key": "eduPassingYear",
+      "value": "2020"
+    },
+    {
+      "key": "eduGrade",
+      "value": "8.2 CGPA"
+    },
+    {
+      "key": "eduDocument",
+      "value": ""
+    },
+    {
+      "key": "eduDocumentName",
+      "value": ""
+    },
+    {
+      "key": "bankName",
+      "value": "HDFC Bank"
+    },
+    {
+      "key": "bankAccountNo",
+      "value": "50100123456789"
+    },
+    {
+      "key": "accountHolderName",
+      "value": "Ananya Iyer"
+    },
+    {
+      "key": "ifscCode",
+      "value": "HDFC0001234"
+    },
+    {
+      "key": "familyName",
+      "value": "Ramesh Iyer"
+    },
+    {
+      "key": "familyRelation",
+      "value": "Father"
+    },
+    {
+      "key": "familyMobile",
+      "value": "9876501234"
+    },
+    {
+      "key": "nomineeName",
+      "value": "Neha Iyer"
+    },
+    {
+      "key": "nominateFor",
+      "value": "PF"
+    },
+    {
+      "key": "nomineeRelation",
+      "value": "Sister"
+    },
+    {
+      "key": "nomineePercent",
+      "value": "100"
+    },
+    {
+      "key": "expOrganization",
+      "value": "Previous Corp"
+    },
+    {
+      "key": "expDesignation",
+      "value": "Analyst"
+    },
+    {
+      "key": "expFromDate",
+      "value": "2020-07-01"
+    },
+    {
+      "key": "expToDate",
+      "value": "2023-12-31"
+    },
+    {
+      "key": "expLastSalary",
+      "value": "45000"
+    },
+    {
+      "key": "visaCountry",
+      "value": "USA"
+    },
+    {
+      "key": "visaType",
+      "value": "B1/B2"
+    },
+    {
+      "key": "visaNumber",
+      "value": "V1234567"
+    },
+    {
+      "key": "visaFromDate",
+      "value": "2025-01-01"
+    },
+    {
+      "key": "visaToDate",
+      "value": "2025-12-31"
+    },
+    {
+      "key": "payrollBasic",
+      "value": "40000"
+    },
+    {
+      "key": "payrollCtc",
+      "value": "600000"
+    },
+    {
+      "key": "payrollPaymentMode",
+      "value": "Bank"
+    },
+    {
+      "key": "payrollUan",
+      "value": ""
+    },
+    {
+      "key": "detailsApproval",
+      "value": "Approved"
+    },
+    {
+      "key": "attendanceDate",
+      "value": "2026-09-23"
+    },
+    {
+      "key": "punchSource",
+      "value": "web"
+    },
+    {
+      "key": "roleName",
+      "value": "Custom Role"
+    },
+    {
+      "key": "roleDescription",
+      "value": "Test role"
+    },
+    {
+      "key": "roleStatus",
+      "value": "Active"
+    },
+    {
+      "key": "roleUpdateDescription",
+      "value": "Updated description"
+    },
+    {
+      "key": "userRole",
+      "value": "Employee"
+    },
+    {
+      "key": "userStatus",
+      "value": "Active"
+    },
+    {
+      "key": "punchType",
+      "value": "in"
+    },
+    {
+      "key": "punchTime",
+      "value": "09:30"
+    },
+    {
+      "key": "punchReason",
+      "value": "Forgot to punch"
+    },
+    {
+      "key": "punchRemarks",
+      "value": "Approved by HR"
+    },
+    {
+      "key": "punchSourceMobile",
+      "value": "mobile"
+    },
+    {
+      "key": "punchSourceOut",
+      "value": "web"
+    },
+    {
+      "key": "familyOccupation",
+      "value": "Business"
+    },
+    {
+      "key": "educationId",
+      "value": ""
+    }
   ],
   "item": [
+    {
+      "name": "0 Health",
+      "item": [
+        {
+          "name": "API Root",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('API is working', function () {",
+                  "  var j = pm.response.json();",
+                  "  pm.expect(j.success).to.eql(true);",
+                  "  pm.expect(j.status).to.eql('ok');",
+                  "  pm.expect(j.message).to.eql('HRMS API is working');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/",
+            "description": "Simple root check (no token).\n\nResponse:\n```json\n{\n  \"success\": true,\n  \"status\": \"ok\",\n  \"message\": \"HRMS API is working\",\n  \"name\": \"HRMS API\",\n  \"version\": \"1.0.0\"\n}\n```"
+          }
+        },
+        {
+          "name": "Health Check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('API healthy + MongoDB connected', function () {",
+                  "  var j = pm.response.json();",
+                  "  pm.expect(j.success).to.eql(true);",
+                  "  pm.expect(j.status).to.eql('ok');",
+                  "  pm.expect(j.mongodb).to.eql('connected');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/health",
+            "description": "Public health check — no token.\nChecks API + MongoDB.\n\nHealthy (200):\n```json\n{\n  \"success\": true,\n  \"status\": \"ok\",\n  \"message\": \"HRMS API is healthy\",\n  \"mongodb\": \"connected\"\n}\n```\n\nDown (503):\n```json\n{\n  \"success\": false,\n  \"status\": \"down\",\n  \"message\": \"MongoDB is not connected\",\n  \"mongodb\": \"disconnected\"\n}\n```"
+          }
+        }
+      ]
+    },
     {
       "name": "1 Auth",
       "item": [
@@ -22,7 +447,8 @@
               "script": {
                 "exec": [
                   "var j = pm.response.json();",
-                  "if (j.token) pm.collectionVariables.set('token', j.token);"
+                  "if (j.token) pm.collectionVariables.set('token', j.token);",
+                  "if (j.user && j.user.id) pm.collectionVariables.set('userId', j.user.id);"
                 ],
                 "type": "text/javascript"
               }
@@ -30,13 +456,18 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"officialEmail\": \"shivangi@techculture.ai\",\n  \"password\": \"123456\"\n}"
+              "raw": "{\n  \"officialEmail\": \"{{adminEmail}}\",\n  \"password\": \"{{password}}\"\n}"
             },
             "url": "{{baseUrl}}/api/auth/login",
-            "description": "Sets {{token}}. Login with officialEmail. Returns permissions + menu + lastLogin."
+            "description": "Sets {{token}} + {{userId}}.\nThen use **Update Profile (Super Admin)** — full objects allowed."
           }
         },
         {
@@ -47,7 +478,8 @@
               "script": {
                 "exec": [
                   "var j = pm.response.json();",
-                  "if (j.token) pm.collectionVariables.set('token', j.token);"
+                  "if (j.token) pm.collectionVariables.set('token', j.token);",
+                  "if (j.user && j.user.id) pm.collectionVariables.set('userId', j.user.id);"
                 ],
                 "type": "text/javascript"
               }
@@ -55,19 +487,30 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"officialEmail\": \"shivig5964@gmail.com\",\n  \"password\": \"123456\"\n}"
+              "raw": "{\n  \"officialEmail\": \"{{employeeEmail}}\",\n  \"password\": \"{{password}}\"\n}"
             },
-            "url": "{{baseUrl}}/api/auth/login"
+            "url": "{{baseUrl}}/api/auth/login",
+            "description": "Sets {{token}} + {{userId}}.\nThen use **Update Profile (Employee)** — personal only (phones etc). No official{}."
           }
         },
         {
           "name": "Me",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": "{{baseUrl}}/api/auth/me",
             "description": "Current user + permissions + menu"
           }
@@ -81,18 +524,28 @@
           "name": "Permissions Catalog",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": "{{baseUrl}}/api/permissions/modules",
-            "description": "Full catalog from permissions.js (admin + ESS trees)"
+            "description": "2 objects only — side once each:\n\n{\n  actions,\n  count: 2,\n  data: [\n    { side: \"admin\", modules: [ { module, heading, subModules }, ... ] },\n    { side: \"employee\", modules: [ ... ] }\n  ]\n}"
           }
         },
         {
           "name": "My Permissions",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": "{{baseUrl}}/api/permissions/my",
-            "description": "Logged-in role permissions + filtered menu"
+            "description": "One list only — no duplicate menu.\n\n{ role, side, permissionCount, count, data: [ { module, heading, subModules } ] }\n\nSidebar: filter subModules with view === true"
           }
         }
       ]
@@ -117,21 +570,33 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Custom Role\",\n  \"description\": \"Test role\",\n  \"status\": \"Active\"\n}"
+              "raw": "{\n  \"name\": \"{{roleName}}\",\n  \"description\": \"{{roleDescription}}\",\n  \"status\": \"{{roleStatus}}\"\n}"
             },
-            "url": "{{baseUrl}}/api/roles"
+            "url": "{{baseUrl}}/api/roles",
+            "description": "Creates role. Sets {{roleId}}.\nVars: roleName, roleDescription, roleStatus"
           }
         },
         {
           "name": "List Roles",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": "{{baseUrl}}/api/roles"
           }
         },
@@ -139,7 +604,12 @@
           "name": "Get Role Permissions",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": "{{baseUrl}}/api/roles/{{roleId}}/permissions"
           }
         },
@@ -148,21 +618,28 @@
           "request": {
             "method": "PUT",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"description\": \"Updated description\",\n  \"status\": \"Active\"\n}"
+              "raw": "{\n  \"description\": \"{{roleUpdateDescription}}\",\n  \"status\": \"{{roleStatus}}\"\n}"
             },
-            "url": "{{baseUrl}}/api/roles/{{roleId}}"
+            "url": "{{baseUrl}}/api/roles/{{roleId}}",
+            "description": "Updates {{roleId}}. Vars: roleUpdateDescription, roleStatus"
           }
         }
       ]
     },
     {
       "name": "4 Employees (Users)",
-      "description": "Access & Control Create User + profile CRUD.\nRoles enforced on routes via authorize middleware.",
+      "description": "Same PUT update API for everyone.\nLogin Super Admin → Update Profile (Super Admin)\nLogin Employee → Update Profile (Employee)",
       "item": [
         {
           "name": "Create User",
@@ -181,22 +658,33 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Ananya Iyer\",\n  \"officialEmail\": \"ananya@techculture.ai\",\n  \"mobileNo\": \"9810044556\",\n  \"password\": \"123456\",\n  \"role\": \"Employee\",\n  \"company\": \"TechCulture Solutions Private Limited\",\n  \"department\": \"Finance\",\n  \"city\": \"Noida\",\n  \"state\": \"DELHI\",\n  \"country\": \"India\",\n  \"status\": \"Active\"\n}"
+              "raw": "{\n  \"name\": \"{{newUserName}}\",\n  \"officialEmail\": \"{{newUserEmail}}\",\n  \"employeeCode\": \"{{employeeCode}}\",\n  \"mobileNo\": \"{{mobileNo}}\",\n  \"password\": \"{{password}}\",\n  \"role\": \"{{userRole}}\",\n  \"company\": \"{{company}}\",\n  \"department\": \"{{department}}\",\n  \"city\": \"{{city}}\",\n  \"state\": \"{{state}}\",\n  \"country\": \"{{country}}\",\n  \"status\": \"{{userStatus}}\"\n}"
             },
             "url": "{{baseUrl}}/api/employees",
-            "description": "Super Admin / HR Manager only.\n\nSaves:\n- officialEmail → personal.officialEmail\n- mobileNo → personal.mobileNo\n- company, department → official\n- city, state, country → personal.permanentAddress\n- detailsApproval = Approved if Super Admin, else Unapproved"
+            "description": "Super Admin / HR Manager only.\n\nMaps:\n- officialEmail → official.officialEmail\n- employeeCode → official.employeeCode\n- mobileNo → personal.mobileNo\n- company, department → official\n- city, state, country → personal.permanentAddress\n\nSets {{userId}} from response."
           }
         },
         {
           "name": "List Users",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": "{{baseUrl}}/api/employees",
             "description": "Admin → all | Employee → self only"
           }
@@ -205,48 +693,70 @@
           "name": "Get User by ID",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": "{{baseUrl}}/api/employees/{{userId}}",
             "description": "Admin any id | Employee own id only"
           }
         },
         {
-          "name": "Update Profile",
+          "name": "Update Profile (Super Admin)",
           "request": {
             "method": "PUT",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"personal\": {\n    \"gender\": \"Female\",\n    \"panNo\": \"ABCDE1234F\",\n    \"mobileNo\": \"9810044556\",\n    \"workPhone\": \"\",\n    \"workExt\": \"\",\n    \"permanentAddress\": {\n      \"city\": \"Noida\",\n      \"state\": \"DELHI\",\n      \"country\": \"India\"\n    }\n  },\n  \"official\": {\n    \"designation\": \"Finance Executive\",\n    \"grade\": \"G4\",\n    \"company\": \"TechCulture Solutions Private Limited\",\n    \"department\": \"Finance\"\n  }\n}"
+              "raw": "{\n  \"name\": \"{{newUserName}}\",\n  \"personal\": {\n    \"dateOfBirth\": \"{{dateOfBirth}}\",\n    \"gender\": \"{{gender}}\",\n    \"maritalStatus\": \"{{maritalStatus}}\",\n    \"fatherOrHusbandName\": \"{{fatherOrHusbandName}}\",\n    \"panNo\": \"{{panNo}}\",\n    \"aadhaarNo\": \"{{aadhaarNo}}\",\n    \"personalEmail\": \"{{personalEmail}}\",\n    \"mobileNo\": \"{{mobileNo}}\",\n    \"workPhone\": \"{{workPhone}}\",\n    \"workExt\": \"{{workExt}}\",\n    \"drivingLicenseNo\": \"{{drivingLicenseNo}}\",\n    \"passportNo\": \"{{passportNo}}\",\n    \"languageKnown\": \"{{languageKnown}}\",\n    \"emergencyContact1\": \"{{emergencyContact1}}\",\n    \"emergencyContact2\": \"{{emergencyContact2}}\",\n    \"presentAddress\": {\n      \"address\": \"{{address}}\",\n      \"city\": \"{{city}}\",\n      \"state\": \"{{state}}\",\n      \"country\": \"{{country}}\",\n      \"pincode\": \"{{pincode}}\"\n    },\n    \"permanentAddress\": {\n      \"address\": \"{{address}}\",\n      \"city\": \"{{city}}\",\n      \"state\": \"{{state}}\",\n      \"country\": \"{{country}}\",\n      \"pincode\": \"{{pincode}}\"\n    }\n  },\n  \"official\": {\n    \"employeeCode\": \"{{employeeCode}}\",\n    \"officialEmail\": \"{{newUserEmail}}\",\n    \"company\": \"{{company}}\",\n    \"department\": \"{{department}}\",\n    \"designation\": \"{{designation}}\",\n    \"grade\": \"{{grade}}\",\n    \"jobRole\": \"{{jobRole}}\",\n    \"reportingHead1\": \"{{reportingHead1}}\",\n    \"reportingHead2\": \"{{reportingHead2}}\",\n    \"dateOfJoining\": \"{{dateOfJoining}}\"\n  },\n  \"other\": {\n    \"bloodGroup\": \"{{bloodGroup}}\",\n    \"passportExpiry\": \"{{passportExpiry}}\"\n  },\n  \"education\": [\n    {\n      \"courseType\": \"{{eduCourseType}}\",\n      \"courseLevel\": \"{{eduCourseLevel}}\",\n      \"courseName\": \"{{eduCourseName}}\",\n      \"instituteName\": \"{{eduInstitute}}\",\n      \"location\": \"{{city}}\",\n      \"fromYear\": \"{{eduFromYear}}\",\n      \"passingYear\": \"{{eduPassingYear}}\",\n      \"percentageOrGrade\": \"{{eduGrade}}\",\n      \"document\": \"{{eduDocument}}\",\n      \"documentName\": \"{{eduDocumentName}}\"\n    }\n  ],\n  \"accounts\": [\n    {\n      \"bankName\": \"{{bankName}}\",\n      \"accountNo\": \"{{bankAccountNo}}\",\n      \"accountHolderName\": \"{{accountHolderName}}\",\n      \"ifscCode\": \"{{ifscCode}}\",\n      \"location\": \"{{city}}\",\n      \"active\": true,\n      \"salaryAccount\": true\n    }\n  ],\n  \"family\": [\n    {\n      \"name\": \"{{familyName}}\",\n      \"relation\": \"{{familyRelation}}\",\n      \"mobileNo\": \"{{familyMobile}}\",\n      \"occupation\": \"{{familyOccupation}}\"\n    }\n  ],\n  \"nominees\": [\n    {\n      \"nominateFor\": \"{{nominateFor}}\",\n      \"nomineeName\": \"{{nomineeName}}\",\n      \"relation\": \"{{nomineeRelation}}\",\n      \"amountPercent\": {{nomineePercent}},\n      \"address\": \"{{address}}\"\n    }\n  ],\n  \"experience\": [\n    {\n      \"organization\": \"{{expOrganization}}\",\n      \"designation\": \"{{expDesignation}}\",\n      \"location\": \"{{city}}\",\n      \"fromDate\": \"{{expFromDate}}\",\n      \"toDate\": \"{{expToDate}}\",\n      \"lastSalaryDrawn\": \"{{expLastSalary}}\"\n    }\n  ],\n  \"visas\": [\n    {\n      \"countryName\": \"{{visaCountry}}\",\n      \"visaType\": \"{{visaType}}\",\n      \"visaNumber\": \"{{visaNumber}}\",\n      \"fromDate\": \"{{visaFromDate}}\",\n      \"toDate\": \"{{visaToDate}}\"\n    }\n  ],\n  \"payroll\": {\n    \"basic\": {{payrollBasic}},\n    \"annualCtc\": {{payrollCtc}},\n    \"paymentMode\": \"{{payrollPaymentMode}}\",\n    \"uanNo\": \"{{payrollUan}}\",\n    \"bankName\": \"{{bankName}}\",\n    \"bankAccount\": \"{{bankAccountNo}}\",\n    \"ifsc\": \"{{ifscCode}}\"\n  },\n  \"detailsApproval\": \"{{detailsApproval}}\"\n}"
             },
             "url": "{{baseUrl}}/api/employees/{{userId}}",
-            "description": "Admin: full nested update (personal + official).\nEmployee: personal only — can set mobileNo, workPhone, workExt (omit official{}).\nLocked if detailsApproval = Approved."
+            "description": "PUT /api/employees/{{userId}} — ALL objects (admin).\n\npersonal | official | other | education | accounts | family | nominees | experience | visas | payroll | detailsApproval\n\nEdit values in Collection → Variables. Login Super Admin first."
           }
         },
         {
-          "name": "Update Phones (Employee)",
+          "name": "Update Profile (Employee)",
           "request": {
             "method": "PUT",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"personal\": {\n    \"mobileNo\": \"9810044556\",\n    \"workPhone\": \"0120-4000000\",\n    \"workExt\": \"204\"\n  }\n}"
+              "raw": "{\n  \"personal\": {\n    \"dateOfBirth\": \"{{dateOfBirth}}\",\n    \"gender\": \"{{gender}}\",\n    \"maritalStatus\": \"{{maritalStatus}}\",\n    \"fatherOrHusbandName\": \"{{fatherOrHusbandName}}\",\n    \"panNo\": \"{{panNo}}\",\n    \"aadhaarNo\": \"{{aadhaarNo}}\",\n    \"personalEmail\": \"{{personalEmail}}\",\n    \"mobileNo\": \"{{mobileNo}}\",\n    \"workPhone\": \"{{workPhone}}\",\n    \"workExt\": \"{{workExt}}\",\n    \"drivingLicenseNo\": \"{{drivingLicenseNo}}\",\n    \"passportNo\": \"{{passportNo}}\",\n    \"languageKnown\": \"{{languageKnown}}\",\n    \"emergencyContact1\": \"{{emergencyContact1}}\",\n    \"emergencyContact2\": \"{{emergencyContact2}}\",\n    \"presentAddress\": {\n      \"address\": \"{{address}}\",\n      \"city\": \"{{city}}\",\n      \"state\": \"{{state}}\",\n      \"country\": \"{{country}}\",\n      \"pincode\": \"{{pincode}}\"\n    },\n    \"permanentAddress\": {\n      \"address\": \"{{address}}\",\n      \"city\": \"{{city}}\",\n      \"state\": \"{{state}}\",\n      \"country\": \"{{country}}\",\n      \"pincode\": \"{{pincode}}\"\n    }\n  },\n  \"other\": {\n    \"bloodGroup\": \"{{bloodGroup}}\",\n    \"passportExpiry\": \"{{passportExpiry}}\"\n  },\n  \"education\": [\n    {\n      \"courseType\": \"{{eduCourseType}}\",\n      \"courseLevel\": \"{{eduCourseLevel}}\",\n      \"courseName\": \"{{eduCourseName}}\",\n      \"instituteName\": \"{{eduInstitute}}\",\n      \"location\": \"{{city}}\",\n      \"fromYear\": \"{{eduFromYear}}\",\n      \"passingYear\": \"{{eduPassingYear}}\",\n      \"percentageOrGrade\": \"{{eduGrade}}\",\n      \"document\": \"{{eduDocument}}\",\n      \"documentName\": \"{{eduDocumentName}}\"\n    }\n  ],\n  \"accounts\": [\n    {\n      \"bankName\": \"{{bankName}}\",\n      \"accountNo\": \"{{bankAccountNo}}\",\n      \"accountHolderName\": \"{{accountHolderName}}\",\n      \"ifscCode\": \"{{ifscCode}}\",\n      \"location\": \"{{city}}\",\n      \"active\": true,\n      \"salaryAccount\": true\n    }\n  ],\n  \"family\": [\n    {\n      \"name\": \"{{familyName}}\",\n      \"relation\": \"{{familyRelation}}\",\n      \"mobileNo\": \"{{familyMobile}}\",\n      \"occupation\": \"{{familyOccupation}}\"\n    }\n  ],\n  \"nominees\": [\n    {\n      \"nominateFor\": \"{{nominateFor}}\",\n      \"nomineeName\": \"{{nomineeName}}\",\n      \"relation\": \"{{nomineeRelation}}\",\n      \"amountPercent\": {{nomineePercent}},\n      \"address\": \"{{address}}\"\n    }\n  ],\n  \"experience\": [\n    {\n      \"organization\": \"{{expOrganization}}\",\n      \"designation\": \"{{expDesignation}}\",\n      \"location\": \"{{city}}\",\n      \"fromDate\": \"{{expFromDate}}\",\n      \"toDate\": \"{{expToDate}}\",\n      \"lastSalaryDrawn\": \"{{expLastSalary}}\"\n    }\n  ],\n  \"visas\": [\n    {\n      \"countryName\": \"{{visaCountry}}\",\n      \"visaType\": \"{{visaType}}\",\n      \"visaNumber\": \"{{visaNumber}}\",\n      \"fromDate\": \"{{visaFromDate}}\",\n      \"toDate\": \"{{visaToDate}}\"\n    }\n  ]\n}"
             },
             "url": "{{baseUrl}}/api/employees/{{userId}}",
-            "description": "Employee self-update (Login Employee first).\nUpdates personal.mobileNo, workPhone, workExt.\nWorks while detailsApproval is Unapproved or Rejected."
+            "description": "PUT /api/employees/{{userId}} — employee objects.\n\npersonal | other | education | accounts | family | nominees | experience | visas\n\nNO official / payroll / detailsApproval. Login Employee first."
           }
         },
         {
           "name": "Upload Education Document",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "body": {
               "mode": "formdata",
               "formdata": [
@@ -259,7 +769,7 @@
               ]
             },
             "url": "{{baseUrl}}/api/employees/{{userId}}/education/document",
-            "description": "Upload to Cloudinary (PDF/JPG/PNG/DOC).\nNeeds CLOUDINARY_* in .env.\nUse returned document (URL) + documentName in PUT education[]."
+            "description": "Upload file only → returns Cloudinary URL.\nDB save nahi hota.\n\nFrontend flow (Add Education form):\n1. User chooses file → POST this API → get document + documentName\n2. On Submit → PUT /api/employees/:id with education[] including that URL"
           }
         },
         {
@@ -267,15 +777,21 @@
           "request": {
             "method": "PUT",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"detailsApproval\": \"Approved\"\n}"
+              "raw": "{\n  \"detailsApproval\": \"{{detailsApproval}}\"\n}"
             },
             "url": "{{baseUrl}}/api/employees/{{userId}}",
-            "description": "Super Admin / HR Manager / Manager only.\nValues: Unapproved | Approved | Rejected"
+            "description": "Same PUT API — admin only shortcut.\nValues: Unapproved | Approved | Rejected"
           }
         },
         {
@@ -283,22 +799,33 @@
           "request": {
             "method": "PUT",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"password\": \"newpass123\"\n}"
+              "raw": "{\n  \"password\": \"{{newPassword}}\"\n}"
             },
             "url": "{{baseUrl}}/api/employees/{{userId}}",
-            "description": "Super Admin / HR Manager only"
+            "description": "Same PUT API — Super Admin / HR Manager only"
           }
         },
         {
           "name": "Delete User",
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": "{{baseUrl}}/api/employees/{{userId}}",
             "description": "Super Admin / HR Manager / Manager. Cannot delete self."
           }
@@ -313,15 +840,21 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"source\": \"web\"\n}"
+              "raw": "{\n  \"source\": \"{{punchSource}}\"\n}"
             },
             "url": "{{baseUrl}}/api/attendance/punch-in",
-            "description": "Self punch-in. source = web | mobile | biometric"
+            "description": "Self punch-in. Set {{punchSource}} = web | mobile | biometric"
           }
         },
         {
@@ -329,15 +862,21 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"source\": \"mobile\"\n}"
+              "raw": "{\n  \"source\": \"{{punchSourceMobile}}\"\n}"
             },
             "url": "{{baseUrl}}/api/attendance/punch-in",
-            "description": "Mobile app / fingerprint button → source mobile"
+            "description": "Vars: punchSourceMobile (default mobile). Uses {{baseUrl}}, {{token}}"
           }
         },
         {
@@ -345,15 +884,21 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"source\": \"web\"\n}"
+              "raw": "{\n  \"source\": \"{{punchSourceOut}}\"\n}"
             },
             "url": "{{baseUrl}}/api/attendance/punch-out",
-            "description": "Self punch-out. Same source values as punch-in.\nSee record.punchInSource + record.punchOutSource."
+            "description": "Vars: punchSourceOut. Uses {{baseUrl}}, {{token}}"
           }
         },
         {
@@ -361,22 +906,33 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"employeeId\": \"{{userId}}\",\n  \"punchType\": \"in\",\n  \"time\": \"09:30\",\n  \"reason\": \"Forgot to punch\",\n  \"remarks\": \"Approved by HR\"\n}"
+              "raw": "{\n  \"employeeId\": \"{{userId}}\",\n  \"punchType\": \"{{punchType}}\",\n  \"time\": \"{{punchTime}}\",\n  \"reason\": \"{{punchReason}}\",\n  \"remarks\": \"{{punchRemarks}}\"\n}"
             },
             "url": "{{baseUrl}}/api/attendance/manual",
-            "description": "Admin only — when employee missed punch.\nEmployees cannot use manual.\nDate always today. Set {{userId}} to target employee."
+            "description": "Admin only. Vars: userId, punchType, punchTime, punchReason, punchRemarks"
           }
         },
         {
           "name": "My Today",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": "{{baseUrl}}/api/attendance/today"
           }
         },
@@ -384,9 +940,14 @@
           "name": "List Attendance",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-            "url": "{{baseUrl}}/api/attendance",
-            "description": "Optional query: ?date=2026-09-22&source=web"
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/attendance?date={{attendanceDate}}&source={{punchSource}}",
+            "description": "Query vars: attendanceDate, punchSource. Remove query if not needed."
           }
         }
       ]
