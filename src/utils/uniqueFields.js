@@ -99,6 +99,8 @@ const normalizeSectionUniques = (sectionName, data = {}) => {
  * @returns {Promise<string|null>} friendly error text, or null if ok
  */
 const findUniqueConflict = async (values = {}, excludeId = null) => {
+  const checks = [];
+
   for (const f of UNIQUE_FIELDS) {
     const raw = values[f.path];
     if (raw === undefined || raw === null) continue;
@@ -109,12 +111,16 @@ const findUniqueConflict = async (values = {}, excludeId = null) => {
     const filter = { [f.path]: value };
     if (excludeId) filter._id = { $ne: excludeId }; // allow keeping own value
 
-    const taken = await User.findOne(filter).select("_id").lean();
-    if (taken) {
-      return `${f.label} already exists`;
-    }
+    checks.push(
+      User.findOne(filter)
+        .select("_id")
+        .lean()
+        .then((taken) => (taken ? `${f.label} already exists` : null))
+    );
   }
-  return null;
+
+  const results = await Promise.all(checks);
+  return results.find(Boolean) || null;
 };
 
 /**

@@ -32,11 +32,11 @@ const {
   getEmployee,
   updateEmployee,
   deleteEmployee,
-  uploadEducationDocument,
+  uploadAttachment,
 } = require("../controllers/employee.controller");
 const { protect, authorize, ALL_ACCESS } = require("../middleware/auth");
 const { validate } = require("../middleware/validate");
-const { uploadEducationDoc } = require("../middleware/upload");
+const { uploadFile } = require("../middleware/upload");
 const {
   createUserSchema,
   updateUserSchema,
@@ -81,8 +81,8 @@ const router = express.Router();
  *             employee:
  *               summary: Create Employee
  *               value:
- *                 name: Ananya Iyer
- *                 officialEmail: ananya@techculture.ai
+ *                 name: Shivi Gupta
+ *                 officialEmail: shivi.gupta@techculture.ai
  *                 employeeCode: EMP-1024
  *                 mobileNo: "9810044556"
  *                 password: "123456"
@@ -111,8 +111,8 @@ const router = express.Router();
  *             fullProfile:
  *               summary: Create with full profile
  *               value:
- *                 name: Ananya Iyer
- *                 officialEmail: ananya.full@techculture.ai
+ *                 name: Shivi Gupta
+ *                 officialEmail: shivi.gupta@techculture.ai
  *                 password: "123456"
  *                 role: Employee
  *                 company: TechCulture Solutions Private Limited
@@ -125,7 +125,7 @@ const router = express.Router();
  *                   gender: Female
  *                   fatherOrHusbandName: Ramesh Iyer
  *                   maritalStatus: Single
- *                   personalEmail: ananya.personal@gmail.com
+ *                   personalEmail: shivi.gupta.personal@gmail.com
  *                   languageKnown: English, Hindi
  *                   emergencyContact1: "9810011122"
  *                   emergencyContact2: "9810033344"
@@ -141,17 +141,66 @@ const router = express.Router();
  *                 official:
  *                   employeeCode: EMP-1024
  *                   designation: Finance Executive
+ *                   reportingHead1: Shivangi Gupta
+ *                   jobRole: Executive
  *                   dateOfJoining: "2024-01-15"
  *                   grade: G4
+ *                 other:
+ *                   bloodGroup: B+
+ *                   passportExpiry: "2030-12-31"
  *                 education:
- *                   - courseName: B.Com
+ *                   - courseType: Full Time
  *                     courseLevel: Graduation
+ *                     courseName: B.Com
  *                     instituteName: ABC College
+ *                     location: Noida
+ *                     fromYear: "2016"
+ *                     passingYear: "2020"
+ *                     percentageOrGrade: 8.2 CGPA
+ *                 accounts:
+ *                   - bankName: HDFC Bank
+ *                     accountNo: "50100123456789"
+ *                     accountHolderName: Shivi Gupta
+ *                     ifscCode: HDFC0001234
+ *                     location: Noida
+ *                     attachment: ""
+ *                     active: true
+ *                     salaryAccount: true
+ *                 family:
+ *                   - name: Ramesh Iyer
+ *                     relation: Father
+ *                     occupation: Business
+ *                     mobileNo: "9876501234"
+ *                     mediclaim: false
+ *                 nominees:
+ *                   - nominateFor: PF
+ *                     nomineeName: Neha Iyer
+ *                     relation: Sister
+ *                     amountPercent: 100
+ *                     address: Sector 62
+ *                 experience:
+ *                   - organization: Previous Corp
+ *                     designation: Analyst
+ *                     location: Noida
+ *                     fromDate: "2020-07-01"
+ *                     toDate: "2023-12-31"
+ *                     lastSalaryDrawn: "45000"
+ *                 visas:
+ *                   - countryName: USA
+ *                     visaType: B1/B2
+ *                     visaNumber: V1234567
+ *                     fromDate: "2025-01-01"
+ *                     toDate: "2025-12-31"
  *                 payroll:
  *                   basic: 40000
+ *                   annualCtc: 600000
  *                   paymentMode: Bank
+ *                   taxRegime: New
+ *                   bankName: HDFC Bank
+ *                   bankAccount: "50100123456789"
+ *                   ifsc: HDFC0001234
  *     responses:
- *       201: { description: User created (emailSent true/false) }
+ *       201: { description: User created. Welcome email is sent after the response. }
  *       400: { description: Validation failed / unique field conflict }
  *       403: { description: Role not allowed }
  */
@@ -190,59 +239,66 @@ router.get(
 
 /**
  * @swagger
- * /api/employees/{id}/education/document:
+ * /api/employees/upload:
  *   post:
  *     tags: [Employees]
- *     summary: Upload education document (certificate / marksheet)
+ *     summary: Upload attachment to Cloudinary
  *     description: |
- *       Form-data field: `document` (file only).
- *       Uploads to Cloudinary and returns `document` URL + `documentName`.
- *       Does **not** update DB — frontend includes URL in education on Submit (PUT).
+ *       No user id. Form-data: `document` (file) and `type` (`education` or `account`).
+ *       Cloudinary folder is `hrms/<type>`. The same type always uses that same folder.
+ *       Saves nothing in the database. On Submit, put the returned `url` in:
+ *       - education → `education[].document` and `education[].documentName`
+ *       - account → `accounts[].attachment`
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - $ref: '#/components/parameters/UserId'
  *     requestBody:
  *       required: true
  *       content:
  *         multipart/form-data:
  *           schema:
  *             type: object
- *             required: [document]
+ *             required: [document, type]
  *             properties:
  *               document:
  *                 type: string
  *                 format: binary
- *                 description: Certificate or marksheet (PDF, JPG, PNG, DOC — max 5MB)
+ *                 description: PDF, JPG, PNG or DOC — max 5MB
+ *               type:
+ *                 type: string
+ *                 enum: [education, account]
+ *                 example: account
  *     responses:
  *       201:
- *         description: Uploaded — returns document URL + documentName
+ *         description: Cloudinary URL only
  *         content:
  *           application/json:
  *             example:
  *               success: true
- *               message: Document uploaded
- *               document: https://res.cloudinary.com/demo/image/upload/v1/hrms/education/marksheet.pdf
- *               documentName: marksheet.pdf
+ *               message: File uploaded
+ *               type: account
+ *               folder: hrms/account
+ *               url: https://res.cloudinary.com/demo/image/upload/v1/hrms/account/passbook.pdf
+ *               fileName: passbook.pdf
+ *               document: https://res.cloudinary.com/demo/image/upload/v1/hrms/account/passbook.pdf
+ *               documentName: passbook.pdf
  *       400:
- *         description: No file or invalid type
+ *         description: Missing file, bad type, or invalid file
  *       500:
  *         description: Cloudinary not configured or upload failed
  */
-// UPLOAD education document — Cloudinary URL only (DB save via PUT education[])
 router.post(
-  "/:id/education/document",
+  "/upload",
   protect,
   authorize(...ALL_ACCESS, "Employee"),
   (req, res, next) => {
-    uploadEducationDoc(req, res, (err) => {
+    uploadFile(req, res, (err) => {
       if (err) {
         return res.status(400).json({ message: err.message });
       }
       next();
     });
   },
-  uploadEducationDocument
+  uploadAttachment
 );
 
 /**
@@ -297,8 +353,8 @@ router.get(
  *
  *       **Auto:** personal.anniversaryDate = next work anniversary from official.dateOfJoining
  *
- *       **Education + document:** upload via POST .../education/document, then PUT education[] with
- *       `document` + `documentName`.
+ *       **Files:** POST /api/employees/upload with type `education` or `account`.
+ *       Cloudinary folder is `hrms/education` or `hrms/account`. Put `url` on Submit.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -313,7 +369,7 @@ router.get(
  *             superAdminFull:
  *               summary: Super Admin — all objects (incl. official + payroll)
  *               value:
- *                 name: Ananya Iyer
+ *                 name: Shivi Gupta
  *                 detailsApproval: Approved
  *                 personal:
  *                   dateOfBirth: "1995-06-15"
@@ -322,7 +378,7 @@ router.get(
  *                   fatherOrHusbandName: Ramesh Iyer
  *                   panNo: ABCDE1234F
  *                   aadhaarNo: "123456789012"
- *                   personalEmail: ananya.personal@gmail.com
+ *                   personalEmail: shivi.gupta.personal@gmail.com
  *                   mobileNo: "9810044556"
  *                   workPhone: "0120-4000000"
  *                   workExt: "204"
@@ -345,7 +401,7 @@ router.get(
  *                     pincode: "201301"
  *                 official:
  *                   employeeCode: EMP-1024
- *                   officialEmail: ananya@techculture.ai
+ *                   officialEmail: shivi.gupta@techculture.ai
  *                   company: TechCulture Solutions Private Limited
  *                   department: Finance
  *                   designation: Finance Executive
@@ -370,7 +426,7 @@ router.get(
  *                 accounts:
  *                   - bankName: HDFC Bank
  *                     accountNo: "50100123456789"
- *                     accountHolderName: Ananya Iyer
+ *                     accountHolderName: Shivi Gupta
  *                     ifscCode: HDFC0001234
  *                     location: Noida
  *                     active: true
@@ -416,7 +472,7 @@ router.get(
  *                   fatherOrHusbandName: Ramesh Iyer
  *                   panNo: ABCDE1234F
  *                   aadhaarNo: "123456789012"
- *                   personalEmail: ananya.personal@gmail.com
+ *                   personalEmail: shivi.gupta.personal@gmail.com
  *                   mobileNo: "9810044556"
  *                   workPhone: "0120-4000000"
  *                   workExt: "204"
@@ -452,7 +508,7 @@ router.get(
  *                 accounts:
  *                   - bankName: HDFC Bank
  *                     accountNo: "50100123456789"
- *                     accountHolderName: Ananya Iyer
+ *                     accountHolderName: Shivi Gupta
  *                     ifscCode: HDFC0001234
  *                     active: true
  *                     salaryAccount: true

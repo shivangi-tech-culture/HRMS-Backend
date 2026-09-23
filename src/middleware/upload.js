@@ -1,7 +1,9 @@
 /**
- * File upload — education documents via Cloudinary
+ * File upload — Cloudinary only (no database save)
  *
  * Flow: multer (memory) → upload stream to Cloudinary → return secure URL
+ * type=education → folder hrms/education
+ * type=account   → folder hrms/account
  *
  * IMPORTANT — PDF not opening in browser?
  *   Cloudinary FREE plans block PDF delivery by default.
@@ -13,7 +15,7 @@
  *
  * Env:
  *   CLOUDINARY_CLOUD_NAME / API_KEY / API_SECRET
- *   CLOUDINARY_FOLDER=hrms/education
+ *   CLOUDINARY_FOLDER=hrms   (files go to hrms/education or hrms/account)
  */
 const multer = require("multer");
 const path = require("path");
@@ -34,8 +36,11 @@ const allowed = new Set([
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ]);
 
-/** Multer field name: "document" — max 5 MB */
-const uploadEducationDoc = multer({
+/** Allowed attachment kinds. Folder on Cloudinary is hrms/<type>. */
+const UPLOAD_TYPES = ["education", "account"];
+
+/** Common file parser for every type. Field name: "document" — max 5 MB */
+const uploadFile = multer({
   storage: multer.memoryStorage(),
   fileFilter: (_req, file, cb) => {
     if (allowed.has(file.mimetype)) cb(null, true);
@@ -57,8 +62,15 @@ const safeBaseName = (originalName) =>
  * DOC → raw + extension in public_id (download only)
  * JPG/PNG → image
  */
-const uploadOptionsFor = (file) => {
-  const folder = process.env.CLOUDINARY_FOLDER || "hrms/education";
+/** hrms/education stays hrms/education; account uses the same root. */
+const folderFor = (type) => {
+  const configured = (process.env.CLOUDINARY_FOLDER || "hrms").replace(/\/+$/, "");
+  const root = configured.replace(/\/(education|account)$/, "") || "hrms";
+  return `${root}/${type}`;
+};
+
+const uploadOptionsFor = (file, type = "education") => {
+  const folder = folderFor(type);
   const baseId = `${Date.now()}-${safeBaseName(file.originalname)}`;
   const mime = file.mimetype;
 
@@ -111,7 +123,7 @@ const uploadOptionsFor = (file) => {
  * Upload a multer file buffer to Cloudinary.
  * @returns {{ url, publicId, originalName }}
  */
-const uploadToCloudinary = (file) => {
+const uploadToCloudinary = (file, type = "education") => {
   return new Promise((resolve, reject) => {
     if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY) {
       return reject(
@@ -121,17 +133,23 @@ const uploadToCloudinary = (file) => {
       );
     }
 
-    const options = uploadOptionsFor(file);
+    const options = uploadOptionsFor(file, type);
     const stream = cloudinary.uploader.upload_stream(options, (err, result) => {
       if (err) return reject(err);
       resolve({
         url: result.secure_url,
         publicId: result.public_id,
         originalName: file.originalname,
+        folder: options.folder,
       });
     });
     stream.end(file.buffer);
   });
 };
 
-module.exports = { uploadEducationDoc, uploadToCloudinary, cloudinary };
+module.exports = {
+  UPLOAD_TYPES,
+  uploadFile,
+  uploadToCloudinary,
+  cloudinary,
+};

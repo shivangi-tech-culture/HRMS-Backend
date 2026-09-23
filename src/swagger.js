@@ -18,7 +18,7 @@ const description = [
   "1. `POST /api/auth/login` with `officialEmail` + `password`",
   "2. Use token on protected APIs",
   "3. `POST /api/employees` creates the user and the full profile in one request",
-  "4. Education file → upload API → put URL in `education[]` on Submit",
+  "4. File → `POST /api/employees/upload` with `type` (`education` or `account`) → put the URL on Submit",
   "",
   "**Roles:** name cannot change. Super Admin cannot be edited or deleted and always has full access.",
   "Permission update (`PUT /api/roles/{id}/permissions`) works for Employee, HR Manager, Manager, and custom roles.",
@@ -272,7 +272,7 @@ module.exports = swaggerJsdoc({
             },
             personalEmail: {
               type: "string",
-              example: "ananya.personal@gmail.com",
+              example: "shivi.gupta.personal@gmail.com",
               description: "Unique when set",
             },
             languageKnown: { type: "string", example: "Hindi, English" },
@@ -313,7 +313,7 @@ module.exports = swaggerJsdoc({
             },
             officialEmail: {
               type: "string",
-              example: "ananya@techculture.ai",
+              example: "shivi.gupta@techculture.ai",
               description: "Login ID — unique",
             },
             company: {
@@ -378,7 +378,7 @@ module.exports = swaggerJsdoc({
           properties: {
             bankName: { type: "string", example: "HDFC Bank" },
             accountNo: { type: "string", example: "50100123456789" },
-            accountHolderName: { type: "string", example: "Ananya Iyer" },
+            accountHolderName: { type: "string", example: "Shivi Gupta" },
             ifscCode: { type: "string", example: "HDFC0001234" },
             location: { type: "string", example: "Noida" },
             remarks: { type: "string" },
@@ -491,10 +491,10 @@ module.exports = swaggerJsdoc({
             "status",
           ],
           properties: {
-            name: { type: "string", example: "Ananya Iyer" },
+            name: { type: "string", example: "Shivi Gupta" },
             officialEmail: {
               type: "string",
-              example: "ananya@techculture.ai",
+              example: "shivi.gupta@techculture.ai",
               description: "→ official.officialEmail",
             },
             employeeCode: {
@@ -561,7 +561,7 @@ module.exports = swaggerJsdoc({
           description:
             "All nested objects. Admin: full. Employee: personal/other/arrays only (no official/payroll).",
           properties: {
-            name: { type: "string", example: "Ananya Iyer" },
+            name: { type: "string", example: "Shivi Gupta" },
             password: {
               type: "string",
               example: "newpass123",

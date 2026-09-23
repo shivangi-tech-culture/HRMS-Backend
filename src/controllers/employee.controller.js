@@ -7,7 +7,7 @@
  *   GET    /api/employees/:id          → get one user
  *   PUT    /api/employees/:id          → update profile (same API for admin + employee)
  *   DELETE /api/employees/:id          → delete user
- *   POST   /api/employees/:id/education/document → upload certificate to Cloudinary
+ *   POST   /api/employees/upload               → Cloudinary file (type: education | account)
  *
  * Create mapping:
  *   Required flat: name, officialEmail, password, role, company, department, status
@@ -28,7 +28,7 @@ const User = require("../models/User");
 const Role = require("../models/Role");
 const { hasAllAccess } = require("../middleware/auth");
 const { sendWelcomeEmail } = require("../utils/mail");
-const { uploadToCloudinary } = require("../middleware/upload");
+const { uploadToCloudinary, UPLOAD_TYPES } = require("../middleware/upload");
 const { applyAnniversary } = require("../utils/anniversary");
 const {
   normalizeSectionUniques,
@@ -173,23 +173,27 @@ const createEmployee = async (req, res) => {
       permanentAddress,
     });
 
-    const createConflict = await findUniqueConflict({
-      "official.officialEmail": official.officialEmail,
-      "official.employeeCode": official.employeeCode,
-      "personal.mobileNo": personal.mobileNo,
-      "personal.personalEmail": personal.personalEmail,
-      "personal.panNo": personal.panNo,
-      "personal.aadhaarNo": personal.aadhaarNo,
-      "personal.drivingLicenseNo": personal.drivingLicenseNo,
-      "personal.passportNo": personal.passportNo,
-    });
+    const roleName = (role || "Employee").trim();
+
+    // Unique check, role lookup, and password hash run together so create returns faster.
+    const [createConflict, targetRole, hashedPassword] = await Promise.all([
+      findUniqueConflict({
+        "official.officialEmail": official.officialEmail,
+        "official.employeeCode": official.employeeCode,
+        "personal.mobileNo": personal.mobileNo,
+        "personal.personalEmail": personal.personalEmail,
+        "personal.panNo": personal.panNo,
+        "personal.aadhaarNo": personal.aadhaarNo,
+        "personal.drivingLicenseNo": personal.drivingLicenseNo,
+        "personal.passportNo": personal.passportNo,
+      }),
+      Role.findOne({ name: roleName, status: "Active" }),
+      bcrypt.hash(password, 10),
+    ]);
     if (createConflict) {
       return res.status(400).json({ message: createConflict });
     }
 
-    // Role must exist and be Active
-    const roleName = (role || "Employee").trim();
-    const targetRole = await Role.findOne({ name: roleName, status: "Active" });
     if (!targetRole) {
       return res.status(400).json({ message: "Role not found or inactive" });
     }
@@ -201,7 +205,7 @@ const createEmployee = async (req, res) => {
 
     const employee = await User.create({
       name,
-      password: await bcrypt.hash(password, 10),
+      password: hashedPassword,
       role: roleName,
       status: status || "Active",
       detailsApproval: defaultDetailsApproval(roleName),
@@ -217,30 +221,20 @@ const createEmployee = async (req, res) => {
       ...(req.body.payroll ? { payroll: req.body.payroll } : {}),
     });
 
-    // Welcome mail is best-effort (user is still created if mail fails)
-    let emailSent = false;
-    let emailError = null;
-    try {
-      await sendWelcomeEmail({
-        name,
-        email,
-        password,
-        role: roleName,
-        company: official.company,
-        department: official.department,
-      });
-      emailSent = true;
-    } catch (mailErr) {
+    // Mail goes after the response so SMTP does not hold the request.
+    sendWelcomeEmail({
+      name,
+      email,
+      password,
+      role: roleName,
+      company: official.company,
+      department: official.department,
+    }).catch((mailErr) => {
       console.error("Welcome email failed:", mailErr.message);
-      emailError = mailErr.message;
-    }
+    });
 
     return res.status(201).json({
-      message: emailSent
-        ? "User created and welcome email sent"
-        : "User created but welcome email failed",
-      emailSent,
-      emailError,
+      message: "User created",
       employee: safeUser(employee),
     });
   } catch (err) {
@@ -492,41 +486,37 @@ const deleteEmployee = async (req, res) => {
 };
 
 // =============================================================================
-// UPLOAD EDUCATION DOCUMENT — POST /api/employees/:id/education/document
-// Form-data: document (file only)
-// Only uploads to Cloudinary → returns URL.
-// Frontend puts document + documentName into education[] on Submit (PUT).
+// UPLOAD FILE — POST /api/employees/upload
+// No user id. Form-data: document (file) + type (education | account)
+// Same type always saves in the same Cloudinary folder (hrms/education, hrms/account).
+// Returns the URL only. Frontend saves it on Submit (PUT).
 // =============================================================================
-const uploadEducationDocument = async (req, res) => {
+const uploadAttachment = async (req, res) => {
   try {
-    if (!hasAllAccess(req.user) && !isOwnRecord(req, req.params.id)) {
-      return res
-        .status(403)
-        .json({ message: "You can only upload for your own profile" });
-    }
-
-    const employee = await User.findById(req.params.id);
-    if (!employee) {
-      return res.status(404).json({ message: "Employee not found" });
-    }
-
-    if (isProfileLocked(req, employee)) {
-      return res.status(403).json({
-        message: "Details are approved — editing is locked. Contact HR / Admin.",
+    const type = String(req.body.type || "")
+      .trim()
+      .toLowerCase();
+    if (!UPLOAD_TYPES.includes(type)) {
+      return res.status(400).json({
+        message: "type is required: education or account",
       });
     }
 
     if (!req.file) {
-      return res
-        .status(400)
-        .json({ message: "Please choose a file (certificate / marksheet)" });
+      return res.status(400).json({
+        message: "Please choose a file (PDF, JPG, PNG or DOC — max 5MB)",
+      });
     }
 
-    const uploaded = await uploadToCloudinary(req.file);
+    const uploaded = await uploadToCloudinary(req.file, type);
 
     return res.status(201).json({
       success: true,
-      message: "Document uploaded",
+      message: "File uploaded",
+      type,
+      folder: uploaded.folder,
+      url: uploaded.url,
+      fileName: uploaded.originalName,
       document: uploaded.url,
       documentName: uploaded.originalName,
     });
@@ -541,5 +531,5 @@ module.exports = {
   getEmployee,
   updateEmployee,
   deleteEmployee,
-  uploadEducationDocument,
+  uploadAttachment,
 };
