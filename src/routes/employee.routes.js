@@ -11,7 +11,8 @@
  *   4. controller  → business logic
  *
  * WHO CAN CALL WHAT:
- *   Create user          → Super Admin, HR Manager
+ *   Create user          → Super Admin always.
+ *                          HR Manager / Manager only if Employee → create is on.
  *   List / Get / Update  → Super Admin, HR Manager, Manager, Employee
  *   Delete               → Super Admin, HR Manager, Manager
  *
@@ -35,6 +36,7 @@ const {
   uploadAttachment,
 } = require("../controllers/employee.controller");
 const { protect, authorize, ALL_ACCESS } = require("../middleware/auth");
+const { checkPermission } = require("../controllers/permission.controller");
 const { validate } = require("../middleware/validate");
 const { uploadFile } = require("../middleware/upload");
 const {
@@ -59,7 +61,8 @@ const router = express.Router();
  *     tags: [Employees]
  *     summary: Create User
  *     description: |
- *       **Who:** Super Admin, HR Manager
+ *       **Who:** Super Admin always. HR Manager and Manager only when
+ *       Employee → Employee → create is allowed. Otherwise 403.
  *
  *       **Required:** name, officialEmail, password, role, company, department, status
  *       **Optional flat:** employeeCode, mobileNo, city, state, country
@@ -202,13 +205,14 @@ const router = express.Router();
  *     responses:
  *       201: { description: User created. Welcome email is sent after the response. }
  *       400: { description: Validation failed / unique field conflict }
- *       403: { description: Role not allowed }
+ *       403: { description: Role not allowed, or Employee create permission is off }
  */
-// CREATE USER — Super Admin / HR Manager only
+// CREATE USER — Super Admin always; HR / Manager only with Employee create permission
 router.post(
   "/",
   protect,
-  authorize("Super Admin", "HR Manager" , "Manager"),
+  authorize("Super Admin", "HR Manager", "Manager"),
+  checkPermission("Employee", "Employee", "create"),
   validate(createUserSchema),
   createEmployee
 );
