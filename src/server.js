@@ -20,6 +20,8 @@
  *   Health   → http://localhost:9001/api/health
  */
 require("dotenv").config();
+const fs = require("fs");
+const path = require("path");
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
@@ -159,76 +161,13 @@ app.use(globalLimiter);
 // =============================================================================
 
 /**
- * Swagger UI — interactive API docs (try endpoints in browser).
- * customCss restyles the guide above the endpoints (tables, headings, code chips).
+ * Swagger UI — interactive API docs
+ * Styles live in src/swagger/custom.css (not inline here)
  */
-const swaggerCss = `
-  .swagger-ui .topbar { display: none; }
-  .swagger-ui .info { margin: 24px 0 8px; }
-  .swagger-ui .info .title { color: #143028; font-size: 30px; }
-  .swagger-ui .info .title small.version-stamp { background: #1f6b4a; }
-  .swagger-ui .info .description {
-    margin-top: 16px;
-    padding: 4px 18px 12px;
-    border: 1px solid #d7e3dc;
-    border-radius: 12px;
-    background: #fbfdfc;
-  }
-  .swagger-ui .info .description p {
-    margin: 12px 0 8px;
-    line-height: 1.5;
-    color: #3d4f47;
-  }
-  .swagger-ui .info .description h3 {
-    margin: 22px 0 8px;
-    padding-bottom: 6px;
-    border-bottom: 1px solid #e3ebe6;
-    color: #143028;
-    font-size: 15px;
-    font-weight: 700;
-  }
-  .swagger-ui .info table {
-    margin: 0 0 6px;
-    border: 1px solid #d7e3dc;
-    border-radius: 8px;
-    border-collapse: separate;
-    border-spacing: 0;
-    overflow: hidden;
-  }
-  .swagger-ui .info table thead tr th,
-  .swagger-ui .info table thead tr td {
-    background: #143028;
-    color: #f4faf7;
-    padding: 8px 12px;
-    border-bottom: none;
-    font-size: 12px;
-  }
-  .swagger-ui .info table tbody tr td {
-    padding: 8px 12px;
-    border-bottom: 1px solid #e7eeea;
-    vertical-align: middle;
-    min-width: 0;
-  }
-  .swagger-ui .info table tbody tr:last-child td { border-bottom: none; }
-  .swagger-ui .info table tbody tr:nth-child(even) td { background: #f3f8f5; }
-  .swagger-ui .info .markdown code,
-  .swagger-ui .info .renderedMarkdown code {
-    color: #0f5c42;
-    background: #e7f3ed;
-    font-weight: 600;
-    font-size: 12.5px;
-    padding: 1px 6px;
-    border-radius: 5px;
-  }
-  .swagger-ui .scheme-container {
-    margin: 12px 0 18px;
-    padding: 12px 16px;
-    background: #f7faf8;
-    box-shadow: none;
-    border: 1px solid #e4ebe7;
-    border-radius: 10px;
-  }
-`;
+const swaggerCss = fs.readFileSync(
+  path.join(__dirname, "swagger", "custom.css"),
+  "utf8"
+);
 
 app.use(
   "/api-docs",
@@ -239,8 +178,7 @@ app.use(
   })
 );
 
-/** Root — quick pointer to docs + health + route names */
-/** Root — simple status message (details via /api/health + /api-docs) */
+/** Root — simple status message */
 app.get("/", (req, res) => {
   res.status(200).json({
     success: true,
