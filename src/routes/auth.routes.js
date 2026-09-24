@@ -1,14 +1,12 @@
 /**
  * Auth routes → /api/auth
  *
- * Public:  POST /login  (no token)
- * Private: GET  /me     (needs Bearer token)
+ * Public: POST /login (no token)
  *
  * Flow: validate(Joi) → controller
  */
 const express = require("express");
-const { login, me } = require("../controllers/auth.controller");
-const { protect } = require("../middleware/auth");
+const { login } = require("../controllers/auth.controller");
 const { validate } = require("../middleware/validate");
 const { loginSchema } = require("../validators/user.validation");
 
@@ -18,7 +16,7 @@ const router = express.Router();
  * @swagger
  * tags:
  *   - name: Auth
- *     description: Login and current user (no duplicate menu in responses)
+ *     description: Login with official email and password
  */
 
 /**
@@ -51,22 +49,5 @@ const router = express.Router();
  *         description: Invalid credentials or inactive account
  */
 router.post("/login", validate(loginSchema), login);
-
-/**
- * @swagger
- * /api/auth/me:
- *   get:
- *     tags: [Auth]
- *     summary: Current logged-in user
- *     description: Returns user + permissions (single list — no menu)
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Profile + permissions
- *       401:
- *         description: Missing or invalid token
- */
-router.get("/me", protect, me);
 
 module.exports = router;

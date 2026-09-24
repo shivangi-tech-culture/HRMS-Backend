@@ -2,7 +2,6 @@
  * Auth controller — login and current user
  *
  * POST /api/auth/login  → check official email + password → JWT + permissions
- * GET  /api/auth/me     → return logged-in user (needs Bearer token)
  *
  * Login ID is stored at: official.officialEmail
  */
@@ -90,22 +89,4 @@ const login = async (req, res) => {
   }
 };
 
-/**
- * GET /api/auth/me
- * Requires: Authorization Bearer token (protect middleware sets req.user)
- * Returns permissions once (no duplicate menu)
- */
-const me = async (req, res) => {
-  try {
-    const roleDoc = await Role.findOne({ name: req.user.role });
-    return res.json({
-      user: req.user,
-      permissionCount: permLabel(roleDoc),
-      permissions: roleDoc ? roleDoc.permissions : [],
-    });
-  } catch (err) {
-    return res.status(500).json({ message: err.message });
-  }
-};
-
-module.exports = { login, me };
+module.exports = { login };

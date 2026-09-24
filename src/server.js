@@ -37,7 +37,6 @@ const authRoutes = require("./routes/auth.routes");
 const roleRoutes = require("./routes/role.routes");
 const employeeRoutes = require("./routes/employee.routes");
 const attendanceRoutes = require("./routes/attendance.routes");
-const permissionRoutes = require("./routes/permission.routes");
 const healthRoutes = require("./routes/health.routes");
 
 const app = express();
@@ -195,9 +194,8 @@ app.get("/", (req, res) => {
  */
 app.use("/api/health", healthRoutes); // public health check (API + MongoDB)
 app.use("/api/auth/login", loginLimiter); // count login attempts (max 20 / window)
-app.use("/api/auth", authRoutes); // login, me
+app.use("/api/auth", authRoutes); // login
 app.use("/api/roles", roleRoutes); // role CRUD + permission matrix
-app.use("/api/permissions", permissionRoutes); // catalog + my permissions
 app.use("/api/employees", employeeRoutes); // users / profile / education upload
 app.use("/api/attendance", attendanceRoutes); // punch in/out + manual mark
 

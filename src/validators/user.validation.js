@@ -17,6 +17,7 @@
  *   nominees[], experience[], visas[], payroll{}
  */
 const Joi = require("joi");
+const { validate } = require("../middleware/validate");
 
 // Small helpers so schemas stay short and consistent
 const str = () => Joi.string().trim().allow("").optional();
@@ -76,8 +77,8 @@ const personalItem = only({
   anniversaryDate: date(), // ignored in controller (auto-calculated)
   personalEmail: emailOpt(),
   languageKnown: str(),
-  emergencyContact1: phoneOpt(),
-  emergencyContact2: phoneOpt(),
+  emergencyContact1: str(),
+  emergencyContact2: str(),
   drivingLicenseNo: str(),
   licenseValidUpto: date(),
   passportNo: str(),
@@ -85,7 +86,7 @@ const personalItem = only({
   presentAddress: address.optional(),
   permanentAddress: address.optional(),
   mobileNo: phoneOpt(),
-  workPhone: phoneOpt(),
+  workPhone: str(),
   workExt: str(),
 });
 
@@ -251,9 +252,16 @@ const createUserSchema = Joi.object({
   payroll: payrollItem.optional(),
 }).unknown(false);
 
+/** One new/edited row, or the full list (replace). */
+const listOrOne = (item) =>
+  Joi.alternatives().try(item, Joi.array().items(item));
+
 /**
  * UPDATE USER body
  * At least one field required. Same *Item field checks as create.
+ * education, accounts, family, nominees, experience, visas:
+ *   one object → append, or update that row when _id is sent
+ *   array → replace the whole list
  */
 const updateUserSchema = Joi.object({
   name: Joi.string().trim().min(2).max(100).optional(),
@@ -266,12 +274,12 @@ const updateUserSchema = Joi.object({
   personal: personalItem.optional(),
   official: officialItem.optional(),
   other: otherItem.optional(),
-  education: Joi.array().items(educationItem).optional(),
-  accounts: Joi.array().items(accountItem).optional(),
-  family: Joi.array().items(familyItem).optional(),
-  nominees: Joi.array().items(nomineeItem).optional(),
-  experience: Joi.array().items(experienceItem).optional(),
-  visas: Joi.array().items(visaItem).optional(),
+  education: listOrOne(educationItem).optional(),
+  accounts: listOrOne(accountItem).optional(),
+  family: listOrOne(familyItem).optional(),
+  nominees: listOrOne(nomineeItem).optional(),
+  experience: listOrOne(experienceItem).optional(),
+  visas: listOrOne(visaItem).optional(),
   payroll: payrollItem.optional(),
 })
   .min(1)
@@ -283,8 +291,67 @@ const loginSchema = Joi.object({
   password: Joi.string().required(),
 }).unknown(false);
 
+/** Same row checks as update, keyed by the list name in the URL. */
+const ARRAY_ITEM_SCHEMAS = {
+  education: educationItem,
+  accounts: accountItem,
+  family: familyItem,
+  nominees: nomineeItem,
+  experience: experienceItem,
+  visas: visaItem,
+};
+
+/** official{} and payroll{} — same field checks as profile update. Admin only. */
+const OBJECT_SECTION_SCHEMAS = {
+  official: officialItem,
+  payroll: payrollItem,
+};
+
+const badSection = (res) =>
+  res.status(400).json({
+    message:
+      "section must be education, accounts, family, nominees, experience, visas, official, or payroll",
+  });
+
+/** PUT /api/employees/:id/:section — official/payroll object, or one list row, or many rows. */
+const validateSectionEdit = (req, res, next) => {
+  const { section } = req.params;
+  const objectSchema = OBJECT_SECTION_SCHEMAS[section];
+  if (objectSchema) return validate(objectSchema.min(1))(req, res, next);
+
+  const itemSchema = ARRAY_ITEM_SCHEMAS[section];
+  if (!itemSchema) return badSection(res);
+
+  const row = itemSchema.keys({ _id: Joi.string().trim().required() });
+  return validate(Joi.alternatives().try(row, Joi.array().items(row).min(1)))(
+    req,
+    res,
+    next
+  );
+};
+
+/** DELETE /api/employees/:id/:section — one { _id }, an array of ids, or payroll clear. */
+const validateSectionDelete = (req, res, next) => {
+  const { section } = req.params;
+  if (section === "official" || section === "payroll") return next();
+  if (!ARRAY_ITEM_SCHEMAS[section]) return badSection(res);
+
+  const id = Joi.string().trim().required();
+  const one = Joi.object({ _id: id }).unknown(true);
+  return validate(
+    Joi.alternatives().try(
+      one,
+      Joi.array().items(id).min(1),
+      Joi.array().items(one).min(1)
+    )
+  )(req, res, next);
+};
+
 module.exports = {
   createUserSchema,
   updateUserSchema,
   loginSchema,
+  validateSectionEdit,
+  validateSectionDelete,
+  ARRAY_ITEM_SCHEMAS,
 };

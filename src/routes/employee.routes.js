@@ -34,6 +34,8 @@ const {
   listEmployees,
   getEmployee,
   updateEmployee,
+  editSection,
+  deleteSection,
   deleteEmployee,
   uploadAttachment,
 } = require("../controllers/employee.controller");
@@ -44,6 +46,8 @@ const { uploadFile } = require("../middleware/upload");
 const {
   createUserSchema,
   updateUserSchema,
+  validateSectionEdit,
+  validateSectionDelete,
 } = require("../validators/user.validation");
 
 const router = express.Router();
@@ -403,6 +407,10 @@ router.get(
  *
  *       **Auto:** personal.anniversaryDate = next work anniversary from official.dateOfJoining
  *
+ *       **Lists** (education, accounts, family, nominees, experience, visas):
+ *       send one object to append, or the same object with `_id` to edit that row.
+ *       Send the full array only when replacing the list (for example to delete a row).
+ *
  *       **Files:** POST /api/employees/upload with type `education` or `account`.
  *       Cloudinary folder is `hrms/education` or `hrms/account`. Put `url` on Submit.
  *     security:
@@ -605,6 +613,80 @@ router.put(
   authorize(...ALL_ACCESS, "Employee"),
   validate(updateUserSchema),
   updateEmployee
+);
+
+/**
+ * @swagger
+ * /api/employees/{id}/{section}:
+ *   put:
+ *     tags: [Employees]
+ *     summary: Edit a section
+ *     description: |
+ *       **Lists** (education, accounts, family, nominees, experience, visas):
+ *       one object with `_id` edits that row. An array of objects edits each row.
+ *       **official / payroll:** one object. Super Admin, HR Manager, Manager only.
+ *       Same field checks as profile update.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/UserId'
+ *       - in: path
+ *         name: section
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [education, accounts, family, nominees, experience, visas, official, payroll]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             oneOf:
+ *               - $ref: '#/components/schemas/Official'
+ *               - $ref: '#/components/schemas/Payroll'
+ *           example:
+ *             designation: Finance Executive
+ *             department: Finance
+ *     responses:
+ *       200: { description: Section updated }
+ *       400: { description: Invalid fields }
+ *       403: { description: Employee or wrong company }
+ *   delete:
+ *     tags: [Employees]
+ *     summary: Delete section rows or clear payroll
+ *     description: |
+ *       **Lists:** one object `{ _id }`, or an array of ids, deletes those rows.
+ *       **payroll:** clears payroll. Super Admin, HR Manager, Manager only.
+ *       Official cannot be deleted.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/UserId'
+ *       - in: path
+ *         name: section
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [payroll]
+ *     responses:
+ *       200: { description: Payroll cleared }
+ *       400: { description: Official cannot be deleted }
+ *       403: { description: Employee or wrong company }
+ */
+router.put(
+  "/:id/:section",
+  protect,
+  authorize(...ALL_ACCESS, "Employee"),
+  validateSectionEdit,
+  editSection
+);
+
+router.delete(
+  "/:id/:section",
+  protect,
+  authorize(...ALL_ACCESS, "Employee"),
+  validateSectionDelete,
+  deleteSection
 );
 
 /**

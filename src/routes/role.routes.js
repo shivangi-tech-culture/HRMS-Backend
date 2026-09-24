@@ -9,7 +9,6 @@ const {
   createRole,
   listRoles,
   getRole,
-  updateRole,
   deleteRole,
   getPermissions,
   savePermissions,
@@ -19,7 +18,6 @@ const { checkPermission } = require("../controllers/permission.controller");
 const { validate } = require("../middleware/validate");
 const {
   createRoleSchema,
-  updateRoleSchema,
   savePermissionsSchema,
 } = require("../validators/role.validation");
 
@@ -160,37 +158,6 @@ router.get(
   protect,
   checkPermission("Administration", "Roles & Permissions", "view"),
   getRole
-);
-
-/**
- * @swagger
- * /api/roles/{id}:
- *   put:
- *     tags: [Roles]
- *     summary: Update role description or status
- *     description: |
- *       Role name cannot be changed.
- *       Super Admin cannot be edited.
- *       Employee, HR Manager, Manager, and custom roles can update description or status.
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - $ref: '#/components/parameters/RoleId'
- *     requestBody:
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/UpdateRoleBody'
- *     responses:
- *       200: { description: Updated }
- */
-router.put(
-  "/:id",
-  protect,
-  authorize(...ADMIN),
-  checkPermission("Administration", "Roles & Permissions", "edit"),
-  validate(updateRoleSchema),
-  updateRole
 );
 
 /**

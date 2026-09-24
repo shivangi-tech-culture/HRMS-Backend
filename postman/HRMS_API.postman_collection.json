@@ -535,53 +535,6 @@
             "url": "{{baseUrl}}/api/auth/login",
             "description": "Sets {{token}} + {{userId}}.\nThen use **Update Profile (Employee)** — personal only (phones etc). No official{}."
           }
-        },
-        {
-          "name": "Me",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": "{{baseUrl}}/api/auth/me",
-            "description": "Current user + permissions + menu"
-          }
-        }
-      ]
-    },
-    {
-      "name": "2 Permissions",
-      "item": [
-        {
-          "name": "Permissions Catalog",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": "{{baseUrl}}/api/permissions/modules",
-            "description": "2 objects only — side once each:\n\n{\n  actions,\n  count: 2,\n  data: [\n    { side: \"admin\", modules: [ { module, heading, subModules }, ... ] },\n    { side: \"employee\", modules: [ ... ] }\n  ]\n}"
-          }
-        },
-        {
-          "name": "My Permissions",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": "{{baseUrl}}/api/permissions/my",
-            "description": "One list only — no duplicate menu.\n\n{ role, side, permissionCount, count, data: [ { module, heading, subModules } ] }\n\nSidebar: filter subModules with view === true"
-          }
         }
       ]
     },
@@ -668,28 +621,6 @@
             },
             "url": "{{baseUrl}}/api/roles/{{roleId}}/permissions",
             "description": "Updates permissions for Employee, HR Manager, Manager, and custom roles.\nSuper Admin is rejected — that role always has full access.\nSet {{roleId}} to the role you want to edit, not Super Admin.\nMissing pages are saved as false."
-          }
-        },
-        {
-          "name": "Update Role",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"description\": \"{{roleUpdateDescription}}\",\n  \"status\": \"{{roleStatus}}\"\n}"
-            },
-            "url": "{{baseUrl}}/api/roles/{{roleId}}",
-            "description": "Description or status only. Role name cannot be changed.\nSuper Admin cannot be edited.\nDo not send name."
           }
         },
         {
@@ -981,6 +912,108 @@
             },
             "url": "{{baseUrl}}/api/employees/{{userId}}",
             "description": "Same PUT API — Super Admin / HR Manager only"
+          }
+        },
+        {
+          "name": "Edit List Item",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"_id\": \"{{itemId}}\",\n  \"bankName\": \"SBI\",\n  \"ifscCode\": \"SBIN0001234\",\n  \"active\": true\n}"
+            },
+            "url": "{{baseUrl}}/api/employees/{{userId}}/accounts",
+            "description": "Edit rows. One object or an array of objects. Each needs _id.\nChange accounts to education, family, nominees, experience, or visas.\nSame field checks as profile update."
+          }
+        },
+        {
+          "name": "Edit Official",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"designation\": \"{{designation}}\",\n  \"department\": \"{{department}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/employees/{{userId}}/official",
+            "description": "Super Admin / HR Manager / Manager only. Same field checks as profile update. Employee gets 403."
+          }
+        },
+        {
+          "name": "Edit Payroll",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"basic\": {{payrollBasic}},\n  \"paymentMode\": \"{{payrollPaymentMode}}\",\n  \"ifsc\": \"{{ifscCode}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/employees/{{userId}}/payroll",
+            "description": "Super Admin / HR Manager / Manager only. Same field checks as profile update."
+          }
+        },
+        {
+          "name": "Clear Payroll",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/employees/{{userId}}/payroll",
+            "description": "Super Admin / HR Manager / Manager only. Clears payroll. Official cannot be deleted."
+          }
+        },
+        {
+          "name": "Delete List Item",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"_id\": \"{{itemId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/employees/{{userId}}/accounts",
+            "description": "Delete rows. One object { _id }, or an array of ids.\nSection: education, accounts, family, nominees, experience, or visas."
           }
         },
         {

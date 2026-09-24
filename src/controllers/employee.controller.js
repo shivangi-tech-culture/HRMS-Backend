@@ -6,6 +6,8 @@
  *   GET    /api/employees              → list users
  *   GET    /api/employees/:id          → get one user
  *   PUT    /api/employees/:id          → update profile (same API for admin + employee)
+ *   PUT    /api/employees/:id/:section → edit official, payroll, one list row, or many rows
+ *   DELETE /api/employees/:id/:section → delete one list row, many ids, or clear payroll
  *   DELETE /api/employees/:id          → delete user
  *   POST   /api/employees/upload               → Cloudinary file (type: education | account)
  *
@@ -23,6 +25,7 @@
  *   Password  → Super Admin / HR Manager only
  */
 const bcrypt = require("bcryptjs");
+const mongoose = require("mongoose");
 const User = require("../models/User");
 const Role = require("../models/Role");
 const { hasAllAccess } = require("../middleware/auth");
@@ -70,8 +73,60 @@ const pickProfile = (body = {}) => {
   return out;
 };
 
-/** These sections are objects (merge fields). Arrays are replaced as a whole. */
+/** These sections are objects (merge fields). */
 const OBJECT_SECTIONS = new Set(["personal", "official", "other"]);
+
+/** Lists: one object appends or updates by _id. An array replaces the list. */
+const ARRAY_SECTIONS = new Set([
+  "education",
+  "accounts",
+  "family",
+  "nominees",
+  "experience",
+  "visas",
+]);
+
+const asPlainRows = (value) => {
+  const rows = Array.isArray(value) ? value : [];
+  return rows.map((row) =>
+    row && typeof row.toObject === "function" ? row.toObject() : { ...row }
+  );
+};
+
+/**
+ * One object without _id → append.
+ * One object with _id → update that row.
+ * Array → replace the whole list (use this to delete a row).
+ * Returns an error message, or null.
+ */
+const applyArraySection = (employee, key, incoming) => {
+  if (Array.isArray(incoming)) {
+    employee[key] = incoming;
+    employee.markModified(key);
+    return null;
+  }
+
+  const current = asPlainRows(employee[key]);
+  const row = { ...incoming };
+  const id = row._id ? String(row._id) : "";
+
+  if (!id) {
+    delete row._id;
+    current.push(row);
+    employee[key] = current;
+    employee.markModified(key);
+    return null;
+  }
+
+  const index = current.findIndex((item) => String(item._id) === id);
+  if (index === -1) {
+    return `${key} item not found`;
+  }
+  current[index] = { ...current[index], ...row, _id: current[index]._id };
+  employee[key] = current;
+  employee.markModified(key);
+  return null;
+};
 
 /**
  * Merge one object section without wiping other fields.
@@ -542,13 +597,16 @@ const updateEmployee = async (req, res) => {
       return res.status(400).json({ message: conflict });
     }
 
-    // Apply: objects merge, arrays replace
+    // Objects merge. One list row appends or updates. A full array replaces.
     for (const key of Object.keys(profile)) {
       if (OBJECT_SECTIONS.has(key)) {
         employee[key] = mergeSection(employee[key], profile[key], key);
-        employee.markModified(key); // tell Mongoose nested object changed
+        employee.markModified(key);
+      } else if (ARRAY_SECTIONS.has(key)) {
+        const arrayError = applyArraySection(employee, key, profile[key]);
+        if (arrayError) return res.status(404).json({ message: arrayError });
       } else {
-        employee[key] = profile[key]; // education, accounts, family, …
+        employee[key] = profile[key];
       }
     }
 
@@ -572,6 +630,311 @@ const updateEmployee = async (req, res) => {
   } catch (err) {
     const dup = duplicateKeyMessage(err);
     if (dup) return res.status(400).json({ message: dup });
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+/** Same access rules as profile update: own record, company, approved lock. */
+const loadEditableEmployee = async (req) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return { status: 400, message: "Invalid employee id" };
+  }
+  if (!hasAllAccess(req.user) && !isOwnRecord(req, req.params.id)) {
+    return { status: 403, message: "You can only update your own profile" };
+  }
+
+  const employee = await User.findById(req.params.id);
+  if (!employee) return { status: 404, message: "Employee not found" };
+
+  if (hasAllAccess(req.user)) {
+    const scopeErr = assertSameCompanyEmployee(req.user, employee);
+    if (scopeErr) return { status: 403, message: scopeErr };
+  }
+
+  if (isProfileLocked(req, employee)) {
+    return {
+      status: 403,
+      message: "Details are approved — editing is locked. Contact HR / Admin.",
+      detailsApproval: employee.detailsApproval,
+    };
+  }
+
+  return { employee };
+};
+
+const rejectIfBadSection = (section, res) => {
+  if (ARRAY_SECTIONS.has(section)) return false;
+  res.status(400).json({
+    message:
+      "section must be education, accounts, family, nominees, experience, or visas",
+  });
+  return true;
+};
+
+const asRowList = (body) => (Array.isArray(body) ? body : [body]);
+
+const collectDeleteIds = (body) => {
+  if (!Array.isArray(body)) return [String(body._id)];
+  return body.map((entry) =>
+    typeof entry === "string" ? String(entry) : String(entry._id)
+  );
+};
+
+// =============================================================================
+// EDIT LIST ROWS — PUT /api/employees/:id/:section/items
+// One object, or an array of objects. Each object must include _id.
+// =============================================================================
+const editArrayItem = async (req, res) => {
+  try {
+    const { section } = req.params;
+    if (rejectIfBadSection(section, res)) return;
+
+    const rows = asRowList(req.body);
+    for (const row of rows) {
+      if (!mongoose.Types.ObjectId.isValid(row._id)) {
+        return res.status(400).json({ message: "Invalid item id" });
+      }
+      const fields = { ...row };
+      delete fields._id;
+      if (!Object.keys(fields).length) {
+        return res.status(400).json({ message: "Send at least one field to update" });
+      }
+    }
+
+    const loaded = await loadEditableEmployee(req);
+    if (!loaded.employee) {
+      return res.status(loaded.status).json({
+        message: loaded.message,
+        ...(loaded.detailsApproval
+          ? { detailsApproval: loaded.detailsApproval }
+          : {}),
+      });
+    }
+
+    const current = asPlainRows(loaded.employee[section]);
+    for (const row of rows) {
+      const found = current.some((item) => String(item._id) === String(row._id));
+      if (!found) {
+        return res.status(404).json({ message: `${section} item not found` });
+      }
+    }
+
+    for (const row of rows) {
+      const arrayError = applyArraySection(loaded.employee, section, row);
+      if (arrayError) return res.status(404).json({ message: arrayError });
+    }
+
+    await loaded.employee.save();
+    return res.json({
+      message: rows.length === 1 ? `${section} item updated` : `${section} items updated`,
+      employee: safeUser(loaded.employee),
+    });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+// =============================================================================
+// DELETE LIST ROWS — DELETE /api/employees/:id/:section/items
+// One object { _id }, an array of ids, or an array of { _id }.
+// =============================================================================
+const deleteArrayItem = async (req, res) => {
+  try {
+    const { section } = req.params;
+    if (rejectIfBadSection(section, res)) return;
+
+    const ids = collectDeleteIds(req.body);
+    for (const id of ids) {
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({ message: "Invalid item id" });
+      }
+    }
+
+    const loaded = await loadEditableEmployee(req);
+    if (!loaded.employee) {
+      return res.status(loaded.status).json({
+        message: loaded.message,
+        ...(loaded.detailsApproval
+          ? { detailsApproval: loaded.detailsApproval }
+          : {}),
+      });
+    }
+
+    const current = asPlainRows(loaded.employee[section]);
+    const idSet = new Set(ids.map(String));
+    for (const id of idSet) {
+      const found = current.some((item) => String(item._id) === id);
+      if (!found) {
+        return res.status(404).json({ message: `${section} item not found` });
+      }
+    }
+
+    loaded.employee[section] = current.filter((item) => !idSet.has(String(item._id)));
+    loaded.employee.markModified(section);
+    await loaded.employee.save();
+
+    return res.json({
+      message: idSet.size === 1 ? `${section} item deleted` : `${section} items deleted`,
+      employee: safeUser(loaded.employee),
+    });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+/** official{} and payroll{} — Super Admin / HR Manager / Manager (and Global Admin). */
+const loadAdminSection = async (req) => {
+  if (!hasAllAccess(req.user)) {
+    return {
+      status: 403,
+      message:
+        "Only Super Admin / HR Manager / Manager can update official details and payroll",
+    };
+  }
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return { status: 400, message: "Invalid employee id" };
+  }
+
+  const employee = await User.findById(req.params.id);
+  if (!employee) return { status: 404, message: "Employee not found" };
+
+  const scopeErr = assertSameCompanyEmployee(req.user, employee);
+  if (scopeErr) return { status: 403, message: scopeErr };
+
+  return { employee };
+};
+
+const EMPTY_PAYROLL = {
+  salaryGroup: "",
+  salaryDate: "",
+  appraisalDuration: "",
+  basic: 0,
+  annualCtc: 0,
+  grossSalary: 0,
+  totalEarning: 0,
+  totalDeduction: 0,
+  appraisalDate: null,
+  paymentMode: "",
+  ot1Rate: 0,
+  ot2Rate: 0,
+  remarks: "",
+  uanNo: "",
+  pfApply: false,
+  pfEmployerShare: false,
+  pfNo: "",
+  pfType: "",
+  pf: "",
+  pfApplyFrom: null,
+  pfApplyTo: null,
+  esiApply: false,
+  esiNo: "",
+  esiEmployerShare: false,
+  esiApplyFrom: null,
+  esiApplyTo: null,
+  ptApply: false,
+  tdsApply: false,
+  taxRegime: "New",
+  bankName: "",
+  bankAccount: "",
+  ifsc: "",
+};
+
+// =============================================================================
+// EDIT official OR payroll — PUT /api/employees/:id/:section
+// Same field checks as profile update. Admin roles only.
+// =============================================================================
+const editObjectSection = async (req, res) => {
+  try {
+    const { section } = req.params;
+    if (section !== "official" && section !== "payroll") {
+      return res.status(400).json({ message: "section must be official or payroll" });
+    }
+
+    const loaded = await loadAdminSection(req);
+    if (!loaded.employee) {
+      return res.status(loaded.status).json({ message: loaded.message });
+    }
+
+    const employee = loaded.employee;
+
+    if (section === "official") {
+      const incoming = normalizeSectionUniques("official", { ...req.body });
+      if (incoming.company !== undefined) {
+        const companyErr = assertSameCompany(req.user, incoming.company);
+        if (companyErr) return res.status(403).json({ message: companyErr });
+      }
+
+      const uniqueCheck = {};
+      const addIfChanged = (path, nextVal, currentVal) => {
+        if (nextVal === undefined || nextVal === null) return;
+        const n = String(nextVal).trim();
+        if (!n) return;
+        if (n === String(currentVal || "").trim()) return;
+        uniqueCheck[path] = n;
+      };
+      addIfChanged(
+        "official.officialEmail",
+        incoming.officialEmail,
+        employee.official?.officialEmail
+      );
+      addIfChanged(
+        "official.employeeCode",
+        incoming.employeeCode,
+        employee.official?.employeeCode
+      );
+      const conflict = await findUniqueConflict(uniqueCheck, employee._id);
+      if (conflict) return res.status(400).json({ message: conflict });
+
+      employee.official = mergeSection(employee.official, incoming, "official");
+      employee.markModified("official");
+    } else {
+      employee.payroll = mergeSection(employee.payroll, req.body, "payroll");
+      employee.markModified("payroll");
+    }
+
+    await employee.save();
+    return res.json({
+      message: `${section} updated`,
+      employee: safeUser(employee),
+    });
+  } catch (err) {
+    const dup = duplicateKeyMessage(err);
+    if (dup) return res.status(400).json({ message: dup });
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+// =============================================================================
+// CLEAR payroll — DELETE /api/employees/:id/payroll
+// official stays (it holds the login email). Admin roles only.
+// =============================================================================
+const deleteObjectSection = async (req, res) => {
+  try {
+    const { section } = req.params;
+    if (section === "official") {
+      return res.status(400).json({
+        message:
+          "Official details cannot be deleted. They hold the login email. Update the fields instead.",
+      });
+    }
+    if (section !== "payroll") {
+      return res.status(400).json({ message: "section must be payroll" });
+    }
+
+    const loaded = await loadAdminSection(req);
+    if (!loaded.employee) {
+      return res.status(loaded.status).json({ message: loaded.message });
+    }
+
+    loaded.employee.payroll = { ...EMPTY_PAYROLL };
+    loaded.employee.markModified("payroll");
+    await loaded.employee.save();
+
+    return res.json({
+      message: "payroll cleared",
+      employee: safeUser(loaded.employee),
+    });
+  } catch (err) {
     return res.status(500).json({ message: err.message });
   }
 };
@@ -649,11 +1012,31 @@ const uploadAttachment = async (req, res) => {
   }
 };
 
+/** One edit API. official/payroll for admins. Lists: one object or an array of objects. */
+const editSection = (req, res) => {
+  const { section } = req.params;
+  if (section === "official" || section === "payroll") {
+    return editObjectSection(req, res);
+  }
+  return editArrayItem(req, res);
+};
+
+/** One delete API. Lists: one { _id } or an array of ids. payroll clears. */
+const deleteSection = (req, res) => {
+  const { section } = req.params;
+  if (section === "official" || section === "payroll") {
+    return deleteObjectSection(req, res);
+  }
+  return deleteArrayItem(req, res);
+};
+
 module.exports = {
   createEmployee,
   listEmployees,
   getEmployee,
   updateEmployee,
+  editSection,
+  deleteSection,
   deleteEmployee,
   uploadAttachment,
 };

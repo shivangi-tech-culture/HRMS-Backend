@@ -49,8 +49,8 @@ module.exports = swaggerJsdoc({
         ],
     tags: [
       { name: "Health", description: "API + MongoDB health check (no auth)" },
-      { name: "Auth", description: "Login and current user" },
-      { name: "Permissions", description: "Catalog + my permissions" },
+      { name: "Auth", description: "Login" },
+      { name: "Permissions", description: "Update a role permission matrix" },
       { name: "Roles", description: "Role CRUD + permission matrix" },
       { name: "Employees", description: "Create user + profile CRUD" },
       { name: "Attendance", description: "Punch in/out + manual mark" },
@@ -567,32 +567,80 @@ module.exports = swaggerJsdoc({
               description: "Admin only",
             },
             other: { $ref: "#/components/schemas/Other" },
-            education: {
+            education: { $ref: "#/components/schemas/ListOrOneEducation" },
+            accounts: { $ref: "#/components/schemas/ListOrOneAccount" },
+            family: { $ref: "#/components/schemas/ListOrOneFamily" },
+            nominees: { $ref: "#/components/schemas/ListOrOneNominee" },
+            experience: { $ref: "#/components/schemas/ListOrOneExperience" },
+            visas: { $ref: "#/components/schemas/ListOrOneVisa" },
+            payroll: { $ref: "#/components/schemas/Payroll" },
+          },
+        },
+        ListOrOneEducation: {
+          description:
+            "One object appends, or updates that row when _id is sent. An array replaces the whole list.",
+          oneOf: [
+            { $ref: "#/components/schemas/EducationItem" },
+            {
               type: "array",
               items: { $ref: "#/components/schemas/EducationItem" },
             },
-            accounts: {
+          ],
+        },
+        ListOrOneAccount: {
+          description:
+            "One object appends, or updates that row when _id is sent. An array replaces the whole list.",
+          oneOf: [
+            { $ref: "#/components/schemas/AccountItem" },
+            {
               type: "array",
               items: { $ref: "#/components/schemas/AccountItem" },
             },
-            family: {
+          ],
+        },
+        ListOrOneFamily: {
+          description:
+            "One object appends, or updates that row when _id is sent. An array replaces the whole list.",
+          oneOf: [
+            { $ref: "#/components/schemas/FamilyItem" },
+            {
               type: "array",
               items: { $ref: "#/components/schemas/FamilyItem" },
             },
-            nominees: {
+          ],
+        },
+        ListOrOneNominee: {
+          description:
+            "One object appends, or updates that row when _id is sent. An array replaces the whole list.",
+          oneOf: [
+            { $ref: "#/components/schemas/NomineeItem" },
+            {
               type: "array",
               items: { $ref: "#/components/schemas/NomineeItem" },
             },
-            experience: {
+          ],
+        },
+        ListOrOneExperience: {
+          description:
+            "One object appends, or updates that row when _id is sent. An array replaces the whole list.",
+          oneOf: [
+            { $ref: "#/components/schemas/ExperienceItem" },
+            {
               type: "array",
               items: { $ref: "#/components/schemas/ExperienceItem" },
             },
-            visas: {
+          ],
+        },
+        ListOrOneVisa: {
+          description:
+            "One object appends, or updates that row when _id is sent. An array replaces the whole list.",
+          oneOf: [
+            { $ref: "#/components/schemas/VisaItem" },
+            {
               type: "array",
               items: { $ref: "#/components/schemas/VisaItem" },
             },
-            payroll: { $ref: "#/components/schemas/Payroll" },
-          },
+          ],
         },
         PunchBody: {
           type: "object",
