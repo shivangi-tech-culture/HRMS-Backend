@@ -20,7 +20,11 @@ const description = [
   "3. `POST /api/employees` creates the user and the full profile in one request",
   "4. File → `POST /api/employees/upload` with `type` (`education` or `account`) → put the URL on Submit",
   "",
-  "**Roles:** name cannot change. Super Admin cannot be edited or deleted and always has full access.",
+  "**Roles**",
+  "- **Global Admin** → all companies, full access (cannot edit/delete role)",
+  "- **Super Admin** → own company only, full access (cannot edit/delete role)",
+  "- **HR Manager / Manager** → own company, permission matrix",
+  "- **Employee** → ESS only",
   "Permission update (`PUT /api/roles/{id}/permissions`) works for Employee, HR Manager, Manager, and custom roles.",
   "",
   "**Tip:** Open each endpoint below for request body examples.",
@@ -31,7 +35,7 @@ module.exports = swaggerJsdoc({
     openapi: "3.0.0",
     info: {
       title: "HRMS API",
-      version: "3.4.0",
+      version: "3.5.0",
       description,
     },
     servers: isProduction
@@ -304,7 +308,7 @@ module.exports = swaggerJsdoc({
         Official: {
           type: "object",
           additionalProperties: false,
-          description: "Admin only — Super Admin / HR Manager / Manager",
+          description: "Admin only — Global Admin / Super Admin / HR Manager / Manager",
           properties: {
             employeeCode: {
               type: "string",
@@ -483,13 +487,19 @@ module.exports = swaggerJsdoc({
           type: "object",
           required: ["name", "password", "role", "status", "official"],
           description:
-            "Account fields flat; profile nested like DB (official / personal / …). No flat officialEmail, company, mobileNo.",
+            "Same shape as User model. Account flat (name/password/role/status). Profile nested: official (required), personal, other, education[], … No flat officialEmail / company / mobileNo.",
           properties: {
             name: { type: "string", example: "Shivi Gupta" },
             password: { type: "string", example: "123456" },
             role: {
               type: "string",
-              enum: ["Super Admin", "HR Manager", "Manager", "Employee"],
+              enum: [
+                "Global Admin",
+                "Super Admin",
+                "HR Manager",
+                "Manager",
+                "Employee",
+              ],
               example: "Employee",
             },
             status: {
@@ -500,7 +510,8 @@ module.exports = swaggerJsdoc({
             official: {
               allOf: [{ $ref: "#/components/schemas/Official" }],
               required: ["officialEmail", "company", "department"],
-              description: "Required on create — login email + company + department",
+              description:
+                "Required — login email + company + department. Global Admin may set any company; Super Admin / HR / Manager only their own.",
             },
             personal: { $ref: "#/components/schemas/Personal" },
             other: { $ref: "#/components/schemas/Other" },
@@ -540,7 +551,7 @@ module.exports = swaggerJsdoc({
             password: {
               type: "string",
               example: "newpass123",
-              description: "Super Admin / HR Manager only",
+              description: "Global Admin / Super Admin / HR Manager only",
             },
             role: { type: "string" },
             status: { type: "string", enum: ["Active", "Inactive"] },
@@ -636,7 +647,7 @@ module.exports = swaggerJsdoc({
         },
         UpdateRoleBody: {
           type: "object",
-          description: "Name cannot be changed. Super Admin cannot be updated.",
+          description: "Name cannot be changed. Global Admin / Super Admin roles cannot be updated.",
           properties: {
             description: { type: "string", example: "Team tasks" },
             status: {

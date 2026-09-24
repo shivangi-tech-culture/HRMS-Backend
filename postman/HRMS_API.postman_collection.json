@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "HRMS API",
-    "description": "HRMS Express API — ALL requests use {{vars}} like Login Super Admin.\n\n**baseUrl = http://localhost:9001**\n\nOpen Collection → Variables to edit any value.\nLogin Super Admin sets {{token}} + {{userId}}.\nCreate Role sets {{roleId}}. Create User sets {{userId}}.\n\nAuth: {{adminEmail}} / {{employeeEmail}} / {{password}}\nRoles: {{roleName}}, {{roleDescription}}, {{roleStatus}}\nCreate user: {{newUserName}} = Shivi Gupta, {{newUserEmail}}, {{userRole}}, {{userStatus}}, …\nUpload file: POST /api/employees/upload — no user id. type = education | account.\nUpdate profile: personal/official/other/education/accounts/family/nominees/experience/visas/payroll vars\nAttendance: {{punchSource}}, {{punchType}}, {{punchTime}}, …",
+    "description": "HRMS Express API — ALL requests use {{vars}}.\n\n**baseUrl = http://localhost:9001**\n\nOpen Collection → Variables to edit any value.\nLogin Global Admin / Super Admin sets {{token}} + {{userId}}.\nCreate Role sets {{roleId}}. Create User sets {{userId}}.\n\nAuth: {{globalAdminEmail}} / {{adminEmail}} / {{employeeEmail}} / {{password}}\nRoles: Global Admin (all companies) | Super Admin (own company) | HR / Manager | Employee\nCreate user: nested body like User model — official{ email, company, dept }, personal{ mobileNo }\nUpload file: POST /api/employees/upload — type = education | account.\nUpdate profile: personal/official/other/education/… vars",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -20,6 +20,10 @@
     {
       "key": "roleId",
       "value": ""
+    },
+    {
+      "key": "globalAdminEmail",
+      "value": "globaladmin@techculture.ai"
     },
     {
       "key": "adminEmail",
@@ -440,6 +444,37 @@
       "name": "1 Auth",
       "item": [
         {
+          "name": "Login Global Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var j = pm.response.json();",
+                  "if (j.token) pm.collectionVariables.set('token', j.token);",
+                  "if (j.user && j.user.id) pm.collectionVariables.set('userId', j.user.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"officialEmail\": \"{{globalAdminEmail}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/login",
+            "description": "Global Admin — all companies.\nSets {{token}} + {{userId}}.\nEmail: globaladmin@techculture.ai (after npm run seed)."
+          }
+        },
+        {
           "name": "Login Super Admin",
           "event": [
             {
@@ -467,7 +502,7 @@
               "raw": "{\n  \"officialEmail\": \"{{adminEmail}}\",\n  \"password\": \"{{password}}\"\n}"
             },
             "url": "{{baseUrl}}/api/auth/login",
-            "description": "Sets {{token}} + {{userId}}.\nThen use **Update Profile (Super Admin)** — full objects allowed."
+            "description": "Super Admin — own company only.\nSets {{token}} + {{userId}}.\nThen use **Update Profile (Super Admin)** — full objects allowed."
           }
         },
         {
@@ -705,10 +740,10 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"{{newUserName}}\",\n  \"officialEmail\": \"{{newUserEmail}}\",\n  \"employeeCode\": \"{{employeeCode}}\",\n  \"mobileNo\": \"{{mobileNo}}\",\n  \"password\": \"{{password}}\",\n  \"role\": \"{{userRole}}\",\n  \"company\": \"{{company}}\",\n  \"department\": \"{{department}}\",\n  \"city\": \"{{city}}\",\n  \"state\": \"{{state}}\",\n  \"country\": \"{{country}}\",\n  \"status\": \"{{userStatus}}\"\n}"
+              "raw": "{\n  \"name\": \"{{newUserName}}\",\n  \"password\": \"{{password}}\",\n  \"role\": \"{{userRole}}\",\n  \"status\": \"{{userStatus}}\",\n  \"official\": {\n    \"officialEmail\": \"{{newUserEmail}}\",\n    \"employeeCode\": \"{{employeeCode}}\",\n    \"company\": \"{{company}}\",\n    \"department\": \"{{department}}\"\n  },\n  \"personal\": {\n    \"mobileNo\": \"{{mobileNo}}\",\n    \"presentAddress\": {\n      \"city\": \"{{city}}\",\n      \"state\": \"{{state}}\",\n      \"country\": \"{{country}}\"\n    }\n  }\n}"
             },
             "url": "{{baseUrl}}/api/employees",
-            "description": "Super Admin / HR Manager only.\n\nMaps:\n- officialEmail → official.officialEmail\n- employeeCode → official.employeeCode\n- mobileNo → personal.mobileNo\n- company, department → official\n- city, state, country → personal.permanentAddress\n\nSets {{userId}} from response.\n\nFull profile in one call: use Create Employee (full profile)."
+            "description": "Global Admin / Super Admin / HR Manager / Manager.\n\nBody same as User model (nested):\n- official.officialEmail, company, department (required)\n- personal.mobileNo, presentAddress (optional)\n\nCompany: Global Admin → any; others → own company only.\nSets {{userId}} from response.\n\nFull profile: use Create Employee (full profile)."
           }
         },
         {
@@ -739,10 +774,10 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"{{newUserName}}\",\n  \"officialEmail\": \"{{newUserEmail}}\",\n  \"password\": \"{{password}}\",\n  \"role\": \"{{userRole}}\",\n  \"company\": \"{{company}}\",\n  \"department\": \"{{department}}\",\n  \"status\": \"{{userStatus}}\",\n  \"personal\": {\n    \"dateOfBirth\": \"{{dateOfBirth}}\",\n    \"aadhaarNo\": \"{{aadhaarNo}}\",\n    \"panNo\": \"{{panNo}}\",\n    \"gender\": \"{{gender}}\",\n    \"fatherOrHusbandName\": \"{{fatherOrHusbandName}}\",\n    \"maritalStatus\": \"{{maritalStatus}}\",\n    \"spouseName\": \"\",\n    \"anniversaryDate\": null,\n    \"personalEmail\": \"{{personalEmail}}\",\n    \"languageKnown\": \"{{languageKnown}}\",\n    \"emergencyContact1\": \"{{emergencyContact1}}\",\n    \"emergencyContact2\": \"{{emergencyContact2}}\",\n    \"drivingLicenseNo\": \"{{drivingLicenseNo}}\",\n    \"licenseValidUpto\": null,\n    \"passportNo\": \"{{passportNo}}\",\n    \"remarks\": \"\",\n    \"mobileNo\": \"{{mobileNo}}\",\n    \"workPhone\": \"{{workPhone}}\",\n    \"workExt\": \"{{workExt}}\",\n    \"presentAddress\": {\n      \"address\": \"{{address}}\",\n      \"country\": \"{{country}}\",\n      \"state\": \"{{state}}\",\n      \"city\": \"{{city}}\",\n      \"pincode\": \"{{pincode}}\"\n    },\n    \"permanentAddress\": {\n      \"address\": \"{{address}}\",\n      \"country\": \"{{country}}\",\n      \"state\": \"{{state}}\",\n      \"city\": \"{{city}}\",\n      \"pincode\": \"{{pincode}}\"\n    }\n  },\n  \"official\": {\n    \"employeeCode\": \"{{employeeCode}}\",\n    \"designation\": \"{{designation}}\",\n    \"reportingHead1\": \"{{reportingHead1}}\",\n    \"reportingHead2\": \"{{reportingHead2}}\",\n    \"jobRole\": \"{{jobRole}}\",\n    \"dateOfJoining\": \"{{dateOfJoining}}\",\n    \"calculateSalaryFrom\": \"{{dateOfJoining}}\",\n    \"dateOfRetirement\": null,\n    \"grade\": \"{{grade}}\"\n  },\n  \"other\": {\n    \"bloodGroup\": \"{{bloodGroup}}\",\n    \"passportExpiry\": \"{{passportExpiry}}\"\n  },\n  \"education\": [\n    {\n      \"courseType\": \"{{eduCourseType}}\",\n      \"courseLevel\": \"{{eduCourseLevel}}\",\n      \"courseName\": \"{{eduCourseName}}\",\n      \"instituteName\": \"{{eduInstitute}}\",\n      \"location\": \"{{city}}\",\n      \"fromYear\": \"{{eduFromYear}}\",\n      \"passingYear\": \"{{eduPassingYear}}\",\n      \"major\": \"\",\n      \"minor\": \"\",\n      \"percentageOrGrade\": \"{{eduGrade}}\",\n      \"document\": \"{{eduDocument}}\",\n      \"documentName\": \"{{eduDocumentName}}\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"accounts\": [\n    {\n      \"bankName\": \"{{bankName}}\",\n      \"accountNo\": \"{{bankAccountNo}}\",\n      \"accountHolderName\": \"{{accountHolderName}}\",\n      \"ifscCode\": \"{{ifscCode}}\",\n      \"location\": \"{{city}}\",\n      \"remarks\": \"\",\n      \"attachment\": \"\",\n      \"active\": true,\n      \"salaryAccount\": true\n    }\n  ],\n  \"family\": [\n    {\n      \"name\": \"{{familyName}}\",\n      \"relation\": \"{{familyRelation}}\",\n      \"dob\": null,\n      \"occupation\": \"{{familyOccupation}}\",\n      \"education\": \"\",\n      \"aadhaarNo\": \"\",\n      \"mobileNo\": \"{{familyMobile}}\",\n      \"mediclaim\": false\n    }\n  ],\n  \"nominees\": [\n    {\n      \"nominateFor\": \"{{nominateFor}}\",\n      \"nomineeName\": \"{{nomineeName}}\",\n      \"relation\": \"{{nomineeRelation}}\",\n      \"dob\": null,\n      \"amountPercent\": {{nomineePercent}},\n      \"address\": \"{{address}}\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"experience\": [\n    {\n      \"organization\": \"{{expOrganization}}\",\n      \"designation\": \"{{expDesignation}}\",\n      \"location\": \"{{city}}\",\n      \"fromDate\": \"{{expFromDate}}\",\n      \"toDate\": \"{{expToDate}}\",\n      \"lastSalaryDrawn\": \"{{expLastSalary}}\",\n      \"description\": \"\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"visas\": [\n    {\n      \"countryName\": \"{{visaCountry}}\",\n      \"visaType\": \"{{visaType}}\",\n      \"visaNumber\": \"{{visaNumber}}\",\n      \"fromDate\": \"{{visaFromDate}}\",\n      \"toDate\": \"{{visaToDate}}\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"payroll\": {\n    \"salaryGroup\": \"\",\n    \"salaryDate\": \"\",\n    \"appraisalDuration\": \"\",\n    \"basic\": {{payrollBasic}},\n    \"annualCtc\": {{payrollCtc}},\n    \"grossSalary\": 0,\n    \"totalEarning\": 0,\n    \"totalDeduction\": 0,\n    \"appraisalDate\": null,\n    \"paymentMode\": \"{{payrollPaymentMode}}\",\n    \"ot1Rate\": 0,\n    \"ot2Rate\": 0,\n    \"remarks\": \"\",\n    \"uanNo\": \"{{payrollUan}}\",\n    \"pfApply\": false,\n    \"pfEmployerShare\": false,\n    \"pfNo\": \"\",\n    \"pfType\": \"\",\n    \"pf\": \"\",\n    \"pfApplyFrom\": null,\n    \"pfApplyTo\": null,\n    \"esiApply\": false,\n    \"esiNo\": \"\",\n    \"esiEmployerShare\": false,\n    \"esiApplyFrom\": null,\n    \"esiApplyTo\": null,\n    \"ptApply\": false,\n    \"tdsApply\": false,\n    \"taxRegime\": \"New\",\n    \"bankName\": \"{{bankName}}\",\n    \"bankAccount\": \"{{bankAccountNo}}\",\n    \"ifsc\": \"{{ifscCode}}\"\n  }\n}"
+              "raw": "{\n  \"name\": \"{{newUserName}}\",\n  \"password\": \"{{password}}\",\n  \"role\": \"{{userRole}}\",\n  \"status\": \"{{userStatus}}\",\n  \"personal\": {\n    \"dateOfBirth\": \"{{dateOfBirth}}\",\n    \"aadhaarNo\": \"{{aadhaarNo}}\",\n    \"panNo\": \"{{panNo}}\",\n    \"gender\": \"{{gender}}\",\n    \"fatherOrHusbandName\": \"{{fatherOrHusbandName}}\",\n    \"maritalStatus\": \"{{maritalStatus}}\",\n    \"spouseName\": \"\",\n    \"anniversaryDate\": null,\n    \"personalEmail\": \"{{personalEmail}}\",\n    \"languageKnown\": \"{{languageKnown}}\",\n    \"emergencyContact1\": \"{{emergencyContact1}}\",\n    \"emergencyContact2\": \"{{emergencyContact2}}\",\n    \"drivingLicenseNo\": \"{{drivingLicenseNo}}\",\n    \"licenseValidUpto\": null,\n    \"passportNo\": \"{{passportNo}}\",\n    \"remarks\": \"\",\n    \"mobileNo\": \"{{mobileNo}}\",\n    \"workPhone\": \"{{workPhone}}\",\n    \"workExt\": \"{{workExt}}\",\n    \"presentAddress\": {\n      \"address\": \"{{address}}\",\n      \"country\": \"{{country}}\",\n      \"state\": \"{{state}}\",\n      \"city\": \"{{city}}\",\n      \"pincode\": \"{{pincode}}\"\n    },\n    \"permanentAddress\": {\n      \"address\": \"{{address}}\",\n      \"country\": \"{{country}}\",\n      \"state\": \"{{state}}\",\n      \"city\": \"{{city}}\",\n      \"pincode\": \"{{pincode}}\"\n    }\n  },\n  \"official\": {\n    \"officialEmail\": \"{{newUserEmail}}\",\n    \"company\": \"{{company}}\",\n    \"department\": \"{{department}}\",\n    \"employeeCode\": \"{{employeeCode}}\",\n    \"designation\": \"{{designation}}\",\n    \"reportingHead1\": \"{{reportingHead1}}\",\n    \"reportingHead2\": \"{{reportingHead2}}\",\n    \"jobRole\": \"{{jobRole}}\",\n    \"dateOfJoining\": \"{{dateOfJoining}}\",\n    \"calculateSalaryFrom\": \"{{dateOfJoining}}\",\n    \"dateOfRetirement\": null,\n    \"grade\": \"{{grade}}\"\n  },\n  \"other\": {\n    \"bloodGroup\": \"{{bloodGroup}}\",\n    \"passportExpiry\": \"{{passportExpiry}}\"\n  },\n  \"education\": [\n    {\n      \"courseType\": \"{{eduCourseType}}\",\n      \"courseLevel\": \"{{eduCourseLevel}}\",\n      \"courseName\": \"{{eduCourseName}}\",\n      \"instituteName\": \"{{eduInstitute}}\",\n      \"location\": \"{{city}}\",\n      \"fromYear\": \"{{eduFromYear}}\",\n      \"passingYear\": \"{{eduPassingYear}}\",\n      \"major\": \"\",\n      \"minor\": \"\",\n      \"percentageOrGrade\": \"{{eduGrade}}\",\n      \"document\": \"{{eduDocument}}\",\n      \"documentName\": \"{{eduDocumentName}}\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"accounts\": [\n    {\n      \"bankName\": \"{{bankName}}\",\n      \"accountNo\": \"{{bankAccountNo}}\",\n      \"accountHolderName\": \"{{accountHolderName}}\",\n      \"ifscCode\": \"{{ifscCode}}\",\n      \"location\": \"{{city}}\",\n      \"remarks\": \"\",\n      \"attachment\": \"\",\n      \"active\": true,\n      \"salaryAccount\": true\n    }\n  ],\n  \"family\": [\n    {\n      \"name\": \"{{familyName}}\",\n      \"relation\": \"{{familyRelation}}\",\n      \"dob\": null,\n      \"occupation\": \"{{familyOccupation}}\",\n      \"education\": \"\",\n      \"aadhaarNo\": \"\",\n      \"mobileNo\": \"{{familyMobile}}\",\n      \"mediclaim\": false\n    }\n  ],\n  \"nominees\": [\n    {\n      \"nominateFor\": \"{{nominateFor}}\",\n      \"nomineeName\": \"{{nomineeName}}\",\n      \"relation\": \"{{nomineeRelation}}\",\n      \"dob\": null,\n      \"amountPercent\": {{nomineePercent}},\n      \"address\": \"{{address}}\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"experience\": [\n    {\n      \"organization\": \"{{expOrganization}}\",\n      \"designation\": \"{{expDesignation}}\",\n      \"location\": \"{{city}}\",\n      \"fromDate\": \"{{expFromDate}}\",\n      \"toDate\": \"{{expToDate}}\",\n      \"lastSalaryDrawn\": \"{{expLastSalary}}\",\n      \"description\": \"\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"visas\": [\n    {\n      \"countryName\": \"{{visaCountry}}\",\n      \"visaType\": \"{{visaType}}\",\n      \"visaNumber\": \"{{visaNumber}}\",\n      \"fromDate\": \"{{visaFromDate}}\",\n      \"toDate\": \"{{visaToDate}}\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"payroll\": {\n    \"salaryGroup\": \"\",\n    \"salaryDate\": \"\",\n    \"appraisalDuration\": \"\",\n    \"basic\": {{payrollBasic}},\n    \"annualCtc\": {{payrollCtc}},\n    \"grossSalary\": 0,\n    \"totalEarning\": 0,\n    \"totalDeduction\": 0,\n    \"appraisalDate\": null,\n    \"paymentMode\": \"{{payrollPaymentMode}}\",\n    \"ot1Rate\": 0,\n    \"ot2Rate\": 0,\n    \"remarks\": \"\",\n    \"uanNo\": \"{{payrollUan}}\",\n    \"pfApply\": false,\n    \"pfEmployerShare\": false,\n    \"pfNo\": \"\",\n    \"pfType\": \"\",\n    \"pf\": \"\",\n    \"pfApplyFrom\": null,\n    \"pfApplyTo\": null,\n    \"esiApply\": false,\n    \"esiNo\": \"\",\n    \"esiEmployerShare\": false,\n    \"esiApplyFrom\": null,\n    \"esiApplyTo\": null,\n    \"ptApply\": false,\n    \"tdsApply\": false,\n    \"taxRegime\": \"New\",\n    \"bankName\": \"{{bankName}}\",\n    \"bankAccount\": \"{{bankAccountNo}}\",\n    \"ifsc\": \"{{ifscCode}}\"\n  }\n}"
             },
             "url": "{{baseUrl}}/api/employees",
-            "description": "Same POST /api/employees. Login as Super Admin or HR Manager.\n\nSends the Add Employee form in one body:\npersonal (name stays top-level), official, other, education, accounts, family, nominees, experience, visas, payroll.\n\nLeave unique fields empty (\"\") when you do not have a value. A filled PAN, Aadhaar, personal email, license, or passport must be unique.\nChange {{newUserEmail}} and {{employeeCode}} before each create."
+            "description": "Same POST /api/employees — nested like User model.\nLogin as Global Admin / Super Admin / HR Manager.\n\nofficial must include officialEmail, company, department.\npersonal holds mobileNo and addresses.\n\nLeave unique fields empty (\"\") when unused.\nChange {{newUserEmail}} and {{employeeCode}} before each create."
           }
         },
         {
@@ -810,7 +845,7 @@
                 }
               ]
             },
-            "description": "One list API for Access & Control and All Employees.\n\nReturns only table columns: _id, name, email, role, department, lastLogin, status, employeeCode, gender, designation, branch.\nFull profile is GET /api/employees/{{userId}}.\n\nSuper Admin, HR Manager, Manager → all users.\nEmployee → only their own row.\n\nQuery: search, role, status, department, designation, gender, branch, page, limit."
+            "description": "One list API for Access & Control and All Employees.\n\nReturns only table columns: _id, name, email, role, department, lastLogin, status, employeeCode, gender, designation, branch.\nFull profile is GET /api/employees/{{userId}}.\n\nGlobal Admin → all companies.\nSuper Admin / HR Manager / Manager → own company only.\nEmployee → only their own row.\n\nQuery: search, role, status, department, designation, gender, branch, page, limit."
           }
         },
         {

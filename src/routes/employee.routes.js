@@ -63,17 +63,18 @@ const router = express.Router();
  *     tags: [Employees]
  *     summary: Create User
  *     description: |
- *       **Who:** Super Admin, HR Manager, Manager when
- *       Employee → Employee → create is allowed. Employee role cannot create. Otherwise 403.
+ *       **Who:** Global Admin, Super Admin, HR Manager, Manager
+ *       (with Employee → create permission). Employee role cannot create.
  *
- *       **Required:** name, officialEmail, password, role, company, department, status
- *       **Optional flat:** employeeCode, mobileNo, city, state, country
- *       **Optional nested (same request):** personal, official, other, education,
- *       accounts, family, nominees, experience, visas, payroll
+ *       **Company:** Global Admin → any company. Others → own company only.
  *
- *       Flat fields fill official / personal when the nested object omits them.
- *       Top-level officialEmail is always the login id.
- *       detailsApproval = Approved (Super Admin only) | Unapproved (everyone else)
+ *       **Required flat:** name, password, role, status
+ *       **Required nested:** official{ officialEmail, company, department }
+ *       **Optional nested:** personal{ mobileNo, … }, other, education[],
+ *       accounts[], family[], nominees[], experience[], visas[], payroll{}
+ *
+ *       Same shape as User model — no flat mobileNo / email / city.
+ *       detailsApproval = Approved (Global Admin / Super Admin) | Unapproved (others)
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -87,41 +88,44 @@ const router = express.Router();
  *               summary: Create Employee
  *               value:
  *                 name: Shivi Gupta
- *                 officialEmail: shivi.gupta@techculture.ai
- *                 employeeCode: EMP-1024
- *                 mobileNo: "9810044556"
  *                 password: "123456"
  *                 role: Employee
- *                 company: TechCulture Solutions Private Limited
- *                 department: Finance
- *                 city: Noida
- *                 state: DELHI
- *                 country: India
  *                 status: Active
+ *                 official:
+ *                   officialEmail: shivi.gupta@techculture.ai
+ *                   employeeCode: EMP-1024
+ *                   company: TechCulture Solutions Private Limited
+ *                   department: Finance
+ *                 personal:
+ *                   mobileNo: "9810044556"
+ *                   presentAddress:
+ *                     city: Noida
+ *                     state: DELHI
+ *                     country: India
  *             hrManager:
  *               summary: Create HR Manager
  *               value:
  *                 name: Priya Sharma
- *                 officialEmail: priya@techculture.ai
- *                 employeeCode: EMP-2001
- *                 mobileNo: "9876543210"
  *                 password: "123456"
  *                 role: HR Manager
- *                 company: TechCulture Solutions Private Limited
- *                 department: HR
- *                 city: Noida
- *                 state: DELHI
- *                 country: India
  *                 status: Active
+ *                 official:
+ *                   officialEmail: priya@techculture.ai
+ *                   employeeCode: EMP-2001
+ *                   company: TechCulture Solutions Private Limited
+ *                   department: HR
+ *                 personal:
+ *                   mobileNo: "9876543210"
+ *                   presentAddress:
+ *                     city: Noida
+ *                     state: DELHI
+ *                     country: India
  *             fullProfile:
  *               summary: Create with full profile
  *               value:
  *                 name: Shivi Gupta
- *                 officialEmail: shivi.gupta@techculture.ai
  *                 password: "123456"
  *                 role: Employee
- *                 company: TechCulture Solutions Private Limited
- *                 department: Finance
  *                 status: Active
  *                 personal:
  *                   dateOfBirth: "1996-04-12"
@@ -137,6 +141,7 @@ const router = express.Router();
  *                   drivingLicenseNo: DL-0420110012345
  *                   licenseValidUpto: "2030-04-12"
  *                   passportNo: J8765432
+ *                   mobileNo: "9810044556"
  *                   presentAddress:
  *                     address: Sector 62
  *                     country: India
@@ -144,7 +149,10 @@ const router = express.Router();
  *                     city: Noida
  *                     pincode: "201301"
  *                 official:
+ *                   officialEmail: shivi.gupta@techculture.ai
  *                   employeeCode: EMP-1024
+ *                   company: TechCulture Solutions Private Limited
+ *                   department: Finance
  *                   designation: Finance Executive
  *                   reportingHead1: Shivangi Gupta
  *                   jobRole: Executive
@@ -207,9 +215,9 @@ const router = express.Router();
  *     responses:
  *       201: { description: User created. Welcome email is sent after the response. }
  *       400: { description: Validation failed / unique field conflict }
- *       403: { description: Role not allowed, or Employee create permission is off }
+ *       403: { description: Role not allowed, wrong company, or create permission off }
  */
-// CREATE USER — Super Admin / HR Manager / Manager (Employee role cannot create)
+// CREATE USER — Global Admin / Super Admin / HR Manager / Manager
 router.post(
   "/",
   protect,
