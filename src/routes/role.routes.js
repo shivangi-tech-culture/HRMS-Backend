@@ -25,7 +25,7 @@ const {
 
 const router = express.Router();
 
-const ADMIN = ["Super Admin", "HR Manager", "Manager"];
+const ADMIN = ["Global Admin", "Super Admin", "HR Manager", "Manager"];
 
 
 /**
@@ -212,7 +212,7 @@ router.put(
 router.delete(
   "/:id",
   protect,
-  authorize("Super Admin"),
+  authorize("Global Admin", "Super Admin"),
   checkPermission("Administration", "Roles & Permissions", "delete"),
   deleteRole
 );

@@ -14,14 +14,9 @@
  *   payroll{}   → admin only
  *
  * CREATE USER:
- *   Flat account fields plus optional nested profile in one POST.
- *   officialEmail  → official.officialEmail
- *   employeeCode   → official.employeeCode
- *   mobileNo       → personal.mobileNo
- *   company/dept   → official
- *   city/state/country → personal.permanentAddress
- *   personal / official / other / education / accounts / family /
- *   nominees / experience / visas / payroll → saved as sent
+ *   Flat account: name, password, role, status
+ *   Nested (same keys as this schema): official (required email/company/dept),
+ *   personal, other, education, accounts, family, nominees, experience, visas, payroll
  *
  * UNIQUE WHEN NOT EMPTY:
  *   officialEmail, employeeCode, mobileNo, personalEmail,
@@ -56,7 +51,7 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: "Employee",
       trim: true,
-    }, // Super Admin | HR Manager | Manager | Employee
+    }, // Global Admin | Super Admin | HR Manager | Manager | Employee
     status: { type: String, default: "Active" }, // Active = can login | Inactive = blocked
     lastLogin: { type: Date, default: null }, // updated on every successful login
 

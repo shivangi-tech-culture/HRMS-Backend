@@ -5,12 +5,12 @@
  *   Rejects unknown fields and wrong types before the controller runs.
  *   unknown(false) → extra keys in the body return HTTP 400.
  *
- * CREATE:
- *   Required account fields stay flat: name, officialEmail, password, role,
- *   company, department, status.
- *   Optional flat: employeeCode, mobileNo, city, state, country.
- *   Optional nested (same shape as update): personal, official, other,
- *   education, accounts, family, nominees, experience, visas, payroll.
+ * CREATE (same shape as User model — one format):
+ *   Account flat: name, password, role, status
+ *   Required nested: official{ officialEmail, company, department, … }
+ *   Optional nested: personal{ mobileNo, … }, other{}, education[],
+ *     accounts[], family[], nominees[], experience[], visas[], payroll{}
+ *   No flat mobileNo / email / city — those live inside personal / official.
  *
  * UPDATE (nested objects only):
  *   personal{}, official{}, other{}, education[], accounts[], family[],
@@ -19,10 +19,33 @@
 const Joi = require("joi");
 
 // Small helpers so schemas stay short and consistent
-const str = () => Joi.string().allow("").optional(); // optional string (empty ok)
+const str = () => Joi.string().trim().allow("").optional();
 const num = () => Joi.number().optional();
 const bool = () => Joi.boolean().optional();
 const date = () => Joi.date().allow(null).optional();
+const emailOpt = () => Joi.string().trim().email().allow("").optional();
+const phoneOpt = () =>
+  Joi.string()
+    .trim()
+    .pattern(/^\d{10}$/)
+    .allow("")
+    .optional()
+    .messages({ "string.pattern.base": "must be a 10-digit phone number" });
+const yearOpt = () =>
+  Joi.string()
+    .trim()
+    .pattern(/^\d{4}$/)
+    .allow("")
+    .optional()
+    .messages({ "string.pattern.base": "must be a 4-digit year (e.g. 2020)" });
+const ifscOpt = () =>
+  Joi.string()
+    .trim()
+    .uppercase()
+    .pattern(/^[A-Z]{4}0[A-Z0-9]{6}$/)
+    .allow("")
+    .optional()
+    .messages({ "string.pattern.base": "must be a valid IFSC (e.g. HDFC0001234)" });
 
 /** Object that only allows the listed keys (no extra junk) */
 const only = (keys) => Joi.object(keys).unknown(false);
@@ -36,35 +59,40 @@ const address = only({
   pincode: str(),
 });
 
-/** personal{} — employee may update (phones + IDs + addresses) */
-const personal = only({
+/** personal{} fields — same keys as User.personal (like educationItem) */
+const personalItem = only({
   dateOfBirth: date(),
-  aadhaarNo: str(), // unique in DB when not empty
-  panNo: str(), // unique in DB when not empty
+  aadhaarNo: Joi.string().trim().pattern(/^\d{12}$/).allow("").optional(),
+  panNo: Joi.string()
+    .trim()
+    .uppercase()
+    .pattern(/^[A-Z]{5}[0-9]{4}[A-Z]$/)
+    .allow("")
+    .optional(),
   gender: str(),
   fatherOrHusbandName: str(),
   maritalStatus: str(),
   spouseName: str(),
   anniversaryDate: date(), // ignored in controller (auto-calculated)
-  personalEmail: Joi.string().trim().email().allow("").optional(), // unique when set
+  personalEmail: emailOpt(),
   languageKnown: str(),
-  emergencyContact1: str(),
-  emergencyContact2: str(),
-  drivingLicenseNo: str(), // unique when set
+  emergencyContact1: phoneOpt(),
+  emergencyContact2: phoneOpt(),
+  drivingLicenseNo: str(),
   licenseValidUpto: date(),
-  passportNo: str(), // unique when set
+  passportNo: str(),
   remarks: str(),
   presentAddress: address.optional(),
   permanentAddress: address.optional(),
-  mobileNo: str(), // unique when set
-  workPhone: str(),
+  mobileNo: phoneOpt(),
+  workPhone: phoneOpt(),
   workExt: str(),
 });
 
-/** official{} — admin only in controller (employee gets 403) */
-const official = only({
-  employeeCode: str(), // unique when set
-  officialEmail: Joi.string().trim().email().allow("").optional(), // login id
+/** official{} fields — same keys as User.official (like educationItem) */
+const officialItem = only({
+  employeeCode: Joi.string().trim().uppercase().allow("").optional(),
+  officialEmail: emailOpt(),
   company: str(),
   department: str(),
   designation: str(),
@@ -77,24 +105,26 @@ const official = only({
   grade: str(),
 });
 
-const other = only({
+/** other{} fields — same keys as User.other (like educationItem) */
+const otherItem = only({
   bloodGroup: str(),
   passportExpiry: date(),
 });
 
+/** education[] row — unknown keys → 400 */
 const educationItem = only({
-  _id: str(), // optional when updating an existing row
+  _id: str(),
   courseType: str(),
   courseLevel: str(),
   courseName: str(),
   instituteName: str(),
   location: str(),
-  fromYear: str(),
-  passingYear: str(),
+  fromYear: yearOpt(),
+  passingYear: yearOpt(),
   major: str(),
   minor: str(),
   percentageOrGrade: str(),
-  document: str(), // Cloudinary URL
+  document: str(),
   documentName: str(),
   remarks: str(),
 });
@@ -104,7 +134,7 @@ const accountItem = only({
   bankName: str(),
   accountNo: str(),
   accountHolderName: str(),
-  ifscCode: str(),
+  ifscCode: ifscOpt(),
   location: str(),
   remarks: str(),
   attachment: str(),
@@ -119,8 +149,8 @@ const familyItem = only({
   dob: date(),
   occupation: str(),
   education: str(),
-  aadhaarNo: str(),
-  mobileNo: str(),
+  aadhaarNo: Joi.string().trim().pattern(/^\d{12}$/).allow("").optional(),
+  mobileNo: phoneOpt(),
   mediclaim: bool(),
 });
 
@@ -157,7 +187,8 @@ const visaItem = only({
   remarks: str(),
 });
 
-const payroll = only({
+/** payroll{} fields — same keys as User.payroll (like educationItem) */
+const payrollItem = only({
   salaryGroup: str(),
   salaryDate: str(),
   appraisalDuration: str(),
@@ -186,47 +217,43 @@ const payroll = only({
   esiApplyTo: date(),
   ptApply: bool(),
   tdsApply: bool(),
-  taxRegime: str(),
+  taxRegime: Joi.string().valid("New", "Old", "").optional(),
   bankName: str(),
   bankAccount: str(),
-  ifsc: str(),
+  ifsc: ifscOpt(),
+});
+
+/** Create: official must have login email + company + department */
+const officialCreate = officialItem.keys({
+  officialEmail: Joi.string().trim().email().required(),
+  company: Joi.string().trim().min(2).required(),
+  department: Joi.string().trim().min(2).required(),
 });
 
 /**
- * CREATE USER body
- * Required: name, officialEmail, password, role, company, department, status
- * Optional flat: employeeCode, mobileNo, city, state, country
- * Optional nested: full profile in one request (personal, official, payroll, …)
+ * CREATE USER body — same shape as User model
+ * Every nested object uses *Item schema (same as education → educationItem)
  */
 const createUserSchema = Joi.object({
   name: Joi.string().trim().min(2).max(100).required(),
-  officialEmail: Joi.string().trim().email().required(),
-  employeeCode: Joi.string().trim().allow("").optional(),
-  mobileNo: Joi.string().trim().min(8).max(20).optional(),
   password: Joi.string().min(6).max(50).required(),
   role: Joi.string().trim().required(),
-  company: Joi.string().trim().min(2).required(),
-  department: Joi.string().trim().min(2).required(),
   status: Joi.string().valid("Active", "Inactive").required(),
-  city: Joi.string().trim().allow("").optional(),
-  state: Joi.string().trim().allow("").optional(),
-  country: Joi.string().trim().allow("").optional(),
-  personal: personal.optional(),
-  official: official.optional(),
-  other: other.optional(),
+  official: officialCreate.required(),
+  personal: personalItem.optional(),
+  other: otherItem.optional(),
   education: Joi.array().items(educationItem).optional(),
   accounts: Joi.array().items(accountItem).optional(),
   family: Joi.array().items(familyItem).optional(),
   nominees: Joi.array().items(nomineeItem).optional(),
   experience: Joi.array().items(experienceItem).optional(),
   visas: Joi.array().items(visaItem).optional(),
-  payroll: payroll.optional(),
+  payroll: payrollItem.optional(),
 }).unknown(false);
 
 /**
  * UPDATE USER body
- * At least one field required. Only nested objects for profile data.
- * Flat phone/city/company here → 400 (use nested personal / official instead).
+ * At least one field required. Same *Item field checks as create.
  */
 const updateUserSchema = Joi.object({
   name: Joi.string().trim().min(2).max(100).optional(),
@@ -236,16 +263,16 @@ const updateUserSchema = Joi.object({
   detailsApproval: Joi.string()
     .valid("Unapproved", "Approved", "Rejected")
     .optional(),
-  personal: personal.optional(),
-  official: official.optional(),
-  other: other.optional(),
+  personal: personalItem.optional(),
+  official: officialItem.optional(),
+  other: otherItem.optional(),
   education: Joi.array().items(educationItem).optional(),
   accounts: Joi.array().items(accountItem).optional(),
   family: Joi.array().items(familyItem).optional(),
   nominees: Joi.array().items(nomineeItem).optional(),
   experience: Joi.array().items(experienceItem).optional(),
   visas: Joi.array().items(visaItem).optional(),
-  payroll: payroll.optional(),
+  payroll: payrollItem.optional(),
 })
   .min(1)
   .unknown(false);

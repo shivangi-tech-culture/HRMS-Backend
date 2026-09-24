@@ -9,14 +9,13 @@
  *   DELETE /api/employees/:id          → delete user
  *   POST   /api/employees/upload               → Cloudinary file (type: education | account)
  *
- * Create mapping:
- *   Required flat: name, officialEmail, password, role, company, department, status
- *   Optional flat: employeeCode, mobileNo, city, state, country
- *   Optional nested (saved in the same request):
- *     personal, official, other, education, accounts, family,
+ * Create mapping (same shape as User model):
+ *   Required flat: name, password, role, status
+ *   Required nested: official{ officialEmail, company, department, … }
+ *   Optional nested: personal, other, education, accounts, family,
  *     nominees, experience, visas, payroll
- *   Flat fields fill official / personal when the nested object omits them.
- *   officialEmail (top level) is always the login id.
+ *   Login id = official.officialEmail
+ *   No flat mobileNo / city / company
  *
  * Update rules:
  *   Employee  → personal, other, education, accounts, family, nominees, experience, visas
@@ -35,6 +34,11 @@ const {
   findUniqueConflict,
   duplicateKeyMessage,
 } = require("../utils/uniqueFields");
+const {
+  assertSameCompany,
+  assertSameCompanyEmployee,
+  companyFilter,
+} = require("../utils/companyScope");
 
 /** Nested profile keys accepted on update */
 const PROFILE_KEYS = [
@@ -111,16 +115,19 @@ const safeUser = (doc) => {
 /** True if the logged-in user is editing their own id */
 const isOwnRecord = (req, id) => String(req.user._id) === String(id);
 
-/** New Super Admin → Approved; everyone else → Unapproved */
+/** New Global Admin / Super Admin → Approved; everyone else → Unapproved */
 const defaultDetailsApproval = (role) =>
-  role === "Super Admin" ? "Approved" : "Unapproved";
+  role === "Global Admin" || role === "Super Admin"
+    ? "Approved"
+    : "Unapproved";
 
 /**
  * Lock own profile after Approved.
- * Super Admin is never locked. Admins editing someone else are not locked by this.
+ * Global Admin / Super Admin never locked.
+ * Admins editing someone else are not locked by this.
  */
 const isProfileLocked = (req, employee) => {
-  if (req.user.role === "Super Admin") return false;
+  if (["Global Admin", "Super Admin"].includes(req.user.role)) return false;
   if (!isOwnRecord(req, employee._id)) return false;
   return employee.detailsApproval === "Approved";
 };
@@ -130,48 +137,26 @@ const isProfileLocked = (req, employee) => {
 // =============================================================================
 const createEmployee = async (req, res) => {
   try {
-    // Account fields stay flat. Profile sections are optional on the same body.
-    const {
-      name,
-      officialEmail,
-      employeeCode,
-      password,
-      mobileNo,
-      role,
-      company,
-      department,
-      city,
-      state,
-      country,
-      status,
-    } = req.body;
-
-    const email = String(officialEmail).toLowerCase().trim();
-    const code = employeeCode ? String(employeeCode).trim().toUpperCase() : "";
-    const mobile = mobileNo ? String(mobileNo).trim() : "";
+    // Same shape as User model: account flat + nested official / personal / …
+    const { name, password, role, status } = req.body;
 
     const officialIn = { ...(req.body.official || {}) };
     const personalIn = { ...(req.body.personal || {}) };
     delete personalIn.anniversaryDate;
 
-    const permanentAddress = { ...(personalIn.permanentAddress || {}) };
-    if (city && !permanentAddress.city) permanentAddress.city = city;
-    if (state && !permanentAddress.state) permanentAddress.state = state;
-    if (country && !permanentAddress.country) permanentAddress.country = country;
+    const email = String(officialIn.officialEmail || "")
+      .toLowerCase()
+      .trim();
 
     const official = normalizeSectionUniques("official", {
       ...officialIn,
       officialEmail: email,
-      employeeCode: code || officialIn.employeeCode || "",
-      company: company || officialIn.company || "",
-      department: department || officialIn.department || "",
+      employeeCode: officialIn.employeeCode
+        ? String(officialIn.employeeCode).trim().toUpperCase()
+        : "",
     });
 
-    const personal = normalizeSectionUniques("personal", {
-      ...personalIn,
-      mobileNo: mobile || personalIn.mobileNo || "",
-      permanentAddress,
-    });
+    const personal = normalizeSectionUniques("personal", personalIn);
 
     const roleName = (role || "Employee").trim();
 
@@ -198,9 +183,25 @@ const createEmployee = async (req, res) => {
       return res.status(400).json({ message: "Role not found or inactive" });
     }
 
-    // Only a Super Admin can create another Super Admin
-    if (roleName === "Super Admin" && req.user.role !== "Super Admin") {
-      return res.status(403).json({ message: "Only Super Admin can create Super Admin" });
+    // Who can create privileged roles
+    if (roleName === "Global Admin" && req.user.role !== "Global Admin") {
+      return res.status(403).json({
+        message: "Only Global Admin can create Global Admin",
+      });
+    }
+    if (
+      roleName === "Super Admin" &&
+      !["Global Admin", "Super Admin"].includes(req.user.role)
+    ) {
+      return res.status(403).json({
+        message: "Only Global Admin / Super Admin can create Super Admin",
+      });
+    }
+
+    // Global Admin → any company; others → own company only
+    const companyErr = assertSameCompany(req.user, official.company);
+    if (companyErr) {
+      return res.status(403).json({ message: companyErr });
     }
 
     const employee = await User.create({
@@ -266,6 +267,15 @@ const listEmployees = async (req, res) => {
     // Employee can search and filter only inside their own profile
     if (!hasAllAccess(req.user)) {
       and.push({ _id: req.user._id });
+    } else {
+      // Global Admin → all companies; others → own company only
+      const scope = companyFilter(req.user);
+      if (scope === false) {
+        return res.status(403).json({
+          message: "Your profile has no company — cannot list employees",
+        });
+      }
+      if (scope) and.push(scope);
     }
 
     const search = String(req.query.search || "").trim();
@@ -351,6 +361,14 @@ const getEmployee = async (req, res) => {
       return res.status(404).json({ message: "Employee not found" });
     }
 
+    // Admin may only view employees in their own company
+    if (hasAllAccess(req.user)) {
+      const scopeErr = assertSameCompanyEmployee(req.user, employee);
+      if (scopeErr) {
+        return res.status(403).json({ message: scopeErr });
+      }
+    }
+
     return res.json({ employee: safeUser(employee) });
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -374,6 +392,14 @@ const updateEmployee = async (req, res) => {
     }
 
     const isAdmin = hasAllAccess(req.user); // Super Admin / HR / Manager
+
+    // Admin may only update employees in their own company
+    if (isAdmin) {
+      const scopeErr = assertSameCompanyEmployee(req.user, employee);
+      if (scopeErr) {
+        return res.status(403).json({ message: scopeErr });
+      }
+    }
 
     // After Approved, owner cannot edit (except Super Admin)
     if (isProfileLocked(req, employee)) {
@@ -403,19 +429,30 @@ const updateEmployee = async (req, res) => {
       if (!isAdmin) {
         return res.status(403).json({ message: "Only admin can change role" });
       }
-      if (req.body.role === "Super Admin" && req.user.role !== "Super Admin") {
-        return res
-          .status(403)
-          .json({ message: "Only Super Admin can assign Super Admin" });
+      if (req.body.role === "Global Admin" && req.user.role !== "Global Admin") {
+        return res.status(403).json({
+          message: "Only Global Admin can assign Global Admin",
+        });
+      }
+      if (
+        req.body.role === "Super Admin" &&
+        !["Global Admin", "Super Admin"].includes(req.user.role)
+      ) {
+        return res.status(403).json({
+          message: "Only Global Admin / Super Admin can assign Super Admin",
+        });
       }
       employee.role = req.body.role.trim();
     }
 
-    // --- password (Super Admin / HR Manager only) ---
+    // --- password (Global Admin / Super Admin / HR Manager only) ---
     if (req.body.password) {
-      if (!["Super Admin", "HR Manager"].includes(req.user.role)) {
+      if (
+        !["Global Admin", "Super Admin", "HR Manager"].includes(req.user.role)
+      ) {
         return res.status(403).json({
-          message: "Only Super Admin / HR Manager can change password",
+          message:
+            "Only Global Admin / Super Admin / HR Manager can change password",
         });
       }
       employee.password = await bcrypt.hash(req.body.password, 10);
@@ -439,6 +476,14 @@ const updateEmployee = async (req, res) => {
     }
     if (profile.official) {
       profile.official = normalizeSectionUniques("official", profile.official);
+
+      // Cannot move employee to another company
+      if (profile.official.company !== undefined) {
+        const companyErr = assertSameCompany(req.user, profile.official.company);
+        if (companyErr) {
+          return res.status(403).json({ message: companyErr });
+        }
+      }
     }
 
     // Collect unique fields that actually changed (skip empty / same value)
@@ -541,10 +586,18 @@ const deleteEmployee = async (req, res) => {
       return res.status(400).json({ message: "You cannot delete your own account" });
     }
 
-    const employee = await User.findByIdAndDelete(req.params.id);
+    const employee = await User.findById(req.params.id);
     if (!employee) {
       return res.status(404).json({ message: "Employee not found" });
     }
+
+    // Super Admin / HR / Manager → only delete within own company
+    const scopeErr = assertSameCompanyEmployee(req.user, employee);
+    if (scopeErr) {
+      return res.status(403).json({ message: scopeErr });
+    }
+
+    await employee.deleteOne();
 
     return res.json({ message: "Employee deleted", id: req.params.id });
   } catch (err) {

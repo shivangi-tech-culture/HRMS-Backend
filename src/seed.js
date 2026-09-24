@@ -58,18 +58,23 @@ const seed = async () => {
 
   const roles = [
     {
+      name: "Global Admin",
+      description: "Global admin — all companies, full access.",
+      permissions: permissionsForRole("Global Admin"),
+    },
+    {
       name: "Super Admin",
-      description: "Full admin access.",
+      description: "Full admin access within own company.",
       permissions: permissionsForRole("Super Admin"),
     },
     {
       name: "HR Manager",
-      description: "Same as Super Admin (admin modules).",
+      description: "Same as Super Admin (admin modules), own company.",
       permissions: permissionsForRole("HR Manager"),
     },
     {
       name: "Manager",
-      description: "Same as Super Admin (admin modules).",
+      description: "Same as Super Admin (admin modules), own company.",
       permissions: permissionsForRole("Manager"),
     },
     {
@@ -88,6 +93,26 @@ const seed = async () => {
 
   // Seed users — nested shape (officialEmail + employeeCode under official)
   const users = [
+    {
+      name: "Global Admin",
+      password: "123456",
+      role: "Global Admin",
+      status: "Active",
+      personal: {
+        mobileNo: "9876543200",
+        permanentAddress: {
+          city: "Noida",
+          state: "DELHI",
+          country: "India",
+        },
+      },
+      official: {
+        employeeCode: "EMP-0001",
+        officialEmail: "globaladmin@techculture.ai",
+        company: "Platform",
+        department: "Administration",
+      },
+    },
     {
       name: "Shivangi Gupta",
       password: "123456",
@@ -139,7 +164,10 @@ const seed = async () => {
       password: hashed,
       role: u.role,
       status: u.status,
-      detailsApproval: u.role === "Super Admin" ? "Approved" : "Unapproved",
+      detailsApproval:
+        u.role === "Global Admin" || u.role === "Super Admin"
+          ? "Approved"
+          : "Unapproved",
       personal: u.personal,
       official: { ...u.official, officialEmail: email },
     });

@@ -10,16 +10,25 @@
  *   → after protect; only listed roles may continue
  *
  * hasAllAccess(user)
- *   → true for Super Admin / HR Manager / Manager
+ *   → true for Global Admin / Super Admin / HR Manager / Manager
  *
  * ALL_ACCESS
- *   → same three roles as an array (spread into authorize)
+ *   → admin roles as an array (spread into authorize)
+ *
+ * Roles (company scope):
+ *   Global Admin → all companies
+ *   Super Admin / HR Manager / Manager → own company only
  */
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
 /** Roles that can manage other users, official{}, payroll, approvals */
-const ALL_ACCESS = ["Super Admin", "HR Manager", "Manager"];
+const ALL_ACCESS = [
+  "Global Admin",
+  "Super Admin",
+  "HR Manager",
+  "Manager",
+];
 
 /**
  * Must be logged in.

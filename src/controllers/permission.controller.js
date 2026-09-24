@@ -94,7 +94,12 @@ const checkPermission = (module, name, action) => {
   return async (req, res, next) => {
     try {
       // Super Admin always has every action. Their matrix cannot be reduced.
-      if (req.user.role === "Super Admin") return next();
+      if (
+        req.user.role === "Global Admin" ||
+        req.user.role === "Super Admin"
+      ) {
+        return next();
+      }
 
       const role = await Role.findOne({ name: req.user.role });
       if (!role) {

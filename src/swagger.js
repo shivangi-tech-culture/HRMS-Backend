@@ -481,53 +481,28 @@ module.exports = swaggerJsdoc({
         },
         CreateUserBody: {
           type: "object",
-          required: [
-            "name",
-            "officialEmail",
-            "password",
-            "role",
-            "company",
-            "department",
-            "status",
-          ],
+          required: ["name", "password", "role", "status", "official"],
+          description:
+            "Account fields flat; profile nested like DB (official / personal / …). No flat officialEmail, company, mobileNo.",
           properties: {
             name: { type: "string", example: "Shivi Gupta" },
-            officialEmail: {
-              type: "string",
-              example: "shivi.gupta@techculture.ai",
-              description: "→ official.officialEmail",
-            },
-            employeeCode: {
-              type: "string",
-              example: "EMP-1024",
-              description: "→ official.employeeCode (optional)",
-            },
-            mobileNo: {
-              type: "string",
-              example: "9810044556",
-              description: "→ personal.mobileNo (optional)",
-            },
             password: { type: "string", example: "123456" },
             role: {
               type: "string",
               enum: ["Super Admin", "HR Manager", "Manager", "Employee"],
               example: "Employee",
             },
-            company: {
-              type: "string",
-              example: "TechCulture Solutions Private Limited",
-            },
-            department: { type: "string", example: "Finance" },
-            city: { type: "string", example: "Noida" },
-            state: { type: "string", example: "DELHI" },
-            country: { type: "string", example: "India" },
             status: {
               type: "string",
               enum: ["Active", "Inactive"],
               example: "Active",
             },
+            official: {
+              allOf: [{ $ref: "#/components/schemas/Official" }],
+              required: ["officialEmail", "company", "department"],
+              description: "Required on create — login email + company + department",
+            },
             personal: { $ref: "#/components/schemas/Personal" },
-            official: { $ref: "#/components/schemas/Official" },
             other: { $ref: "#/components/schemas/Other" },
             education: {
               type: "array",

@@ -17,12 +17,14 @@ const {
 } = require("../config/permissions");
 
 const SUPER_ADMIN = "Super Admin";
+const GLOBAL_ADMIN = "Global Admin";
 
-const isSuperAdminRole = (role) => role.name === SUPER_ADMIN;
+const isLockedRole = (role) =>
+  role.name === SUPER_ADMIN || role.name === GLOBAL_ADMIN;
 
-/** Super Admin always keeps the full admin matrix. */
-async function forceSuperAdminAccess(role) {
-  const full = permissionsForRole(SUPER_ADMIN);
+/** Locked roles always keep the full admin matrix. */
+async function forceFullAdminAccess(role) {
+  const full = permissionsForRole(role.name);
   if (countPermissions(role.permissions) !== countPermissions(full)) {
     role.permissions = full;
     await role.save();
@@ -124,9 +126,9 @@ const updateRole = async (req, res) => {
       return res.status(404).json({ message: "Role not found" });
     }
 
-    if (isSuperAdminRole(role)) {
+    if (isLockedRole(role)) {
       return res.status(403).json({
-        message: "Super Admin role cannot be edited.",
+        message: `${role.name} role cannot be edited.`,
       });
     }
 
@@ -148,9 +150,9 @@ const deleteRole = async (req, res) => {
       return res.status(404).json({ message: "Role not found" });
     }
 
-    if (isSuperAdminRole(role)) {
+    if (isLockedRole(role)) {
       return res.status(403).json({
-        message: "Super Admin role cannot be deleted.",
+        message: `${role.name} role cannot be deleted.`,
       });
     }
 
@@ -174,7 +176,7 @@ const getPermissions = async (req, res) => {
       return res.status(404).json({ message: "Role not found" });
     }
 
-    if (isSuperAdminRole(role)) await forceSuperAdminAccess(role);
+    if (isLockedRole(role)) await forceFullAdminAccess(role);
 
     const byModule = {};
     for (const m of [...new Set(ADMIN_TREE.map((x) => x.module))]) {
@@ -207,10 +209,10 @@ const savePermissions = async (req, res) => {
       return res.status(404).json({ message: "Role not found" });
     }
 
-    if (isSuperAdminRole(role)) {
-      await forceSuperAdminAccess(role);
+    if (isLockedRole(role)) {
+      await forceFullAdminAccess(role);
       return res.status(403).json({
-        message: "Super Admin always has full access. Permissions cannot be changed.",
+        message: `${role.name} always has full access. Permissions cannot be changed.`,
       });
     }
 

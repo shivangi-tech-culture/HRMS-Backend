@@ -11,16 +11,18 @@
  *   4. controller  → business logic
  *
  * WHO CAN CALL WHAT:
- *   Create user          → Super Admin always.
- *                          HR Manager / Manager only if Employee → create is on.
- *   List / Get / Update  → Super Admin, HR Manager, Manager, Employee
- *   Delete               → Super Admin, HR Manager, Manager
+ *   Create user          → Global Admin, Super Admin, HR Manager, Manager
+ *                          (Global Admin = all companies; others = own company)
+ *                          Employee role cannot create.
+ *   List / Get / Update  → Global Admin, Super Admin, HR Manager, Manager, Employee
+ *   Delete               → Global Admin, Super Admin, HR Manager, Manager
  *
- * CREATE BODY:
- *   Required flat: name, officialEmail, password, role, company, department, status
- *   Optional flat: employeeCode, mobileNo, city, state, country
- *   Optional nested (same request): personal, official, other, education,
+ * CREATE BODY (same as User model):
+ *   Required flat: name, password, role, status
+ *   Required nested: official{ officialEmail, company, department }
+ *   Optional nested: personal{ mobileNo, … }, other, education,
  *   accounts, family, nominees, experience, visas, payroll
+ *   No flat mobileNo / email / city — use personal / official.
  *
  * UPDATE:
  *   One PUT for all objects (personal, official, education, …).
@@ -61,8 +63,8 @@ const router = express.Router();
  *     tags: [Employees]
  *     summary: Create User
  *     description: |
- *       **Who:** Super Admin always. HR Manager and Manager only when
- *       Employee → Employee → create is allowed. Otherwise 403.
+ *       **Who:** Super Admin, HR Manager, Manager when
+ *       Employee → Employee → create is allowed. Employee role cannot create. Otherwise 403.
  *
  *       **Required:** name, officialEmail, password, role, company, department, status
  *       **Optional flat:** employeeCode, mobileNo, city, state, country
@@ -207,11 +209,11 @@ const router = express.Router();
  *       400: { description: Validation failed / unique field conflict }
  *       403: { description: Role not allowed, or Employee create permission is off }
  */
-// CREATE USER — Super Admin always; HR / Manager only with Employee create permission
+// CREATE USER — Super Admin / HR Manager / Manager (Employee role cannot create)
 router.post(
   "/",
   protect,
-  authorize("Super Admin", "HR Manager", "Manager"),
+  authorize("Global Admin", "Super Admin", "HR Manager", "Manager"),
   checkPermission("Employee", "Employee", "create"),
   validate(createUserSchema),
   createEmployee
