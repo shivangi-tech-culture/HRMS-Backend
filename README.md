@@ -186,10 +186,10 @@ Login ID = `official.officialEmail`.
 | Role | Scope | Notes |
 |------|-------|--------|
 | **Global Admin** | All companies | Platform owner. Visible in roles **only to Global Admin**. Only Global can create more (cap `MAX_GLOBAL_ADMINS`, default 5). Super Admin cannot escalate. |
-| **Super Admin** | Own company | Full company admin; profile starts Approved |
+| **Super Admin** | Own company | Full company admin |
 | **HR Manager** | Own company | Permission matrix; can create users / reset password |
 | **Manager** | Own company | Permission matrix |
-| **Employee** | Self | ESS; locked after `detailsApproval: Approved` |
+| **Employee** | Self | ESS profile (no approval lock) |
 
 **Admin roles** (ALL_ACCESS): Global Admin, Super Admin, HR Manager, Manager.  
 Roles UI / dropdown uses `GET /api/roles` → Super Admin, HR Manager, Manager, Employee (+ custom).
@@ -339,9 +339,9 @@ After create → welcome email (if SMTP configured).
 
 | Section | Who |
 |---------|-----|
-| `personal`, `other`, list arrays | Employee (if not Approved) + Admin |
+| `personal`, `other`, list arrays | Employee + Admin |
 | `official`, `payroll` | Admin only |
-| `detailsApproval`, `role`, `status` | Admin only |
+| `role`, `status` | Admin only |
 | `password` | Super Admin / HR Manager |
 
 **Lists** (`education`, `accounts`, …):
@@ -401,7 +401,7 @@ Requires Organization → Mail → `email` (Global / Super Admin bypass). Uses s
 
 One MongoDB document per person:
 
-1. Account — name, password, role, status, detailsApproval, lastLogin  
+1. Account — name, password, role, status, lastLogin  
 2. `personal` — IDs, phones, emails, addresses  
 3. `official` — employeeCode, officialEmail, company, dept, designation, division, employeeGroup, joining  
 4. `other` — blood group, passport expiry  
@@ -448,7 +448,7 @@ HRMS-Backend/
 1. Login as Employee  
 2. Upload file → put URL in body  
 3. `PUT /api/employees/:id` with personal / arrays  
-4. Admin sets `detailsApproval: "Approved"` → employee edit locked  
+4. Admins can always edit; activity log tracks who changed what  
 
 ### C. Access & Control vs Employee table
 
@@ -517,7 +517,6 @@ Folders in Postman: Health, Auth (incl. Logout), Roles, Employees, Users, Mail, 
 | Please login first | Cookie missing or invalid Bearer |
 | CORS on website | Add origin to `CLIENT_URL`; use `credentials: "include"` |
 | Mobile CORS | N/A — use Bearer token |
-| Profile locked | `detailsApproval` is Approved |
 | Unique field 400 | Email / mobile / PAN already used |
 | PDF on Cloudinary | Enable PDF/ZIP delivery in Cloudinary security settings |
 | 429 | Wait or raise `RATE_LIMIT_*` |

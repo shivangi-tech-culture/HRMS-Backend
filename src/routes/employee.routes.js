@@ -10,6 +10,8 @@ const {
   exportEmployees,
   getEmployee,
   updateEmployee,
+  listEmployeeActivity,
+  listCompanyActivity,
   deleteSection,
   deleteEmployee,
   uploadAttachment,
@@ -33,7 +35,7 @@ const router = express.Router();
  * @swagger
  * tags:
  *   - name: Admin / Employees
- *     description: Create User + profile CRUD + education upload + detailsApproval
+ *     description: Create User + profile CRUD + education upload + activity log
  */
 
 /**
@@ -148,13 +150,55 @@ router.post(
  *       200:
  *         description: Page of employees plus total, page, limit, from, to
  */
-// LIST EMPLOYEES — admin only (Employee Management table). Employee → GET /:id own profile.
+  // LIST EMPLOYEES — admin only (Employee Management table). Employee → GET /:id own profile.
 router.get(
   "/",
   protect,
   authorize(...ALL_ACCESS),
   checkPermission("Employee", "Employee", "view"),
   listEmployees
+);
+
+/**
+ * @swagger
+ * /api/employees/activity:
+ *   get:
+ *     tags: [Admin / Employees]
+ *     summary: Admin activity log (all employees)
+ *     description: |
+ *       Company-wide tracking — who edited which employee.
+ *       **Who:** Global Admin, Super Admin, HR Manager, Manager
+ *       Each log has nested `employee{}` + `actor{}` (name, email, code, role, company).
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: company
+ *         schema: { type: string }
+ *       - in: query
+ *         name: employeeId
+ *         schema: { type: string }
+ *       - in: query
+ *         name: actorId
+ *         schema: { type: string }
+ *       - in: query
+ *         name: action
+ *         schema: { type: string, enum: [create, update, delete, section_update, section_delete] }
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 20 }
+ *     responses:
+ *       200: { description: Paginated activity logs }
+ */
+router.get(
+  "/activity",
+  protect,
+  authorize(...ALL_ACCESS),
+  checkPermission("Employee", "Employee", "view"),
+  listCompanyActivity
 );
 
 /**
@@ -252,6 +296,40 @@ router.post(
 
 /**
  * @swagger
+ * /api/employees/{id}/activity:
+ *   get:
+ *     tags: [Admin / Employees, Employee / ESS]
+ *     summary: Employee activity log (by id)
+ *     description: |
+ *       Tracking for one employee — who changed their profile.
+ *       **Employee:** own id only. **Admin:** same company.
+ *       Log shape: `employee{}`, `actor{}`, `action`, `section`, `summary`, `changes`, `createdAt`.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/UserId'
+ *       - in: query
+ *         name: action
+ *         schema: { type: string, enum: [create, update, delete, section_update, section_delete] }
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 20 }
+ *     responses:
+ *       200: { description: Paginated activity logs for this employee }
+ */
+router.get(
+  "/:id/activity",
+  protect,
+  authorize(...ALL_ACCESS, "Employee"),
+  checkEmployeeProfilePermission("view"),
+  listEmployeeActivity
+);
+
+/**
+ * @swagger
  * /api/employees/{id}:
  *   get:
  *     tags: [Admin / Employees, Employee / ESS]
@@ -289,17 +367,16 @@ router.get(
  *     summary: Update employee / my profile
  *     description: |
  *       **Admin:** any profile (company scope) | **Employee ESS:** own id only.
- *       **Who:** Admin (any) | Own profile if detailsApproval ≠ Approved
- *       (Super Admin never locked; HR/Manager/Employee locked when Approved)
+ *       **Who:** Admin (any) | Own profile
  *
  *       **Joi:** nested objects only — personal (addresses/emails/phones),
  *       official, other, education, etc. Flat city/company → 400. No contact module.
  *
  *       **Employee can update:** personal.mobileNo, personal.workPhone, personal.workExt
- *       (and other personal fields) while detailsApproval ≠ Approved
+ *       (and other personal fields)
  *
  *       **Admin-only (official{}):** employeeCode, officialEmail, company, department, …
- *       Also: detailsApproval, password (Super Admin/HR), payroll, role, status
+ *       Also: password (Super Admin/HR), payroll, role, status
  *
  *       **Unique when non-empty:** officialEmail, employeeCode, mobileNo,
  *       personalEmail, panNo, aadhaarNo, drivingLicenseNo, passportNo → 400 if duplicate
@@ -327,7 +404,6 @@ router.get(
  *               summary: Super Admin — all objects (incl. official + payroll)
  *               value:
  *                 name: Shivi Gupta
- *                 detailsApproval: Approved
  *                 personal:
  *                   dateOfBirth: "1995-06-15"
  *                   gender: Female
@@ -488,9 +564,6 @@ router.get(
  *                     visaNumber: V1234567
  *                     fromDate: "2025-01-01"
  *                     toDate: "2025-12-31"
- *             approve:
- *               summary: Approve details (admin)
- *               value: { detailsApproval: Approved }
  *             phonesOnly:
  *               summary: Employee update phones only
  *               value:
@@ -501,7 +574,7 @@ router.get(
  *     responses:
  *       200: { description: Updated }
  *       400: { description: Unknown / invalid fields / unique conflict }
- *       403: { description: Locked after Approved / no permission }
+ *       403: { description: No permission / wrong company }
  */
 // UPDATE PROFILE — one API; role checks in controller + matrix permission here
 // Admin: Employee→Employee→edit | Employee: Self→General Info→edit

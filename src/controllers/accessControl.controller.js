@@ -7,7 +7,7 @@ const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 const Role = require("../models/Role");
 const { maxGlobalAdmins } = require("./role.controller");
-const { sendWelcomeEmailSafe, sendEmail } = require("../utils/mail");
+const { queueWelcomeEmail, sendEmail } = require("../utils/mail");
 const { applyAnniversary } = require("../utils/anniversary");
 const { sendExcel } = require("../utils/excel");
 const {
@@ -220,10 +220,6 @@ const createAccessUserAccount = async (req) => {
       password: hashedPassword,
       role: roleName,
       status: status || "Active",
-      detailsApproval:
-        roleName === "Global Admin" || roleName === "Super Admin"
-          ? "Approved"
-          : "Unapproved",
       official,
     };
 
@@ -237,7 +233,7 @@ const createAccessUserAccount = async (req) => {
 
     const user = await User.create(createDoc);
 
-    const mail = await sendWelcomeEmailSafe({
+    const mail = queueWelcomeEmail({
       name: createDoc.name,
       email,
       password,
@@ -250,9 +246,8 @@ const createAccessUserAccount = async (req) => {
     return {
       ok: true,
       user: safeUser(fresh),
-      emailSent: mail.emailSent,
+      emailQueued: true,
       emailTo: mail.emailTo,
-      ...(mail.emailError ? { emailError: mail.emailError } : {}),
     };
   } catch (err) {
     const dup = duplicateKeyMessage(err);
@@ -268,12 +263,9 @@ const createUser = async (req, res) => {
     return res.status(result.status).json({ message: result.message });
   }
   return res.status(201).json({
-    message: result.emailSent
-      ? `User created. Welcome email sent to ${result.emailTo}.`
-      : "User created. Welcome email failed — check emailError / SMTP env on server.",
-    emailSent: !!result.emailSent,
+    message: `User created. Welcome email queued for ${result.emailTo}.`,
+    emailQueued: true,
     emailTo: result.emailTo || undefined,
-    ...(result.emailError ? { emailError: result.emailError } : {}),
     user: result.user,
   });
 };

@@ -242,7 +242,6 @@ const seed = async () => {
       password: hashed,
       role: u.role,
       status: u.status,
-      detailsApproval: platform ? "Approved" : "Unapproved",
       official: { ...u.official, officialEmail: email },
     };
 

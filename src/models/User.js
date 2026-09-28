@@ -45,11 +45,6 @@ const userSchema = new mongoose.Schema(
     /** Updated on every successful login */
     lastLogin: { type: Date, default: null },
 
-    /**
-     * Profile review status (set by admin).
-     * Allowed values validated in Joi (user.validation.js): Unapproved | Approved | Rejected
-     */
-    detailsApproval: { type: String, default: "Unapproved" },
     // 1. PERSONAL — employee can update (phones, emails, addresses, IDs)
 
     personal: {

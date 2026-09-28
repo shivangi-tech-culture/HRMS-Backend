@@ -10,7 +10,9 @@ const User = require("../models/User");
 const Role = require("../models/Role");
 const { maxGlobalAdmins } = require("./role.controller");
 const { hasAllAccess } = require("../middleware/auth");
-const { sendWelcomeEmailSafe } = require("../utils/mail");
+const { queueWelcomeEmail } = require("../utils/mail");
+const { logEmployeeActivity } = require("../utils/activityLog");
+const ActivityLog = require("../models/ActivityLog");
 const { applyAnniversary } = require("../utils/anniversary");
 const { sendExcel } = require("../utils/excel");
 const { uploadToCloudinary, UPLOAD_TYPES } = require("../middleware/upload");
@@ -259,17 +261,6 @@ const mergeSection = (existing, incoming, sectionKey) => {
 const isOwnRecord = (req, id) => String(req.user._id) === String(id);
 
 /**
- * Lock own profile after Approved.
- * Global Admin / Super Admin never locked.
- * Admins editing someone else are not locked by this.
- */
-const isProfileLocked = (req, employee) => {
-  if (["Global Admin", "Super Admin"].includes(req.user.role)) return false;
-  if (!isOwnRecord(req, employee._id)) return false;
-  return employee.detailsApproval === "Approved";
-};
-
-/**
  * CREATE EMPLOYEE — POST /api/employees
  *
  * Who: Global Admin / Super Admin / HR Manager only (route authorize).
@@ -357,7 +348,6 @@ const createEmployee = async (req, res) => {
       password: hashedPassword,
       role: "Employee",
       status: status || "Active",
-      detailsApproval: "Unapproved",
       official,
       personal,
     };
@@ -377,8 +367,16 @@ const createEmployee = async (req, res) => {
     // 4. Create User with role Employee (password already hashed above)
     const employee = await User.create(createDoc);
 
-    // 5. Welcome email — await so Render does not drop the SMTP job after response
-    const mail = await sendWelcomeEmailSafe({
+    await logEmployeeActivity({
+      actor: req.user,
+      employee,
+      action: "create",
+      summary: `${req.user.name} created employee ${employee.name}`,
+      changes: ["name", "official", "personal"],
+    });
+
+    // 5. Welcome email in background — never wait on SMTP (Render timeouts were ~60s)
+    const mail = queueWelcomeEmail({
       name,
       email,
       password,
@@ -390,12 +388,9 @@ const createEmployee = async (req, res) => {
     // 6. Return employee without password
     const fresh = await User.findById(employee._id).select("-password");
     return res.status(201).json({
-      message: mail.emailSent
-        ? `Employee created. Welcome email sent to ${mail.emailTo}.`
-        : "Employee created. Welcome email failed — check emailError / SMTP env on server.",
-      emailSent: mail.emailSent,
+      message: `Employee created. Welcome email queued for ${mail.emailTo}.`,
+      emailQueued: true,
       emailTo: mail.emailTo || email,
-      ...(mail.emailError ? { emailError: mail.emailError } : {}),
       employee: safeUser(fresh),
     });
   } catch (err) {
@@ -541,7 +536,6 @@ const getEmployee = async (req, res) => {
  *
  * Body: any nested sections in one request (personal, official, education, …)
  * Auth: Employee → self only (no official/payroll); admin → same company
- * After detailsApproval = Approved, the owner cannot edit (admins still can).
  */
 const updateEmployee = async (req, res) => {
   try {
@@ -565,29 +559,9 @@ const updateEmployee = async (req, res) => {
       }
     }
 
-    // --- Profile lock after Approved (owner only; Global/Super never locked) ---
-    if (isProfileLocked(req, employee)) {
-      return res.status(403).json({
-        message: "Details are approved — editing is locked. Contact HR / Admin.",
-        detailsApproval: employee.detailsApproval,
-      });
-    }
-
-    // --- detailsApproval (HR Manager / Super / Global only) ---
-    if (req.body.detailsApproval !== undefined) {
-      const canApproveDetails = [
-        "Global Admin",
-        "Super Admin",
-        "HR Manager",
-      ].includes(req.user.role);
-      if (!canApproveDetails) {
-        return res.status(403).json({
-          message:
-            "Only Global Admin / Super Admin / HR Manager can approve or reject details",
-        });
-      }
-      employee.detailsApproval = req.body.detailsApproval;
-    }
+    const changedKeys = Object.keys(req.body || {}).filter(
+      (k) => req.body[k] !== undefined
+    );
 
     // --- name / status / role / password ---
     if (req.body.name !== undefined) employee.name = req.body.name;
@@ -790,6 +764,14 @@ const updateEmployee = async (req, res) => {
     // --- save + response ---
     await employee.save();
 
+    await logEmployeeActivity({
+      actor: req.user,
+      employee,
+      action: "update",
+      summary: `${req.user.name} updated employee ${employee.name}`,
+      changes: changedKeys,
+    });
+
     // Role promote to Global / Super → strip heavy HR profile fields
     if (
       req.body.role !== undefined &&
@@ -833,14 +815,6 @@ const loadEditableEmployee = async (req) => {
   if (hasAllAccess(req.user) && !hasGlobalCompanyAccess(req.user)) {
     const scopeErr = assertSameCompanyEmployee(req.user, employee);
     if (scopeErr) return { status: 403, message: scopeErr };
-  }
-
-  if (isProfileLocked(req, employee)) {
-    return {
-      status: 403,
-      message: "Details are approved — editing is locked. Contact HR / Admin.",
-      detailsApproval: employee.detailsApproval,
-    };
   }
 
   return { employee };
@@ -887,9 +861,6 @@ const deleteArrayItem = async (req, res) => {
     if (!loaded.employee) {
       return res.status(loaded.status).json({
         message: loaded.message,
-        ...(loaded.detailsApproval
-          ? { detailsApproval: loaded.detailsApproval }
-          : {}),
       });
     }
 
@@ -905,6 +876,15 @@ const deleteArrayItem = async (req, res) => {
     loaded.employee[section] = current.filter((item) => !idSet.has(String(item._id)));
     loaded.employee.markModified(section);
     await loaded.employee.save();
+
+    await logEmployeeActivity({
+      actor: req.user,
+      employee: loaded.employee,
+      action: "section_delete",
+      section,
+      summary: `${req.user.name} deleted ${idSet.size} ${section} item(s) for ${loaded.employee.name}`,
+      changes: [...idSet],
+    });
 
     return res.json({
       message: idSet.size === 1 ? `${section} item deleted` : `${section} items deleted`,
@@ -1004,6 +984,15 @@ const deleteObjectSection = async (req, res) => {
     loaded.employee.markModified("payroll");
     await loaded.employee.save();
 
+    await logEmployeeActivity({
+      actor: req.user,
+      employee: loaded.employee,
+      action: "section_delete",
+      section: "payroll",
+      summary: `${req.user.name} cleared payroll for ${loaded.employee.name}`,
+      changes: ["payroll"],
+    });
+
     return res.json({
       message: "payroll cleared",
       employee: safeUser(loaded.employee),
@@ -1038,6 +1027,14 @@ const deleteEmployee = async (req, res) => {
         return res.status(403).json({ message: scopeErr });
       }
     }
+
+    await logEmployeeActivity({
+      actor: req.user,
+      employee,
+      action: "delete",
+      summary: `${req.user.name} deleted employee ${employee.name}`,
+      changes: ["employee"],
+    });
 
     await employee.deleteOne();
 
@@ -1102,12 +1099,132 @@ const deleteSection = (req, res) => {
   return deleteArrayItem(req, res);
 };
 
+/**
+ * ACTIVITY LOG (employee) — GET /api/employees/:id/activity
+ * Employee sees own tracking. Admin sees that employee's full history.
+ */
+const listEmployeeActivity = async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: "Invalid employee id" });
+    }
+
+    if (!hasAllAccess(req.user) && !isOwnRecord(req, req.params.id)) {
+      return res.status(403).json({ message: "You can only view your own activity" });
+    }
+
+    const employee = await User.findById(req.params.id).select(
+      "name role official"
+    );
+    if (!employee) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+
+    if (hasAllAccess(req.user) && !hasGlobalCompanyAccess(req.user)) {
+      const scopeErr = assertSameCompanyEmployee(req.user, employee);
+      if (scopeErr) {
+        return res.status(403).json({ message: scopeErr });
+      }
+    }
+
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+    const skip = (page - 1) * limit;
+
+    const filter = { "employee.id": employee._id };
+    if (req.query.action) filter.action = String(req.query.action).trim();
+
+    const [total, logs] = await Promise.all([
+      ActivityLog.countDocuments(filter),
+      ActivityLog.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+    ]);
+
+    return res.json({
+      employee: {
+        id: employee._id,
+        name: employee.name,
+        officialEmail: employee.official?.officialEmail || "",
+        employeeCode: employee.official?.employeeCode || "",
+        company: employee.official?.company || "",
+        department: employee.official?.department || "",
+      },
+      count: logs.length,
+      total,
+      page,
+      limit,
+      pages: Math.ceil(total / limit) || 1,
+      logs,
+    });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+/**
+ * ACTIVITY LOG (admin) — GET /api/employees/activity
+ * All employee edits in company (Global Admin = all companies).
+ */
+const listCompanyActivity = async (req, res) => {
+  try {
+    if (!hasAllAccess(req.user)) {
+      return res.status(403).json({ message: "Only admin can view company activity" });
+    }
+
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+    const skip = (page - 1) * limit;
+
+    const filter = {};
+    if (!hasGlobalCompanyAccess(req.user)) {
+      filter.company = String(req.user.official?.company || "").trim();
+    } else if (req.query.company) {
+      filter.company = String(req.query.company).trim();
+    }
+    if (req.query.action) filter.action = String(req.query.action).trim();
+    if (req.query.actorId && mongoose.Types.ObjectId.isValid(req.query.actorId)) {
+      filter["actor.id"] = req.query.actorId;
+    }
+    if (
+      req.query.employeeId &&
+      mongoose.Types.ObjectId.isValid(req.query.employeeId)
+    ) {
+      filter["employee.id"] = req.query.employeeId;
+    }
+
+    const [total, logs] = await Promise.all([
+      ActivityLog.countDocuments(filter),
+      ActivityLog.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+    ]);
+
+    return res.json({
+      count: logs.length,
+      total,
+      page,
+      limit,
+      pages: Math.ceil(total / limit) || 1,
+      logs,
+    });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
 module.exports = {
   createEmployee,
   listEmployees,
   exportEmployees,
   getEmployee,
   updateEmployee,
+  listEmployeeActivity,
+  listCompanyActivity,
   deleteSection,
   deleteEmployee,
   uploadAttachment,

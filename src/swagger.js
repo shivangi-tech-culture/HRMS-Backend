@@ -616,12 +616,6 @@ module.exports = swaggerJsdoc({
             },
             role: { type: "string" },
             status: { type: "string", enum: ["Active", "Inactive"] },
-            detailsApproval: {
-              type: "string",
-              enum: ["Unapproved", "Approved", "Rejected"],
-              description: "Admin only",
-              example: "Approved",
-            },
             personal: { $ref: "#/components/schemas/Personal" },
             official: {
               allOf: [{ $ref: "#/components/schemas/Official" }],

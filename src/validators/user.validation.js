@@ -291,9 +291,6 @@ const updateUserSchema = Joi.object({
   password: Joi.string().min(6).max(50).optional(),
   role: Joi.string().trim().optional(),
   status: Joi.string().valid("Active", "Inactive").optional(),
-  detailsApproval: Joi.string()
-    .valid("Unapproved", "Approved", "Rejected")
-    .optional(),
   personal: personalItem.optional(),
   official: officialUpdateItem.optional(),
   other: otherItem.optional(),

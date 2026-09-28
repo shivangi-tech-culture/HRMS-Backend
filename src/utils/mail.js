@@ -2,8 +2,8 @@
  * MAIL UTILS — send email via Zoho SMTP (nodemailer)
  * sendWelcomeEmail (user / employee create) · sendEmail (generic)
  *
- * Local: smtp.zoho.com:587 usually works.
- * Render: often times out on 587 (outbound SMTP filtered) — use 465 or set SMTP_PORT_EZ=465.
+ * Create APIs must NOT await SMTP — Render often blocks/times out Zoho ports
+ * (587/465), which made create take ~60s. Welcome mail is fire-and-forget.
  */
 const nodemailer = require("nodemailer");
 
@@ -16,15 +16,16 @@ function createTransporter(portOverride) {
   const user = mailUser();
   const pass = mailPass();
   const host = mailHost();
-  const port = Number(
-    portOverride || process.env.SMTP_PORT_EZ || 587
-  );
+  const port = Number(portOverride || process.env.SMTP_PORT_EZ || 465);
 
   if (!user || !pass) {
     throw new Error(
       "Mail not configured. Set EMAIL_USER_EZ and EMAIL_PASS_EZ in .env (and on Render)"
     );
   }
+
+  // Keep short — never block create API; background send should die fast if blocked
+  const connectionTimeout = Number(process.env.SMTP_TIMEOUT_MS || 8000);
 
   return nodemailer.createTransport({
     host,
@@ -33,22 +34,24 @@ function createTransporter(portOverride) {
     requireTLS: port === 587,
     auth: { user, pass },
     tls: { minVersion: "TLSv1.2", servername: host },
-    // Render / cloud hosts: IPv6 SMTP often hangs → force IPv4
     family: 4,
-    connectionTimeout: 30000,
-    greetingTimeout: 30000,
-    socketTimeout: 45000,
+    connectionTimeout,
+    greetingTimeout: connectionTimeout,
+    socketTimeout: connectionTimeout + 5000,
   });
 }
 
-/** Prefer configured port, then the other common Zoho port (Render 587 often times out). */
+/** Only the configured port by default (fallback doubles wait on Render). */
 function smtpPortsToTry() {
-  const preferred = Number(process.env.SMTP_PORT_EZ || 587);
-  const other = preferred === 465 ? 587 : 465;
-  return [preferred, other];
+  const preferred = Number(process.env.SMTP_PORT_EZ || 465);
+  if (String(process.env.SMTP_TRY_FALLBACK || "").toLowerCase() === "true") {
+    const other = preferred === 465 ? 587 : 465;
+    return [preferred, other];
+  }
+  return [preferred];
 }
 
-/** Send with port fallback when connection times out (common on Render → Zoho). */
+/** Send with optional port fallback when connection times out. */
 async function sendMailWithFallback(mailOptions) {
   const ports = smtpPortsToTry();
   let lastErr;
@@ -69,11 +72,11 @@ async function sendMailWithFallback(mailOptions) {
           msg
         );
       console.error(`SMTP port ${port} failed:`, msg);
-      if (!retryable) throw err;
+      if (!retryable || ports.length === 1) throw err;
     }
   }
   throw new Error(
-    `SMTP connection failed on ports ${ports.join(" & ")} from this host (often blocked on Render). Last error: ${lastErr && lastErr.message}. Set SMTP_PORT_EZ=465 on Render or use an HTTPS mail API.`
+    `SMTP connection failed on ports ${ports.join(" & ")} from this host (often blocked on Render). Last error: ${lastErr && lastErr.message}. Set SMTP_PORT_EZ=465 on Render, or use an HTTPS mail provider.`
   );
 }
 
@@ -259,6 +262,24 @@ const sendWelcomeEmail = async ({
 };
 
 /**
+ * Fire welcome mail in the background (never blocks create API).
+ * Returns immediately with emailQueued + emailTo.
+ */
+const queueWelcomeEmail = (payload) => {
+  const emailTo = String(payload.email || "")
+    .toLowerCase()
+    .trim();
+  setImmediate(() => {
+    sendWelcomeEmailSafe(payload).then((mail) => {
+      if (!mail.emailSent) {
+        console.error("Background welcome email failed →", emailTo, mail.emailError);
+      }
+    });
+  });
+  return { emailQueued: true, emailTo };
+};
+
+/**
  * Fire welcome mail; never throws to the create API.
  * Returns { emailSent, emailTo, emailError? } for the JSON response.
  */
@@ -272,10 +293,10 @@ const sendWelcomeEmailSafe = async (payload) => {
       "Welcome email sent →",
       emailTo,
       info.messageId || "",
+      "port:",
+      info._usedPort || "",
       "accepted:",
-      (info.accepted || []).join(",") || "(none)",
-      "response:",
-      info.response || ""
+      (info.accepted || []).join(",") || "(none)"
     );
     return { emailSent: true, emailTo };
   } catch (err) {
@@ -321,6 +342,7 @@ const sendEmail = async ({ to, subject, body, cc, bcc, isHtml = false }) => {
 module.exports = {
   sendWelcomeEmail,
   sendWelcomeEmailSafe,
+  queueWelcomeEmail,
   sendEmail,
   createTransporter,
 };
