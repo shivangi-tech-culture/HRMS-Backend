@@ -391,9 +391,10 @@ const createEmployee = async (req, res) => {
     const fresh = await User.findById(employee._id).select("-password");
     return res.status(201).json({
       message: mail.emailSent
-        ? "Employee created. Welcome email sent."
-        : "Employee created. Welcome email failed — check server logs / SMTP env.",
+        ? `Employee created. Welcome email sent to ${mail.emailTo}.`
+        : "Employee created. Welcome email failed — check emailError / SMTP env on server.",
       emailSent: mail.emailSent,
+      emailTo: mail.emailTo || email,
       ...(mail.emailError ? { emailError: mail.emailError } : {}),
       employee: safeUser(fresh),
     });

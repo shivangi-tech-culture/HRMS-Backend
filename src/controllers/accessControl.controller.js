@@ -251,6 +251,7 @@ const createAccessUserAccount = async (req) => {
       ok: true,
       user: safeUser(fresh),
       emailSent: mail.emailSent,
+      emailTo: mail.emailTo,
       ...(mail.emailError ? { emailError: mail.emailError } : {}),
     };
   } catch (err) {
@@ -268,9 +269,10 @@ const createUser = async (req, res) => {
   }
   return res.status(201).json({
     message: result.emailSent
-      ? "User created. Welcome email sent."
-      : "User created. Welcome email failed — check server logs / SMTP env.",
+      ? `User created. Welcome email sent to ${result.emailTo}.`
+      : "User created. Welcome email failed — check emailError / SMTP env on server.",
     emailSent: !!result.emailSent,
+    emailTo: result.emailTo || undefined,
     ...(result.emailError ? { emailError: result.emailError } : {}),
     user: result.user,
   });

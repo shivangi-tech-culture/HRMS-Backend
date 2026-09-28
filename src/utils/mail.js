@@ -1,15 +1,24 @@
 /**
  * MAIL UTILS — send email via Zoho SMTP (nodemailer)
  * sendWelcomeEmail (user / employee create) · sendEmail (generic)
+ *
+ * Local: smtp.zoho.com:587 usually works.
+ * Render: often times out on 587 (outbound SMTP filtered) — use 465 or set SMTP_PORT_EZ=465.
  */
 const nodemailer = require("nodemailer");
 
-/** Build nodemailer transporter from .env (Zoho SMTP) */
-function createTransporter() {
-  const user = process.env.EMAIL_USER_EZ;
-  const pass = String(process.env.EMAIL_PASS_EZ || "").replace(/\s+/g, "");
-  const host = process.env.SMTP_HOST_EZ || "smtp.zoho.com";
-  const port = Number(process.env.SMTP_PORT_EZ || 587);
+const mailUser = () => process.env.EMAIL_USER_EZ;
+const mailPass = () => String(process.env.EMAIL_PASS_EZ || "").replace(/\s+/g, "");
+const mailHost = () => process.env.SMTP_HOST_EZ || "smtp.zoho.com";
+
+/** Build one Zoho transporter (port 465 = SSL, 587 = STARTTLS). Force IPv4 for Render. */
+function createTransporter(portOverride) {
+  const user = mailUser();
+  const pass = mailPass();
+  const host = mailHost();
+  const port = Number(
+    portOverride || process.env.SMTP_PORT_EZ || 587
+  );
 
   if (!user || !pass) {
     throw new Error(
@@ -20,14 +29,52 @@ function createTransporter() {
   return nodemailer.createTransport({
     host,
     port,
-    secure: port === 465, // 465 = SSL, 587 = STARTTLS
+    secure: port === 465,
     requireTLS: port === 587,
     auth: { user, pass },
-    tls: { minVersion: "TLSv1.2" },
-    connectionTimeout: 15000,
-    greetingTimeout: 15000,
-    socketTimeout: 20000,
+    tls: { minVersion: "TLSv1.2", servername: host },
+    // Render / cloud hosts: IPv6 SMTP often hangs → force IPv4
+    family: 4,
+    connectionTimeout: 30000,
+    greetingTimeout: 30000,
+    socketTimeout: 45000,
   });
+}
+
+/** Prefer configured port, then the other common Zoho port (Render 587 often times out). */
+function smtpPortsToTry() {
+  const preferred = Number(process.env.SMTP_PORT_EZ || 587);
+  const other = preferred === 465 ? 587 : 465;
+  return [preferred, other];
+}
+
+/** Send with port fallback when connection times out (common on Render → Zoho). */
+async function sendMailWithFallback(mailOptions) {
+  const ports = smtpPortsToTry();
+  let lastErr;
+  for (const port of ports) {
+    try {
+      const transporter = createTransporter(port);
+      const info = await transporter.sendMail(mailOptions);
+      if (info.rejected && info.rejected.length) {
+        throw new Error(`SMTP rejected: ${info.rejected.join(", ")}`);
+      }
+      info._usedPort = port;
+      return info;
+    } catch (err) {
+      lastErr = err;
+      const msg = String(err.message || err);
+      const retryable =
+        /timeout|ETIMEDOUT|ECONNREFUSED|ECONNRESET|ESOCKET|Greeting never received/i.test(
+          msg
+        );
+      console.error(`SMTP port ${port} failed:`, msg);
+      if (!retryable) throw err;
+    }
+  }
+  throw new Error(
+    `SMTP connection failed on ports ${ports.join(" & ")} from this host (often blocked on Render). Last error: ${lastErr && lastErr.message}. Set SMTP_PORT_EZ=465 on Render or use an HTTPS mail API.`
+  );
 }
 
 /** From display name + address for outgoing mail */
@@ -68,7 +115,6 @@ const sendWelcomeEmail = async ({
   const appUrl = process.env.APP_URL || "https://hrms-techculture.vercel.app";
   const roleLabel = role || "Employee";
   const brand = company || "TechCulture.Ai";
-  const transporter = createTransporter();
 
   const safe = {
     name: escapeHtml(name),
@@ -195,46 +241,53 @@ const sendWelcomeEmail = async ({
 </html>
   `;
 
-  const info = await transporter.sendMail({
+  const info = await sendMailWithFallback({
     from,
     to,
-    subject: `Welcome to ${brand} — your account is ready`,
+    replyTo: process.env.EMAIL_REPLY_TO || process.env.EMAIL_USER_EZ,
+    subject: `[HRMS] Your login for ${brand}`,
     text: `Hi ${name},\n\nWelcome to your HR portal at ${brand}. Your account is ready.\n\nHow to sign in:\n1. Open ${appUrl}\n2. Email: ${to}\n3. Password: ${password}\n4. Your role: ${roleLabel}\n\nPlease change your password after first login.\n\nRegards,\n${fromName}`,
     html,
+    headers: {
+      "X-Priority": "1",
+      "X-Mailer": "HRMS-API",
+      "Auto-Submitted": "auto-generated",
+    },
   });
-
-  if (info.rejected && info.rejected.length) {
-    throw new Error(`SMTP rejected: ${info.rejected.join(", ")}`);
-  }
 
   return info;
 };
 
 /**
  * Fire welcome mail; never throws to the create API.
- * Returns { emailSent, emailError? } for the JSON response.
+ * Returns { emailSent, emailTo, emailError? } for the JSON response.
  */
 const sendWelcomeEmailSafe = async (payload) => {
+  const emailTo = String(payload.email || "")
+    .toLowerCase()
+    .trim();
   try {
     const info = await sendWelcomeEmail(payload);
     console.log(
       "Welcome email sent →",
-      payload.email,
+      emailTo,
       info.messageId || "",
-      (info.accepted || []).join(",")
+      "accepted:",
+      (info.accepted || []).join(",") || "(none)",
+      "response:",
+      info.response || ""
     );
-    return { emailSent: true };
+    return { emailSent: true, emailTo };
   } catch (err) {
-    console.error("Welcome email failed:", err.message);
+    console.error("Welcome email failed →", emailTo, err.message);
     if (err.response) console.error("SMTP response:", err.response);
-    return { emailSent: false, emailError: err.message };
+    return { emailSent: false, emailTo, emailError: err.message };
   }
 };
 
 /** Generic send used by POST /api/mail/send */
 const sendEmail = async ({ to, subject, body, cc, bcc, isHtml = false }) => {
   const { fromName, from } = fromAddress();
-  const transporter = createTransporter();
 
   const text = isHtml
     ? String(body || "")
@@ -248,7 +301,7 @@ const sendEmail = async ({ to, subject, body, cc, bcc, isHtml = false }) => {
     : `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#111;line-height:1.6;white-space:pre-wrap;">${escapeHtml(body)}</div>
        <p style="font-size:12px;color:#94a3b8;margin-top:24px;">Sent via ${escapeHtml(fromName)}</p>`;
 
-  const info = await transporter.sendMail({
+  const info = await sendMailWithFallback({
     from,
     to,
     cc: cc || undefined,
