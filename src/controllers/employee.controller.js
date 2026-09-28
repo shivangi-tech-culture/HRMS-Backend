@@ -10,7 +10,7 @@ const User = require("../models/User");
 const Role = require("../models/Role");
 const { maxGlobalAdmins } = require("./role.controller");
 const { hasAllAccess } = require("../middleware/auth");
-const { queueWelcomeEmail } = require("../utils/mail");
+const { sendWelcomeEmail } = require("../utils/mail");
 const { logEmployeeActivity } = require("../utils/activityLog");
 const ActivityLog = require("../models/ActivityLog");
 const { applyAnniversary } = require("../utils/anniversary");
@@ -375,22 +375,33 @@ const createEmployee = async (req, res) => {
       changes: ["name", "official", "personal"],
     });
 
-    // 5. Welcome email in background — never wait on SMTP (Render timeouts were ~60s)
-    const mail = queueWelcomeEmail({
-      name,
-      email,
-      password,
-      role: "Employee",
-      company: official.company || "",
-      department: String(official.department || "").trim(),
-    });
+    // 5. Welcome email — same as seed (await SMTP)
+    let emailSent = false;
+    let emailError;
+    try {
+      await sendWelcomeEmail({
+        name,
+        email,
+        password,
+        role: "Employee",
+        company: official.company || "",
+        department: String(official.department || "").trim(),
+      });
+      emailSent = true;
+    } catch (mailErr) {
+      emailError = mailErr.message;
+      console.error("Welcome email failed →", email, mailErr.message);
+    }
 
     // 6. Return employee without password
     const fresh = await User.findById(employee._id).select("-password");
     return res.status(201).json({
-      message: `Employee created. Welcome email queued for ${mail.emailTo}.`,
-      emailQueued: true,
-      emailTo: mail.emailTo || email,
+      message: emailSent
+        ? `Employee created. Welcome email sent to ${email}.`
+        : `Employee created. Welcome email failed: ${emailError}`,
+      emailSent,
+      emailTo: email,
+      ...(emailError ? { emailError } : {}),
       employee: safeUser(fresh),
     });
   } catch (err) {

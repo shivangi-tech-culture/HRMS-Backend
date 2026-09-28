@@ -7,7 +7,7 @@ const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 const Role = require("../models/Role");
 const { maxGlobalAdmins } = require("./role.controller");
-const { queueWelcomeEmail, sendEmail } = require("../utils/mail");
+const { sendWelcomeEmail, sendEmail } = require("../utils/mail");
 const { applyAnniversary } = require("../utils/anniversary");
 const { sendExcel } = require("../utils/excel");
 const {
@@ -233,21 +233,31 @@ const createAccessUserAccount = async (req) => {
 
     const user = await User.create(createDoc);
 
-    const mail = queueWelcomeEmail({
-      name: createDoc.name,
-      email,
-      password,
-      role: roleName,
-      company: roleName === "Global Admin" ? "All companies" : company,
-      department,
-    });
+    // Welcome email — same as seed (await SMTP)
+    let emailSent = false;
+    let emailError;
+    try {
+      await sendWelcomeEmail({
+        name: createDoc.name,
+        email,
+        password,
+        role: roleName,
+        company: roleName === "Global Admin" ? "All companies" : company,
+        department,
+      });
+      emailSent = true;
+    } catch (mailErr) {
+      emailError = mailErr.message;
+      console.error("Welcome email failed →", email, mailErr.message);
+    }
 
     const fresh = await User.findById(user._id).select("-password");
     return {
       ok: true,
       user: safeUser(fresh),
-      emailQueued: true,
-      emailTo: mail.emailTo,
+      emailSent,
+      emailTo: email,
+      ...(emailError ? { emailError } : {}),
     };
   } catch (err) {
     const dup = duplicateKeyMessage(err);
@@ -263,9 +273,12 @@ const createUser = async (req, res) => {
     return res.status(result.status).json({ message: result.message });
   }
   return res.status(201).json({
-    message: `User created. Welcome email queued for ${result.emailTo}.`,
-    emailQueued: true,
+    message: result.emailSent
+      ? `User created. Welcome email sent to ${result.emailTo}.`
+      : `User created. Welcome email failed: ${result.emailError}`,
+    emailSent: !!result.emailSent,
     emailTo: result.emailTo || undefined,
+    ...(result.emailError ? { emailError: result.emailError } : {}),
     user: result.user,
   });
 };
