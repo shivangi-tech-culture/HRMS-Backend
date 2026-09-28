@@ -48,16 +48,12 @@ app.use(
   })
 );
 
-/** CORS — CLIENT_URL origins; credentials for httpOnly cookies */
-const corsOrigins = String(process.env.CLIENT_URL || "")
-  .split(",")
-  .map((s) => s.trim())
-  .filter(Boolean);
-
+/** CORS — allow all origins */
 app.use(
   cors({
-    origin: corsOrigins.length ? corsOrigins : true,
-    credentials: true,
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
   })
 );
 
