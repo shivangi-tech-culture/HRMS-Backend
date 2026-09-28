@@ -1,11 +1,10 @@
 /**
- * MongoDB connection
- *
- * Uses MONGODB_URI from .env. Exits the process if connection fails.
+ * DATABASE CONFIG — connect Mongoose to MongoDB (MONGODB_URI)
  */
 const mongoose = require("mongoose");
 const chalk = require("chalk");
 
+/** Connect Mongoose using MONGODB_URI; exit on failure */
 const connectDB = async () => {
   try {
     await mongoose.connect(process.env.MONGODB_URI);

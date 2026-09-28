@@ -1,40 +1,23 @@
 /**
- * User / Employee model (MongoDB / Mongoose)
- *
- * WHAT THIS FILE IS:
- *   One document = one person in the HRMS (login account + full profile).
- *
- * LOGIN:
- *   User signs in with official.officialEmail + password.
- *   That email must be unique (empty values are ignored by the index).
- *
- * WHO CAN EDIT WHAT:
- *   personal{}  → employee can update (if detailsApproval is not Approved)
- *   official{}  → Super Admin / HR Manager / Manager only
- *   payroll{}   → admin only
- *
- * CREATE USER:
- *   Flat account: name, password, role, status
- *   Nested (same keys as this schema): official (required email/company/dept),
- *   personal, other, education, accounts, family, nominees, experience, visas, payroll
- *
- * UNIQUE WHEN NOT EMPTY:
- *   officialEmail, employeeCode, mobileNo, personalEmail,
- *   panNo, aadhaarNo, drivingLicenseNo, passportNo
+ * USER MODEL — login account + employee profile (one document per person)
+ * Login: official.officialEmail + password. Validation → user.validation.js (Joi).
+ * Unique when set: officialEmail, employeeCode, mobileNo, personalEmail, pan, aadhaar, DL, passport.
  */
 const mongoose = require("mongoose");
 const { nextWorkAnniversary } = require("../utils/anniversary");
 
-/**
- * Address block reused for present + permanent address.
- * _id: false → do not create a separate id for each address object.
- */
+/** Address block for present + permanent (_id: false) */
 const addressSchema = new mongoose.Schema(
   {
-    address: { type: String, default: "" }, // street / line 1
+    /** Street / line 1 */
+    address: { type: String, default: "" },
+    /** Country name */
     country: { type: String, default: "" },
+    /** State / province */
     state: { type: String, default: "" },
+    /** City */
     city: { type: String, default: "" },
+    /** Postal / PIN code */
     pincode: { type: String, default: "" },
   },
   { _id: false }
@@ -42,93 +25,119 @@ const addressSchema = new mongoose.Schema(
 
 const userSchema = new mongoose.Schema(
   {
-    // =========================================================================
     // ACCOUNT — used for login and access control
-    // =========================================================================
-    name: { type: String, default: "", trim: true }, // display name
-    password: { type: String, default: "" }, // always store hashed (bcrypt), never plain text
+
+    /** Display name shown in UI and emails */
+    name: { type: String, default: "", trim: true },
+    /** Always store bcrypt hash — never plain text */
+    password: { type: String, default: "" },
+    /**
+     * Access role string (must match Role.name / authorize lists).
+     * Typical: Global Admin | Super Admin | HR Manager | Manager | Employee
+     */
     role: {
       type: String,
       default: "Employee",
       trim: true,
-    }, // Global Admin | Super Admin | HR Manager | Manager | Employee
-    status: { type: String, default: "Active" }, // Active = can login | Inactive = blocked
-    lastLogin: { type: Date, default: null }, // updated on every successful login
+    },
+    /** Active = can login; Inactive = blocked by protect() */
+    status: { type: String, default: "Active" },
+    /** Updated on every successful login */
+    lastLogin: { type: Date, default: null },
 
     /**
      * Profile review status (set by admin).
-     * Unapproved / Rejected → employee may edit own profile
-     * Approved              → employee own-profile edit is locked
-     * Super Admin users start as Approved; others start as Unapproved
+     * Allowed values validated in Joi (user.validation.js): Unapproved | Approved | Rejected
      */
-    detailsApproval: {
-      type: String,
-      enum: ["Unapproved", "Approved", "Rejected"],
-      default: "Unapproved",
-    },
-
-    // =========================================================================
+    detailsApproval: { type: String, default: "Unapproved" },
     // 1. PERSONAL — employee can update (phones, emails, addresses, IDs)
-    // =========================================================================
+
     personal: {
+      /** Date of birth */
       dateOfBirth: { type: Date, default: null },
-      aadhaarNo: { type: String, default: "" }, // unique when set
-      panNo: { type: String, default: "" }, // unique when set
+      /** Unique when set — Indian Aadhaar */
+      aadhaarNo: { type: String, default: "" },
+      /** Unique when set — PAN */
+      panNo: { type: String, default: "" },
       gender: { type: String, default: "" },
       fatherOrHusbandName: { type: String, default: "" },
       maritalStatus: { type: String, default: "" },
       spouseName: { type: String, default: "" },
-      // Filled automatically from official.dateOfJoining (do not trust client value)
+      /**
+       * Next work-anniversary date (auto from official.dateOfJoining).
+       * Do not trust a client-supplied value — pre-save hook overwrites it.
+       */
       anniversaryDate: { type: Date, default: null },
-      personalEmail: { type: String, default: "" }, // unique when set (not login id)
+      /** Unique when set — not used as login id */
+      personalEmail: { type: String, default: "" },
       languageKnown: { type: String, default: "" },
       emergencyContact1: { type: String, default: "" },
       emergencyContact2: { type: String, default: "" },
-      drivingLicenseNo: { type: String, default: "" }, // unique when set
+      /** Unique when set */
+      drivingLicenseNo: { type: String, default: "" },
       licenseValidUpto: { type: Date, default: null },
-      passportNo: { type: String, default: "" }, // unique when set
+      /** Unique when set */
+      passportNo: { type: String, default: "" },
       remarks: { type: String, default: "" },
+      /** Current residential address */
       presentAddress: { type: addressSchema, default: () => ({}) },
+      /** Permanent / native address */
       permanentAddress: { type: addressSchema, default: () => ({}) },
-      mobileNo: { type: String, default: "" }, // unique when set
-      workPhone: { type: String, default: "" }, // not unique
-      workExt: { type: String, default: "" }, // not unique
+      /** Unique when set — primary mobile */
+      mobileNo: { type: String, default: "" },
+      /** Office phone (not unique) */
+      workPhone: { type: String, default: "" },
+      /** Office extension (not unique) */
+      workExt: { type: String, default: "" },
     },
-
-    // =========================================================================
     // 2. OFFICIAL — admin only (employee cannot change these)
-    // =========================================================================
+
     official: {
-      employeeCode: { type: String, default: "" }, // unique when set (e.g. EMP-1024)
+      /** Unique when set (e.g. EMP-1024) */
+      employeeCode: { type: String, default: "" },
+      /**
+       * LOGIN ID — unique when set.
+       * Stored lowercase; used by auth + uniqueFields helpers.
+       */
       officialEmail: {
         type: String,
         default: "",
         lowercase: true,
         trim: true,
-      }, // LOGIN ID — unique when set
-      company: { type: String, default: "" },
+      },
+      /**
+       * Company name string (matches Master type=company `name`).
+       * Used by companyScope for tenant isolation.
+       */
+      company: { type: String, default: "TechCulture.Ai Private Limited" },
+      /** Department name from masters (string, not ObjectId) */
       department: { type: String, default: "" },
+      /** Designation name from masters */
       designation: { type: String, default: "" },
+      /** Division name from masters */
+      division: { type: String, default: "" },
+      /** Employee group name from masters */
+      employeeGroup: { type: String, default: "" },
+      /** Primary reporting manager (display / email / name as stored by UI) */
       reportingHead1: { type: String, default: "" },
+      /** Secondary reporting manager */
       reportingHead2: { type: String, default: "" },
       jobRole: { type: String, default: "" },
-      dateOfJoining: { type: Date, default: null }, // also drives anniversaryDate
+      /** Joining date — also drives personal.anniversaryDate */
+      dateOfJoining: { type: Date, default: null },
+      /** Payroll start date (may differ from joining) */
       calculateSalaryFrom: { type: Date, default: null },
       dateOfRetirement: { type: Date, default: null },
       grade: { type: String, default: "" },
     },
+    // 3. OTHER — extra personal details
 
-    // =========================================================================
-    // 3. OTHER
-    // =========================================================================
     other: {
       bloodGroup: { type: String, default: "" },
       passportExpiry: { type: Date, default: null },
     },
-
-    // =========================================================================
     // 4. EDUCATION — list of courses (array)
-    // =========================================================================
+
     education: [
       {
         courseType: { type: String, default: "" },
@@ -141,15 +150,13 @@ const userSchema = new mongoose.Schema(
         major: { type: String, default: "" },
         minor: { type: String, default: "" },
         percentageOrGrade: { type: String, default: "" },
-        document: { type: String, default: "" }, // Cloudinary file URL
-        documentName: { type: String, default: "" }, // original file name
+        /** Cloudinary URL from POST /api/employees/upload */
+        document: { type: String, default: "" },
         remarks: { type: String, default: "" },
       },
     ],
-
-    // =========================================================================
     // 5. BANK ACCOUNTS — list (array)
-    // =========================================================================
+
     accounts: [
       {
         bankName: { type: String, default: "" },
@@ -158,15 +165,16 @@ const userSchema = new mongoose.Schema(
         ifscCode: { type: String, default: "" },
         location: { type: String, default: "" },
         remarks: { type: String, default: "" },
+        /** Optional bank proof file URL (Cloudinary) */
         attachment: { type: String, default: "" },
+        /** Soft-active flag for the account row */
         active: { type: Boolean, default: true },
+        /** True when this account receives salary */
         salaryAccount: { type: Boolean, default: false },
       },
     ],
-
-    // =========================================================================
     // 6. FAMILY — list (array)
-    // =========================================================================
+
     family: [
       {
         name: { type: String, default: "" },
@@ -176,28 +184,27 @@ const userSchema = new mongoose.Schema(
         education: { type: String, default: "" },
         aadhaarNo: { type: String, default: "" },
         mobileNo: { type: String, default: "" },
+        /** Covered under company mediclaim? */
         mediclaim: { type: Boolean, default: false },
       },
     ],
-
-    // =========================================================================
     // 7. NOMINEES — list (array)
-    // =========================================================================
+
     nominees: [
       {
-        nominateFor: { type: String, default: "" }, // e.g. PF, Gratuity
+        /** Benefit type, e.g. PF, Gratuity */
+        nominateFor: { type: String, default: "" },
         nomineeName: { type: String, default: "" },
         relation: { type: String, default: "" },
         dob: { type: Date, default: null },
+        /** Share of benefit (0–100) */
         amountPercent: { type: Number, default: 0 },
         address: { type: String, default: "" },
         remarks: { type: String, default: "" },
       },
     ],
-
-    // =========================================================================
     // 8. EXPERIENCE — previous jobs (array)
-    // =========================================================================
+
     experience: [
       {
         organization: { type: String, default: "" },
@@ -210,10 +217,8 @@ const userSchema = new mongoose.Schema(
         remarks: { type: String, default: "" },
       },
     ],
-
-    // =========================================================================
     // 9. VISAS — list (array)
-    // =========================================================================
+
     visas: [
       {
         countryName: { type: String, default: "" },
@@ -224,10 +229,8 @@ const userSchema = new mongoose.Schema(
         remarks: { type: String, default: "" },
       },
     ],
-
-    // =========================================================================
     // PAYROLL — admin only (optional on Create User)
-    // =========================================================================
+
     payroll: {
       salaryGroup: { type: String, default: "" },
       salaryDate: { type: String, default: "" },
@@ -242,6 +245,7 @@ const userSchema = new mongoose.Schema(
       ot1Rate: { type: Number, default: 0 },
       ot2Rate: { type: Number, default: 0 },
       remarks: { type: String, default: "" },
+      /** Universal Account Number (EPFO) */
       uanNo: { type: String, default: "" },
       pfApply: { type: Boolean, default: false },
       pfEmployerShare: { type: Boolean, default: false },
@@ -266,10 +270,7 @@ const userSchema = new mongoose.Schema(
   { timestamps: true } // adds createdAt + updatedAt automatically
 );
 
-/**
- * Before every save:
- * If date of joining exists, set personal.anniversaryDate to the next work anniversary.
- */
+/** Before save: set personal.anniversaryDate from dateOfJoining */
 userSchema.pre("save", function (next) {
   if (this.official?.dateOfJoining) {
     this.personal = this.personal || {};
@@ -278,10 +279,7 @@ userSchema.pre("save", function (next) {
   next();
 });
 
-/**
- * Helper: unique index that ignores empty strings.
- * Many users can have "" — but two users cannot share the same non-empty value.
- */
+/** Unique index that ignores empty strings */
 const uniquePartial = (path) => [
   { [path]: 1 },
   {
@@ -301,5 +299,5 @@ userSchema.index(...uniquePartial("personal.aadhaarNo"));
 userSchema.index(...uniquePartial("personal.drivingLicenseNo"));
 userSchema.index(...uniquePartial("personal.passportNo"));
 
-// Export model so controllers can use User.find / User.create / …
+/** Mongoose model: User — used by auth, employees, attendance, seed, etc. */
 module.exports = mongoose.model("User", userSchema);

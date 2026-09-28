@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "HRMS API",
-    "description": "HRMS Express API — ALL requests use {{vars}}.\n\n**baseUrl = http://localhost:9001**\n\nOpen Collection → Variables to edit any value.\nLogin Global Admin / Super Admin sets {{token}} + {{userId}}.\nCreate Role sets {{roleId}}. Create User sets {{userId}}.\n\nAuth: {{globalAdminEmail}} / {{adminEmail}} / {{employeeEmail}} / {{password}}\nRoles: Global Admin (all companies) | Super Admin (own company) | HR / Manager | Employee\nCreate user: nested body like User model — official{ email, company, dept }, personal{ mobileNo }\nUpload file: POST /api/employees/upload — type = education | account.\nUpdate profile: personal/official/other/education/… vars",
+    "description": "HRMS API — folders match the two dashboards.\n\n**0. Setup** — Health + login (all roles). Password: {{password}}\n**1. Admin Dashboard** — Roles, Users, Employee Management, Masters write, Mail, Manual attendance\n**2. Employee Dashboard (ESS)** — My permissions, My profile, Punch in/out, Master dropdowns\n\nbaseUrl = {{baseUrl}} (default http://localhost:9001)\n\nSeeded emails: {{globalAdminEmail}} | {{adminEmail}} | {{hrEmail}} | {{managerEmail}} | {{employeeEmail}}\n\nAuth: Bearer {{token}} after login. Custom roles: catalog admin|employee + permissions matrix gates each module.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -14,7 +14,19 @@
       "value": ""
     },
     {
+      "key": "itemId",
+      "value": ""
+    },
+    {
+      "key": "mailTo",
+      "value": "rahul@techculture.ai"
+    },
+    {
       "key": "userId",
+      "value": ""
+    },
+    {
+      "key": "masterId",
       "value": ""
     },
     {
@@ -28,6 +40,14 @@
     {
       "key": "adminEmail",
       "value": "shivangi@techculture.ai"
+    },
+    {
+      "key": "hrEmail",
+      "value": "hr@techculture.ai"
+    },
+    {
+      "key": "managerEmail",
+      "value": "manager@techculture.ai"
     },
     {
       "key": "employeeEmail",
@@ -55,7 +75,7 @@
     },
     {
       "key": "company",
-      "value": "TechCulture Solutions Private Limited"
+      "value": "TechCulture.Ai Private Limited"
     },
     {
       "key": "department",
@@ -323,15 +343,19 @@
     },
     {
       "key": "roleName",
-      "value": "Custom Role"
+      "value": "Peon"
     },
     {
       "key": "roleDescription",
-      "value": "Test role"
+      "value": "Limited admin modules"
     },
     {
       "key": "roleStatus",
       "value": "Active"
+    },
+    {
+      "key": "roleCatalog",
+      "value": "admin"
     },
     {
       "key": "roleUpdateDescription",
@@ -380,7 +404,8 @@
   ],
   "item": [
     {
-      "name": "0 Health",
+      "name": "0. Setup — Health & Login",
+      "description": "Start here. Login as the role you want to test (token → {{token}}).",
       "item": [
         {
           "name": "API Root",
@@ -437,12 +462,7 @@
             "url": "{{baseUrl}}/api/health",
             "description": "Public health check — no token.\nChecks API + MongoDB.\n\nHealthy (200):\n```json\n{\n  \"success\": true,\n  \"status\": \"ok\",\n  \"message\": \"HRMS API is healthy\",\n  \"mongodb\": \"connected\"\n}\n```\n\nDown (503):\n```json\n{\n  \"success\": false,\n  \"status\": \"down\",\n  \"message\": \"MongoDB is not connected\",\n  \"mongodb\": \"disconnected\"\n}\n```"
           }
-        }
-      ]
-    },
-    {
-      "name": "1 Auth",
-      "item": [
+        },
         {
           "name": "Login Global Admin",
           "event": [
@@ -471,7 +491,7 @@
               "raw": "{\n  \"officialEmail\": \"{{globalAdminEmail}}\",\n  \"password\": \"{{password}}\"\n}"
             },
             "url": "{{baseUrl}}/api/auth/login",
-            "description": "Global Admin — all companies.\nSets {{token}} + {{userId}}.\nEmail: globaladmin@techculture.ai (after npm run seed)."
+            "description": "Global Admin — all companies (lean login account, no employee profile).\nSets {{token}} + {{userId}}.\nEmail: globaladmin@techculture.ai"
           }
         },
         {
@@ -502,7 +522,69 @@
               "raw": "{\n  \"officialEmail\": \"{{adminEmail}}\",\n  \"password\": \"{{password}}\"\n}"
             },
             "url": "{{baseUrl}}/api/auth/login",
-            "description": "Super Admin — own company only.\nSets {{token}} + {{userId}}.\nThen use **Update Profile (Super Admin)** — full objects allowed."
+            "description": "Super Admin — own company (lean account: login + company only).\nSets {{token}} + {{userId}}.\nEmail: shivangi@techculture.ai"
+          }
+        },
+        {
+          "name": "Login HR Manager",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var j = pm.response.json();",
+                  "if (j.token) pm.collectionVariables.set('token', j.token);",
+                  "if (j.user && j.user.id) pm.collectionVariables.set('userId', j.user.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"officialEmail\": \"{{hrEmail}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/login",
+            "description": "HR Manager — own company + employee profile.\nEmail: hr@techculture.ai"
+          }
+        },
+        {
+          "name": "Login Manager",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var j = pm.response.json();",
+                  "if (j.token) pm.collectionVariables.set('token', j.token);",
+                  "if (j.user && j.user.id) pm.collectionVariables.set('userId', j.user.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"officialEmail\": \"{{managerEmail}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/login",
+            "description": "Manager — own company + employee profile.\nEmail: manager@techculture.ai"
           }
         },
         {
@@ -535,620 +617,1398 @@
             "url": "{{baseUrl}}/api/auth/login",
             "description": "Sets {{token}} + {{userId}}.\nThen use **Update Profile (Employee)** — personal only (phones etc). No official{}."
           }
-        }
-      ]
-    },
-    {
-      "name": "3 Roles",
-      "item": [
+        },
         {
-          "name": "Create Role",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "var j = pm.response.json();",
-                  "if (j.role && j.role.id) pm.collectionVariables.set('roleId', j.role.id);"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
+          "name": "Logout",
           "request": {
             "method": "POST",
             "header": [
               {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
                 "key": "Authorization",
                 "value": "Bearer {{token}}"
               }
             ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"{{roleName}}\",\n  \"description\": \"{{roleDescription}}\",\n  \"status\": \"{{roleStatus}}\"\n}"
-            },
-            "url": "{{baseUrl}}/api/roles",
-            "description": "Creates role. Sets {{roleId}}.\nVars: roleName, roleDescription, roleStatus"
-          }
-        },
-        {
-          "name": "List Roles",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": "{{baseUrl}}/api/roles"
-          }
-        },
-        {
-          "name": "Get Role Permissions",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": "{{baseUrl}}/api/roles/{{roleId}}/permissions"
-          }
-        },
-        {
-          "name": "Update Role Permissions",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"permissions\": [\n    {\n      \"module\": \"Dashboard\",\n      \"heading\": \"Overview\",\n      \"subModules\": [\n        {\n          \"name\": \"Attendance Summary\",\n          \"view\": true,\n          \"create\": false,\n          \"edit\": false,\n          \"delete\": false,\n          \"approve\": false,\n          \"reject\": false,\n          \"download\": false,\n          \"export\": true,\n          \"import\": false,\n          \"upload\": false,\n          \"print\": false,\n          \"email\": false,\n          \"share\": false,\n          \"cancel\": false,\n          \"assign\": false\n        }\n      ]\n    }\n  ]\n}"
-            },
-            "url": "{{baseUrl}}/api/roles/{{roleId}}/permissions",
-            "description": "Updates permissions for Employee, HR Manager, Manager, and custom roles.\nSuper Admin is rejected — that role always has full access.\nSet {{roleId}} to the role you want to edit, not Super Admin.\nMissing pages are saved as false."
-          }
-        },
-        {
-          "name": "Delete Role",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": "{{baseUrl}}/api/roles/{{roleId}}",
-            "description": "Super Admin cannot be deleted.\nEmployee, HR Manager, Manager, and custom roles can be deleted when no user has that role.\nLogin as Super Admin. Set {{roleId}} to the role to delete."
+            "url": "{{baseUrl}}/api/auth/logout",
+            "description": "Clears httpOnly cookie `token`. Browser clients should call this on sign-out."
           }
         }
       ]
     },
     {
-      "name": "4 Employees (Users)",
-      "description": "Same PUT update API for everyone.\nLogin Super Admin → Update Profile (Super Admin)\nLogin Employee → Update Profile (Employee)",
+      "name": "1. Admin Dashboard",
+      "description": "ADMIN side APIs (catalog: admin). Login as Global / Super / HR / Manager / custom admin role. Each action still checked via permissions.",
       "item": [
         {
-          "name": "Create User",
-          "event": [
+          "name": "1.1 Roles & Permissions",
+          "description": "Permission catalogs + role CRUD + matrix",
+          "item": [
             {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "var j = pm.response.json();",
-                  "if (j.employee && j.employee._id) pm.collectionVariables.set('userId', j.employee._id);"
+              "name": "Get Permission Catalogs",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
                 ],
-                "type": "text/javascript"
+                "url": "{{baseUrl}}/api/permissions/modules",
+                "description": "Returns both catalogs for Create Role UI:\n- side: admin → Super Admin / HR / Manager modules\n- side: employee → ESS modules\n\nPick ONE side, toggle modules/actions, then POST /api/roles with that catalog + permissions array."
               }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"{{newUserName}}\",\n  \"password\": \"{{password}}\",\n  \"role\": \"{{userRole}}\",\n  \"status\": \"{{userStatus}}\",\n  \"official\": {\n    \"officialEmail\": \"{{newUserEmail}}\",\n    \"employeeCode\": \"{{employeeCode}}\",\n    \"company\": \"{{company}}\",\n    \"department\": \"{{department}}\"\n  },\n  \"personal\": {\n    \"mobileNo\": \"{{mobileNo}}\",\n    \"presentAddress\": {\n      \"city\": \"{{city}}\",\n      \"state\": \"{{state}}\",\n      \"country\": \"{{country}}\"\n    }\n  }\n}"
             },
-            "url": "{{baseUrl}}/api/employees",
-            "description": "Global Admin / Super Admin / HR Manager / Manager.\n\nBody same as User model (nested):\n- official.officialEmail, company, department (required)\n- personal.mobileNo, presentAddress (optional)\n\nCompany: Global Admin → any; others → own company only.\nSets {{userId}} from response.\n\nFull profile: use Create Employee (full profile)."
-          }
-        },
-        {
-          "name": "Create Employee (full profile)",
-          "event": [
             {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "var j = pm.response.json();",
-                  "if (j.employee && j.employee._id) pm.collectionVariables.set('userId', j.employee._id);"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"{{newUserName}}\",\n  \"password\": \"{{password}}\",\n  \"role\": \"{{userRole}}\",\n  \"status\": \"{{userStatus}}\",\n  \"personal\": {\n    \"dateOfBirth\": \"{{dateOfBirth}}\",\n    \"aadhaarNo\": \"{{aadhaarNo}}\",\n    \"panNo\": \"{{panNo}}\",\n    \"gender\": \"{{gender}}\",\n    \"fatherOrHusbandName\": \"{{fatherOrHusbandName}}\",\n    \"maritalStatus\": \"{{maritalStatus}}\",\n    \"spouseName\": \"\",\n    \"anniversaryDate\": null,\n    \"personalEmail\": \"{{personalEmail}}\",\n    \"languageKnown\": \"{{languageKnown}}\",\n    \"emergencyContact1\": \"{{emergencyContact1}}\",\n    \"emergencyContact2\": \"{{emergencyContact2}}\",\n    \"drivingLicenseNo\": \"{{drivingLicenseNo}}\",\n    \"licenseValidUpto\": null,\n    \"passportNo\": \"{{passportNo}}\",\n    \"remarks\": \"\",\n    \"mobileNo\": \"{{mobileNo}}\",\n    \"workPhone\": \"{{workPhone}}\",\n    \"workExt\": \"{{workExt}}\",\n    \"presentAddress\": {\n      \"address\": \"{{address}}\",\n      \"country\": \"{{country}}\",\n      \"state\": \"{{state}}\",\n      \"city\": \"{{city}}\",\n      \"pincode\": \"{{pincode}}\"\n    },\n    \"permanentAddress\": {\n      \"address\": \"{{address}}\",\n      \"country\": \"{{country}}\",\n      \"state\": \"{{state}}\",\n      \"city\": \"{{city}}\",\n      \"pincode\": \"{{pincode}}\"\n    }\n  },\n  \"official\": {\n    \"officialEmail\": \"{{newUserEmail}}\",\n    \"company\": \"{{company}}\",\n    \"department\": \"{{department}}\",\n    \"employeeCode\": \"{{employeeCode}}\",\n    \"designation\": \"{{designation}}\",\n    \"reportingHead1\": \"{{reportingHead1}}\",\n    \"reportingHead2\": \"{{reportingHead2}}\",\n    \"jobRole\": \"{{jobRole}}\",\n    \"dateOfJoining\": \"{{dateOfJoining}}\",\n    \"calculateSalaryFrom\": \"{{dateOfJoining}}\",\n    \"dateOfRetirement\": null,\n    \"grade\": \"{{grade}}\"\n  },\n  \"other\": {\n    \"bloodGroup\": \"{{bloodGroup}}\",\n    \"passportExpiry\": \"{{passportExpiry}}\"\n  },\n  \"education\": [\n    {\n      \"courseType\": \"{{eduCourseType}}\",\n      \"courseLevel\": \"{{eduCourseLevel}}\",\n      \"courseName\": \"{{eduCourseName}}\",\n      \"instituteName\": \"{{eduInstitute}}\",\n      \"location\": \"{{city}}\",\n      \"fromYear\": \"{{eduFromYear}}\",\n      \"passingYear\": \"{{eduPassingYear}}\",\n      \"major\": \"\",\n      \"minor\": \"\",\n      \"percentageOrGrade\": \"{{eduGrade}}\",\n      \"document\": \"{{eduDocument}}\",\n      \"documentName\": \"{{eduDocumentName}}\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"accounts\": [\n    {\n      \"bankName\": \"{{bankName}}\",\n      \"accountNo\": \"{{bankAccountNo}}\",\n      \"accountHolderName\": \"{{accountHolderName}}\",\n      \"ifscCode\": \"{{ifscCode}}\",\n      \"location\": \"{{city}}\",\n      \"remarks\": \"\",\n      \"attachment\": \"\",\n      \"active\": true,\n      \"salaryAccount\": true\n    }\n  ],\n  \"family\": [\n    {\n      \"name\": \"{{familyName}}\",\n      \"relation\": \"{{familyRelation}}\",\n      \"dob\": null,\n      \"occupation\": \"{{familyOccupation}}\",\n      \"education\": \"\",\n      \"aadhaarNo\": \"\",\n      \"mobileNo\": \"{{familyMobile}}\",\n      \"mediclaim\": false\n    }\n  ],\n  \"nominees\": [\n    {\n      \"nominateFor\": \"{{nominateFor}}\",\n      \"nomineeName\": \"{{nomineeName}}\",\n      \"relation\": \"{{nomineeRelation}}\",\n      \"dob\": null,\n      \"amountPercent\": {{nomineePercent}},\n      \"address\": \"{{address}}\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"experience\": [\n    {\n      \"organization\": \"{{expOrganization}}\",\n      \"designation\": \"{{expDesignation}}\",\n      \"location\": \"{{city}}\",\n      \"fromDate\": \"{{expFromDate}}\",\n      \"toDate\": \"{{expToDate}}\",\n      \"lastSalaryDrawn\": \"{{expLastSalary}}\",\n      \"description\": \"\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"visas\": [\n    {\n      \"countryName\": \"{{visaCountry}}\",\n      \"visaType\": \"{{visaType}}\",\n      \"visaNumber\": \"{{visaNumber}}\",\n      \"fromDate\": \"{{visaFromDate}}\",\n      \"toDate\": \"{{visaToDate}}\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"payroll\": {\n    \"salaryGroup\": \"\",\n    \"salaryDate\": \"\",\n    \"appraisalDuration\": \"\",\n    \"basic\": {{payrollBasic}},\n    \"annualCtc\": {{payrollCtc}},\n    \"grossSalary\": 0,\n    \"totalEarning\": 0,\n    \"totalDeduction\": 0,\n    \"appraisalDate\": null,\n    \"paymentMode\": \"{{payrollPaymentMode}}\",\n    \"ot1Rate\": 0,\n    \"ot2Rate\": 0,\n    \"remarks\": \"\",\n    \"uanNo\": \"{{payrollUan}}\",\n    \"pfApply\": false,\n    \"pfEmployerShare\": false,\n    \"pfNo\": \"\",\n    \"pfType\": \"\",\n    \"pf\": \"\",\n    \"pfApplyFrom\": null,\n    \"pfApplyTo\": null,\n    \"esiApply\": false,\n    \"esiNo\": \"\",\n    \"esiEmployerShare\": false,\n    \"esiApplyFrom\": null,\n    \"esiApplyTo\": null,\n    \"ptApply\": false,\n    \"tdsApply\": false,\n    \"taxRegime\": \"New\",\n    \"bankName\": \"{{bankName}}\",\n    \"bankAccount\": \"{{bankAccountNo}}\",\n    \"ifsc\": \"{{ifscCode}}\"\n  }\n}"
-            },
-            "url": "{{baseUrl}}/api/employees",
-            "description": "Same POST /api/employees — nested like User model.\nLogin as Global Admin / Super Admin / HR Manager.\n\nofficial must include officialEmail, company, department.\npersonal holds mobileNo and addresses.\n\nLeave unique fields empty (\"\") when unused.\nChange {{newUserEmail}} and {{employeeCode}} before each create."
-          }
-        },
-        {
-          "name": "List Users",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/employees?search=&role=&status=&department=&designation=&gender=&branch=&page=1&limit=10",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "employees"
-              ],
-              "query": [
+              "name": "Create Role (admin catalog)",
+              "event": [
                 {
-                  "key": "search",
-                  "value": "",
-                  "description": "Name, employee code, or email"
-                },
-                {
-                  "key": "role",
-                  "value": "",
-                  "description": "Exact role"
-                },
-                {
-                  "key": "status",
-                  "value": "",
-                  "description": "Active or Inactive"
-                },
-                {
-                  "key": "department",
-                  "value": "",
-                  "description": "Exact department"
-                },
-                {
-                  "key": "designation",
-                  "value": "",
-                  "description": "Exact designation"
-                },
-                {
-                  "key": "gender",
-                  "value": "",
-                  "description": "Male, Female, or Other"
-                },
-                {
-                  "key": "branch",
-                  "value": "",
-                  "description": "Company / branch"
-                },
-                {
-                  "key": "page",
-                  "value": "1"
-                },
-                {
-                  "key": "limit",
-                  "value": "10"
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "var j = pm.response.json();",
+                      "if (j.role && j.role.id) pm.collectionVariables.set('roleId', j.role.id);"
+                    ],
+                    "type": "text/javascript"
+                  }
                 }
-              ]
-            },
-            "description": "One list API for Access & Control and All Employees.\n\nReturns only table columns: _id, name, email, role, department, lastLogin, status, employeeCode, gender, designation, branch.\nFull profile is GET /api/employees/{{userId}}.\n\nGlobal Admin → all companies.\nSuper Admin / HR Manager / Manager → own company only.\nEmployee → only their own row.\n\nQuery: search, role, status, department, designation, gender, branch, page, limit."
-          }
-        },
-        {
-          "name": "Get User by ID",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": "{{baseUrl}}/api/employees/{{userId}}",
-            "description": "Admin any id | Employee own id only"
-          }
-        },
-        {
-          "name": "Update Profile (Super Admin)",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"{{newUserName}}\",\n  \"personal\": {\n    \"dateOfBirth\": \"{{dateOfBirth}}\",\n    \"gender\": \"{{gender}}\",\n    \"maritalStatus\": \"{{maritalStatus}}\",\n    \"fatherOrHusbandName\": \"{{fatherOrHusbandName}}\",\n    \"panNo\": \"{{panNo}}\",\n    \"aadhaarNo\": \"{{aadhaarNo}}\",\n    \"personalEmail\": \"{{personalEmail}}\",\n    \"mobileNo\": \"{{mobileNo}}\",\n    \"workPhone\": \"{{workPhone}}\",\n    \"workExt\": \"{{workExt}}\",\n    \"drivingLicenseNo\": \"{{drivingLicenseNo}}\",\n    \"passportNo\": \"{{passportNo}}\",\n    \"languageKnown\": \"{{languageKnown}}\",\n    \"emergencyContact1\": \"{{emergencyContact1}}\",\n    \"emergencyContact2\": \"{{emergencyContact2}}\",\n    \"presentAddress\": {\n      \"address\": \"{{address}}\",\n      \"city\": \"{{city}}\",\n      \"state\": \"{{state}}\",\n      \"country\": \"{{country}}\",\n      \"pincode\": \"{{pincode}}\"\n    },\n    \"permanentAddress\": {\n      \"address\": \"{{address}}\",\n      \"city\": \"{{city}}\",\n      \"state\": \"{{state}}\",\n      \"country\": \"{{country}}\",\n      \"pincode\": \"{{pincode}}\"\n    }\n  },\n  \"official\": {\n    \"employeeCode\": \"{{employeeCode}}\",\n    \"officialEmail\": \"{{newUserEmail}}\",\n    \"company\": \"{{company}}\",\n    \"department\": \"{{department}}\",\n    \"designation\": \"{{designation}}\",\n    \"grade\": \"{{grade}}\",\n    \"jobRole\": \"{{jobRole}}\",\n    \"reportingHead1\": \"{{reportingHead1}}\",\n    \"reportingHead2\": \"{{reportingHead2}}\",\n    \"dateOfJoining\": \"{{dateOfJoining}}\"\n  },\n  \"other\": {\n    \"bloodGroup\": \"{{bloodGroup}}\",\n    \"passportExpiry\": \"{{passportExpiry}}\"\n  },\n  \"education\": [\n    {\n      \"courseType\": \"{{eduCourseType}}\",\n      \"courseLevel\": \"{{eduCourseLevel}}\",\n      \"courseName\": \"{{eduCourseName}}\",\n      \"instituteName\": \"{{eduInstitute}}\",\n      \"location\": \"{{city}}\",\n      \"fromYear\": \"{{eduFromYear}}\",\n      \"passingYear\": \"{{eduPassingYear}}\",\n      \"percentageOrGrade\": \"{{eduGrade}}\",\n      \"document\": \"{{eduDocument}}\",\n      \"documentName\": \"{{eduDocumentName}}\"\n    }\n  ],\n  \"accounts\": [\n    {\n      \"bankName\": \"{{bankName}}\",\n      \"accountNo\": \"{{bankAccountNo}}\",\n      \"accountHolderName\": \"{{accountHolderName}}\",\n      \"ifscCode\": \"{{ifscCode}}\",\n      \"location\": \"{{city}}\",\n      \"active\": true,\n      \"salaryAccount\": true,\n      \"attachment\": \"\"\n    }\n  ],\n  \"family\": [\n    {\n      \"name\": \"{{familyName}}\",\n      \"relation\": \"{{familyRelation}}\",\n      \"mobileNo\": \"{{familyMobile}}\",\n      \"occupation\": \"{{familyOccupation}}\"\n    }\n  ],\n  \"nominees\": [\n    {\n      \"nominateFor\": \"{{nominateFor}}\",\n      \"nomineeName\": \"{{nomineeName}}\",\n      \"relation\": \"{{nomineeRelation}}\",\n      \"amountPercent\": {{nomineePercent}},\n      \"address\": \"{{address}}\"\n    }\n  ],\n  \"experience\": [\n    {\n      \"organization\": \"{{expOrganization}}\",\n      \"designation\": \"{{expDesignation}}\",\n      \"location\": \"{{city}}\",\n      \"fromDate\": \"{{expFromDate}}\",\n      \"toDate\": \"{{expToDate}}\",\n      \"lastSalaryDrawn\": \"{{expLastSalary}}\"\n    }\n  ],\n  \"visas\": [\n    {\n      \"countryName\": \"{{visaCountry}}\",\n      \"visaType\": \"{{visaType}}\",\n      \"visaNumber\": \"{{visaNumber}}\",\n      \"fromDate\": \"{{visaFromDate}}\",\n      \"toDate\": \"{{visaToDate}}\"\n    }\n  ],\n  \"payroll\": {\n    \"basic\": {{payrollBasic}},\n    \"annualCtc\": {{payrollCtc}},\n    \"paymentMode\": \"{{payrollPaymentMode}}\",\n    \"uanNo\": \"{{payrollUan}}\",\n    \"bankName\": \"{{bankName}}\",\n    \"bankAccount\": \"{{bankAccountNo}}\",\n    \"ifsc\": \"{{ifscCode}}\"\n  },\n  \"detailsApproval\": \"{{detailsApproval}}\"\n}"
-            },
-            "url": "{{baseUrl}}/api/employees/{{userId}}",
-            "description": "PUT /api/employees/{{userId}} — ALL objects (admin).\n\npersonal | official | other | education | accounts | family | nominees | experience | visas | payroll | detailsApproval\n\nEdit values in Collection → Variables. Login Super Admin first."
-          }
-        },
-        {
-          "name": "Update Profile (Employee)",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"personal\": {\n    \"dateOfBirth\": \"{{dateOfBirth}}\",\n    \"gender\": \"{{gender}}\",\n    \"maritalStatus\": \"{{maritalStatus}}\",\n    \"fatherOrHusbandName\": \"{{fatherOrHusbandName}}\",\n    \"panNo\": \"{{panNo}}\",\n    \"aadhaarNo\": \"{{aadhaarNo}}\",\n    \"personalEmail\": \"{{personalEmail}}\",\n    \"mobileNo\": \"{{mobileNo}}\",\n    \"workPhone\": \"{{workPhone}}\",\n    \"workExt\": \"{{workExt}}\",\n    \"drivingLicenseNo\": \"{{drivingLicenseNo}}\",\n    \"passportNo\": \"{{passportNo}}\",\n    \"languageKnown\": \"{{languageKnown}}\",\n    \"emergencyContact1\": \"{{emergencyContact1}}\",\n    \"emergencyContact2\": \"{{emergencyContact2}}\",\n    \"presentAddress\": {\n      \"address\": \"{{address}}\",\n      \"city\": \"{{city}}\",\n      \"state\": \"{{state}}\",\n      \"country\": \"{{country}}\",\n      \"pincode\": \"{{pincode}}\"\n    },\n    \"permanentAddress\": {\n      \"address\": \"{{address}}\",\n      \"city\": \"{{city}}\",\n      \"state\": \"{{state}}\",\n      \"country\": \"{{country}}\",\n      \"pincode\": \"{{pincode}}\"\n    }\n  },\n  \"other\": {\n    \"bloodGroup\": \"{{bloodGroup}}\",\n    \"passportExpiry\": \"{{passportExpiry}}\"\n  },\n  \"education\": [\n    {\n      \"courseType\": \"{{eduCourseType}}\",\n      \"courseLevel\": \"{{eduCourseLevel}}\",\n      \"courseName\": \"{{eduCourseName}}\",\n      \"instituteName\": \"{{eduInstitute}}\",\n      \"location\": \"{{city}}\",\n      \"fromYear\": \"{{eduFromYear}}\",\n      \"passingYear\": \"{{eduPassingYear}}\",\n      \"percentageOrGrade\": \"{{eduGrade}}\",\n      \"document\": \"{{eduDocument}}\",\n      \"documentName\": \"{{eduDocumentName}}\"\n    }\n  ],\n  \"accounts\": [\n    {\n      \"bankName\": \"{{bankName}}\",\n      \"accountNo\": \"{{bankAccountNo}}\",\n      \"accountHolderName\": \"{{accountHolderName}}\",\n      \"ifscCode\": \"{{ifscCode}}\",\n      \"location\": \"{{city}}\",\n      \"active\": true,\n      \"salaryAccount\": true,\n      \"attachment\": \"\"\n    }\n  ],\n  \"family\": [\n    {\n      \"name\": \"{{familyName}}\",\n      \"relation\": \"{{familyRelation}}\",\n      \"mobileNo\": \"{{familyMobile}}\",\n      \"occupation\": \"{{familyOccupation}}\"\n    }\n  ],\n  \"nominees\": [\n    {\n      \"nominateFor\": \"{{nominateFor}}\",\n      \"nomineeName\": \"{{nomineeName}}\",\n      \"relation\": \"{{nomineeRelation}}\",\n      \"amountPercent\": {{nomineePercent}},\n      \"address\": \"{{address}}\"\n    }\n  ],\n  \"experience\": [\n    {\n      \"organization\": \"{{expOrganization}}\",\n      \"designation\": \"{{expDesignation}}\",\n      \"location\": \"{{city}}\",\n      \"fromDate\": \"{{expFromDate}}\",\n      \"toDate\": \"{{expToDate}}\",\n      \"lastSalaryDrawn\": \"{{expLastSalary}}\"\n    }\n  ],\n  \"visas\": [\n    {\n      \"countryName\": \"{{visaCountry}}\",\n      \"visaType\": \"{{visaType}}\",\n      \"visaNumber\": \"{{visaNumber}}\",\n      \"fromDate\": \"{{visaFromDate}}\",\n      \"toDate\": \"{{visaToDate}}\"\n    }\n  ]\n}"
-            },
-            "url": "{{baseUrl}}/api/employees/{{userId}}",
-            "description": "PUT /api/employees/{{userId}} — employee objects.\n\npersonal | other | education | accounts | family | nominees | experience | visas\n\nNO official / payroll / detailsApproval. Login Employee first."
-          }
-        },
-        {
-          "name": "Upload Attachment",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "body": {
-              "mode": "formdata",
-              "formdata": [
-                {
-                  "key": "type",
-                  "value": "account",
-                  "type": "text",
-                  "description": "education or account"
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"{{roleName}}\",\n  \"description\": \"{{roleDescription}}\",\n  \"status\": \"{{roleStatus}}\",\n  \"catalog\": \"admin\",\n  \"permissions\": [\n    {\n      \"module\": \"Dashboard\",\n      \"heading\": \"Overview\",\n      \"subModules\": [\n        {\n          \"name\": \"Attendance Summary\",\n          \"view\": true,\n          \"create\": false,\n          \"edit\": false,\n          \"delete\": false,\n          \"approve\": false,\n          \"reject\": false,\n          \"download\": true,\n          \"export\": true,\n          \"import\": false,\n          \"upload\": false,\n          \"print\": true,\n          \"email\": false,\n          \"share\": false,\n          \"cancel\": false,\n          \"assign\": false\n        }\n      ]\n    },\n    {\n      \"module\": \"Attendance\",\n      \"heading\": \"Attendance & Time\",\n      \"subModules\": [\n        {\n          \"name\": \"Daily Attendance\",\n          \"view\": true,\n          \"create\": false,\n          \"edit\": false,\n          \"delete\": false,\n          \"approve\": false,\n          \"reject\": false,\n          \"download\": false,\n          \"export\": false,\n          \"import\": false,\n          \"upload\": false,\n          \"print\": false,\n          \"email\": false,\n          \"share\": false,\n          \"cancel\": false,\n          \"assign\": false\n        }\n      ]\n    }\n  ]\n}"
                 },
+                "url": "{{baseUrl}}/api/roles",
+                "description": "Create custom role from **admin** catalog only.\nSend only modules you want ON (rest normalize to false).\nSets {{roleId}}.\nVars: roleName, roleDescription, roleStatus\n\nDo NOT mix employee ESS modules when catalog=admin."
+              }
+            },
+            {
+              "name": "Create Role (employee catalog)",
+              "event": [
                 {
-                  "key": "document",
-                  "type": "file",
-                  "src": [
-                    "C:\\Users\\owner\\Postman\\files\\EZ_Wealth_Portfolio_10L.pdf"
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "var j = pm.response.json();",
+                      "if (j.role && j.role.id) pm.collectionVariables.set('roleId', j.role.id);"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Field Staff\",\n  \"description\": \"Limited ESS modules\",\n  \"status\": \"Active\",\n  \"catalog\": \"employee\",\n  \"permissions\": [\n    {\n      \"module\": \"Dashboard\",\n      \"heading\": \"\",\n      \"subModules\": [\n        {\n          \"name\": \"My Home\",\n          \"view\": true,\n          \"create\": false,\n          \"edit\": false,\n          \"delete\": false,\n          \"approve\": false,\n          \"reject\": false,\n          \"download\": false,\n          \"export\": false,\n          \"import\": false,\n          \"upload\": false,\n          \"print\": false,\n          \"email\": false,\n          \"share\": false,\n          \"cancel\": false,\n          \"assign\": false\n        }\n      ]\n    },\n    {\n      \"module\": \"Self\",\n      \"heading\": \"\",\n      \"subModules\": [\n        {\n          \"name\": \"General Info\",\n          \"view\": true,\n          \"create\": false,\n          \"edit\": true,\n          \"delete\": false,\n          \"approve\": false,\n          \"reject\": false,\n          \"download\": false,\n          \"export\": false,\n          \"import\": false,\n          \"upload\": false,\n          \"print\": false,\n          \"email\": false,\n          \"share\": false,\n          \"cancel\": false,\n          \"assign\": false\n        },\n        {\n          \"name\": \"Leave\",\n          \"view\": true,\n          \"create\": true,\n          \"edit\": false,\n          \"delete\": false,\n          \"approve\": false,\n          \"reject\": false,\n          \"download\": false,\n          \"export\": false,\n          \"import\": false,\n          \"upload\": false,\n          \"print\": false,\n          \"email\": false,\n          \"share\": false,\n          \"cancel\": true,\n          \"assign\": false\n        }\n      ]\n    }\n  ]\n}"
+                },
+                "url": "{{baseUrl}}/api/roles",
+                "description": "Create custom role from **employee** (ESS) catalog only.\nSend only modules you keep. Sets {{roleId}}.\nDo NOT mix admin modules when catalog=employee."
+              }
+            },
+            {
+              "name": "List Roles",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/roles",
+                "description": "Global Admin login → includes Global Admin role.\nSuper Admin / HR / Manager → Global Admin hidden (no escalation)."
+              }
+            },
+            {
+              "name": "Get Role Permissions",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/roles/{{roleId}}/permissions",
+                "description": "Permission matrix for {{roleId}} (array of module objects)."
+              }
+            },
+            {
+              "name": "Update Role Permissions",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"catalog\": \"{{roleCatalog}}\",\n  \"permissions\": [\n    {\n      \"module\": \"Dashboard\",\n      \"heading\": \"Overview\",\n      \"subModules\": [\n        {\n          \"name\": \"Attendance Summary\",\n          \"view\": true,\n          \"create\": false,\n          \"edit\": false,\n          \"delete\": false,\n          \"approve\": false,\n          \"reject\": false,\n          \"download\": true,\n          \"export\": true,\n          \"import\": false,\n          \"upload\": false,\n          \"print\": false,\n          \"email\": false,\n          \"share\": false,\n          \"cancel\": false,\n          \"assign\": false\n        }\n      ]\n    }\n  ]\n}"
+                },
+                "url": "{{baseUrl}}/api/roles/{{roleId}}/permissions",
+                "description": "Update permissions for custom / HR / Manager / Employee roles.\nBody: catalog (admin|employee) + permissions array — keep/remove modules.\nSuper Admin / Global Admin locked (full access).\nVar {{roleCatalog}} default = admin."
+              }
+            },
+            {
+              "name": "Delete Role",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/roles/{{roleId}}",
+                "description": "Super Admin / Global Admin cannot be deleted.\nOther roles deletable when no user has that role.\nLogin as Super Admin. Set {{roleId}}."
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.2 Access & Control (Users)",
+          "description": "User hierarchy — /api/users",
+          "item": [
+            {
+              "name": "Create User",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "var j = pm.response.json();",
+                      "if (j.user && j.user._id) pm.collectionVariables.set(\"userId\", j.user._id);"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"{{newUserName}}\",\n  \"password\": \"{{password}}\",\n  \"role\": \"Employee\",\n  \"status\": \"Active\",\n  \"official\": {\n    \"officialEmail\": \"{{newUserEmail}}\",\n    \"company\": \"{{company}}\",\n    \"department\": \"{{department}}\"\n  },\n  \"personal\": {\n    \"mobileNo\": \"{{mobileNo}}\",\n    \"presentAddress\": {\n      \"city\": \"{{city}}\",\n      \"state\": \"{{state}}\",\n      \"country\": \"{{country}}\"\n    }\n  }\n}"
+                },
+                "url": "{{baseUrl}}/api/users",
+                "description": "POST /api/users — create lean user (any role). Sets {{userId}}."
+              }
+            },
+            {
+              "name": "Create Super Admin",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "var j = pm.response.json();",
+                      "if (j.user && j.user._id) pm.collectionVariables.set(\"userId\", j.user._id);"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Company Super Admin\",\n  \"password\": \"{{password}}\",\n  \"role\": \"Super Admin\",\n  \"status\": \"Active\",\n  \"official\": {\n    \"officialEmail\": \"super2@techculture.ai\",\n    \"company\": \"{{company}}\"\n  }\n}"
+                },
+                "url": "{{baseUrl}}/api/users",
+                "description": "Create Super Admin. Global Admin → any company; Super Admin → own company only."
+              }
+            },
+            {
+              "name": "Create HR Manager",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "var j = pm.response.json();",
+                      "if (j.user && j.user._id) pm.collectionVariables.set(\"userId\", j.user._id);"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Priya Mehta\",\n  \"password\": \"{{password}}\",\n  \"role\": \"HR Manager\",\n  \"status\": \"Active\",\n  \"official\": {\n    \"officialEmail\": \"priya.access@techculture.ai\",\n    \"company\": \"{{company}}\",\n    \"department\": \"HR\"\n  },\n  \"personal\": {\n    \"mobileNo\": \"9876543210\",\n    \"presentAddress\": {\n      \"city\": \"Noida\",\n      \"state\": \"DELHI\",\n      \"country\": \"India\"\n    }\n  }\n}"
+                },
+                "url": "{{baseUrl}}/api/users",
+                "description": "Create HR Manager from Access & Control drawer."
+              }
+            },
+            {
+              "name": "Create Global Admin (lean)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Global Admin 2\",\n  \"password\": \"{{password}}\",\n  \"role\": \"Global Admin\",\n  \"status\": \"Active\",\n  \"official\": {\n    \"officialEmail\": \"globaladmin2@techculture.ai\"\n  }\n}"
+                },
+                "url": "{{baseUrl}}/api/employees",
+                "description": "Only Global Admin can create another Global Admin (lean, empty company).\nSoft cap MAX_GLOBAL_ADMINS (default 5). Super Admin cannot create Global Admin.\nRole appears in GET /api/roles only for Global Admin login."
+              }
+            },
+            {
+              "name": "List Users",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/users?search=&role=&status=&department=&company=&page=1&limit=10",
+                  "host": [
+                    "{{baseUrl}}"
                   ],
-                  "description": "PDF, JPG, PNG or DOC. File must be a real file, not a folder."
+                  "path": [
+                    "api",
+                    "users"
+                  ],
+                  "query": [
+                    {
+                      "key": "search",
+                      "value": "",
+                      "description": "name or email"
+                    },
+                    {
+                      "key": "role",
+                      "value": ""
+                    },
+                    {
+                      "key": "status",
+                      "value": "",
+                      "description": "Active | Inactive"
+                    },
+                    {
+                      "key": "department",
+                      "value": ""
+                    },
+                    {
+                      "key": "company",
+                      "value": ""
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "10"
+                    }
+                  ]
+                },
+                "description": "GET /api/users — filters + pagination. Hierarchy by actor role."
+              }
+            },
+            {
+              "name": "Export Users Excel",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/users/export?search=&role=&status=&department=&company=",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "users",
+                    "export"
+                  ],
+                  "query": [
+                    {
+                      "key": "search",
+                      "value": ""
+                    },
+                    {
+                      "key": "role",
+                      "value": ""
+                    },
+                    {
+                      "key": "status",
+                      "value": ""
+                    },
+                    {
+                      "key": "department",
+                      "value": ""
+                    },
+                    {
+                      "key": "company",
+                      "value": ""
+                    }
+                  ]
+                },
+                "description": "GET /api/users/export — .xlsx (Access & Control → export). Same filters as list."
+              }
+            },
+            {
+              "name": "Get User by ID",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/users/{{userId}}",
+                "description": "GET /api/users/:id"
+              }
+            },
+            {
+              "name": "Update User",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Vivek\",\n  \"role\": \"Super Admin\",\n  \"status\": \"Active\",\n  \"password\": \"\",\n  \"official\": {\n    \"department\": \"Administration\"\n  },\n  \"personal\": {\n    \"mobileNo\": \"9876543210\",\n    \"presentAddress\": {\n      \"city\": \"Noida\",\n      \"state\": \"DELHI\",\n      \"country\": \"India\"\n    }\n  }\n}"
+                },
+                "url": "{{baseUrl}}/api/users/{{userId}}",
+                "description": "PUT /api/users/:id — Edit drawer. Email + company locked. Blank password = keep."
+              }
+            },
+            {
+              "name": "Send Mail to User",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"subject\": \"Hello from Access & Control\",\n  \"body\": \"Hi, this is a test mail from the Access & Control row action.\",\n  \"isHtml\": false\n}"
+                },
+                "url": "{{baseUrl}}/api/users/{{userId}}/mail",
+                "description": "POST /api/users/:id/mail — row mail icon. Uses user officialEmail."
+              }
+            },
+            {
+              "name": "Delete User",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/users/{{userId}}",
+                "description": "DELETE /api/users/:id — separate delete API. Cannot delete self."
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.3 Employees (Management)",
+          "description": "Employee Management — /api/employees (admin)",
+          "item": [
+            {
+              "name": "Create Employee (full profile)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "var j = pm.response.json();",
+                      "if (j.employee && j.employee._id) pm.collectionVariables.set('userId', j.employee._id);"
+                    ],
+                    "type": "text/javascript"
+                  }
                 }
-              ]
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"{{newUserName}}\",\n  \"password\": \"{{password}}\",\n  \"role\": \"{{userRole}}\",\n  \"status\": \"{{userStatus}}\",\n  \"personal\": {\n    \"dateOfBirth\": \"{{dateOfBirth}}\",\n    \"aadhaarNo\": \"{{aadhaarNo}}\",\n    \"panNo\": \"{{panNo}}\",\n    \"gender\": \"{{gender}}\",\n    \"fatherOrHusbandName\": \"{{fatherOrHusbandName}}\",\n    \"maritalStatus\": \"{{maritalStatus}}\",\n    \"spouseName\": \"\",\n    \"anniversaryDate\": null,\n    \"personalEmail\": \"{{personalEmail}}\",\n    \"languageKnown\": \"{{languageKnown}}\",\n    \"emergencyContact1\": \"{{emergencyContact1}}\",\n    \"emergencyContact2\": \"{{emergencyContact2}}\",\n    \"drivingLicenseNo\": \"{{drivingLicenseNo}}\",\n    \"licenseValidUpto\": null,\n    \"passportNo\": \"{{passportNo}}\",\n    \"remarks\": \"\",\n    \"mobileNo\": \"{{mobileNo}}\",\n    \"workPhone\": \"{{workPhone}}\",\n    \"workExt\": \"{{workExt}}\",\n    \"presentAddress\": {\n      \"address\": \"{{address}}\",\n      \"country\": \"{{country}}\",\n      \"state\": \"{{state}}\",\n      \"city\": \"{{city}}\",\n      \"pincode\": \"{{pincode}}\"\n    },\n    \"permanentAddress\": {\n      \"address\": \"{{address}}\",\n      \"country\": \"{{country}}\",\n      \"state\": \"{{state}}\",\n      \"city\": \"{{city}}\",\n      \"pincode\": \"{{pincode}}\"\n    }\n  },\n  \"official\": {\n    \"officialEmail\": \"{{newUserEmail}}\",\n    \"company\": \"{{company}}\",\n    \"department\": \"{{department}}\",\n    \"employeeCode\": \"{{employeeCode}}\",\n    \"designation\": \"{{designation}}\",\n    \"reportingHead1\": \"{{reportingHead1}}\",\n    \"reportingHead2\": \"{{reportingHead2}}\",\n    \"jobRole\": \"{{jobRole}}\",\n    \"dateOfJoining\": \"{{dateOfJoining}}\",\n    \"calculateSalaryFrom\": \"{{dateOfJoining}}\",\n    \"dateOfRetirement\": null,\n    \"grade\": \"{{grade}}\"\n  },\n  \"other\": {\n    \"bloodGroup\": \"{{bloodGroup}}\",\n    \"passportExpiry\": \"{{passportExpiry}}\"\n  },\n  \"education\": [\n    {\n      \"courseType\": \"{{eduCourseType}}\",\n      \"courseLevel\": \"{{eduCourseLevel}}\",\n      \"courseName\": \"{{eduCourseName}}\",\n      \"instituteName\": \"{{eduInstitute}}\",\n      \"location\": \"{{city}}\",\n      \"fromYear\": \"{{eduFromYear}}\",\n      \"passingYear\": \"{{eduPassingYear}}\",\n      \"major\": \"\",\n      \"minor\": \"\",\n      \"percentageOrGrade\": \"{{eduGrade}}\",\n      \"document\": \"{{eduDocument}}\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"accounts\": [\n    {\n      \"bankName\": \"{{bankName}}\",\n      \"accountNo\": \"{{bankAccountNo}}\",\n      \"accountHolderName\": \"{{accountHolderName}}\",\n      \"ifscCode\": \"{{ifscCode}}\",\n      \"location\": \"{{city}}\",\n      \"remarks\": \"\",\n      \"attachment\": \"\",\n      \"active\": true,\n      \"salaryAccount\": true\n    }\n  ],\n  \"family\": [\n    {\n      \"name\": \"{{familyName}}\",\n      \"relation\": \"{{familyRelation}}\",\n      \"dob\": null,\n      \"occupation\": \"{{familyOccupation}}\",\n      \"education\": \"\",\n      \"aadhaarNo\": \"\",\n      \"mobileNo\": \"{{familyMobile}}\",\n      \"mediclaim\": false\n    }\n  ],\n  \"nominees\": [\n    {\n      \"nominateFor\": \"{{nominateFor}}\",\n      \"nomineeName\": \"{{nomineeName}}\",\n      \"relation\": \"{{nomineeRelation}}\",\n      \"dob\": null,\n      \"amountPercent\": {{nomineePercent}},\n      \"address\": \"{{address}}\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"experience\": [\n    {\n      \"organization\": \"{{expOrganization}}\",\n      \"designation\": \"{{expDesignation}}\",\n      \"location\": \"{{city}}\",\n      \"fromDate\": \"{{expFromDate}}\",\n      \"toDate\": \"{{expToDate}}\",\n      \"lastSalaryDrawn\": \"{{expLastSalary}}\",\n      \"description\": \"\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"visas\": [\n    {\n      \"countryName\": \"{{visaCountry}}\",\n      \"visaType\": \"{{visaType}}\",\n      \"visaNumber\": \"{{visaNumber}}\",\n      \"fromDate\": \"{{visaFromDate}}\",\n      \"toDate\": \"{{visaToDate}}\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"payroll\": {\n    \"salaryGroup\": \"\",\n    \"salaryDate\": \"\",\n    \"appraisalDuration\": \"\",\n    \"basic\": {{payrollBasic}},\n    \"annualCtc\": {{payrollCtc}},\n    \"grossSalary\": 0,\n    \"totalEarning\": 0,\n    \"totalDeduction\": 0,\n    \"appraisalDate\": null,\n    \"paymentMode\": \"{{payrollPaymentMode}}\",\n    \"ot1Rate\": 0,\n    \"ot2Rate\": 0,\n    \"remarks\": \"\",\n    \"uanNo\": \"{{payrollUan}}\",\n    \"pfApply\": false,\n    \"pfEmployerShare\": false,\n    \"pfNo\": \"\",\n    \"pfType\": \"\",\n    \"pf\": \"\",\n    \"pfApplyFrom\": null,\n    \"pfApplyTo\": null,\n    \"esiApply\": false,\n    \"esiNo\": \"\",\n    \"esiEmployerShare\": false,\n    \"esiApplyFrom\": null,\n    \"esiApplyTo\": null,\n    \"ptApply\": false,\n    \"tdsApply\": false,\n    \"taxRegime\": \"New\",\n    \"bankName\": \"{{bankName}}\",\n    \"bankAccount\": \"{{bankAccountNo}}\",\n    \"ifsc\": \"{{ifscCode}}\"\n  }\n}"
+                },
+                "url": "{{baseUrl}}/api/employees",
+                "description": "Full nested profile for Employee / HR / Manager.\nLogin as Global Admin / Super Admin / HR Manager.\n\nofficialEmail + department required; company defaults to {{company}}.\nChange {{newUserEmail}} and {{employeeCode}} before each create."
+              }
             },
-            "url": "{{baseUrl}}/api/employees/upload",
-            "description": "No user id. Login token is enough.\n\nForm-data:\n- type = education | account\n- document = file\n\nSame type always saves in the same Cloudinary folder:\nhrms/education or hrms/account.\nResponse url use on Submit (PUT /api/employees/:id):\n- education → education[].document + documentName\n- account → accounts[].attachment"
-          }
-        },
-        {
-          "name": "Approve Details",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
+            {
+              "name": "List Employees",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/employees?search=&status=&department=&designation=&gender=&branch=&page=1&limit=10",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "employees"
+                  ],
+                  "query": [
+                    {
+                      "key": "search",
+                      "value": "",
+                      "description": "Name, employee code, or email"
+                    },
+                    {
+                      "key": "status",
+                      "value": "",
+                      "description": "Active or Inactive"
+                    },
+                    {
+                      "key": "department",
+                      "value": "",
+                      "description": "Exact department"
+                    },
+                    {
+                      "key": "designation",
+                      "value": "",
+                      "description": "Exact designation"
+                    },
+                    {
+                      "key": "gender",
+                      "value": "",
+                      "description": "Male, Female, or Other"
+                    },
+                    {
+                      "key": "branch",
+                      "value": "",
+                      "description": "Company / branch"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "10"
+                    }
+                  ]
+                },
+                "description": "Employee Management — **only role = Employee**.\n\nFor Access & Control (all roles) use **List Users** → GET /api/users.\n\nColumns: _id, name, email, role, department, lastLogin, status, employeeCode, gender, designation, branch.\nGlobal Admin → all companies. Super Admin / HR / Manager → own company."
               }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"detailsApproval\": \"{{detailsApproval}}\"\n}"
             },
-            "url": "{{baseUrl}}/api/employees/{{userId}}",
-            "description": "Same PUT API — admin only shortcut.\nValues: Unapproved | Approved | Rejected"
-          }
-        },
-        {
-          "name": "Change Password",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
+            {
+              "name": "Export Employees Excel",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/employees/export?search=&status=&department=&designation=&gender=&company=",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "employees",
+                    "export"
+                  ],
+                  "query": [
+                    {
+                      "key": "search",
+                      "value": ""
+                    },
+                    {
+                      "key": "status",
+                      "value": ""
+                    },
+                    {
+                      "key": "department",
+                      "value": ""
+                    },
+                    {
+                      "key": "designation",
+                      "value": ""
+                    },
+                    {
+                      "key": "gender",
+                      "value": ""
+                    },
+                    {
+                      "key": "company",
+                      "value": ""
+                    }
+                  ]
+                },
+                "description": "GET /api/employees/export — admin only (not Employee role)."
               }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"password\": \"{{newPassword}}\"\n}"
             },
-            "url": "{{baseUrl}}/api/employees/{{userId}}",
-            "description": "Same PUT API — Super Admin / HR Manager only"
-          }
-        },
-        {
-          "name": "Edit List Item",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
+            {
+              "name": "Update Profile (Super Admin)",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"{{newUserName}}\",\n  \"personal\": {\n    \"dateOfBirth\": \"{{dateOfBirth}}\",\n    \"gender\": \"{{gender}}\",\n    \"maritalStatus\": \"{{maritalStatus}}\",\n    \"fatherOrHusbandName\": \"{{fatherOrHusbandName}}\",\n    \"panNo\": \"{{panNo}}\",\n    \"aadhaarNo\": \"{{aadhaarNo}}\",\n    \"personalEmail\": \"{{personalEmail}}\",\n    \"mobileNo\": \"{{mobileNo}}\",\n    \"workPhone\": \"{{workPhone}}\",\n    \"workExt\": \"{{workExt}}\",\n    \"drivingLicenseNo\": \"{{drivingLicenseNo}}\",\n    \"passportNo\": \"{{passportNo}}\",\n    \"languageKnown\": \"{{languageKnown}}\",\n    \"emergencyContact1\": \"{{emergencyContact1}}\",\n    \"emergencyContact2\": \"{{emergencyContact2}}\",\n    \"presentAddress\": {\n      \"address\": \"{{address}}\",\n      \"city\": \"{{city}}\",\n      \"state\": \"{{state}}\",\n      \"country\": \"{{country}}\",\n      \"pincode\": \"{{pincode}}\"\n    },\n    \"permanentAddress\": {\n      \"address\": \"{{address}}\",\n      \"city\": \"{{city}}\",\n      \"state\": \"{{state}}\",\n      \"country\": \"{{country}}\",\n      \"pincode\": \"{{pincode}}\"\n    }\n  },\n  \"official\": {\n    \"employeeCode\": \"{{employeeCode}}\",\n    \"officialEmail\": \"{{newUserEmail}}\",\n    \"company\": \"{{company}}\",\n    \"department\": \"{{department}}\",\n    \"designation\": \"{{designation}}\",\n    \"grade\": \"{{grade}}\",\n    \"jobRole\": \"{{jobRole}}\",\n    \"reportingHead1\": \"{{reportingHead1}}\",\n    \"reportingHead2\": \"{{reportingHead2}}\",\n    \"dateOfJoining\": \"{{dateOfJoining}}\"\n  },\n  \"other\": {\n    \"bloodGroup\": \"{{bloodGroup}}\",\n    \"passportExpiry\": \"{{passportExpiry}}\"\n  },\n  \"education\": [\n    {\n      \"courseType\": \"{{eduCourseType}}\",\n      \"courseLevel\": \"{{eduCourseLevel}}\",\n      \"courseName\": \"{{eduCourseName}}\",\n      \"instituteName\": \"{{eduInstitute}}\",\n      \"location\": \"{{city}}\",\n      \"fromYear\": \"{{eduFromYear}}\",\n      \"passingYear\": \"{{eduPassingYear}}\",\n      \"percentageOrGrade\": \"{{eduGrade}}\",\n      \"document\": \"{{eduDocument}}\"\n    }\n  ],\n  \"accounts\": [\n    {\n      \"bankName\": \"{{bankName}}\",\n      \"accountNo\": \"{{bankAccountNo}}\",\n      \"accountHolderName\": \"{{accountHolderName}}\",\n      \"ifscCode\": \"{{ifscCode}}\",\n      \"location\": \"{{city}}\",\n      \"active\": true,\n      \"salaryAccount\": true,\n      \"attachment\": \"\"\n    }\n  ],\n  \"family\": [\n    {\n      \"name\": \"{{familyName}}\",\n      \"relation\": \"{{familyRelation}}\",\n      \"mobileNo\": \"{{familyMobile}}\",\n      \"occupation\": \"{{familyOccupation}}\"\n    }\n  ],\n  \"nominees\": [\n    {\n      \"nominateFor\": \"{{nominateFor}}\",\n      \"nomineeName\": \"{{nomineeName}}\",\n      \"relation\": \"{{nomineeRelation}}\",\n      \"amountPercent\": {{nomineePercent}},\n      \"address\": \"{{address}}\"\n    }\n  ],\n  \"experience\": [\n    {\n      \"organization\": \"{{expOrganization}}\",\n      \"designation\": \"{{expDesignation}}\",\n      \"location\": \"{{city}}\",\n      \"fromDate\": \"{{expFromDate}}\",\n      \"toDate\": \"{{expToDate}}\",\n      \"lastSalaryDrawn\": \"{{expLastSalary}}\"\n    }\n  ],\n  \"visas\": [\n    {\n      \"countryName\": \"{{visaCountry}}\",\n      \"visaType\": \"{{visaType}}\",\n      \"visaNumber\": \"{{visaNumber}}\",\n      \"fromDate\": \"{{visaFromDate}}\",\n      \"toDate\": \"{{visaToDate}}\"\n    }\n  ],\n  \"payroll\": {\n    \"basic\": {{payrollBasic}},\n    \"annualCtc\": {{payrollCtc}},\n    \"paymentMode\": \"{{payrollPaymentMode}}\",\n    \"uanNo\": \"{{payrollUan}}\",\n    \"bankName\": \"{{bankName}}\",\n    \"bankAccount\": \"{{bankAccountNo}}\",\n    \"ifsc\": \"{{ifscCode}}\"\n  },\n  \"detailsApproval\": \"{{detailsApproval}}\"\n}"
+                },
+                "url": "{{baseUrl}}/api/employees/{{userId}}",
+                "description": "PUT /api/employees/{{userId}} — ALL objects (admin).\n\npersonal | official | other | education | accounts | family | nominees | experience | visas | payroll | detailsApproval\n\nEdit values in Collection → Variables. Login Super Admin first."
               }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"_id\": \"{{itemId}}\",\n  \"bankName\": \"SBI\",\n  \"ifscCode\": \"SBIN0001234\",\n  \"active\": true\n}"
             },
-            "url": "{{baseUrl}}/api/employees/{{userId}}/accounts",
-            "description": "Edit rows. One object or an array of objects. Each needs _id.\nChange accounts to education, family, nominees, experience, or visas.\nSame field checks as profile update."
-          }
-        },
-        {
-          "name": "Edit Official",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
+            {
+              "name": "Approve Details",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"detailsApproval\": \"{{detailsApproval}}\"\n}"
+                },
+                "url": "{{baseUrl}}/api/employees/{{userId}}",
+                "description": "Same PUT API — admin only shortcut.\nValues: Unapproved | Approved | Rejected"
               }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"designation\": \"{{designation}}\",\n  \"department\": \"{{department}}\"\n}"
             },
-            "url": "{{baseUrl}}/api/employees/{{userId}}/official",
-            "description": "Super Admin / HR Manager / Manager only. Same field checks as profile update. Employee gets 403."
-          }
-        },
-        {
-          "name": "Edit Payroll",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
+            {
+              "name": "Change Password",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"password\": \"{{newPassword}}\"\n}"
+                },
+                "url": "{{baseUrl}}/api/employees/{{userId}}",
+                "description": "Same PUT API — Super Admin / HR Manager only"
               }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"basic\": {{payrollBasic}},\n  \"paymentMode\": \"{{payrollPaymentMode}}\",\n  \"ifsc\": \"{{ifscCode}}\"\n}"
             },
-            "url": "{{baseUrl}}/api/employees/{{userId}}/payroll",
-            "description": "Super Admin / HR Manager / Manager only. Same field checks as profile update."
-          }
-        },
-        {
-          "name": "Clear Payroll",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
+            {
+              "name": "Upload Attachment",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "type",
+                      "value": "account",
+                      "type": "text",
+                      "description": "education or account"
+                    },
+                    {
+                      "key": "document",
+                      "type": "file",
+                      "src": [
+                        "C:\\Users\\owner\\Postman\\files\\EZ_Wealth_Portfolio_10L.pdf"
+                      ],
+                      "description": "PDF, JPG, PNG or DOC. File must be a real file, not a folder."
+                    }
+                  ]
+                },
+                "url": "{{baseUrl}}/api/employees/upload",
+                "description": "No user id. Login token is enough.\n\nForm-data:\n- type = education | account\n- document = file\n\nSame type always saves in the same Cloudinary folder:\nhrms/education or hrms/account.\nResponse url use on Submit (PUT /api/employees/:id):\n- education → education[].document (url only)\n- account → accounts[].attachment"
               }
-            ],
-            "url": "{{baseUrl}}/api/employees/{{userId}}/payroll",
-            "description": "Super Admin / HR Manager / Manager only. Clears payroll. Official cannot be deleted."
-          }
-        },
-        {
-          "name": "Delete List Item",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"_id\": \"{{itemId}}\"\n}"
             },
-            "url": "{{baseUrl}}/api/employees/{{userId}}/accounts",
-            "description": "Delete rows. One object { _id }, or an array of ids.\nSection: education, accounts, family, nominees, experience, or visas."
-          }
+            {
+              "name": "Edit List Item (via profile update)",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"accounts\": {\n    \"_id\": \"{{itemId}}\",\n    \"bankName\": \"SBI\",\n    \"ifscCode\": \"SBIN0001234\",\n    \"active\": true\n  }\n}"
+                },
+                "url": "{{baseUrl}}/api/employees/{{userId}}",
+                "description": "Section PUT removed. Use PUT /api/employees/:id with one nested key.\nOne object with _id updates that row; without _id appends. Array replaces the list.\nSame for education, family, nominees, experience, visas."
+              }
+            },
+            {
+              "name": "Edit Official (via profile update)",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"official\": {\n    \"designation\": \"{{designation}}\",\n    \"department\": \"{{department}}\"\n  }\n}"
+                },
+                "url": "{{baseUrl}}/api/employees/{{userId}}",
+                "description": "Admin only. PUT /api/employees/:id with official{}. Employee gets 403."
+              }
+            },
+            {
+              "name": "Edit Payroll (via profile update)",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"payroll\": {\n    \"basic\": {{payrollBasic}},\n    \"paymentMode\": \"{{payrollPaymentMode}}\",\n    \"ifsc\": \"{{ifscCode}}\"\n  }\n}"
+                },
+                "url": "{{baseUrl}}/api/employees/{{userId}}",
+                "description": "Admin only. PUT /api/employees/:id with payroll{}."
+              }
+            },
+            {
+              "name": "Clear Payroll",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/employees/{{userId}}/payroll",
+                "description": "Super Admin / HR Manager / Manager only. Clears payroll. Official cannot be deleted."
+              }
+            },
+            {
+              "name": "Delete List Item",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"_id\": \"{{itemId}}\"\n}"
+                },
+                "url": "{{baseUrl}}/api/employees/{{userId}}/accounts",
+                "description": "Delete rows. One object { _id }, or an array of ids.\nSection: education, accounts, family, nominees, experience, or visas."
+              }
+            },
+            {
+              "name": "Delete Employee",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/employees/{{userId}}",
+                "description": "Super Admin / HR Manager / Manager. Cannot delete self."
+              }
+            }
+          ]
         },
         {
-          "name": "Delete User",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
+          "name": "1.4 Masters (Admin write)",
+          "description": "Create / update / delete masters + lists",
+          "item": [
+            {
+              "name": "List Companies",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/masters?type=company&status=Active",
+                "description": "Company master: `name` is the company name (no parent company field)."
               }
-            ],
-            "url": "{{baseUrl}}/api/employees/{{userId}}",
-            "description": "Super Admin / HR Manager / Manager. Cannot delete self."
-          }
+            },
+            {
+              "name": "List Departments",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/masters?type=department&company={{company}}&status=Active",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "masters"
+                  ],
+                  "query": [
+                    {
+                      "key": "type",
+                      "value": "department"
+                    },
+                    {
+                      "key": "company",
+                      "value": "{{company}}"
+                    },
+                    {
+                      "key": "status",
+                      "value": "Active"
+                    }
+                  ]
+                },
+                "description": "Use `data[].name` in employee create/update official.department."
+              }
+            },
+            {
+              "name": "List Designations",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/masters?type=designation&company={{company}}&status=Active"
+              }
+            },
+            {
+              "name": "List Divisions",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/masters?type=division&company={{company}}&status=Active"
+              }
+            },
+            {
+              "name": "List Employee Groups",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/masters?type=employeeGroup&company={{company}}&status=Active"
+              }
+            },
+            {
+              "name": "Create Company",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"type\": \"company\",\n  \"name\": \"Another Company Pvt Ltd\",\n  \"status\": \"Active\"\n}"
+                },
+                "url": "{{baseUrl}}/api/masters",
+                "description": "Global Admin only. Body has no parent `company` — `name` is the company."
+              }
+            },
+            {
+              "name": "Create Department",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"type\": \"department\",\n  \"name\": \"Marketing\",\n  \"status\": \"Active\",\n  \"company\": \"{{company}}\"\n}"
+                },
+                "url": "{{baseUrl}}/api/masters",
+                "description": "Writes to `departments` collection. Fields: type, name, status, company (no code)."
+              }
+            },
+            {
+              "name": "Create Designation",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"type\": \"designation\",\n  \"name\": \"Tech Lead\",\n  \"status\": \"Active\",\n  \"company\": \"{{company}}\"\n}"
+                },
+                "url": "{{baseUrl}}/api/masters",
+                "description": "Writes to `designations` collection. Fields: type, name, status, company (no code)."
+              }
+            },
+            {
+              "name": "Update Master",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Human Resources\",\n  \"status\": \"Active\"\n}"
+                },
+                "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                "description": "Set {{masterId}} from create/list response `_id`."
+              }
+            },
+            {
+              "name": "Delete Master",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/masters/{{masterId}}"
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.5 Mail",
+          "description": "Organization → Mail (admin)",
+          "item": [
+            {
+              "name": "Send Email",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"to\": \"{{mailTo}}\",\n  \"subject\": \"HRMS test email\",\n  \"body\": \"Hi, this is a test from HRMS API.\",\n  \"isHtml\": false\n}"
+                },
+                "url": "{{baseUrl}}/api/mail/send",
+                "description": "Organization → Mail.\nNeeds Mail → email permission (Global/Super Admin always allowed).\nOptional: cc, bcc (string or array), isHtml: true for HTML body."
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.6 Attendance (Admin)",
+          "description": "Manual mark + list attendance",
+          "item": [
+            {
+              "name": "Mark Attendance (manual)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"employeeId\": \"{{userId}}\",\n  \"punchType\": \"{{punchType}}\",\n  \"time\": \"{{punchTime}}\",\n  \"reason\": \"{{punchReason}}\",\n  \"remarks\": \"{{punchRemarks}}\"\n}"
+                },
+                "url": "{{baseUrl}}/api/attendance/manual",
+                "description": "Admin only. Vars: userId, punchType, punchTime, punchReason, punchRemarks"
+              }
+            },
+            {
+              "name": "List Attendance",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/attendance?date={{attendanceDate}}&source={{punchSource}}",
+                "description": "Query vars: attendanceDate, punchSource. Remove query if not needed."
+              }
+            }
+          ]
         }
       ]
     },
     {
-      "name": "5 Attendance",
+      "name": "2. Employee Dashboard (ESS)",
+      "description": "EMPLOYEE / ESS side APIs (catalog: employee). Login as Employee (or custom ESS role). Use own {{userId}} for profile.",
       "item": [
         {
-          "name": "Punch In (web)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
+          "name": "2.1 My Permissions",
+          "description": "What modules this role can see",
+          "item": [
+            {
+              "name": "My Permissions",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/permissions/my",
+                "description": "Logged-in user's role permission matrix (compact)."
               }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"source\": \"{{punchSource}}\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "2.2 My Profile",
+          "description": "Self General Info — GET/PUT own employee id",
+          "item": [
+            {
+              "name": "Update My Profile",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"personal\": {\n    \"dateOfBirth\": \"{{dateOfBirth}}\",\n    \"gender\": \"{{gender}}\",\n    \"maritalStatus\": \"{{maritalStatus}}\",\n    \"fatherOrHusbandName\": \"{{fatherOrHusbandName}}\",\n    \"panNo\": \"{{panNo}}\",\n    \"aadhaarNo\": \"{{aadhaarNo}}\",\n    \"personalEmail\": \"{{personalEmail}}\",\n    \"mobileNo\": \"{{mobileNo}}\",\n    \"workPhone\": \"{{workPhone}}\",\n    \"workExt\": \"{{workExt}}\",\n    \"drivingLicenseNo\": \"{{drivingLicenseNo}}\",\n    \"passportNo\": \"{{passportNo}}\",\n    \"languageKnown\": \"{{languageKnown}}\",\n    \"emergencyContact1\": \"{{emergencyContact1}}\",\n    \"emergencyContact2\": \"{{emergencyContact2}}\",\n    \"presentAddress\": {\n      \"address\": \"{{address}}\",\n      \"city\": \"{{city}}\",\n      \"state\": \"{{state}}\",\n      \"country\": \"{{country}}\",\n      \"pincode\": \"{{pincode}}\"\n    },\n    \"permanentAddress\": {\n      \"address\": \"{{address}}\",\n      \"city\": \"{{city}}\",\n      \"state\": \"{{state}}\",\n      \"country\": \"{{country}}\",\n      \"pincode\": \"{{pincode}}\"\n    }\n  },\n  \"other\": {\n    \"bloodGroup\": \"{{bloodGroup}}\",\n    \"passportExpiry\": \"{{passportExpiry}}\"\n  },\n  \"education\": [\n    {\n      \"courseType\": \"{{eduCourseType}}\",\n      \"courseLevel\": \"{{eduCourseLevel}}\",\n      \"courseName\": \"{{eduCourseName}}\",\n      \"instituteName\": \"{{eduInstitute}}\",\n      \"location\": \"{{city}}\",\n      \"fromYear\": \"{{eduFromYear}}\",\n      \"passingYear\": \"{{eduPassingYear}}\",\n      \"percentageOrGrade\": \"{{eduGrade}}\",\n      \"document\": \"{{eduDocument}}\"\n    }\n  ],\n  \"accounts\": [\n    {\n      \"bankName\": \"{{bankName}}\",\n      \"accountNo\": \"{{bankAccountNo}}\",\n      \"accountHolderName\": \"{{accountHolderName}}\",\n      \"ifscCode\": \"{{ifscCode}}\",\n      \"location\": \"{{city}}\",\n      \"active\": true,\n      \"salaryAccount\": true,\n      \"attachment\": \"\"\n    }\n  ],\n  \"family\": [\n    {\n      \"name\": \"{{familyName}}\",\n      \"relation\": \"{{familyRelation}}\",\n      \"mobileNo\": \"{{familyMobile}}\",\n      \"occupation\": \"{{familyOccupation}}\"\n    }\n  ],\n  \"nominees\": [\n    {\n      \"nominateFor\": \"{{nominateFor}}\",\n      \"nomineeName\": \"{{nomineeName}}\",\n      \"relation\": \"{{nomineeRelation}}\",\n      \"amountPercent\": {{nomineePercent}},\n      \"address\": \"{{address}}\"\n    }\n  ],\n  \"experience\": [\n    {\n      \"organization\": \"{{expOrganization}}\",\n      \"designation\": \"{{expDesignation}}\",\n      \"location\": \"{{city}}\",\n      \"fromDate\": \"{{expFromDate}}\",\n      \"toDate\": \"{{expToDate}}\",\n      \"lastSalaryDrawn\": \"{{expLastSalary}}\"\n    }\n  ],\n  \"visas\": [\n    {\n      \"countryName\": \"{{visaCountry}}\",\n      \"visaType\": \"{{visaType}}\",\n      \"visaNumber\": \"{{visaNumber}}\",\n      \"fromDate\": \"{{visaFromDate}}\",\n      \"toDate\": \"{{visaToDate}}\"\n    }\n  ]\n}"
+                },
+                "url": "{{baseUrl}}/api/employees/{{userId}}",
+                "description": "PUT /api/employees/{{userId}} — employee objects.\n\npersonal | other | education | accounts | family | nominees | experience | visas\n\nNO official / payroll / detailsApproval. Login Employee first."
+              }
             },
-            "url": "{{baseUrl}}/api/attendance/punch-in",
-            "description": "Self punch-in. Set {{punchSource}} = web | mobile | biometric"
-          }
-        },
-        {
-          "name": "Punch In (mobile)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
+            {
+              "name": "Get My Profile",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/employees/{{userId}}",
+                "description": "Admin any id | Employee own id only"
               }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"source\": \"{{punchSourceMobile}}\"\n}"
             },
-            "url": "{{baseUrl}}/api/attendance/punch-in",
-            "description": "Vars: punchSourceMobile (default mobile). Uses {{baseUrl}}, {{token}}"
-          }
+            {
+              "name": "Upload Attachment",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "type",
+                      "value": "account",
+                      "type": "text",
+                      "description": "education or account"
+                    },
+                    {
+                      "key": "document",
+                      "type": "file",
+                      "src": [
+                        "C:\\Users\\owner\\Postman\\files\\EZ_Wealth_Portfolio_10L.pdf"
+                      ],
+                      "description": "PDF, JPG, PNG or DOC. File must be a real file, not a folder."
+                    }
+                  ]
+                },
+                "url": "{{baseUrl}}/api/employees/upload",
+                "description": "No user id. Login token is enough.\n\nForm-data:\n- type = education | account\n- document = file\n\nSame type always saves in the same Cloudinary folder:\nhrms/education or hrms/account.\nResponse url use on Submit (PUT /api/employees/:id):\n- education → education[].document (url only)\n- account → accounts[].attachment"
+              }
+            }
+          ]
         },
         {
-          "name": "Punch Out (web)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
+          "name": "2.3 Attendance (Self)",
+          "description": "Punch in/out + my today — any logged-in user",
+          "item": [
+            {
+              "name": "Punch In (web)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"source\": \"{{punchSource}}\"\n}"
+                },
+                "url": "{{baseUrl}}/api/attendance/punch-in",
+                "description": "Self punch-in — ANY role. Body source: web | mobile | biometric. Uses {{token}}."
               }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"source\": \"{{punchSourceOut}}\"\n}"
             },
-            "url": "{{baseUrl}}/api/attendance/punch-out",
-            "description": "Vars: punchSourceOut. Uses {{baseUrl}}, {{token}}"
-          }
-        },
-        {
-          "name": "Mark Attendance (manual)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
+            {
+              "name": "Punch In (mobile)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"source\": \"{{punchSourceMobile}}\"\n}"
+                },
+                "url": "{{baseUrl}}/api/attendance/punch-in",
+                "description": "Self punch-in — ANY role. Body source: web | mobile | biometric. Uses {{token}}."
               }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"employeeId\": \"{{userId}}\",\n  \"punchType\": \"{{punchType}}\",\n  \"time\": \"{{punchTime}}\",\n  \"reason\": \"{{punchReason}}\",\n  \"remarks\": \"{{punchRemarks}}\"\n}"
             },
-            "url": "{{baseUrl}}/api/attendance/manual",
-            "description": "Admin only. Vars: userId, punchType, punchTime, punchReason, punchRemarks"
-          }
+            {
+              "name": "Punch Out (web)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"source\": \"{{punchSourceOut}}\"\n}"
+                },
+                "url": "{{baseUrl}}/api/attendance/punch-out",
+                "description": "Self punch-out — ANY role. Must punch-in first. Uses {{token}}."
+              }
+            },
+            {
+              "name": "My Today",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/attendance/today"
+              }
+            }
+          ]
         },
         {
-          "name": "My Today",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
+          "name": "2.4 Masters (Dropdowns)",
+          "description": "Read-only lists for forms",
+          "item": [
+            {
+              "name": "List Companies",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/masters?type=company&status=Active",
+                "description": "Company master: `name` is the company name (no parent company field)."
               }
-            ],
-            "url": "{{baseUrl}}/api/attendance/today"
-          }
-        },
-        {
-          "name": "List Attendance",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
+            },
+            {
+              "name": "List Departments",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/masters?type=department&company={{company}}&status=Active",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "masters"
+                  ],
+                  "query": [
+                    {
+                      "key": "type",
+                      "value": "department"
+                    },
+                    {
+                      "key": "company",
+                      "value": "{{company}}"
+                    },
+                    {
+                      "key": "status",
+                      "value": "Active"
+                    }
+                  ]
+                },
+                "description": "Use `data[].name` in employee create/update official.department."
               }
-            ],
-            "url": "{{baseUrl}}/api/attendance?date={{attendanceDate}}&source={{punchSource}}",
-            "description": "Query vars: attendanceDate, punchSource. Remove query if not needed."
-          }
+            },
+            {
+              "name": "List Designations",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/masters?type=designation&company={{company}}&status=Active"
+              }
+            },
+            {
+              "name": "List Divisions",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/masters?type=division&company={{company}}&status=Active"
+              }
+            },
+            {
+              "name": "List Employee Groups",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/masters?type=employeeGroup&company={{company}}&status=Active"
+              }
+            }
+          ]
         }
       ]
     }

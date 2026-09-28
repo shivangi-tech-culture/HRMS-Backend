@@ -1,12 +1,9 @@
 /**
- * Role model
- *
- * Stores role name, status, and flat permission blocks:
- *   { module, heading, subModules: [{ name, view, create, … }] }
+ * Role — name, status, permissions matrix
+ * Validation → validators/role.validation.js
  */
 const mongoose = require("mongoose");
 
-/** Action flags stored on each submodule */
 const actionFlags = {
   view: { type: Boolean, default: false },
   create: { type: Boolean, default: false },
@@ -27,17 +24,16 @@ const actionFlags = {
 
 const subModulePermSchema = new mongoose.Schema(
   {
-    name: { type: String, required: true },
+    name: { type: String, default: "" },
     ...actionFlags,
   },
   { _id: false }
 );
 
-/** One permission block: module + heading + list of submodules */
 const permissionBlockSchema = new mongoose.Schema(
   {
-    module: { type: String, required: true },
-    heading: { type: String, default: "" }, // empty allowed for Employee
+    module: { type: String, default: "" },
+    heading: { type: String, default: "" },
     subModules: { type: [subModulePermSchema], default: [] },
   },
   { _id: false }
@@ -45,17 +41,20 @@ const permissionBlockSchema = new mongoose.Schema(
 
 const roleSchema = new mongoose.Schema(
   {
-    name: { type: String, required: true, unique: true, trim: true },
+    name: { type: String, default: "" }, // matches User.role
     description: { type: String, default: "" },
-    status: {
+    status: { type: String, default: "Active" }, // Active | Inactive (Joi)
+    /** Which permission tree this role uses — set at create (admin | employee) */
+    catalog: {
       type: String,
-      enum: ["Active", "Inactive"],
-      default: "Active",
-      required: true,
+      enum: ["admin", "employee"],
+      default: "admin",
     },
     permissions: { type: [permissionBlockSchema], default: [] },
   },
   { timestamps: true }
 );
+
+roleSchema.index({ name: 1 }, { unique: true });
 
 module.exports = mongoose.model("Role", roleSchema);

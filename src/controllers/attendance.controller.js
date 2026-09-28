@@ -1,18 +1,21 @@
 /**
- * Attendance controller
- *
- * Employee self punch: web | mobile | biometric only (never manual)
- * Manual mark: Super Admin / HR / Manager only — when punch was missed
- * Sources: punchInSource + punchOutSource (no duplicate verification field)
+ * ATTENDANCE CONTROLLER — /api/attendance
+ * Punch in/out (self), manual mark (admin), today + list
  */
 const Attendance = require("../models/Attendance");
 const { todayDate } = Attendance;
 const User = require("../models/User");
 const { hasAllAccess } = require("../middleware/auth");
+const {
+  assertSameCompanyEmployee,
+  companyFilter,
+  hasGlobalCompanyAccess,
+} = require("../utils/companyScope");
 const { SELF_SOURCES } = require("../validators/attendance.validation");
 
 const today = todayDate;
 
+/** Combine YYYY-MM-DD + HH:mm into one UTC Date */
 const combineDateTime = (dateStr, timeStr) => {
   const [h, m] = timeStr.split(":").map(Number);
   const d = new Date(`${dateStr}T00:00:00.000Z`);
@@ -20,14 +23,23 @@ const combineDateTime = (dateStr, timeStr) => {
   return d;
 };
 
+/** Reject if source is not web / mobile / biometric (manual is admin Mark Attendance only) */
 const assertSelfSource = (source) => {
   if (!SELF_SOURCES.includes(source)) {
-    return "Employees can only punch via web, mobile, or biometric. Manual is admin-only.";
+    return "Self punch source must be web, mobile, or biometric. Manual is admin-only.";
   }
   return null;
 };
 
-/** POST /api/attendance/punch-in — body: { source: web|mobile|biometric } */
+/**
+ * PUNCH IN — POST /api/attendance/punch-in
+ *
+ * Body: { source: "web" | "mobile" | "biometric" }
+ * Auth: any logged-in role (Employee, HR Manager, Manager, Super Admin, …)
+ * Always punches for req.user (self) — not role-restricted.
+ *
+ * Creates today's record if missing. Fails if already punched in today.
+ */
 const punchIn = async (req, res) => {
   try {
     const sourceErr = assertSelfSource(req.body.source);
@@ -65,7 +77,14 @@ const punchIn = async (req, res) => {
   }
 };
 
-/** POST /api/attendance/punch-out — body: { source: web|mobile|biometric } */
+/**
+ * PUNCH OUT — POST /api/attendance/punch-out
+ *
+ * Body: { source: "web" | "mobile" | "biometric" }
+ * Auth: any logged-in role (self only) — Employee / HR / Manager / Super Admin / …
+ *
+ * Requires punch-in first. Fails if already punched out today.
+ */
 const punchOut = async (req, res) => {
   try {
     const sourceErr = assertSelfSource(req.body.source);
@@ -99,8 +118,12 @@ const punchOut = async (req, res) => {
 };
 
 /**
- * POST /api/attendance/manual — admin only (missed punch)
- * Date always today. Source forced to "manual".
+ * MANUAL MARK — POST /api/attendance/manual
+ *
+ * Body: { employeeId, punchType: "in"|"out", time: "HH:mm", reason, remarks? }
+ * Auth: Super Admin / HR Manager / Manager / Global Admin only
+ *
+ * Date is always today. Source forced to "manual". Used when a punch was missed.
  */
 const markManual = async (req, res) => {
   try {
@@ -113,12 +136,22 @@ const markManual = async (req, res) => {
     const { employeeId, punchType, time, reason, remarks } = req.body;
     const date = today();
 
-    const employee = await User.findById(employeeId).select("_id name status");
+    const employee = await User.findById(employeeId).select(
+      "_id name status official.company"
+    );
     if (!employee) {
       return res.status(404).json({ message: "Employee not found" });
     }
     if (employee.status !== "Active") {
       return res.status(400).json({ message: "Employee is inactive" });
+    }
+
+    // Global Admin → any company; Super Admin / HR / Manager → own company only
+    if (hasAllAccess(req.user) && !hasGlobalCompanyAccess(req.user)) {
+      const scopeErr = assertSameCompanyEmployee(req.user, employee);
+      if (scopeErr) {
+        return res.status(403).json({ message: scopeErr });
+      }
     }
 
     const punchAt = combineDateTime(date, time);
@@ -166,7 +199,12 @@ const markManual = async (req, res) => {
   }
 };
 
-/** GET /api/attendance/today */
+/**
+ * MY TODAY — GET /api/attendance/today
+ *
+ * Auth: logged in
+ * Returns today's attendance for the current user, or null if none.
+ */
 const myToday = async (req, res) => {
   try {
     const record = await Attendance.findOne({
@@ -180,12 +218,30 @@ const myToday = async (req, res) => {
   }
 };
 
-/** GET /api/attendance — optional ?date=&source=web|mobile|biometric|manual */
+/**
+ * LIST — GET /api/attendance
+ *
+ * Query (optional): date=YYYY-MM-DD, source=web|mobile|biometric|manual
+ * Auth: logged in
+ *   Global Admin → all companies; Super/HR/Manager → own company; Employee → own only
+ * source matches punchInSource OR punchOutSource
+ */
 const listAttendance = async (req, res) => {
   try {
     const filter = {};
     if (!hasAllAccess(req.user)) {
       filter.employee = req.user._id;
+    } else if (!hasGlobalCompanyAccess(req.user)) {
+      const scope = companyFilter(req.user);
+      if (scope === false) {
+        return res.status(403).json({
+          message: "Your profile has no company — cannot list attendance",
+        });
+      }
+      if (scope) {
+        const companyUsers = await User.find(scope).select("_id").lean();
+        filter.employee = { $in: companyUsers.map((u) => u._id) };
+      }
     }
     if (req.query.date) filter.date = req.query.date;
 

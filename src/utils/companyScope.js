@@ -1,46 +1,31 @@
 /**
- * Company scope helpers
- *
- * WHY THIS FILE:
- *   Multiple companies exist.
- *   Global Admin → every company (global).
- *   Super Admin / HR Manager / Manager → only their own company.
- *
- * USE ANYWHERE:
- *   const { assertSameCompany, hasGlobalCompanyAccess } = require("../utils/companyScope");
- *   const err = assertSameCompany(req.user, official.company);
- *   if (err) return res.status(403).json({ message: err });
+ * COMPANY SCOPE — who may see / change which company
+ * Global Admin → all; others → own company only.
  */
+/** Default company when create body omits official.company (from .env or fallback) */
+const DEFAULT_COMPANY =
+  String(process.env.DEFAULT_COMPANY || "TechCulture.Ai Private Limited").trim();
 
-/** Platform role — not limited to one company */
+/** Platform role that is not limited to one company */
 const GLOBAL_COMPANY_ROLE = "Global Admin";
 
-/** Normalize company name for compare (trim + lower case) */
+/** Trim + lower-case for case-insensitive company compare */
 const normalizeCompany = (value) => String(value || "").trim().toLowerCase();
 
-/** Read company from a user / employee document */
+/** Read normalized company from user.official.company */
 const getUserCompany = (user) => normalizeCompany(user?.official?.company);
 
-/** True if actor can manage every company */
+/** True if actor is Global Admin (all companies) */
 const hasGlobalCompanyAccess = (user) => user?.role === GLOBAL_COMPANY_ROLE;
 
-/**
- * True when both company values refer to the same company.
- * Empty on either side → false (no company = cannot match).
- */
+/** True when both values refer to the same company */
 const isSameCompany = (companyA, companyB) => {
   const a = normalizeCompany(companyA);
   const b = normalizeCompany(companyB);
   return Boolean(a && b && a === b);
 };
 
-/**
- * Actor may only act on their own company (unless Global Admin).
- *
- * @param {object} actor - logged-in user (req.user)
- * @param {string} targetCompany - company on create/update payload or target user
- * @returns {string|null} error message, or null if allowed
- */
+/** Error message if actor cannot act on targetCompany; null if ok */
 const assertSameCompany = (actor, targetCompany) => {
   if (hasGlobalCompanyAccess(actor)) return null;
 
@@ -54,14 +39,7 @@ const assertSameCompany = (actor, targetCompany) => {
   return null;
 };
 
-/**
- * Actor may only access / update / delete an employee in the same company.
- * Global Admin → any employee. Own-record always allowed.
- *
- * @param {object} actor - req.user
- * @param {object} employee - target user document
- * @returns {string|null} error message, or null if allowed
- */
+/** Error message if actor cannot access employee; null if ok */
 const assertSameCompanyEmployee = (actor, employee) => {
   if (!actor || !employee) {
     return "Access denied";
@@ -71,12 +49,7 @@ const assertSameCompanyEmployee = (actor, employee) => {
   return assertSameCompany(actor, getUserCompany(employee));
 };
 
-/**
- * Mongo filter for list APIs.
- * Global Admin → null (no company filter — see all).
- * Company admin → { "official.company": /…/i }
- * No company on profile → false (caller should 403)
- */
+/** Mongo company filter for list APIs (null = all, false = block) */
 const companyFilter = (actor) => {
   if (hasGlobalCompanyAccess(actor)) return null; // no filter
 
@@ -91,7 +64,14 @@ const companyFilter = (actor) => {
   };
 };
 
+/** Given company, or DEFAULT_COMPANY if empty */
+const withDefaultCompany = (company) => {
+  const value = String(company || "").trim();
+  return value || DEFAULT_COMPANY;
+};
+
 module.exports = {
+  DEFAULT_COMPANY,
   GLOBAL_COMPANY_ROLE,
   normalizeCompany,
   getUserCompany,
@@ -100,4 +80,5 @@ module.exports = {
   assertSameCompany,
   assertSameCompanyEmployee,
   companyFilter,
+  withDefaultCompany,
 };

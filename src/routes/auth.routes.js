@@ -1,12 +1,9 @@
 /**
- * Auth routes → /api/auth
- *
- * Public: POST /login (no token)
- *
- * Flow: validate(Joi) → controller
+ * AUTH ROUTES → /api/auth
+ * POST /login (public) · POST /logout (public)
  */
 const express = require("express");
-const { login } = require("../controllers/auth.controller");
+const { login, logout } = require("../controllers/auth.controller");
 const { validate } = require("../middleware/validate");
 const { loginSchema } = require("../validators/user.validation");
 
@@ -16,7 +13,7 @@ const router = express.Router();
  * @swagger
  * tags:
  *   - name: Auth
- *     description: Login with official email and password
+ *     description: Login with official email and password (JWT in httpOnly cookie)
  */
 
 /**
@@ -27,8 +24,16 @@ const router = express.Router();
  *     summary: Login
  *     description: |
  *       Login with `officialEmail` + `password`.
- *       Login ID = `official.officialEmail` on User.
- *       Returns JWT + user.permissions (single list — **no menu**).
+ *       Sets httpOnly cookie `token` (primary). Also returns `token` for Swagger Bearer.
+ *       `permissionCount` = `"granted of max"` (true action flags / role catalog total).
+ *       `permissions` = only **true** actions (false keys omitted).
+ *
+ *       **Seed (password 123456):**
+ *       - globaladmin@techculture.ai — Global Admin (all companies)
+ *       - shivangi@techculture.ai — Super Admin (own company)
+ *       - hr@techculture.ai — HR Manager
+ *       - manager@techculture.ai — Manager
+ *       - shivig5964@gmail.com — Employee
  *     requestBody:
  *       required: true
  *       content:
@@ -40,7 +45,7 @@ const router = express.Router();
  *             password: "123456"
  *     responses:
  *       200:
- *         description: Login ok
+ *         description: Login ok. Sets httpOnly cookie named token.
  *         content:
  *           application/json:
  *             schema:
@@ -48,6 +53,21 @@ const router = express.Router();
  *       401:
  *         description: Invalid credentials or inactive account
  */
+// LOGIN — public; body: officialEmail + password
 router.post("/login", validate(loginSchema), login);
+
+/**
+ * @swagger
+ * /api/auth/logout:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Logout
+ *     description: Clears the httpOnly `token` cookie.
+ *     responses:
+ *       200:
+ *         description: Logged out
+ */
+// LOGOUT — public; clears cookie (no body required)
+router.post("/logout", logout);
 
 module.exports = router;

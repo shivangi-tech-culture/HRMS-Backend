@@ -1,8 +1,6 @@
 /**
- * Attendance routes → /api/attendance
- *
- * Self punch-in/out require source: web | mobile | biometric
- * Manual mark (admin) always stores source = manual
+ * ATTENDANCE ROUTES → /api/attendance
+ * Punch in/out, manual mark, today, list
  */
 const express = require("express");
 const {
@@ -24,19 +22,22 @@ const router = express.Router();
 /**
  * @swagger
  * tags:
- *   - name: Attendance
- *     description: Punch in/out with source (web, mobile, biometric) + admin manual mark
+ *   - name: Admin / Attendance
+ *     description: Manual mark + attendance list (admin)
+ *   - name: Employee / ESS
+ *     description: Punch in/out + my today (self)
  */
 
 /**
  * @swagger
  * /api/attendance/punch-in:
  *   post:
- *     tags: [Attendance]
- *     summary: Punch in (self)
+ *     tags: [Employee / ESS]
+ *     summary: Punch in (self — any role)
  *     description: |
- *       **Employee self punch** — source must be `web` | `mobile` | `biometric`.
- *       `manual` is NOT allowed here (admin Mark Attendance only, if punch was missed).
+ *       **Any logged-in role** (Employee, HR Manager, Manager, Super Admin, Global Admin)
+ *       can punch in for **themselves**.
+ *       Source: `web` | `mobile` | `biometric` only (`manual` = admin Mark Attendance).
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -51,16 +52,18 @@ const router = express.Router();
  *       400:
  *         description: Already punched in / validation failed
  */
+// PUNCH IN — any role, self only; body: { source }
 router.post("/punch-in", protect, validate(punchSchema), punchIn);
 
 /**
  * @swagger
  * /api/attendance/punch-out:
  *   post:
- *     tags: [Attendance]
- *     summary: Punch out (self)
+ *     tags: [Employee / ESS]
+ *     summary: Punch out (self — any role)
  *     description: |
- *       Same as punch-in — employee: web | mobile | biometric only (not manual).
+ *       Same as punch-in — **any role** punches out for self.
+ *       Source: web | mobile | biometric only (not manual).
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -75,13 +78,14 @@ router.post("/punch-in", protect, validate(punchSchema), punchIn);
  *       400:
  *         description: Not punched in / already out / validation failed
  */
+// PUNCH OUT — any role, self only; body: { source }
 router.post("/punch-out", protect, validate(punchSchema), punchOut);
 
 /**
  * @swagger
  * /api/attendance/manual:
  *   post:
- *     tags: [Attendance]
+ *     tags: [Admin / Attendance]
  *     summary: Mark Attendance (admin manual)
  *     description: |
  *       **Admin only** (Super Admin / HR Manager / Manager) — when employee missed punch.
@@ -103,6 +107,7 @@ router.post("/punch-out", protect, validate(punchSchema), punchOut);
  *       403:
  *         description: Not admin
  */
+// MANUAL MARK — admin only; source forced to "manual"
 router.post(
   "/manual",
   protect,
@@ -115,7 +120,7 @@ router.post(
  * @swagger
  * /api/attendance/today:
  *   get:
- *     tags: [Attendance]
+ *     tags: [Employee / ESS]
  *     summary: My today punch
  *     security:
  *       - bearerAuth: []
@@ -123,13 +128,14 @@ router.post(
  *       200:
  *         description: Today record or null
  */
+// MY TODAY — current user’s punch for today
 router.get("/today", protect, myToday);
 
 /**
  * @swagger
  * /api/attendance:
  *   get:
- *     tags: [Attendance]
+ *     tags: [Admin / Attendance]
  *     summary: List attendance
  *     description: |
  *       Admin → all | Employee → own.
@@ -144,6 +150,7 @@ router.get("/today", protect, myToday);
  *       200:
  *         description: Attendance list
  */
+// LIST ATTENDANCE — optional query: date, source
 router.get("/", protect, listAttendance);
 
 module.exports = router;

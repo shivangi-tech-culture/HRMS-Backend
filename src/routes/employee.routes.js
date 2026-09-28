@@ -1,62 +1,38 @@
 /**
- * Employee / User routes → /api/employees
- *
- * WHAT THIS FILE DOES:
- *   Connects HTTP URLs to controllers, with security + validation in between.
- *
- * MIDDLEWARE ORDER (left → right):
- *   1. protect     → must be logged in (JWT)
- *   2. authorize   → role must be allowed
- *   3. validate    → Joi checks the body
- *   4. controller  → business logic
- *
- * WHO CAN CALL WHAT:
- *   Create user          → Global Admin, Super Admin, HR Manager, Manager
- *                          (Global Admin = all companies; others = own company)
- *                          Employee role cannot create.
- *   List / Get / Update  → Global Admin, Super Admin, HR Manager, Manager, Employee
- *   Delete               → Global Admin, Super Admin, HR Manager, Manager
- *
- * CREATE BODY (same as User model):
- *   Required flat: name, password, role, status
- *   Required nested: official{ officialEmail, company, department }
- *   Optional nested: personal{ mobileNo, … }, other, education,
- *   accounts, family, nominees, experience, visas, payroll
- *   No flat mobileNo / email / city — use personal / official.
- *
- * UPDATE:
- *   One PUT for all objects (personal, official, education, …).
- *   Employee cannot send official{} or payroll{}.
+ * EMPLOYEE ROUTES — /api/employees
+ * Employee Management (role = Employee only, full HR profile).
+ * Access & Control (any role, lean login) → /api/users.
  */
 const express = require("express");
 const {
   createEmployee,
   listEmployees,
+  exportEmployees,
   getEmployee,
   updateEmployee,
-  editSection,
   deleteSection,
   deleteEmployee,
   uploadAttachment,
 } = require("../controllers/employee.controller");
 const { protect, authorize, ALL_ACCESS } = require("../middleware/auth");
-const { checkPermission } = require("../controllers/permission.controller");
+const {
+  checkPermission,
+  checkEmployeeProfilePermission,
+} = require("../controllers/permission.controller");
 const { validate } = require("../middleware/validate");
 const { uploadFile } = require("../middleware/upload");
 const {
-  createUserSchema,
+  createEmployeeSchema,
   updateUserSchema,
-  validateSectionEdit,
   validateSectionDelete,
 } = require("../validators/user.validation");
 
 const router = express.Router();
 
-
 /**
  * @swagger
  * tags:
- *   - name: Employees
+ *   - name: Admin / Employees
  *     description: Create User + profile CRUD + education upload + detailsApproval
  */
 
@@ -64,21 +40,18 @@ const router = express.Router();
  * @swagger
  * /api/employees:
  *   post:
- *     tags: [Employees]
- *     summary: Create User
+ *     tags: [Admin / Employees]
+ *     summary: Create Employee (Employee Management)
  *     description: |
- *       **Who:** Global Admin, Super Admin, HR Manager, Manager
- *       (with Employee → create permission). Employee role cannot create.
+ *       **Employee Management only** — always creates `role: Employee`.
+ *       Access & Control (any login role) → `POST /api/users`.
  *
- *       **Company:** Global Admin → any company. Others → own company only.
+ *       **Who can CREATE:** Global Admin, Super Admin, HR Manager
+ *       (Employee → Employee → create). **Employee role cannot create** —
+ *       after create, Employee only **edits** own General Info.
  *
- *       **Required flat:** name, password, role, status
- *       **Required nested:** official{ officialEmail, company, department }
- *       **Optional nested:** personal{ mobileNo, … }, other, education[],
- *       accounts[], family[], nominees[], experience[], visas[], payroll{}
- *
- *       Same shape as User model — no flat mobileNo / email / city.
- *       detailsApproval = Approved (Global Admin / Super Admin) | Unapproved (others)
+ *       Essential: name, password, officialEmail, employeeCode, dateOfBirth.
+ *       Welcome email sent after create.
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -86,148 +59,35 @@ const router = express.Router();
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/CreateUserBody'
- *           examples:
- *             employee:
- *               summary: Create Employee
- *               value:
- *                 name: Shivi Gupta
- *                 password: "123456"
- *                 role: Employee
- *                 status: Active
- *                 official:
- *                   officialEmail: shivi.gupta@techculture.ai
- *                   employeeCode: EMP-1024
- *                   company: TechCulture Solutions Private Limited
- *                   department: Finance
- *                 personal:
- *                   mobileNo: "9810044556"
- *                   presentAddress:
- *                     city: Noida
- *                     state: DELHI
- *                     country: India
- *             hrManager:
- *               summary: Create HR Manager
- *               value:
- *                 name: Priya Sharma
- *                 password: "123456"
- *                 role: HR Manager
- *                 status: Active
- *                 official:
- *                   officialEmail: priya@techculture.ai
- *                   employeeCode: EMP-2001
- *                   company: TechCulture Solutions Private Limited
- *                   department: HR
- *                 personal:
- *                   mobileNo: "9876543210"
- *                   presentAddress:
- *                     city: Noida
- *                     state: DELHI
- *                     country: India
- *             fullProfile:
- *               summary: Create with full profile
- *               value:
- *                 name: Shivi Gupta
- *                 password: "123456"
- *                 role: Employee
- *                 status: Active
- *                 personal:
- *                   dateOfBirth: "1996-04-12"
- *                   aadhaarNo: "123412341234"
- *                   panNo: ABCDE1234F
- *                   gender: Female
- *                   fatherOrHusbandName: Ramesh Iyer
- *                   maritalStatus: Single
- *                   personalEmail: shivi.gupta.personal@gmail.com
- *                   languageKnown: English, Hindi
- *                   emergencyContact1: "9810011122"
- *                   emergencyContact2: "9810033344"
- *                   drivingLicenseNo: DL-0420110012345
- *                   licenseValidUpto: "2030-04-12"
- *                   passportNo: J8765432
- *                   mobileNo: "9810044556"
- *                   presentAddress:
- *                     address: Sector 62
- *                     country: India
- *                     state: DELHI
- *                     city: Noida
- *                     pincode: "201301"
- *                 official:
- *                   officialEmail: shivi.gupta@techculture.ai
- *                   employeeCode: EMP-1024
- *                   company: TechCulture Solutions Private Limited
- *                   department: Finance
- *                   designation: Finance Executive
- *                   reportingHead1: Shivangi Gupta
- *                   jobRole: Executive
- *                   dateOfJoining: "2024-01-15"
- *                   grade: G4
- *                 other:
- *                   bloodGroup: B+
- *                   passportExpiry: "2030-12-31"
- *                 education:
- *                   - courseType: Full Time
- *                     courseLevel: Graduation
- *                     courseName: B.Com
- *                     instituteName: ABC College
- *                     location: Noida
- *                     fromYear: "2016"
- *                     passingYear: "2020"
- *                     percentageOrGrade: 8.2 CGPA
- *                 accounts:
- *                   - bankName: HDFC Bank
- *                     accountNo: "50100123456789"
- *                     accountHolderName: Shivi Gupta
- *                     ifscCode: HDFC0001234
- *                     location: Noida
- *                     attachment: ""
- *                     active: true
- *                     salaryAccount: true
- *                 family:
- *                   - name: Ramesh Iyer
- *                     relation: Father
- *                     occupation: Business
- *                     mobileNo: "9876501234"
- *                     mediclaim: false
- *                 nominees:
- *                   - nominateFor: PF
- *                     nomineeName: Neha Iyer
- *                     relation: Sister
- *                     amountPercent: 100
- *                     address: Sector 62
- *                 experience:
- *                   - organization: Previous Corp
- *                     designation: Analyst
- *                     location: Noida
- *                     fromDate: "2020-07-01"
- *                     toDate: "2023-12-31"
- *                     lastSalaryDrawn: "45000"
- *                 visas:
- *                   - countryName: USA
- *                     visaType: B1/B2
- *                     visaNumber: V1234567
- *                     fromDate: "2025-01-01"
- *                     toDate: "2025-12-31"
- *                 payroll:
- *                   basic: 40000
- *                   annualCtc: 600000
- *                   paymentMode: Bank
- *                   taxRegime: New
- *                   bankName: HDFC Bank
- *                   bankAccount: "50100123456789"
- *                   ifsc: HDFC0001234
+ *             type: object
+ *             required: [name, password, official, personal]
+ *             properties:
+ *               name: { type: string }
+ *               password: { type: string }
+ *               role: { type: string, enum: [Employee], default: Employee }
+ *               status: { type: string, enum: [Active, Inactive] }
+ *               official:
+ *                 type: object
+ *                 required: [officialEmail, employeeCode]
+ *               personal:
+ *                 type: object
+ *                 required: [dateOfBirth]
  *     responses:
- *       201: { description: User created. Welcome email is sent after the response. }
+ *       201: { description: Employee created. Welcome email is sent after the response. }
  *       400: { description: Validation failed / unique field conflict }
  *       403: { description: Role not allowed, wrong company, or create permission off }
  */
-// CREATE USER — Global Admin / Super Admin / HR Manager / Manager
+// CREATE EMPLOYEE — Super Admin / HR Manager only (Employee role = edit only, no create)
 router.post(
   "/",
   protect,
-  authorize("Global Admin", "Super Admin", "HR Manager", "Manager"),
+  authorize("Global Admin", "Super Admin", "HR Manager"),
   checkPermission("Employee", "Employee", "create"),
-  validate(createUserSchema),
+  (req, _res, next) => {
+    req.body.role = "Employee";
+    next();
+  },
+  validate(createEmployeeSchema),
   createEmployee
 );
 
@@ -235,30 +95,33 @@ router.post(
  * @swagger
  * /api/employees:
  *   get:
- *     tags: [Employees]
- *     summary: List users
+ *     tags: [Admin / Employees]
+ *     summary: List employees
  *     description: |
- *       One list for Access & Control and Employee Management.
- *       Response is only the table columns. Open one person with `GET /api/employees/{id}`.
+ *       Employee Management table — **only** users with role `Employee`.
+ *       For all roles (Access & Control) use `GET /api/users`.
  *
- *       **Who:** Super Admin, HR Manager, Manager see every user.
- *       Employee search and filters apply only to their own record.
+ *       **Who:** Super Admin, HR Manager, Manager (own company); Global Admin (all companies).
+ *       **Employee role:** use `GET /api/employees/:id` for own profile — not this list.
  *
  *       **Columns:** name, email, role, department, lastLogin, status,
  *       employeeCode, gender, designation, branch.
  *
- *       **Query:** search (name, code, or email), role, status, department,
- *       designation, gender, branch (company), page (default 1), limit (default 10, max 100).
+ *       **Search / filters (UI — All Employees):**
+ *       - **search** / q — name, employee code, email, designation, department
+ *       - **status** — All Status → Active | Inactive
+ *       - **department** — All Departments
+ *       - **designation** — All Designations
+ *       - **gender** — All Gender
+ *       - **company** / branch — optional company filter
+ *       - page (default 1), limit (default 10, max 100)
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: search
- *         schema: { type: string, example: Rahul }
- *         description: Matches name, employee code, or email
- *       - in: query
- *         name: role
- *         schema: { type: string, example: Employee }
+ *         schema: { type: string, example: EMP-1024 }
+ *         description: Search name, code, email, designation, department
  *       - in: query
  *         name: status
  *         schema: { type: string, enum: [Active, Inactive] }
@@ -272,9 +135,9 @@ router.post(
  *         name: gender
  *         schema: { type: string, example: Male }
  *       - in: query
- *         name: branch
+ *         name: company
  *         schema: { type: string }
- *         description: Matches official.company
+ *         description: Matches official.company (branch)
  *       - in: query
  *         name: page
  *         schema: { type: integer, default: 1, example: 1 }
@@ -285,25 +148,55 @@ router.post(
  *       200:
  *         description: Page of employees plus total, page, limit, from, to
  */
-// LIST USERS — admin: all | employee: self
+// LIST EMPLOYEES — admin only (Employee Management table). Employee → GET /:id own profile.
 router.get(
   "/",
   protect,
-  authorize(...ALL_ACCESS, "Employee"),
+  authorize(...ALL_ACCESS),
+  checkPermission("Employee", "Employee", "view"),
   listEmployees
+);
+
+/**
+ * @swagger
+ * /api/employees/export:
+ *   get:
+ *     tags: [Admin / Employees]
+ *     summary: Export employees Excel
+ *     description: |
+ *       **Who:** Global Admin, Super Admin, HR Manager, Manager
+ *       (Employee → Employee → export). **Employee role has no export.**
+ *       Same filters as list (search, status, department, designation, gender, company).
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: .xlsx file
+ *         content:
+ *           application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+ *             schema: { type: string, format: binary }
+ *       403: { description: Employee role or no export permission }
+ */
+// EXPORT EXCEL — admin only (not Employee role)
+router.get(
+  "/export",
+  protect,
+  authorize(...ALL_ACCESS),
+  checkPermission("Employee", "Employee", "export"),
+  exportEmployees
 );
 
 /**
  * @swagger
  * /api/employees/upload:
  *   post:
- *     tags: [Employees]
+ *     tags: [Admin / Employees, Employee / ESS]
  *     summary: Upload attachment to Cloudinary
  *     description: |
  *       No user id. Form-data: `document` (file) and `type` (`education` or `account`).
  *       Cloudinary folder is `hrms/<type>`. The same type always uses that same folder.
  *       Saves nothing in the database. On Submit, put the returned `url` in:
- *       - education → `education[].document` and `education[].documentName`
+ *       - education → `education[].document`
  *       - account → `accounts[].attachment`
  *     security:
  *       - bearerAuth: []
@@ -334,16 +227,18 @@ router.get(
  *               type: account
  *               folder: hrms/account
  *               url: https://res.cloudinary.com/demo/raw/upload/v1/hrms/account/passbook.pdf
- *               fileName: passbook.pdf
  *       400:
  *         description: Missing file, bad type, or invalid file
  *       500:
  *         description: Cloudinary not configured or upload failed
  */
+// UPLOAD ATTACHMENT — Cloudinary; form-data: document + type (education|account)
+// Admin: Employee→edit | Employee: Self→General Info→edit
 router.post(
   "/upload",
   protect,
   authorize(...ALL_ACCESS, "Employee"),
+  checkEmployeeProfilePermission("edit"),
   (req, res, next) => {
     uploadFile(req, res, (err) => {
       if (err) {
@@ -359,10 +254,11 @@ router.post(
  * @swagger
  * /api/employees/{id}:
  *   get:
- *     tags: [Employees]
- *     summary: Get one user
+ *     tags: [Admin / Employees, Employee / ESS]
+ *     summary: Get one employee / my profile
  *     description: |
- *       **Who:** Admin roles (any id) | Employee (own id only)
+ *       **Admin:** any employee id (company scope).
+ *       **Employee ESS:** own id only.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -376,10 +272,12 @@ router.post(
  *         description: Not found
  */
 // GET ONE USER by id
+// Admin: Employee→view | Employee: Self→General Info→view (+ own id in controller)
 router.get(
   "/:id",
   protect,
   authorize(...ALL_ACCESS, "Employee"),
+  checkEmployeeProfilePermission("view"),
   getEmployee
 );
 
@@ -387,9 +285,10 @@ router.get(
  * @swagger
  * /api/employees/{id}:
  *   put:
- *     tags: [Employees]
- *     summary: Update user / approve details / education
+ *     tags: [Admin / Employees, Employee / ESS]
+ *     summary: Update employee / my profile
  *     description: |
+ *       **Admin:** any profile (company scope) | **Employee ESS:** own id only.
  *       **Who:** Admin (any) | Own profile if detailsApproval ≠ Approved
  *       (Super Admin never locked; HR/Manager/Employee locked when Approved)
  *
@@ -460,7 +359,7 @@ router.get(
  *                 official:
  *                   employeeCode: EMP-1024
  *                   officialEmail: shivi.gupta@techculture.ai
- *                   company: TechCulture Solutions Private Limited
+ *                   company: TechCulture.Ai Private Limited
  *                   department: Finance
  *                   designation: Finance Executive
  *                   reportingHead1: Shivangi Gupta
@@ -480,7 +379,6 @@ router.get(
  *                     passingYear: "2020"
  *                     percentageOrGrade: 8.2 CGPA
  *                     document: https://res.cloudinary.com/demo/raw/upload/v1/hrms/education/marksheet.pdf
- *                     documentName: marksheet.pdf
  *                 accounts:
  *                   - bankName: HDFC Bank
  *                     accountNo: "50100123456789"
@@ -562,7 +460,6 @@ router.get(
  *                     fromYear: "2016"
  *                     passingYear: "2020"
  *                     document: https://res.cloudinary.com/demo/raw/upload/v1/hrms/education/marksheet.pdf
- *                     documentName: marksheet.pdf
  *                 accounts:
  *                   - bankName: HDFC Bank
  *                     accountNo: "50100123456789"
@@ -606,11 +503,13 @@ router.get(
  *       400: { description: Unknown / invalid fields / unique conflict }
  *       403: { description: Locked after Approved / no permission }
  */
-// UPDATE PROFILE — one API for all nested objects (admin vs employee rules in controller)
+// UPDATE PROFILE — one API; role checks in controller + matrix permission here
+// Admin: Employee→Employee→edit | Employee: Self→General Info→edit
 router.put(
   "/:id",
   protect,
   authorize(...ALL_ACCESS, "Employee"),
+  checkEmployeeProfilePermission("edit"),
   validate(updateUserSchema),
   updateEmployee
 );
@@ -618,14 +517,16 @@ router.put(
 /**
  * @swagger
  * /api/employees/{id}/{section}:
- *   put:
- *     tags: [Employees]
- *     summary: Edit a section
+ *   delete:
+ *     tags: [Admin / Employees]
+ *     summary: Delete section rows or clear payroll
  *     description: |
+ *       Does **not** delete the user. Use `DELETE /api/employees/{id}` for that.
+ *
  *       **Lists** (education, accounts, family, nominees, experience, visas):
- *       one object with `_id` edits that row. An array of objects edits each row.
- *       **official / payroll:** one object. Super Admin, HR Manager, Manager only.
- *       Same field checks as profile update.
+ *       body `{ _id }`, or an array of ids / `{ _id }` objects — deletes those rows.
+ *       **payroll:** clears payroll fields. Admin only.
+ *       Official cannot be deleted (holds login email).
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -635,56 +536,33 @@ router.put(
  *         required: true
  *         schema:
  *           type: string
- *           enum: [education, accounts, family, nominees, experience, visas, official, payroll]
+ *           enum: [education, accounts, family, nominees, experience, visas, payroll]
  *     requestBody:
- *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             oneOf:
- *               - $ref: '#/components/schemas/Official'
- *               - $ref: '#/components/schemas/Payroll'
+ *               - type: object
+ *                 required: [_id]
+ *                 properties:
+ *                   _id: { type: string }
+ *               - type: array
+ *                 items: { type: string }
  *           example:
- *             designation: Finance Executive
- *             department: Finance
+ *             _id: 66f0a1b2c3d4e5f678901234
  *     responses:
- *       200: { description: Section updated }
- *       400: { description: Invalid fields }
- *       403: { description: Employee or wrong company }
- *   delete:
- *     tags: [Employees]
- *     summary: Delete section rows or clear payroll
- *     description: |
- *       **Lists:** one object `{ _id }`, or an array of ids, deletes those rows.
- *       **payroll:** clears payroll. Super Admin, HR Manager, Manager only.
- *       Official cannot be deleted.
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - $ref: '#/components/parameters/UserId'
- *       - in: path
- *         name: section
- *         required: true
- *         schema:
- *           type: string
- *           enum: [payroll]
- *     responses:
- *       200: { description: Payroll cleared }
- *       400: { description: Official cannot be deleted }
- *       403: { description: Employee or wrong company }
+ *       200: { description: Row(s) deleted or payroll cleared }
+ *       400: { description: Official cannot be deleted / invalid id }
+ *       403: { description: Locked / no permission / wrong company }
+ *       404: { description: Item not found }
  */
-router.put(
-  "/:id/:section",
-  protect,
-  authorize(...ALL_ACCESS, "Employee"),
-  validateSectionEdit,
-  editSection
-);
-
+// DELETE SECTION — list row(s) or clear payroll (does not delete the user)
+// Admin: Employee→edit | Employee: Self→General Info→edit
 router.delete(
   "/:id/:section",
   protect,
   authorize(...ALL_ACCESS, "Employee"),
+  checkEmployeeProfilePermission("edit"),
   validateSectionDelete,
   deleteSection
 );
@@ -693,10 +571,12 @@ router.delete(
  * @swagger
  * /api/employees/{id}:
  *   delete:
- *     tags: [Employees]
- *     summary: Delete user
+ *     tags: [Admin / Employees]
+ *     summary: Delete employee (admin only)
  *     description: |
- *       **Who:** Super Admin, HR Manager, Manager
+ *       **Who:** Global Admin, Super Admin, HR Manager, Manager
+ *       with Employee → Employee → **delete** permission.
+ *       **Employee role cannot delete** (blocked by authorize + permission).
  *       Cannot delete your own account.
  *     security:
  *       - bearerAuth: []
@@ -705,13 +585,15 @@ router.delete(
  *     responses:
  *       200: { description: Deleted }
  *       400: { description: Cannot delete self }
+ *       403: { description: Employee role or no delete permission }
  *       404: { description: Not found }
  */
-// DELETE USER — admin only; cannot delete yourself
+// DELETE EMPLOYEE — admin only (ALL_ACCESS + Employee→delete). Employee role never.
 router.delete(
   "/:id",
   protect,
   authorize(...ALL_ACCESS),
+  checkPermission("Employee", "Employee", "delete"),
   deleteEmployee
 );
 

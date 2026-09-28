@@ -1,8 +1,6 @@
 /**
- * Role routes → /api/roles
- *
- * CRUD for roles and get/save of permission blocks.
- * Admin roles only (Super Admin, HR Manager, Manager).
+ * ROLE ROUTES → /api/roles
+ * Role CRUD + get/save permissions
  */
 const express = require("express");
 const {
@@ -23,6 +21,10 @@ const {
 
 const router = express.Router();
 
+/**
+ * System admin names for authorize — custom admin-side roles also pass
+ * when HR Manager / Manager is listed (see auth.authorize). Action still via checkPermission.
+ */
 const ADMIN = ["Global Admin", "Super Admin", "HR Manager", "Manager"];
 
 
@@ -30,9 +32,14 @@ const ADMIN = ["Global Admin", "Super Admin", "HR Manager", "Manager"];
  * @swagger
  * /api/roles:
  *   post:
- *     tags: [Roles]
- *     summary: Create role
- *     description: Creates role with default employee-level Module→SubModule permissions
+ *     tags: [Admin / Roles]
+ *     summary: Create role with permissions (required)
+ *     description: |
+ *       1. `GET /api/permissions/modules` → pick **admin** OR **employee** catalog
+ *       2. Decide modules/actions (hide unused)
+ *       3. `POST /api/roles` with required `catalog` + `permissions`
+ *       DB stores only granted (true) actions. Later: `PUT /api/roles/:id/permissions` to hide/show.
+ *       Route guards use `checkPermission` against this role's saved matrix (works for custom roles too).
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -45,6 +52,7 @@ const ADMIN = ["Global Admin", "Super Admin", "HR Manager", "Manager"];
  *       201: { description: Role created }
  *       400: { description: Validation failed }
  */
+// CREATE ROLE
 router.post(
   "/",
   protect,
@@ -58,13 +66,17 @@ router.post(
  * @swagger
  * /api/roles:
  *   get:
- *     tags: [Roles]
+ *     tags: [Admin / Roles]
  *     summary: List roles
+ *     description: |
+ *       **Global Admin** login → sees Global Admin in the list (can create more platform owners).
+ *       **Super Admin / HR / Manager** → Global Admin is **hidden** (cannot escalate).
  *     security:
  *       - bearerAuth: []
  *     responses:
- *       200: { description: Role list }
+ *       200: { description: Role list (Global Admin only for Global Admin actors) }
  */
+// LIST ROLES
 router.get(
   "/",
   protect,
@@ -76,7 +88,7 @@ router.get(
  * @swagger
  * /api/roles/{id}/permissions:
  *   get:
- *     tags: [Permissions]
+ *     tags: [Admin / Permissions]
  *     summary: Get role permissions (Module → SubModule → Actions)
  *     security:
  *       - bearerAuth: []
@@ -85,6 +97,7 @@ router.get(
  *     responses:
  *       200: { description: Permission matrix }
  */
+// GET PERMISSIONS for one role
 router.get(
   "/:id/permissions",
   protect,
@@ -96,13 +109,14 @@ router.get(
  * @swagger
  * /api/roles/{id}/permissions:
  *   put:
- *     tags: [Permissions]
- *     summary: Update permissions
+ *     tags: [Admin / Permissions]
+ *     summary: Update permissions (hide / show modules)
  *     description: |
- *       One API for Employee, HR Manager, Manager, and custom roles.
- *       Super Admin is rejected — that role always keeps full access.
- *       Employee is saved against the employee catalog. Others use the admin catalog.
- *       Body: { permissions: [ { module, heading, subModules: [ { name, view, create, … } ] } ] }
+ *       Re-decide grants for Employee, HR Manager, Manager, and custom roles.
+ *       Super Admin / Global Admin locked (full access).
+ *       Only **true** actions are stored in DB — omit or set false to hide.
+ *       Body: { catalog?: admin|employee, permissions: [ { module, heading, subModules: […] } ] }
+ *       Routes enforce via checkPermission against this saved matrix.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -131,6 +145,7 @@ router.get(
  *       200: { description: Saved }
  *       400: { description: Validation failed }
  */
+// SAVE PERMISSIONS — Module → SubModule → action flags
 router.put(
   "/:id/permissions",
   protect,
@@ -144,7 +159,7 @@ router.put(
  * @swagger
  * /api/roles/{id}:
  *   get:
- *     tags: [Roles]
+ *     tags: [Admin / Roles]
  *     summary: Get one role
  *     security:
  *       - bearerAuth: []
@@ -153,6 +168,7 @@ router.put(
  *     responses:
  *       200: { description: Role }
  */
+// GET ONE ROLE by id
 router.get(
   "/:id",
   protect,
@@ -164,7 +180,7 @@ router.get(
  * @swagger
  * /api/roles/{id}:
  *   delete:
- *     tags: [Roles]
+ *     tags: [Admin / Roles]
  *     summary: Delete role
  *     description: |
  *       Super Admin cannot be deleted.
@@ -176,6 +192,7 @@ router.get(
  *     responses:
  *       200: { description: Deleted }
  */
+// DELETE ROLE — Global Admin / Super Admin only
 router.delete(
   "/:id",
   protect,

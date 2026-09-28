@@ -1,12 +1,10 @@
 /**
- * Email helpers (Zoho SMTP)
- *
- * Env: EMAIL_USER_EZ, EMAIL_PASS_EZ, SMTP_HOST_EZ, SMTP_PORT_EZ
- * Sends a welcome email whenever a user is created (API or seed).
+ * MAIL UTILS — send email via Zoho SMTP (nodemailer)
+ * sendWelcomeEmail (user create) · sendEmail (POST /api/mail/send)
  */
 const nodemailer = require("nodemailer");
 
-/** Build a nodemailer transporter from .env */
+/** Build nodemailer transporter from .env (Zoho SMTP) */
 function createTransporter() {
   const user = process.env.EMAIL_USER_EZ;
   const pass = String(process.env.EMAIL_PASS_EZ || "").replace(/\s+/g, "");
@@ -27,70 +25,223 @@ function createTransporter() {
   });
 }
 
-/**
- * Send welcome email when any user is created
- * (Super Admin / Manager / Employee — seed or API)
- */
-const sendWelcomeEmail = async ({ name, email, password, role, company, department }) => {
+/** From display name + address for outgoing mail */
+const fromAddress = () => {
   const fromName = process.env.EMAIL_FROM_NAME || "TechCulture HR";
   const fromEmail = process.env.EMAIL_USER_EZ;
+  return { fromName, fromEmail, from: `"${fromName}" <${fromEmail}>` };
+};
+
+/** Escape plain text for safe HTML email bodies */
+const escapeHtml = (value) =>
+  String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+
+/** Welcome email after user create (includes login credentials) */
+const sendWelcomeEmail = async ({ name, email, password, role, company, department }) => {
+  const { fromName, from } = fromAddress();
   const appUrl = process.env.APP_URL || "https://hrms-techculture.vercel.app";
   const roleLabel = role || "Employee";
+  const brand = company || "TechCulture.Ai";
   const transporter = createTransporter();
 
+  const safe = {
+    name: escapeHtml(name),
+    email: escapeHtml(email),
+    password: escapeHtml(password),
+    role: escapeHtml(roleLabel),
+    brand: escapeHtml(brand),
+    dept: escapeHtml(department),
+    fromName: escapeHtml(fromName),
+    appUrl: escapeHtml(appUrl),
+  };
+
+  const deptLine = department
+    ? `<p style="margin:16px 0 0;font-size:13px;color:#64748b;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;">Department · <strong style="color:#0f172a;">${safe.dept}</strong></p>`
+    : "";
+
   const html = `
-  <div style="font-family: Arial, Helvetica, sans-serif; background:#f4f6f8; padding:24px;">
-    <div style="max-width:560px; margin:0 auto; background:#ffffff; border-radius:12px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.06);">
-      <div style="background:#0f766e; color:#fff; padding:20px 24px;">
-        <h1 style="margin:0; font-size:20px;">Welcome to ${company || "TechCulture"}</h1>
-        <p style="margin:8px 0 0; opacity:0.9; font-size:14px;">Your HR workspace account is ready</p>
-      </div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Welcome</title>
+</head>
+<body style="margin:0;padding:0;background:#e8eef5;-webkit-font-smoothing:antialiased;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#e8eef5;padding:40px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 12px 40px rgba(15,23,42,0.12);">
 
-      <div style="padding:24px;">
-        <p style="font-size:15px; color:#111; margin-top:0;">Hi <strong>${name}</strong>,</p>
-        <p style="font-size:14px; color:#333; line-height:1.6;">
-          We're excited to have you on board${department ? ` in <strong>${department}</strong>` : ""}.
-          Your account has been created successfully.
-        </p>
+          <!-- Header -->
+          <tr>
+            <td style="background:linear-gradient(135deg,#0b3d4a 0%,#0f766e 55%,#14b8a6 100%);padding:36px 36px 32px;">
+              <p style="margin:0 0 10px;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:rgba(255,255,255,0.72);font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-weight:600;">
+                ${safe.brand}
+              </p>
+              <h1 style="margin:0;font-size:26px;line-height:1.25;color:#ffffff;font-family:Georgia,'Times New Roman',serif;font-weight:700;">
+                Welcome to your HR portal
+              </h1>
+              <p style="margin:10px 0 0;font-size:15px;line-height:1.5;color:rgba(255,255,255,0.88);font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+                Your account is ready — sign in with the details below
+              </p>
+            </td>
+          </tr>
 
-        <div style="background:#f0fdfa; border:1px solid #99f6e4; border-radius:8px; padding:16px; margin:20px 0;">
-          <p style="margin:0 0 8px; font-size:13px; color:#0f766e; font-weight:bold;">Your login credentials</p>
-          <p style="margin:4px 0; font-size:14px; color:#111;"><strong>Email:</strong> ${email}</p>
-          <p style="margin:4px 0; font-size:14px; color:#111;"><strong>Password:</strong> ${password}</p>
-          <p style="margin:4px 0; font-size:14px; color:#111;"><strong>Role:</strong> ${roleLabel}</p>
-        </div>
+          <!-- Body -->
+          <tr>
+            <td style="padding:36px 36px 28px;">
+              <p style="margin:0 0 12px;font-size:16px;color:#0f172a;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+                Hi <strong>${safe.name}</strong>,
+              </p>
+              <p style="margin:0 0 20px;font-size:15px;line-height:1.65;color:#475569;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+                Welcome to <strong style="color:#0f172a;">${safe.brand}</strong>${department ? ` (${safe.dept})` : ""}.
+                Your login is ready. Use these details to open the HR portal for the first time:
+              </p>
 
-        <p style="font-size:13px; color:#555; line-height:1.5;">
-          Please sign in and change your password after first login for security.
-        </p>
+              <!-- Simple 3 steps -->
+              <p style="margin:0 0 16px;font-size:13px;line-height:1.6;color:#64748b;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+                <strong style="color:#0f172a;">How to sign in</strong><br/>
+                1. Open the HR portal (button below)<br/>
+                2. Enter your email and password<br/>
+                3. Change your password after first login
+              </p>
 
-        <p style="margin:24px 0;">
-          <a href="${appUrl}" style="display:inline-block; background:#0f766e; color:#fff; text-decoration:none; padding:12px 20px; border-radius:8px; font-size:14px; font-weight:bold;">
-            Go to HR Portal
-          </a>
-        </p>
+              <!-- Credentials card -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+                <tr>
+                  <td style="padding:14px 20px;background:#0f172a;">
+                    <p style="margin:0;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:#94a3b8;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-weight:600;">
+                      Your login details
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:4px 20px 8px;">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                      <tr>
+                        <td style="padding:14px 0;border-bottom:1px solid #e2e8f0;font-size:12px;color:#64748b;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;width:88px;vertical-align:top;">
+                          Email
+                        </td>
+                        <td style="padding:14px 0;border-bottom:1px solid #e2e8f0;font-size:14px;color:#0f172a;font-family:Consolas,Monaco,monospace;font-weight:600;word-break:break-all;">
+                          ${safe.email}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:14px 0;border-bottom:1px solid #e2e8f0;font-size:12px;color:#64748b;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;width:88px;vertical-align:top;">
+                          Password
+                        </td>
+                        <td style="padding:14px 0;border-bottom:1px solid #e2e8f0;font-size:14px;color:#0f172a;font-family:Consolas,Monaco,monospace;font-weight:600;">
+                          ${safe.password}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:14px 0;font-size:12px;color:#64748b;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;width:88px;vertical-align:top;">
+                          Your role
+                        </td>
+                        <td style="padding:14px 0;">
+                          <span style="display:inline-block;background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;border-radius:999px;padding:4px 12px;font-size:12px;font-weight:700;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+                            ${safe.role}
+                          </span>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
 
-        <p style="font-size:13px; color:#666; margin-bottom:0;">
-          Warm regards,<br/>
-          <strong>${fromName}</strong><br/>
-          TechCulture.Ai
-        </p>
-      </div>
+              ${deptLine}
 
-      <div style="background:#f8fafc; padding:12px 24px; font-size:11px; color:#94a3b8; text-align:center;">
-        This is an automated message. Please do not reply to this email.
-      </div>
-    </div>
-  </div>
+              <!-- Security note -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:24px 0 28px;">
+                <tr>
+                  <td style="padding:14px 16px;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;font-size:13px;line-height:1.55;color:#92400e;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+                    <strong style="color:#78350f;">Keep it safe:</strong> After you sign in, please change this password. Do not share your email or password with anyone.
+                  </td>
+                </tr>
+              </table>
+
+              <!-- CTA -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 32px;">
+                <tr>
+                  <td align="center" style="border-radius:10px;background:#0f766e;">
+                    <a href="${safe.appUrl}" target="_blank" style="display:inline-block;padding:14px 28px;font-size:14px;font-weight:700;color:#ffffff;text-decoration:none;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;letter-spacing:0.02em;">
+                      Open HR Portal →
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:0;font-size:14px;line-height:1.6;color:#64748b;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+                Need help? Contact your HR team.<br/><br/>
+                Warm regards,<br/>
+                <span style="color:#0f172a;font-weight:700;">${safe.fromName}</span><br/>
+                <span style="color:#94a3b8;font-size:13px;">${safe.brand}</span>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:18px 36px;background:#f1f5f9;border-top:1px solid #e2e8f0;text-align:center;">
+              <p style="margin:0;font-size:11px;line-height:1.5;color:#94a3b8;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+                Automated message from ${safe.brand} HRMS · Please do not reply
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
   `;
 
   return transporter.sendMail({
-    from: `"${fromName}" <${fromEmail}>`,
+    from,
     to: email,
-    subject: `Welcome to ${company || "TechCulture"} — your account is ready`,
-    text: `Hi ${name},\n\nWelcome! Your HR account is ready.\n\nEmail: ${email}\nPassword: ${password}\nRole: ${roleLabel}\n\nPlease login and change your password.\n\nRegards,\n${fromName}`,
+    subject: `Welcome to ${brand} — your account is ready`,
+    text: `Hi ${name},\n\nWelcome to your HR portal at ${brand}. Your account is ready.\n\nHow to sign in:\n1. Open ${appUrl}\n2. Email: ${email}\n3. Password: ${password}\n4. Your role: ${roleLabel}\n\nPlease change your password after first login.\n\nRegards,\n${fromName}`,
     html,
   });
 };
 
-module.exports = { sendWelcomeEmail, createTransporter };
+/** Generic send used by POST /api/mail/send */
+const sendEmail = async ({ to, subject, body, cc, bcc, isHtml = false }) => {
+  const { fromName, from } = fromAddress();
+  const transporter = createTransporter();
+
+  const text = isHtml
+    ? String(body || "")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+    : String(body || "");
+
+  const html = isHtml
+    ? String(body || "")
+    : `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#111;line-height:1.6;white-space:pre-wrap;">${escapeHtml(body)}</div>
+       <p style="font-size:12px;color:#94a3b8;margin-top:24px;">Sent via ${escapeHtml(fromName)}</p>`;
+
+  const info = await transporter.sendMail({
+    from,
+    to,
+    cc: cc || undefined,
+    bcc: bcc || undefined,
+    subject,
+    text: text || subject,
+    html,
+  });
+
+  return {
+    messageId: info.messageId,
+    accepted: info.accepted || [],
+    rejected: info.rejected || [],
+  };
+};
+
+module.exports = { sendWelcomeEmail, sendEmail, createTransporter };

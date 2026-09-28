@@ -1,629 +1,539 @@
 # HRMS API
 
-A simple, ready-to-use **Human Resource Management System** backend built with **Node.js**, **Express**, and **MongoDB**.
+Backend for a **Human Resource Management System** — Node.js, Express, MongoDB.
 
-It handles login, roles and permissions, employee profiles, education document upload, and attendance (punch in/out plus admin manual mark).
+Supports **web** (httpOnly cookie) and **mobile** (Bearer JWT). No public signup; admins create users.
+
+| | |
+|--|--|
+| **Default port** | `9001` |
+| **Swagger** | http://localhost:9001/api-docs |
+| **Health** | http://localhost:9001/api/health |
+| **Postman** | `postman/HRMS_API.postman_collection.json` |
 
 ---
 
-## What this project does
+## Architecture overview
 
-Think of this as the **backend brain** for an HRMS app (web or mobile).
+```text
+                    ┌─────────────────┐
+   Web (Vercel) ──► │  CORS + cookie  │
+                    │  credentials    │
+   Mobile app ────► │  Bearer JWT     │──► Express (server.js)
+                    └─────────────────┘            │
+                                                   ▼
+              ┌────────────────────────────────────────────────┐
+              │  Middleware stack                              │
+              │  helmet → cors → cookieParser → json → morgan  │
+              │  → rate-limit → routes                         │
+              └────────────────────────────────────────────────┘
+                   │
+     ┌─────────────┼─────────────┬──────────────┬────────────┐
+     ▼             ▼             ▼              ▼            ▼
+  /api/auth   /api/employees  /api/users   /api/roles   /api/mail
+  /api/attendance  /api/health  /api-docs
+                   │
+                   ▼
+            ┌──────────────┐
+            │   MongoDB    │
+            │  User        │  ← one collection for all people
+            │  Role        │  ← permission matrix per role
+            │  Attendance  │
+            └──────────────┘
+```
 
-| Area | What you get |
+### Design decisions (current)
+
+| Decision | Approach |
+|----------|----------|
+| Admin vs employee tables | **One `User` collection** — difference is `role` only |
+| Auth for website | httpOnly cookie `token` + `CLIENT_URL` CORS |
+| Auth for app / Swagger | `Authorization: Bearer <token>` (same JWT) |
+| Employee Management UI | `GET /api/employees` → **role = Employee** only |
+| Access & Control UI | `GET /api/users` → all roles with hierarchy |
+| Create Super Admin | `POST /api/users/super-admin` → company required |
+| Profile update | **One** `PUT /api/employees/:id` (section PUT removed) |
+| Delete list rows | `DELETE /api/employees/:id/:section` |
+| Permissions on login | Only **true** action flags; `permissionCount` = `"granted of max"` |
+
+---
+
+## Request flow
+
+```text
+Client
+  │
+  ├─ POST /api/auth/login
+  │     → validate email/password
+  │     → set cookie `token` + return token + user + compact permissions
+  │
+  ├─ Protected route
+  │     → protect: read cookie OR Bearer → load Active user → req.user
+  │     → authorize(roles…)
+  │     → checkPermission(module, page, action)  [where used]
+  │     → validate(Joi)
+  │     → controller → MongoDB → JSON response
+  │
+  └─ POST /api/auth/logout → clear cookie
+```
+
+### Company scope
+
+| Role | Company access |
 |------|----------------|
-| **Auth** | Login with official email + password, JWT token |
-| **Roles** | Super Admin, HR Manager, Manager, Employee |
-| **Permissions** | Full admin menu + employee (ESS) menu catalog |
-| **Employees** | Create user, full profile CRUD, details approval |
-| **Attendance** | Self punch (web / mobile / biometric) + admin manual |
-| **Health** | `GET /api/health` — API + MongoDB status (no auth) |
-| **Docs** | Swagger UI + Postman collection |
+| **Global Admin** | All companies (`official.company` = empty) |
+| **Super Admin / HR Manager / Manager** | Own company only (`official.company`) |
+| **Employee** | Own record only |
 
-**Default port:** `9001`  
-**API docs:** http://localhost:9001/api-docs
+Helpers live in `src/utils/companyScope.js`.
+
+### Create Super Admin — `POST /api/users/super-admin`
+
+Lean account for one company. Prefer this over `POST /api/employees` with `role: Super Admin`.
+
+| Actor | Can set `official.company` to |
+|-------|-------------------------------|
+| Global Admin | **Any** company (required) |
+| Super Admin | **Own** company only |
+
+```json
+{
+  "name": "Acme Super Admin",
+  "password": "123456",
+  "status": "Active",
+  "official": {
+    "officialEmail": "super@acme.com",
+    "company": "Acme Private Limited"
+  }
+}
+```
+
+### User list visibility (`GET /api/users`)
+
+| Viewer | Sees |
+|--------|------|
+| Global Admin | Everyone, every company |
+| Super Admin | Own company, **except** Global Admin |
+| HR Manager / Manager | Own company, **except** Global Admin + Super Admin |
+
+---
+
+## What is built (feature map)
+
+| Area | Status | Notes |
+|------|--------|--------|
+| Auth login / logout | Done | Cookie + Bearer |
+| Roles + permission matrix | Done | Catalog in `config/permissions.js` |
+| Create user + welcome email | Done | Nested body = User model shape |
+| Employee list | Done | Role Employee only |
+| User list | Done | Hierarchy + company |
+| Profile CRUD | Done | Nested sections; approval lock |
+| Section row delete / clear payroll | Done | `DELETE /:id/:section` |
+| File upload (Cloudinary) | Done | `POST /api/employees/upload` |
+| Attendance punch + manual | Done | web / mobile / biometric / manual |
+| Send email (Organization → Mail) | Done | `POST /api/mail/send` |
+| Master dropdowns | Done | One `Master.js` — `type` → collection (`/api/masters?type=`) |
+| Swagger + Postman | Done | Keep in sync when APIs change |
+| Rate limit + Helmet + Morgan | Done | Global + login limits |
 
 ---
 
 ## Tech stack
 
-| Tool | Why we use it |
-|------|----------------|
-| **Express** | HTTP API server |
-| **MongoDB + Mongoose** | Database + models |
-| **JWT** | Secure login sessions |
-| **bcryptjs** | Password hashing |
-| **Joi** | Request body validation |
-| **Multer + Cloudinary** | Education document upload |
-| **Nodemailer** | Welcome email on user create |
-| **Swagger** | Interactive API documentation |
-| **Postman** | Ready-made request collection |
-| **Helmet** | Secure HTTP headers |
-| **Morgan** | Colored HTTP request logs |
-| **express-rate-limit** | Brute-force / flood protection |
-| **Chalk** | Colored server console output |
+| Tool | Purpose |
+|------|---------|
+| Express | HTTP API |
+| MongoDB + Mongoose | Data |
+| JWT + cookie-parser | Sessions |
+| bcryptjs | Password hashes |
+| Joi | Body validation |
+| Multer + Cloudinary | File upload |
+| Nodemailer (Zoho) | Welcome + Mail send |
+| Helmet / CORS / Morgan / rate-limit | Security & ops |
+| Swagger / Postman | Docs & testing |
 
 ---
 
-## Quick start (5 minutes)
-
-### 1. Prerequisites
-
-- **Node.js** 18+ (recommended)
-- **MongoDB** running locally (or a cloud URI)
-
-### 2. Install
+## Quick start
 
 ```bash
-cd "HRMS PROJECT"
+cd HRMS-Backend
 npm install
+# configure .env (see below)
+npm run seed    # sample roles + users (clears users/roles)
+npm run dev     # http://localhost:9001
 ```
 
-### 3. Environment file
+### Seeded logins
 
-Copy the example file and fill in your values:
+| Role | Email | Password | Access |
+|------|-------|----------|--------|
+| Global Admin | `globaladmin@techculture.ai` | `123456` | All companies (seed-only; not in Roles UI) |
+| Super Admin | `shivangi@techculture.ai` | `123456` | Own company (login + company only) |
+| HR Manager | `hr@techculture.ai` | `123456` | Own company + employee profile |
+| Manager | `manager@techculture.ai` | `123456` | Own company + employee profile |
+| Employee | `shivig5964@gmail.com` | `123456` | Self + ESS profile |
 
-```bash
-copy .env.example .env
+Login ID = `official.officialEmail`.
+
+**Global Admin / Super Admin** documents do **not** store employee profile fields (`personal`, `education`, `payroll`, …).  
+**Super Admin** keeps `official.company` for company scope. **Global Admin** has no company (sees all).
+
+---
+
+## Roles
+
+| Role | Scope | Notes |
+|------|-------|--------|
+| **Global Admin** | All companies | Platform owner. Visible in roles **only to Global Admin**. Only Global can create more (cap `MAX_GLOBAL_ADMINS`, default 5). Super Admin cannot escalate. |
+| **Super Admin** | Own company | Full company admin; profile starts Approved |
+| **HR Manager** | Own company | Permission matrix; can create users / reset password |
+| **Manager** | Own company | Permission matrix |
+| **Employee** | Self | ESS; locked after `detailsApproval: Approved` |
+
+**Admin roles** (ALL_ACCESS): Global Admin, Super Admin, HR Manager, Manager.  
+Roles UI / dropdown uses `GET /api/roles` → Super Admin, HR Manager, Manager, Employee (+ custom).
+
+---
+
+## Auth
+
+### Login
+
+```http
+POST /api/auth/login
+{ "officialEmail": "…", "password": "…" }
 ```
 
-Minimum you need for local run:
+Response:
 
-```env
-PORT=9001
-MONGODB_URI=mongodb://127.0.0.1:27017/hrms
-JWT_SECRET=change_this_in_production
-JWT_EXPIRES_IN=7d
+- Sets httpOnly cookie **`token`**
+- Also returns `token` (for mobile / Swagger / Postman)
+- `user.permissionCount` → e.g. `"254 of 254"` = true flags / catalog max
+- `user.permissions` → **only true** actions (false keys omitted)
+
+### Calling protected APIs
+
+| Client | How |
+|--------|-----|
+| Website | `credentials: "include"` (cookie); set `CLIENT_URL` |
+| Mobile / Postman / Swagger | `Authorization: Bearer <token>` |
+
+CORS does **not** apply to native mobile apps — only browsers.
+
+### Logout
+
+```http
+POST /api/auth/logout
 ```
 
-Optional (for emails + file upload):
+Clears the auth cookie.
 
-- Zoho SMTP: `EMAIL_USER_EZ`, `EMAIL_PASS_EZ`, `SMTP_HOST_EZ`, `SMTP_PORT_EZ`
-- Cloudinary: `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`
+---
 
-### 4. Seed sample data
-
-This **clears** users/roles and creates fresh sample accounts:
-
-```bash
-npm run seed
-```
-
-### 5. Start the server
-
-```bash
-npm run dev
-```
-
-Or:
-
-```bash
-npm start
-```
-
-You should see:
+## API map
 
 ```text
-HRMS backend → http://localhost:9001
-Swagger docs → http://localhost:9001/api-docs
+/
+├── /api-docs
+├── /api/health
+├── /api/auth
+│   ├── POST /login
+│   └── POST /logout
+├── /api/roles
+│   ├── CRUD /
+│   └── /:id/permissions
+├── /api/employees          ← role = Employee (management table)
+│   ├── POST   /
+│   ├── GET    /
+│   ├── GET    /:id
+│   ├── PUT    /:id         ← sole update API
+│   ├── DELETE /:id
+│   ├── DELETE /:id/:section
+│   └── POST   /upload
+├── /api/users              ← all roles (Access & Control)
+│     GET  /                ← list (hierarchy)
+│     POST /super-admin     ← create Super Admin (company required)
+│   └── GET    /
+├── /api/mail
+│   └── POST   /send
+├── /api/masters            ← Master.js → type picks collection (departments, …)
+│   ├── GET/POST /
+│   └── GET/PUT/DELETE /:id
+└── /api/attendance
+    ├── POST /punch-in | /punch-out | /manual
+    ├── GET  /today
+    └── GET  /
 ```
 
 ---
 
-## Seeded login accounts
+## Masters (SaaS dropdowns)
 
-After `npm run seed`:
+**One model file** (`Master.js`) — `type` decides Mongo **collection name** (no Department.js / Designation.js):
 
-| Role | Official email (login ID) | Password |
-|------|---------------------------|----------|
-| **Super Admin** | `shivangi@techculture.ai` | `123456` |
-| **Employee** | `shivig5964@gmail.com` | `123456` |
+| `type` | Collection created/used |
+|--------|-------------------------|
+| `company` | `companies` |
+| `department` | `departments` |
+| `designation` | `designations` |
+| `division` | `divisions` |
+| `employeeGroup` | `employeegroups` |
 
-Login always uses **`official.officialEmail`** + password.  
-There is **no public signup** — only admins create users.
+Same API: `/api/masters?type=…` → CRUD us collection pe.  
+Har company ke apne departments / designations ho sakte hain.  
+Fields: `type`, `name`, `status`, `company` (no `code`).
 
----
-
-## Roles explained (simple)
-
-| Role | Side | What they can do |
-|------|------|------------------|
-| **Super Admin** | Admin | Everything. Profile starts **Approved**. |
-| **HR Manager** | Admin | Same admin access as Super Admin. Can create users and reset passwords. |
-| **Manager** | Admin | Same admin modules. Cannot create users (create = Super Admin / HR). |
-| **Employee** | ESS | Own profile + own attendance. Locked after **Approved**. |
-
-**Admin roles** = Super Admin, HR Manager, Manager.
-
----
-
-## How login and security work
-
-```text
-1. POST /api/auth/login  { officialEmail, password }
-2. Server checks user + Active status
-3. Returns JWT token + user + permissions
-4. For other APIs, send header:
-   Authorization: Bearer <token>
-```
-
-Important points:
-
-- Login response has **`permissions` only** (no duplicate `menu` field).
-- Inactive users cannot log in.
-- Most routes need a valid Bearer token.
-
----
-
-## Permissions (for frontend menus)
-
-### Catalog (full map for UI builders)
+Employee pe **name** save karo (not `_id`):
 
 ```http
-GET /api/permissions/modules
+GET /api/masters?type=department&status=Active
+→ { count, data: [ { name: "Finance", … } ] }
+
+POST /api/masters
+{ "type": "department", "name": "Finance" }
+```
+(Super Admin: company auto from login. Global Admin: send `company` in body.)
+
+```http
+GET/POST /api/masters
+GET/PUT/DELETE /api/masters/:id
 ```
 
-Response shape:
+---
 
-```json
+## Employees vs Users
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/employees` | Employee Management — **only** `role: "Employee"` |
+| `GET /api/users` | Access & Control — multiple roles (see visibility table above) |
+
+Shared query params: `search`, `status`, `department`, `designation`, `gender`, `branch` (company), `page`, `limit`.  
+`GET /api/users` also accepts `role` (within what the viewer may see).
+
+---
+
+## Create / update user
+
+Create and update use the **same nested shape** as the `User` model (not flat fields).
+
+### Create — `POST /api/employees`
+
+**Required flat:** `name`, `password`, `role`, `status`  
+**Required nested:** `official.officialEmail` (+ company/department by role — see below)
+
+| Role created | Company | Department | Profile |
+|--------------|---------|------------|---------|
+| Super Admin | **required** (prefer `POST /api/users/super-admin`) | — | lean |
+| HR / Manager / Employee | defaults to TechCulture.Ai Private Limited if omitted | required | full |
+
+**Global Admin** is seed-only (one system account) — hidden from `GET /api/roles` and cannot be created or assigned via API.
+
+Who: Global Admin, Super Admin, HR Manager, Manager (with Employee → create permission).  
+Actor scope: Global Admin → any company; others → own company only.
+
+After create → welcome email (if SMTP configured).
+
+### Update — `PUT /api/employees/:id`
+
+| Section | Who |
+|---------|-----|
+| `personal`, `other`, list arrays | Employee (if not Approved) + Admin |
+| `official`, `payroll` | Admin only |
+| `detailsApproval`, `role`, `status` | Admin only |
+| `password` | Super Admin / HR Manager |
+
+**Lists** (`education`, `accounts`, …):
+
+- One object → append  
+- One object with `_id` → update that row  
+- Full array → replace list  
+
+**Delete rows / clear payroll:** `DELETE /api/employees/:id/:section`  
+(section = education | accounts | family | nominees | experience | visas | payroll). Official cannot be deleted.
+
+### Unique when not empty
+
+`official.officialEmail`, `official.employeeCode`, `personal.mobileNo`, `personal.personalEmail`, `personal.panNo`, `personal.aadhaarNo`, `personal.drivingLicenseNo`, `personal.passportNo`
+
+### File upload
+
+```http
+POST /api/employees/upload
+Form-data: document (file) + type (education | account)
+```
+
+Returns Cloudinary URL only — client puts it into the profile on Submit (`PUT`).
+
+---
+
+## Mail
+
+```http
+POST /api/mail/send
 {
-  "actions": ["view", "create", "edit"],
-  "count": 2,
-  "data": [
-    { "side": "admin", "modules": [] },
-    { "side": "employee", "modules": [] }
-  ]
+  "to": "user@company.com",
+  "subject": "…",
+  "body": "…",
+  "cc": [],
+  "bcc": [],
+  "isHtml": false
 }
 ```
 
-- `side` appears **once per group** (not repeated on every module).
-- Source of truth: `src/config/permissions.js`
-
-### My permissions (for the logged-in user)
-
-```http
-GET /api/permissions/my
-```
-
-```json
-{
-  "role": "Employee",
-  "side": "employee",
-  "permissionCount": "57 of 57",
-  "count": 5,
-  "data": []
-}
-```
-
-**Sidebar tip:** show pages where `view === true`.
-
----
-
-## Employees / Users
-
-Base path: `/api/employees`
-
-| Method | Path | Who | Purpose |
-|--------|------|-----|---------|
-| `POST` | `/` | Super Admin, HR Manager | Create user |
-| `GET` | `/` | All logged-in | List (admin = all, employee = self) |
-| `GET` | `/:id` | All logged-in | Get one profile |
-| `PUT` | `/:id` | All logged-in | Update profile |
-| `DELETE` | `/:id` | Admin roles | Delete user (not yourself) |
-| `POST` | `/:id/education/document` | All logged-in | Upload certificate to Cloudinary |
-
-Employee can only touch **own** profile, and only while `detailsApproval` is not `Approved`.
-
-### Create User — body mapping
-
-Create uses a **flat** body. The server saves nested fields:
-
-| You send | Saved as |
-|----------|----------|
-| `officialEmail` | `official.officialEmail` (login ID) |
-| `employeeCode` | `official.employeeCode` |
-| `mobileNo` | `personal.mobileNo` |
-| `company`, `department` | `official` |
-| `city`, `state`, `country` | `personal.permanentAddress` |
-
-**Required:** `name`, `officialEmail`, `password`, `role`, `company`, `department`, `status`  
-**Optional:** `employeeCode`, `mobileNo`, `city`, `state`, `country`
-
-Example:
-
-```json
-{
-  "name": "Ananya Iyer",
-  "officialEmail": "ananya@techculture.ai",
-  "employeeCode": "EMP-1024",
-  "mobileNo": "9810044556",
-  "password": "123456",
-  "role": "Employee",
-  "company": "TechCulture Solutions Private Limited",
-  "department": "Finance",
-  "city": "Noida",
-  "state": "DELHI",
-  "country": "India",
-  "status": "Active"
-}
-```
-
-### Update User — one PUT for everything
-
-```http
-PUT /api/employees/:id
-```
-
-Send **nested objects** (not the flat create fields).
-
-| Object | Who can edit |
-|--------|----------------|
-| `personal` | Employee (if not Approved) + Admin |
-| `other` | Employee (if not Approved) + Admin |
-| `education`, `accounts`, `family`, `nominees`, `experience`, `visas` | Employee (if not Approved) + Admin |
-| `official` | **Admin only** |
-| `payroll` | **Admin only** |
-| `detailsApproval`, `role`, `status` | **Admin only** |
-| `password` | **Super Admin / HR Manager only** |
-
-**`detailsApproval` values:** `Unapproved` | `Approved` | `Rejected`
-
-- Super Admin users are created as **Approved**
-- Others start as **Unapproved**
-- When **Approved**, employee cannot edit own profile anymore (admin still can)
-
-### Unique identity fields
-
-These must be unique when **not empty**:
-
-- `official.officialEmail`
-- `official.employeeCode`
-- `personal.mobileNo`
-- `personal.personalEmail`
-- `personal.panNo`
-- `personal.aadhaarNo`
-- `personal.drivingLicenseNo`
-- `personal.passportNo`
-
-Duplicate returns **400** with a clear message.
-
-### Education document upload
-
-UI flow (Add Education form — one Submit):
-
-1. User file choose kare → `POST /api/employees/:id/education/document`  
-   Form-data: sirf `document` (file)  
-2. Response: `document` (Cloudinary URL) + `documentName`  
-3. Submit pe → `PUT /api/employees/:id` with `education[]` (form fields + URL)
-
-Upload API **DB update nahi karti** — sirf URL deti hai.
-
-Allowed: PDF, JPG, PNG, DOC (max **5 MB**)
+Requires Organization → Mail → `email` (Global / Super Admin bypass). Uses same Zoho SMTP as welcome mail.
 
 ---
 
 ## Attendance
 
-Base path: `/api/attendance`
-
-| Method | Path | Who | Purpose |
-|--------|------|-----|---------|
-| `POST` | `/punch-in` | Logged-in | Punch in |
-| `POST` | `/punch-out` | Logged-in | Punch out |
-| `POST` | `/manual` | Admin only | Mark missed punch |
-| `GET` | `/today` | Logged-in | My today record |
-| `GET` | `/` | Logged-in | List (admin = all, employee = own) |
-
-### Self punch
-
-```json
-{ "source": "web" }
-```
-
-Allowed sources: **`web`** | **`mobile`** | **`biometric`**  
-Employees **cannot** use `manual`.
-
-### Admin manual mark
-
-```json
-{
-  "employeeId": "665f1a2b3c4d5e6f7a8b9c0d",
-  "punchType": "in",
-  "time": "09:30",
-  "reason": "Forgot to punch",
-  "remarks": "Approved by HR"
-}
-```
-
-- Date is always **today** (client cannot set another date)
-- Source is always stored as **`manual`**
-
-### List filters (optional)
-
-```http
-GET /api/attendance?date=2026-09-23&source=web
-```
+| Method | Path | Who |
+|--------|------|-----|
+| POST | `/punch-in`, `/punch-out` | Logged-in (`source`: web \| mobile \| biometric) |
+| POST | `/manual` | Admin (missed punch; source stored as `manual`) |
+| GET | `/today` | Self |
+| GET | `/` | Admin = all (scoped); Employee = own |
 
 ---
 
-## Auth and Roles API summary
+## User document (profile modules)
 
-### Auth — `/api/auth`
+One MongoDB document per person:
 
-| Method | Path | Auth? | Purpose |
-|--------|------|-------|---------|
-| `POST` | `/login` | No | Login |
-| `GET` | `/me` | Yes | Current user + permissions |
+1. Account — name, password, role, status, detailsApproval, lastLogin  
+2. `personal` — IDs, phones, emails, addresses  
+3. `official` — employeeCode, officialEmail, company, dept, designation, division, employeeGroup, joining  
+4. `other` — blood group, passport expiry  
+5. Arrays — education, accounts, family, nominees, experience, visas  
+6. `payroll` — salary / PF / ESI (admin)
 
-### Roles — `/api/roles`
-
-| Method | Path | Purpose |
-|--------|------|---------|
-| `POST` | `/` | Create role |
-| `GET` | `/` | List roles |
-| `GET` | `/:id` | Get one role |
-| `PUT` | `/:id` | Update role |
-| `DELETE` | `/:id` | Delete role (Super Admin) |
-| `GET` | `/:id/permissions` | Get permission matrix |
-| `PUT` | `/:id/permissions` | Save permission matrix |
+`personal.anniversaryDate` is derived from `official.dateOfJoining`.
 
 ---
 
-## Project folder structure
+## Folder structure
 
 ```text
-HRMS PROJECT/
-├── postman/
-│   └── HRMS_API.postman_collection.json
+HRMS-Backend/
+├── postman/HRMS_API.postman_collection.json
 ├── src/
-│   ├── config/
-│   │   ├── db.js
-│   │   └── permissions.js
-│   ├── controllers/
-│   ├── middleware/
-│   │   ├── auth.js
-│   │   ├── validate.js
-│   │   └── upload.js
-│   ├── models/
-│   │   ├── User.js
-│   │   ├── Role.js
-│   │   └── Attendance.js
-│   ├── routes/
-│   ├── validators/
-│   ├── utils/
+│   ├── config/          db, env, permissions catalog
+│   ├── controllers/     auth, employee, role, attendance, mail, permission
+│   ├── middleware/      auth, validate, upload
+│   ├── models/          User, Role, Attendance, Master (dynamic collections by type)
+│   ├── routes/          auth, employees, users, roles, attendance, mail, masters, health
+│   ├── validators/      Joi schemas
+│   ├── utils/           mail, authCookie, companyScope, uniqueFields, anniversary
 │   ├── seed.js
 │   ├── swagger.js
 │   └── server.js
-├── .env.example
 ├── package.json
 └── README.md
 ```
 
 ---
 
-## User profile modules (what is stored)
-
-One user document holds the full employee file:
-
-1. **Account** — name, password, role, status, detailsApproval, lastLogin
-2. **personal** — DOB, IDs, phones, emails, addresses, emergency contacts
-3. **official** — employeeCode, officialEmail, company, dept, joining date
-4. **other** — blood group, passport expiry
-5. **education[]** — courses + optional document URL
-6. **accounts[]** — bank accounts
-7. **family[]** — family members
-8. **nominees[]** — PF / insurance nominees
-9. **experience[]** — past jobs
-10. **visas[]** — visa records
-11. **payroll** — salary / PF / ESI / TDS (admin only)
-
-`personal.anniversaryDate` is **auto-calculated** from `official.dateOfJoining` (next work anniversary).
-
----
-
-## Testing the API
-
-### Option A — Swagger (browser)
-
-1. Start server
-2. Open http://localhost:9001/api-docs
-3. Call **Login** and copy `token`
-4. Click **Authorize** and paste `Bearer <token>`
-5. Try any protected API
-
-Swagger includes path params, attendance query params, and full Create / Update examples (Super Admin vs Employee).
-
-### Option B — Postman
-
-1. Import `postman/HRMS_API.postman_collection.json`
-2. Collection variable `baseUrl` = `http://localhost:9001`
-3. Run **Login Super Admin** — sets `token` and `userId`
-4. All other requests reuse those variables
-
----
-
 ## Typical workflows
 
-### A. Admin creates an employee
+### A. Admin creates employee
 
-1. Login as Super Admin / HR Manager
-2. `POST /api/employees` with create body
-3. Employee gets welcome email (if SMTP is configured)
-4. Employee logs in with `officialEmail` + password
+1. Login as Global/Super Admin or HR  
+2. `POST /api/employees` (nested body)  
+3. Welcome email sent (async)  
+4. Employee logs in with official email + password  
 
-### B. Employee fills profile
+### B. Employee completes profile
 
-1. Login as Employee
-2. `PUT /api/employees/:id` with `personal`, `other`, arrays
-3. Upload education file, then put URL into `education[]`
-4. Admin sets `detailsApproval: "Approved"`
-5. Profile becomes read-only for the employee
+1. Login as Employee  
+2. Upload file → put URL in body  
+3. `PUT /api/employees/:id` with personal / arrays  
+4. Admin sets `detailsApproval: "Approved"` → employee edit locked  
 
-### C. Daily attendance
+### C. Access & Control vs Employee table
 
-1. Employee: `POST /punch-in` with `{ "source": "web" }`
-2. Later: `POST /punch-out`
-3. If missed: Admin calls `POST /manual`
+- UI **All Employees** → `GET /api/employees`  
+- UI **Users / Access** → `GET /api/users`  
 
----
+### D. Daily attendance
 
-## NPM scripts
-
-| Command | What it does |
-|---------|----------------|
-| `npm install` | Install dependencies |
-| `npm run seed` | Reset DB sample roles + users |
-| `npm run dev` | Start with auto-reload |
-| `npm start` | Start normally |
+1. `POST /api/attendance/punch-in` `{ "source": "web" }`  
+2. Later `punch-out`  
+3. Missed → admin `POST /manual`  
 
 ---
 
-## Environment variables (reference)
+## Environment variables
 
 | Variable | Required? | Purpose |
 |----------|-----------|---------|
-| `PORT` | No (default 9001) | Server port |
-| `NODE_ENV` | No (default development) | `development` uses localhost; `production` uses `API_BASE_URL` |
-| `API_BASE_URL` | No | Public API URL in production (`https://hrms-backend-py1t.onrender.com`) |
-| `MONGODB_URI` | Yes | MongoDB connection string |
-| `JWT_SECRET` | Yes | Signs / verifies tokens |
-| `JWT_EXPIRES_IN` | No (default 7d) | Token lifetime |
-| `APP_URL` | No | Link used in emails |
-| `EMAIL_USER_EZ` | For mail | SMTP username |
-| `EMAIL_PASS_EZ` | For mail | SMTP password |
-| `SMTP_HOST_EZ` | For mail | e.g. `smtp.zoho.com` |
-| `SMTP_PORT_EZ` | For mail | e.g. `587` |
-| `EMAIL_FROM_NAME` | No | From display name |
-| `CLOUDINARY_*` | For uploads | Education document storage |
-| `RATE_LIMIT_WINDOW_MS` | No (default 900000) | Rate-limit window in ms (15 min) |
-| `RATE_LIMIT_MAX` | No (default 200) | Max requests per IP per window |
-| `RATE_LIMIT_LOGIN_MAX` | No (default 20) | Max login attempts per IP per window |
+| `PORT` | No (9001) | Server port |
+| `NODE_ENV` | No | development / production |
+| `API_BASE_URL` | Prod | Public API URL (Swagger servers) |
+| `MONGODB_URI` | Yes | Mongo connection |
+| `JWT_SECRET` | Yes | Sign / verify JWT |
+| `DEFAULT_COMPANY` | No | Default `official.company` on create (`TechCulture.Ai Private Limited`) |
+| `CLIENT_URL` | Web cookies | Comma-separated frontend origins |
+| `COOKIE_SECURE` | Cross-site | `true` → SameSite=None + Secure |
+| `APP_URL` | No | Link in welcome email |
+| `EMAIL_*` / `SMTP_*` | Mail | Zoho SMTP |
+| `CLOUDINARY_*` | Uploads | File storage |
+| `RATE_LIMIT_*` | No | Window / max / login max |
 
-See `.env.example` for a full template (same structure as `.env`).
-
----
-
-## Security middleware
-
-| Package | Purpose |
-|---------|---------|
-| **helmet** | Sets safe HTTP headers (XSS, clickjacking, etc.) |
-| **morgan** | Logs every request with colored status codes |
-| **express-rate-limit** | Limits requests per IP (global + stricter on login) |
-| **chalk** | Colored MongoDB / server startup messages |
-
----
-
-## Rate limit kya hai? (simple explanation)
-
-**Rate limit** = ek IP address se **kitni baar** API call kar sakte ho ek **time window** mein.
-
-### Kyun use karte hain?
-
-1. Koi bhi server ko spam / flood karke crash na kar sake  
-2. Login pe hazaron password try (brute-force) na ho sake  
-3. Shared hosting / DB pe load control rahe  
-
-### Humare project ke numbers (default)
-
-| Limit | Kitni baar | Kitne time mein | Kis pe lagta hai |
-|-------|------------|-----------------|------------------|
-| **Global** | **200** requests | **15 minutes** | Almost saari APIs (health, employees, attendance, …) |
-| **Login** | **20** attempts | **15 minutes** | Sirf `POST /api/auth/login` |
-
-Matlab:
-
-- Aap **15 minute** mein max **200** API calls kar sakte ho (same IP se)  
-- Login alag se: **15 minute** mein max **20** baar login try  
-- Uske baad server **HTTP 429** deta hai:  
-  `"Too many requests from this IP. Please try again later."`  
-  (login pe: `"Too many login attempts…"`)
-
-### `.env` se change kaise karein
+Example cookie CORS:
 
 ```env
-# 900000 ms = 15 minutes
-RATE_LIMIT_WINDOW_MS=900000
-RATE_LIMIT_MAX=200
-RATE_LIMIT_LOGIN_MAX=20
-```
-
-| Variable | Meaning |
-|----------|---------|
-| `RATE_LIMIT_WINDOW_MS` | Window size in **milliseconds** (900000 = 15 min) |
-| `RATE_LIMIT_MAX` | Global max requests per IP in that window |
-| `RATE_LIMIT_LOGIN_MAX` | Max login attempts per IP in that window |
-
-Examples:
-
-- Testing / Postman pe limit jaldi hit ho: `RATE_LIMIT_MAX=1000`  
-- Production mein login tight: `RATE_LIMIT_LOGIN_MAX=10`  
-- Window 1 hour: `RATE_LIMIT_WINDOW_MS=3600000`
-
-### Important notes
-
-- Count **per IP** hota hai (same Wi‑Fi / office often = same IP)  
-- Global + login **dono** apply hote hain — login pe pehle global count bhi badhta hai  
-- Response headers mein remaining quota dikh sakta hai (`RateLimit-*`)  
-- Code comments: `src/server.js` (Rate Limit section)
-
----
-
-## Common problems and fixes
-
-| Problem | Likely fix |
-|---------|------------|
-| Cannot connect to DB | Start MongoDB; check `MONGODB_URI` |
-| `Please login first` | Missing or invalid `Authorization: Bearer …` |
-| `Access denied` | Your role is not allowed for that route |
-| Profile update blocked | `detailsApproval` is `Approved` (ask admin) |
-| Unique field error | Email / mobile / PAN / etc. already used |
-| Cloudinary error | Set Cloudinary keys in `.env` |
-| PDF opens but **"Failed to load PDF document"** | Cloudinary Free blocks PDF delivery. Console → **Settings → Security** → enable **Allow delivery of PDF and ZIP files** → Save → upload again |
-| Mail failed on seed | SMTP optional — seed still creates users |
-| Old login still shows `menu` | Restart server; response no longer includes menu |
-| `Too many requests` (429) | Rate limit hit — wait for window, or raise `RATE_LIMIT_*` in `.env` |
-
-## API quick map
-
-```text
-http://localhost:9001/
-├── /api-docs                 Swagger UI
-├── /api/health               Health (API + MongoDB)
-├── /api/auth
-│   ├── POST /login
-│   └── GET  /me
-├── /api/permissions
-│   ├── GET /modules
-│   └── GET /my
-├── /api/roles
-│   ├── CRUD /:id
-│   └── /:id/permissions
-├── /api/employees
-│   ├── CRUD /:id
-│   └── /:id/education/document
-└── /api/attendance
-    ├── POST /punch-in
-    ├── POST /punch-out
-    ├── POST /manual
-    ├── GET  /today
-    └── GET  /                ?date=&source=
+CLIENT_URL=https://hrms-techculture.vercel.app,http://localhost:3000
+COOKIE_SECURE=true
 ```
 
 ---
 
-## Design notes (for developers)
+## Rate limiting
 
-- **No public signup** — users are created by Super Admin / HR Manager only
-- **One update API** — nested objects; create is flat then mapped to nested
-- **Permissions catalog** lives in code (`permissions.js`), not separate DB collections
-- **Partial unique indexes** — empty strings do not block uniqueness
-- **Request validation** — Joi rejects unknown fields on key schemas
-- Keep **Swagger** (`src/swagger.js` + route JSDoc) and **Postman** in sync when APIs change
+| Limit | Default | Window | Applies to |
+|-------|---------|--------|------------|
+| Global | 200 | 15 min | Almost all routes |
+| Login | 20 | 15 min | `POST /api/auth/login` |
+
+Over limit → **429**. Tunable via `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX`, `RATE_LIMIT_LOGIN_MAX`.
+
+---
+
+## Testing
+
+**Swagger:** login → copy `token` → Authorize → `Bearer <token>`  
+**Postman:** import collection → Login → `{{token}}` / `{{userId}}` set automatically  
+
+Folders in Postman: Health, Auth (incl. Logout), Roles, Employees, Users, Mail, Attendance.
+
+---
+
+## Common issues
+
+| Problem | Fix |
+|---------|-----|
+| DB connect fail | Check `MONGODB_URI` |
+| Please login first | Cookie missing or invalid Bearer |
+| CORS on website | Add origin to `CLIENT_URL`; use `credentials: "include"` |
+| Mobile CORS | N/A — use Bearer token |
+| Profile locked | `detailsApproval` is Approved |
+| Unique field 400 | Email / mobile / PAN already used |
+| PDF on Cloudinary | Enable PDF/ZIP delivery in Cloudinary security settings |
+| 429 | Wait or raise `RATE_LIMIT_*` |
+
+---
+
+## Developer notes
+
+- Keep **Swagger** (route `@swagger` + `src/swagger.js`) and **Postman** aligned when APIs change  
+- Permission catalog source of truth: `src/config/permissions.js`  
+- Partial unique indexes — empty strings do not block uniqueness  
+- Joi `unknown(false)` rejects unexpected body keys  
+- Change `JWT_SECRET`, SMTP, and Cloudinary before production  
 
 ---
 
 ## License / usage
 
-Internal project boilerplate for TechCulture HRMS.  
-Change `JWT_SECRET`, SMTP, and Cloudinary credentials before any production deploy.
+Internal TechCulture HRMS backend. Not for public distribution without review.

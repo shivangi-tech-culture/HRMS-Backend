@@ -1,20 +1,13 @@
 /**
- * Unique field helpers for User
- *
- * PURPOSE:
- *   Keep identity fields unique across employees.
- *   Empty string ("") is allowed for many users — only non-empty values must be unique.
- *
- * FIELDS:
- *   official: officialEmail, employeeCode
- *   personal: mobileNo, personalEmail, panNo, aadhaarNo, drivingLicenseNo, passportNo
- *
- * USED BY:
- *   employee.controller.js on create + update
+ * UNIQUE FIELDS — identity uniqueness helpers for User
+ * Empty values allowed; only non-empty values must be unique across users.
  */
 const User = require("../models/User");
 
-/** List of fields we treat as unique identity */
+/**
+ * List of fields treated as unique identity.
+ * Each entry: Mongo path, section/key for body, friendly label, normalize fn.
+ */
 const UNIQUE_FIELDS = [
   {
     path: "official.officialEmail",
@@ -77,10 +70,7 @@ const UNIQUE_FIELDS = [
 /** Quick lookup by Mongo path (for duplicate-key errors) */
 const byPath = Object.fromEntries(UNIQUE_FIELDS.map((f) => [f.path, f]));
 
-/**
- * Clean unique fields inside personal{} or official{} before save.
- * Example: pan "abcde1234f" → "ABCDE1234F"
- */
+/** Normalize unique fields inside personal{} or official{} before save */
 const normalizeSectionUniques = (sectionName, data = {}) => {
   const out = { ...data };
   for (const f of UNIQUE_FIELDS) {
@@ -92,12 +82,7 @@ const normalizeSectionUniques = (sectionName, data = {}) => {
   return out;
 };
 
-/**
- * Check if any of the given values already belong to another user.
- * @param {object} values - map like { "personal.mobileNo": "98100…" }
- * @param {string|null} excludeId - current user id (on update, skip self)
- * @returns {Promise<string|null>} friendly error text, or null if ok
- */
+/** Return friendly error if any unique value already exists; else null */
 const findUniqueConflict = async (values = {}, excludeId = null) => {
   const checks = [];
 
@@ -123,10 +108,7 @@ const findUniqueConflict = async (values = {}, excludeId = null) => {
   return results.find(Boolean) || null;
 };
 
-/**
- * Turn Mongo error 11000 (duplicate key) into a clear message.
- * Example: "Mobile number already exists"
- */
+/** Turn Mongo 11000 duplicate key into a clear message */
 const duplicateKeyMessage = (err) => {
   if (!err || err.code !== 11000) return null;
   const key = Object.keys(err.keyPattern || err.keyValue || {})[0];

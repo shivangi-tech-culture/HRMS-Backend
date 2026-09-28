@@ -1,23 +1,6 @@
 /**
- * File upload — Cloudinary only (no database save)
- *
- * Flow: multer (memory) → upload stream to Cloudinary → return secure URL
- * type=education → folder hrms/education
- * type=account   → folder hrms/account
- *
- * IMPORTANT — PDF not opening in browser?
- *   Cloudinary FREE plans block PDF delivery by default.
- *   Fix (one-time in Cloudinary Console):
- *     Settings → Security → check "Allow delivery of PDF and ZIP files" → Save
- *   Then re-upload (or wait for CDN cache). Old blocked URLs may stay broken briefly.
- *
- * A real PDF is stored as an image so the browser can open it.
- * Word and Excel are stored as raw files.
- * The file bytes are checked. A .pdf that is not actually a PDF is rejected.
- *
- * Env:
- *   CLOUDINARY_CLOUD_NAME / API_KEY / API_SECRET
- *   CLOUDINARY_FOLDER=hrms   (files go to hrms/education or hrms/account)
+ * UPLOAD MIDDLEWARE — multer (memory) → Cloudinary secure URL
+ * Field "document", max 5 MB. Types: education | account → hrms/<type>.
  */
 const multer = require("multer");
 const path = require("path");
@@ -29,6 +12,7 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+/** MIME types accepted by the multer fileFilter */
 const allowed = new Set([
   "application/pdf",
   "image/jpeg",
@@ -46,7 +30,7 @@ const allowed = new Set([
 /** Allowed attachment kinds. Folder on Cloudinary is hrms/<type>. */
 const UPLOAD_TYPES = ["education", "account"];
 
-/** Common file parser for every type. Field name: "document" — max 5 MB */
+/** Multer: single field "document", max 5 MB, memory storage */
 const uploadFile = multer({
   storage: multer.memoryStorage(),
   fileFilter: (_req, file, cb) => {
@@ -56,17 +40,14 @@ const uploadFile = multer({
   limits: { fileSize: 5 * 1024 * 1024 },
 }).single("document");
 
-/** Base name only — never put .pdf here for image-type uploads */
+/** Safe base name (no extension) for Cloudinary public_id */
 const safeBaseName = (originalName) =>
   path
     .parse(originalName || "file")
     .name.replace(/[^a-zA-Z0-9._-]/g, "_")
     .slice(0, 80) || "file";
 
-/**
- * What the bytes actually are. Extension alone is not trusted.
- * Returns pdf | jpg | png | gif | webp | doc | docx | xls | xlsx, or null.
- */
+/** Detect real file type from bytes (not just extension) */
 const detectKind = (file) => {
   const buf = file.buffer || Buffer.alloc(0);
   const name = String(file.originalname || "").toLowerCase();
@@ -89,25 +70,21 @@ const detectKind = (file) => {
   return null;
 };
 
+/** Build a 400-style Error for invalid file content */
 const rejectFile = (message) => {
   const err = new Error(message);
   err.statusCode = 400;
   return err;
 };
 
-/**
- * Upload options per real file type.
- * PDF → image, so the browser can open it.
- * Word / Excel → raw download.
- * JPG / PNG / GIF / WEBP → image.
- */
-/** hrms/education stays hrms/education; account uses the same root. */
+/** Cloudinary folder: hrms/education or hrms/account */
 const folderFor = (type) => {
   const configured = (process.env.CLOUDINARY_FOLDER || "hrms").replace(/\/+$/, "");
   const root = configured.replace(/\/(education|account)$/, "") || "hrms";
   return `${root}/${type}`;
 };
 
+/** Cloudinary upload options per real file type */
 const uploadOptionsFor = (file, type = "education") => {
   const folder = folderFor(type);
   const baseId = `${Date.now()}-${safeBaseName(file.originalname)}`;
@@ -149,10 +126,7 @@ const uploadOptionsFor = (file, type = "education") => {
   };
 };
 
-/**
- * Upload a multer file buffer to Cloudinary.
- * @returns {{ url, publicId, originalName }}
- */
+/** Upload multer buffer to Cloudinary; returns secure URL */
 const uploadToCloudinary = (file, type = "education") => {
   return new Promise((resolve, reject) => {
     if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY) {
@@ -174,7 +148,6 @@ const uploadToCloudinary = (file, type = "education") => {
       resolve({
         url: result.secure_url,
         publicId: result.public_id,
-        originalName: file.originalname,
         folder: options.folder,
       });
     });

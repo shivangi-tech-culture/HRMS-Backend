@@ -1,21 +1,7 @@
 /**
- * Permissions catalog
- *
- * Single source of truth for Admin and ESS menus.
- * Shape matches Role.permissions in the database:
- *
- *   {
- *     module: "Dashboard",
- *     heading: "Overview",          // label only (can be "" for ESS)
- *     subModules: [
- *       { name: "Attendance Summary", actions: ["view", ...] }
- *     ]
- *   }
- *
- * Super Admin / HR Manager / Manager → ADMIN_TREE
- * Employee → ESS_TREE
+ * PERMISSIONS CATALOG — default role matrices (ADMIN_TREE + ESS_TREE)
+ * Seed and Role APIs use permissionsForRole(name).
  */
-
 const ACTIONS = [
   "view", "create", "edit", "delete", "approve", "reject",
   "download", "export", "import", "upload", "print", "email", "share", "cancel", "assign",
@@ -31,9 +17,8 @@ const CRUD = ["view", "create", "edit", "delete", "export", "import", "upload", 
 const LIST = ["view", "edit", "delete", "export", "import", "upload", "download", "email"];
 const ATT = ["view", "create", "edit", "export", "import", "upload", "download", "print"];
 
-// =========================================================
 // ADMIN — Super Admin / HR Manager / Manager (same)
-// =========================================================
+
 const ADMIN_TREE = [
   // Dashboard
   {
@@ -56,6 +41,7 @@ const ADMIN_TREE = [
         name: "Employee",
         actions: [
           "view", "create", "edit", "delete",
+          "approve", "reject",
           "export", "import", "upload", "download", "email",
         ],
       },
@@ -176,6 +162,19 @@ const ADMIN_TREE = [
     ],
   },
 
+  // Masters — /api/masters?type=… (admin CRUD; GET is open to logged-in Employee too)
+  {
+    module: "Masters",
+    heading: "Masters",
+    subModules: [
+      { name: "Company", actions: CRUD },
+      { name: "Department", actions: CRUD },
+      { name: "Designation", actions: CRUD },
+      { name: "Division", actions: CRUD },
+      { name: "Employee Group", actions: CRUD },
+    ],
+  },
+
   // Work
   {
     module: "Work",
@@ -228,7 +227,8 @@ const ADMIN_TREE = [
     module: "Administration",
     heading: "Administration",
     subModules: [
-      { name: "Access & Control", actions: LIST },
+      // Access & Control: login users of any role (create ≠ Employee Management)
+      { name: "Access & Control", actions: ["view", "create", "edit", "delete", "export", "import", "upload", "download", "email"] },
       {
         name: "Roles & Permissions",
         actions: ["view", "create", "edit", "delete", "export"],
@@ -238,11 +238,10 @@ const ADMIN_TREE = [
   },
 ];
 
-// =========================================================
 // ESS — Employee only (live UI: hrms-techculture.vercel.app)
 // top nav: Dashboard · Self · Team · Request · Tasks
 // green bar = subModules; sidebar sections (Personal Details…) = NOT permissions
-// =========================================================
+
 const ESS_TREE = [
   // Dashboard → My Home | Attendance Summary | Leave Summary
   {
@@ -256,13 +255,15 @@ const ESS_TREE = [
   },
 
   // Self → General Info | Time Sheet | … | Offboarding
+  // General Info = view + edit (employee can update own profile after HR creates them)
   {
     module: "Self",
     heading: "",
     subModules: [
-      { name: "General Info", actions: VEd },
+      { name: "General Info", actions: VEd }, // view + edit own details
       { name: "Time Sheet", actions: VC },
       { name: "Regularize Attendance", actions: VCC },
+      { name: "Leave", actions: VCC }, // Self Service → Leave (UI)
       { name: "My Web Punches", actions: V },
       { name: "On Tour/On Duty Entries", actions: VC },
       { name: "View Shift Roster", actions: V },
@@ -271,12 +272,13 @@ const ESS_TREE = [
     ],
   },
 
-  // Team → Team Dashboard | Team Chat | Mail
+  // Team → Team Dashboard | Team Request | Team Chat | Mail
   {
     module: "Team",
     heading: "",
     subModules: [
       { name: "Team Dashboard", actions: V },
+      { name: "Team Request", actions: V }, // UI: Team → Team Request
       { name: "Team Chat", actions: ["view", "create", "share"] },
       { name: "Mail", actions: ["view", "create", "email"] },
     ],
@@ -312,9 +314,7 @@ const ESS_TREE = [
   },
 ];
 
-// =========================================================
 // HELPERS — simple, easy to follow
-// =========================================================
 
 // Combined catalog (admin + employee)
 const MODULE_TREE = [...ADMIN_TREE, ...ESS_TREE];
@@ -338,6 +338,7 @@ function countSlots(tree) {
 
 const TOTAL_PERMISSIONS = countSlots(ADMIN_TREE); // Super Admin / HR / Manager
 const EMPLOYEE_TOTAL = countSlots(ESS_TREE); // Employee
+const COMBINED_TOTAL = countSlots(MODULE_TREE); // custom roles (admin + ESS)
 
 /** Flat list of every page: { module, heading, subModule } */
 const ALL_SUBS = [];
@@ -365,8 +366,6 @@ function toFlags(allowed) {
 
 /**
  * Convert catalog tree into the shape saved on role.permissions.
- * Input:  { module, heading, subModules: [{ name, actions }] }
- * Output: { module, heading, subModules: [{ name, view, create, … }] }
  */
 function buildFromTree(tree) {
   const result = [];
@@ -386,13 +385,22 @@ function buildFromTree(tree) {
 /** Get full permissions for a role name */
 function permissionsForRole(role) {
   if (role === "Employee") return buildFromTree(ESS_TREE);
-  return buildFromTree(ADMIN_TREE); // Super Admin, HR Manager, Manager
+  return buildFromTree(ADMIN_TREE); // Super Admin, HR Manager, Manager, Global Admin
 }
 
-/** Max permission count for a role */
-function totalForRole(role) {
-  if (role === "Employee") return EMPLOYEE_TOTAL;
-  return TOTAL_PERMISSIONS;
+/** Max permission count for a role (optional catalog for custom roles) */
+function totalForRole(role, catalog) {
+  if (role === "Employee" || catalog === "employee") return EMPLOYEE_TOTAL;
+  if (
+    role === "Super Admin" ||
+    role === "HR Manager" ||
+    role === "Manager" ||
+    role === "Global Admin" ||
+    catalog === "admin"
+  ) {
+    return TOTAL_PERMISSIONS;
+  }
+  return COMBINED_TOTAL; // legacy custom without catalog
 }
 
 /** Count how many flags are true on a permissions array */
@@ -406,6 +414,37 @@ function countPermissions(perms) {
     }
   }
   return total;
+}
+
+/**
+ * Login / my-permissions response: keep only actions that are true.
+ * Example: { name: "Employee", view: true, create: true } — no false keys.
+ * Drops subModules / blocks that have zero true actions.
+ */
+function compactPermissions(perms) {
+  const result = [];
+  for (const block of perms || []) {
+    const subModules = [];
+    for (const sub of block.subModules || []) {
+      const row = { name: sub.name };
+      let any = false;
+      for (const action of ACTIONS) {
+        if (sub[action] === true) {
+          row[action] = true;
+          any = true;
+        }
+      }
+      if (any) subModules.push(row);
+    }
+    if (subModules.length) {
+      result.push({
+        module: block.module,
+        heading: block.heading,
+        subModules,
+      });
+    }
+  }
+  return result;
 }
 
 /**
@@ -517,9 +556,11 @@ module.exports = {
   ALL_ROWS: ALL_SUBS,
   TOTAL_PERMISSIONS,
   EMPLOYEE_TOTAL,
+  COMBINED_TOTAL,
   permissionsForRole,
   totalForRole,
   countPermissions,
+  compactPermissions,
   findAction,
   can,
   menuForPermissions,

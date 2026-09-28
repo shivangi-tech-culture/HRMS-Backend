@@ -1,9 +1,9 @@
 /**
- * Joi validation middleware
- *
- * Rejects unknown keys and returns all validation errors together.
- * Use: validate(schema) before the controller.
+ * VALIDATE MIDDLEWARE — run a Joi schema against req.body
+ * Usage: router.post("/", protect, validate(schema), handler)
  */
+
+/** Express middleware: validate req.body with Joi schema */
 const validate = (schema) => {
   return (req, res, next) => {
     const { error, value } = schema.validate(req.body, {

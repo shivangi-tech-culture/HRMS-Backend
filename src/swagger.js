@@ -7,27 +7,43 @@
 const swaggerJsdoc = require("swagger-jsdoc");
 const { API_BASE_URL, isProduction, DEV_API_URL, PROD_API_URL } = require("./config/env");
 
-/** Short guide above endpoints — keep simple for frontend / testers */
+/** Short guide — Admin vs Employee dashboards (match Postman folders) */
 const description = [
-  "HRMS backend — login, users, roles, permissions, attendance.",
+  "HRMS API — **Admin Dashboard** vs **Employee Dashboard (ESS)**.",
   "",
   `| **Base URL** | \`${API_BASE_URL}\` |`,
-  "| **Auth** | Login → copy token → **Authorize** → `Bearer <token>` |",
+  "| **Auth** | `POST /api/auth/login` → cookie + Bearer token. Swagger → **Authorize** |",
   "",
-  "**Quick start**",
-  "1. `POST /api/auth/login` with `officialEmail` + `password`",
-  "2. Use token on protected APIs",
-  "3. `POST /api/employees` creates the user and the full profile in one request",
-  "4. File → `POST /api/employees/upload` with `type` (`education` or `account`) → put the URL on Submit",
+  "### 1. Admin Dashboard (catalog: `admin`)",
+  "| Area | APIs |",
+  "| --- | --- |",
+  "| Roles & Permissions | `/api/roles`, `/api/permissions/modules`, role permission matrix |",
+  "| Access & Control | `/api/users` CRUD, export, mail |",
+  "| Employee Management | `/api/employees` list/create/export/delete, approve, official/payroll |",
+  "| Masters | `/api/masters` create/update/delete |",
+  "| Mail | `POST /api/mail/send` |",
+  "| Attendance (admin) | `POST /api/attendance/manual`, `GET /api/attendance` list |",
   "",
-  "**Roles**",
-  "- **Global Admin** → all companies, full access (cannot edit/delete role)",
-  "- **Super Admin** → own company only, full access (cannot edit/delete role)",
-  "- **HR Manager / Manager** → own company, permission matrix",
-  "- **Employee** → ESS only",
-  "Permission update (`PUT /api/roles/{id}/permissions`) works for Employee, HR Manager, Manager, and custom roles.",
+  "### 2. Employee Dashboard — ESS (catalog: `employee`)",
+  "| Area | APIs |",
+  "| --- | --- |",
+  "| My permissions | `GET /api/permissions/my` |",
+  "| My profile | `GET/PUT /api/employees/:id` (own id only) |",
+  "| Attendance (self) | punch-in, punch-out, `GET /api/attendance/today` |",
+  "| Masters (dropdowns) | `GET /api/masters?type=…` |",
   "",
-  "**Tip:** Open each endpoint below for request body examples.",
+  "**Custom roles:** pick `catalog` admin|employee → grant modules → `checkPermission` enforces each action.",
+  "",
+  "**Seeded logins** (`npm run seed`, password `123456`)",
+  "| Role | Email | Side |",
+  "| --- | --- | --- |",
+  "| Global Admin | `globaladmin@techculture.ai` | Admin |",
+  "| Super Admin | `shivangi@techculture.ai` | Admin |",
+  "| HR Manager | `hr@techculture.ai` | Admin |",
+  "| Manager | `manager@techculture.ai` | Admin |",
+  "| Employee | `shivig5964@gmail.com` | ESS |",
+  "",
+  "**Quick start:** Login → Authorize Bearer → open **Admin /** or **Employee /** tags below.",
 ].join("\n");
 
 module.exports = swaggerJsdoc({
@@ -35,7 +51,7 @@ module.exports = swaggerJsdoc({
     openapi: "3.0.0",
     info: {
       title: "HRMS API",
-      version: "3.5.0",
+      version: "4.0.0",
       description,
     },
     servers: isProduction
@@ -48,12 +64,41 @@ module.exports = swaggerJsdoc({
           { url: PROD_API_URL, description: "Production (Render)" },
         ],
     tags: [
-      { name: "Health", description: "API + MongoDB health check (no auth)" },
-      { name: "Auth", description: "Login" },
-      { name: "Permissions", description: "Update a role permission matrix" },
-      { name: "Roles", description: "Role CRUD + permission matrix" },
-      { name: "Employees", description: "Create user + profile CRUD" },
-      { name: "Attendance", description: "Punch in/out + manual mark" },
+      { name: "Health", description: "API + MongoDB health (no auth)" },
+      { name: "Auth", description: "Login / logout — use before Admin or Employee APIs" },
+      {
+        name: "Admin / Roles",
+        description: "Admin Dashboard — role CRUD + permission matrix",
+      },
+      {
+        name: "Admin / Permissions",
+        description: "Admin Dashboard — catalogs (admin+employee) for Create Role",
+      },
+      {
+        name: "Admin / Employees",
+        description: "Admin Dashboard — Employee Management (list/create/export/delete)",
+      },
+      {
+        name: "Admin / Users",
+        description: "Admin Dashboard — Access & Control (/api/users)",
+      },
+      {
+        name: "Admin / Masters",
+        description: "Admin Dashboard — masters write; GET also used by ESS dropdowns",
+      },
+      {
+        name: "Admin / Mail",
+        description: "Admin Dashboard — Organization → Mail",
+      },
+      {
+        name: "Admin / Attendance",
+        description: "Admin Dashboard — manual mark + attendance list",
+      },
+      {
+        name: "Employee / ESS",
+        description:
+          "Employee Dashboard — my permissions, own profile, punch in/out, my today",
+      },
     ],
     components: {
       securitySchemes: {
@@ -108,7 +153,10 @@ module.exports = swaggerJsdoc({
           type: "object",
           properties: {
             message: { type: "string", example: "Login successful" },
-            token: { type: "string", description: "JWT — use as Bearer token" },
+            token: {
+              type: "string",
+              description: "JWT — also set as httpOnly cookie `token`; optional for Bearer/Swagger",
+            },
             user: {
               type: "object",
               properties: {
@@ -120,10 +168,14 @@ module.exports = swaggerJsdoc({
                 company: { type: "string" },
                 status: { type: "string", example: "Active" },
                 lastLogin: { type: "string", format: "date-time" },
-                permissionCount: { type: "string", example: "254 of 254" },
+                permissionCount: {
+                  type: "string",
+                  example: "254 of 254",
+                  description: "granted true actions of max catalog actions for this role",
+                },
                 permissions: {
                   type: "array",
-                  description: "Single list — no separate menu field",
+                  description: "Only true action flags (false keys omitted)",
                   items: { $ref: "#/components/schemas/PermissionBlock" },
                 },
               },
@@ -322,10 +374,20 @@ module.exports = swaggerJsdoc({
             },
             company: {
               type: "string",
-              example: "TechCulture Solutions Private Limited",
+              example: "TechCulture.Ai Private Limited",
             },
             department: { type: "string", example: "Finance" },
             designation: { type: "string", example: "Finance Executive" },
+            division: {
+              type: "string",
+              example: "HO",
+              description: "Master name string (not ObjectId)",
+            },
+            employeeGroup: {
+              type: "string",
+              example: "Permanent",
+              description: "Master name string (not ObjectId)",
+            },
             reportingHead1: { type: "string", example: "Shivangi Gupta" },
             reportingHead2: { type: "string" },
             jobRole: { type: "string", example: "Executive" },
@@ -372,7 +434,6 @@ module.exports = swaggerJsdoc({
               example:
                 "https://res.cloudinary.com/demo/raw/upload/v1/hrms/education/marksheet.pdf",
             },
-            documentName: { type: "string", example: "marksheet.pdf" },
             remarks: { type: "string" },
           },
         },
@@ -487,7 +548,7 @@ module.exports = swaggerJsdoc({
           type: "object",
           required: ["name", "password", "role", "status", "official"],
           description:
-            "Same shape as User model. Account flat (name/password/role/status). Profile nested: official (required), personal, other, education[], … No flat officialEmail / company / mobileNo.",
+            "Same shape as User model. Global Admin → lean, empty company (Global Admin actor only). Super Admin → lean + company. Staff → full profile.",
           properties: {
             name: { type: "string", example: "Shivi Gupta" },
             password: { type: "string", example: "123456" },
@@ -509,9 +570,9 @@ module.exports = swaggerJsdoc({
             },
             official: {
               allOf: [{ $ref: "#/components/schemas/Official" }],
-              required: ["officialEmail", "company", "department"],
+              required: ["officialEmail"],
               description:
-                "Required — login email + company + department. Global Admin may set any company; Super Admin / HR / Manager only their own.",
+                "officialEmail always. Global Admin: no company. Super Admin: company required (Global) / own (Super). Staff: department required.",
             },
             personal: { $ref: "#/components/schemas/Personal" },
             other: { $ref: "#/components/schemas/Other" },
@@ -682,14 +743,27 @@ module.exports = swaggerJsdoc({
         },
         CreateRoleBody: {
           type: "object",
-          required: ["name"],
+          required: ["name", "catalog", "permissions"],
           properties: {
-            name: { type: "string", example: "Team Lead" },
-            description: { type: "string", example: "Team tasks" },
+            name: { type: "string", example: "Peon" },
+            description: { type: "string", example: "Limited admin modules" },
             status: {
               type: "string",
               enum: ["Active", "Inactive"],
               example: "Active",
+            },
+            catalog: {
+              type: "string",
+              enum: ["admin", "employee"],
+              example: "admin",
+              description: "One catalog only — permissions decided at create",
+            },
+            permissions: {
+              type: "array",
+              minItems: 1,
+              items: { $ref: "#/components/schemas/PermissionBlock" },
+              description:
+                "Required. Only true actions are stored. Routes check this matrix via checkPermission.",
             },
           },
         },

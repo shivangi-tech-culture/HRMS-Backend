@@ -1,10 +1,9 @@
 /**
- * Work anniversary helpers
- *
- * anniversaryDate = next work-anniversary date from dateOfJoining
- * (same month/day as joining; rolls to next year after it passes).
- * Uses UTC calendar parts so the stored date matches the joining day.
+ * ANNIVERSARY UTILS — next work-anniversary date from date of joining
+ * Used by User pre-save and controllers via applyAnniversary.
  */
+
+/** Next work-anniversary Date (UTC) from date of joining */
 function nextWorkAnniversary(dateOfJoining, fromDate = new Date()) {
   if (!dateOfJoining) return null;
 
@@ -29,7 +28,7 @@ function nextWorkAnniversary(dateOfJoining, fromDate = new Date()) {
   return new Date(Date.UTC(year, month, day));
 }
 
-/** Set personal.anniversaryDate on a user document from official.dateOfJoining */
+/** Set personal.anniversaryDate from official.dateOfJoining */
 function applyAnniversary(user) {
   if (!user) return user;
   const doj = user.official?.dateOfJoining;

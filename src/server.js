@@ -1,29 +1,14 @@
 /**
- * HRMS API — main server entry point (src/server.js)
- *
- * STARTUP FLOW:
- *  1. Load .env
- *  2. Connect MongoDB
- *  3. Apply security middleware (helmet, cors, morgan, rate-limit)
- *  4. Mount routes under /api/*
- *  5. Serve Swagger at /api-docs
- *  6. Listen on PORT (default 9001)
- *
- * RUN:
- *   npm run dev   → nodemon (auto restart)
- *   npm start     → normal start
- *   npm run seed  → sample roles + users
- *
- * URLS:
- *   API      → http://localhost:9001
- *   Swagger  → http://localhost:9001/api-docs
- *   Health   → http://localhost:9001/api/health
+ * HRMS API — main server entry (src/server.js)
+ * Connect DB → middleware → rate limits → /api/* routes → listen
+ * Local: http://localhost:PORT · Swagger /api-docs · Health /api/health
  */
 require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
 const express = require("express");
 const cors = require("cors");
+const cookieParser = require("cookie-parser");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
@@ -32,22 +17,20 @@ const swaggerUi = require("swagger-ui-express");
 const connectDB = require("./config/db");
 const swaggerSpec = require("./swagger");
 
-// ---------- Route modules ----------
 const authRoutes = require("./routes/auth.routes");
 const roleRoutes = require("./routes/role.routes");
 const employeeRoutes = require("./routes/employee.routes");
+const accessControlRoutes = require("./routes/accessControl.routes");
 const attendanceRoutes = require("./routes/attendance.routes");
+const mailRoutes = require("./routes/mail.routes");
+const masterRoutes = require("./routes/master.routes");
 const healthRoutes = require("./routes/health.routes");
 
 const app = express();
 
-// =============================================================================
 // NO HTTP CACHE — API responses always fresh (avoid 304 Not Modified)
-// =============================================================================
-/**
- * Express by default sends ETag. Browser then sends If-None-Match → Express
- * replies 304 (body empty, “use cached”). For JSON APIs we always want 200 + body.
- */
+
+/** Disable ETag so APIs always return 200 + body (no 304 empty cache) */
 app.disable("etag");
 app.use((req, res, next) => {
   res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
@@ -56,31 +39,35 @@ app.use((req, res, next) => {
   next();
 });
 
-// =============================================================================
-// SECURITY & LOGGING MIDDLEWARE
-// =============================================================================
+// SECURITY & LOGGING MIDDLEWARE (order matters — runs top → bottom)
 
-/**
- * HELMET — secure HTTP response headers
- * Protects against common browser attacks (XSS, clickjacking, sniffing, …).
- * contentSecurityPolicy: false → needed so Swagger UI can load its scripts.
- */
+/** Helmet — secure headers (CSP off so Swagger UI works) */
 app.use(
   helmet({
     contentSecurityPolicy: false,
   })
 );
 
-/** CORS — allow frontend apps (web/mobile) to call this API from other origins */
-app.use(cors());
+/** CORS — CLIENT_URL origins; credentials for httpOnly cookies */
+const corsOrigins = String(process.env.CLIENT_URL || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin: corsOrigins.length ? corsOrigins : true,
+    credentials: true,
+  })
+);
+
+/** Cookie parser — reads httpOnly JWT cookie named `token` */
+app.use(cookieParser());
 
 /** JSON body parser — max 1 MB so huge payloads are rejected early */
 app.use(express.json({ limit: "1mb" }));
 
-/**
- * MORGAN — logs every HTTP request in the terminal (method, URL, status, time)
- * Status colors: green = ok | yellow = client error | red = server error
- */
+/** Morgan — colored request log (method, URL, status, ms) */
 app.use(
   morgan((tokens, req, res) => {
     const status = Number(tokens.status(req, res));
@@ -101,47 +88,25 @@ app.use(
   })
 );
 
-// =============================================================================
-// RATE LIMIT — “kitni baar call kar sakte ho”
-// =============================================================================
-/**
- * Rate limit = ek IP address se kitni requests allowed hain ek time window mein.
- *
- * WHY?
- *  - DDoS / flood se server overload na ho
- *  - Login pe password guess (brute-force) slow ho jaye
- *
- * DEFAULTS (change in .env):
- *  RATE_LIMIT_WINDOW_MS   = 900000  → 15 minutes (window size in milliseconds)
- *  RATE_LIMIT_MAX         = 200     → har IP max 200 API calls / 15 min (sab routes)
- *  RATE_LIMIT_LOGIN_MAX   = 20      → sirf /api/auth/login pe max 20 tries / 15 min
- *
- * EXAMPLE:
- *  - Aap 15 min mein 200 baar GET/POST etc. kar sakte ho (global)
- *  - Login separately: 15 min mein max 20 login attempts
- *  - Limit cross hone pe HTTP 429 + message "Too many requests…"
- *
- * COUNT: per client IP (express-rate-limit default). Same Wi‑Fi = often same IP.
- */
+// RATE LIMIT — how many requests an IP may send
+
+/** Rate limits — RATE_LIMIT_* in .env (global + stricter login) */
 const windowMs = Number(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000; // 15 min
 const maxRequests = Number(process.env.RATE_LIMIT_MAX) || 200; // all APIs
 const loginMax = Number(process.env.RATE_LIMIT_LOGIN_MAX) || 20; // login only
 
-/** GLOBAL limiter — applies to almost every request (health, employees, …) */
+/** Global limiter — almost every request (health, employees, …) */
 const globalLimiter = rateLimit({
   windowMs, // time window (ms)
   max: maxRequests, // max hits per IP in that window
-  standardHeaders: true, // RateLimit-* headers in response (remaining count)
-  legacyHeaders: false, // disable old X-RateLimit-* headers
+  standardHeaders: true, // RateLimit-* headers (remaining count)
+  legacyHeaders: false, // disable legacy X-RateLimit-* headers
   message: {
     message: "Too many requests from this IP. Please try again later.",
   },
 });
 
-/**
- * LOGIN limiter — stricter, only on POST /api/auth/login
- * Stops someone from trying thousands of passwords quickly.
- */
+/** Stricter limiter for POST /api/auth/login */
 const loginLimiter = rateLimit({
   windowMs,
   max: loginMax,
@@ -152,17 +117,12 @@ const loginLimiter = rateLimit({
   },
 });
 
-// Apply global limit first (every route after this counts toward 200)
+// Apply global limit first (every route after this counts toward the max)
 app.use(globalLimiter);
 
-// =============================================================================
-// DOCS / HOME / ROUTES
-// =============================================================================
+// DOCS / HOME / API ROUTE MOUNTS
 
-/**
- * Swagger UI — interactive API docs
- * Styles live in src/swagger/custom.css (not inline here)
- */
+/** Swagger UI at /api-docs */
 const swaggerCss = fs.readFileSync(
   path.join(__dirname, "swagger", "custom.css"),
   "utf8"
@@ -177,7 +137,7 @@ app.use(
   })
 );
 
-/** Root — simple status message */
+/** Root GET / — simple "API is working" status (no auth) */
 app.get("/", (req, res) => {
   res.status(200).json({
     success: true,
@@ -188,20 +148,20 @@ app.get("/", (req, res) => {
   });
 });
 
-/**
- * Mount APIs
- * Order matters for login: loginLimiter runs before auth routes on /api/auth/login
- */
+/** Mount APIs under /api/* */
 app.use("/api/health", healthRoutes); // public health check (API + MongoDB)
 app.use("/api/auth/login", loginLimiter); // count login attempts (max 20 / window)
-app.use("/api/auth", authRoutes); // login
+app.use("/api/auth", authRoutes); // login / logout
 app.use("/api/roles", roleRoutes); // role CRUD + permission matrix
-app.use("/api/employees", employeeRoutes); // users / profile / education upload
+app.use("/api/permissions", require("./routes/permission.routes")); // catalogs + my permissions
+app.use("/api/employees", employeeRoutes); // employees only (role = Employee)
+app.use("/api/users", accessControlRoutes); // Access & Control (any role)
 app.use("/api/attendance", attendanceRoutes); // punch in/out + manual mark
+app.use("/api/mail", mailRoutes); // Organization → Mail send
+app.use("/api/masters", masterRoutes); // SaaS masters (typed collections)
 
-// =============================================================================
 // START SERVER (colored chalk banners)
-// =============================================================================
+
 const { PORT, API_BASE_URL, NODE_ENV } = require("./config/env");
 
 connectDB().then(() => {

@@ -1,30 +1,19 @@
 /**
- * User / employee request validation (Joi)
- *
- * WHY THIS FILE:
- *   Rejects unknown fields and wrong types before the controller runs.
- *   unknown(false) → extra keys in the body return HTTP 400.
- *
- * CREATE (same shape as User model — one format):
- *   Account flat: name, password, role, status
- *   Required nested: official{ officialEmail, company, department, … }
- *   Optional nested: personal{ mobileNo, … }, other{}, education[],
- *     accounts[], family[], nominees[], experience[], visas[], payroll{}
- *   No flat mobileNo / email / city — those live inside personal / official.
- *
- * UPDATE (nested objects only):
- *   personal{}, official{}, other{}, education[], accounts[], family[],
- *   nominees[], experience[], visas[], payroll{}
+ * EMPLOYEE MANAGEMENT VALIDATION (Joi) — /api/employees
+ * Login · create Employee · update profile · delete section.
+ * Access & Control lean users → accessControl.validation.js
  */
 const Joi = require("joi");
 const { validate } = require("../middleware/validate");
 
-// Small helpers so schemas stay short and consistent
+// Small helpers
+
 const str = () => Joi.string().trim().allow("").optional();
 const num = () => Joi.number().optional();
 const bool = () => Joi.boolean().optional();
 const date = () => Joi.date().allow(null).optional();
 const emailOpt = () => Joi.string().trim().email().allow("").optional();
+/** 10-digit Indian-style mobile (digits only) */
 const phoneOpt = () =>
   Joi.string()
     .trim()
@@ -32,6 +21,7 @@ const phoneOpt = () =>
     .allow("")
     .optional()
     .messages({ "string.pattern.base": "must be a 10-digit phone number" });
+/** Four-digit year string, e.g. "2020" */
 const yearOpt = () =>
   Joi.string()
     .trim()
@@ -39,6 +29,7 @@ const yearOpt = () =>
     .allow("")
     .optional()
     .messages({ "string.pattern.base": "must be a 4-digit year (e.g. 2020)" });
+/** IFSC code, e.g. HDFC0001234 */
 const ifscOpt = () =>
   Joi.string()
     .trim()
@@ -51,7 +42,10 @@ const ifscOpt = () =>
 /** Object that only allows the listed keys (no extra junk) */
 const only = (keys) => Joi.object(keys).unknown(false);
 
-/** Address shape used inside personal.presentAddress / permanentAddress */
+/**
+ * Address block — used inside personal.presentAddress / permanentAddress
+ * Fields: address, country, state, city, pincode
+ */
 const address = only({
   address: str(),
   country: str(),
@@ -60,10 +54,15 @@ const address = only({
   pincode: str(),
 });
 
-/** personal{} fields — same keys as User.personal (like educationItem) */
+/**
+ * personal{} — identity, contacts, addresses (same keys as User.personal)
+ * anniversaryDate is ignored by the controller (auto-calculated from joining date)
+ */
 const personalItem = only({
   dateOfBirth: date(),
+  /** 12-digit Aadhaar when provided */
   aadhaarNo: Joi.string().trim().pattern(/^\d{12}$/).allow("").optional(),
+  /** PAN format: five letters, four digits, one letter */
   panNo: Joi.string()
     .trim()
     .uppercase()
@@ -90,13 +89,18 @@ const personalItem = only({
   workExt: str(),
 });
 
-/** official{} fields — same keys as User.official (like educationItem) */
+/**
+ * official{} — work email, company, department, reporting heads, etc.
+ * Login email is official.officialEmail
+ */
 const officialItem = only({
   employeeCode: Joi.string().trim().uppercase().allow("").optional(),
   officialEmail: emailOpt(),
   company: str(),
   department: str(),
   designation: str(),
+  division: str(),
+  employeeGroup: str(),
   reportingHead1: str(),
   reportingHead2: str(),
   jobRole: str(),
@@ -106,13 +110,16 @@ const officialItem = only({
   grade: str(),
 });
 
-/** other{} fields — same keys as User.other (like educationItem) */
+/** other{} — blood group and passport expiry */
 const otherItem = only({
   bloodGroup: str(),
   passportExpiry: date(),
 });
 
-/** education[] row — unknown keys → 400 */
+/**
+ * education[] row — course details + optional Cloudinary document URL
+ * Include _id when editing an existing row on update
+ */
 const educationItem = only({
   _id: str(),
   courseType: str(),
@@ -125,11 +132,11 @@ const educationItem = only({
   major: str(),
   minor: str(),
   percentageOrGrade: str(),
-  document: str(),
-  documentName: str(),
+  document: str(), // Cloudinary URL only
   remarks: str(),
 });
 
+/** accounts[] row — bank account; attachment = Cloudinary URL from upload */
 const accountItem = only({
   _id: str(),
   bankName: str(),
@@ -143,6 +150,7 @@ const accountItem = only({
   salaryAccount: bool(),
 });
 
+/** family[] row — dependents / relatives */
 const familyItem = only({
   _id: str(),
   name: str(),
@@ -155,6 +163,7 @@ const familyItem = only({
   mediclaim: bool(),
 });
 
+/** nominees[] row — PF / insurance nominees */
 const nomineeItem = only({
   _id: str(),
   nominateFor: str(),
@@ -166,6 +175,7 @@ const nomineeItem = only({
   remarks: str(),
 });
 
+/** experience[] row — previous employment */
 const experienceItem = only({
   _id: str(),
   organization: str(),
@@ -178,6 +188,7 @@ const experienceItem = only({
   remarks: str(),
 });
 
+/** visas[] row — travel / work visas */
 const visaItem = only({
   _id: str(),
   countryName: str(),
@@ -188,7 +199,10 @@ const visaItem = only({
   remarks: str(),
 });
 
-/** payroll{} fields — same keys as User.payroll (like educationItem) */
+/**
+ * payroll{} — salary, PF/ESI, tax regime, bank for pay
+ * Admin-only on update (Employee cannot send this object)
+ */
 const payrollItem = only({
   salaryGroup: str(),
   salaryDate: str(),
@@ -224,24 +238,31 @@ const payrollItem = only({
   ifsc: ifscOpt(),
 });
 
-/** Create: official must have login email + company + department */
-const officialCreate = officialItem.keys({
-  officialEmail: Joi.string().trim().email().required(),
-  company: Joi.string().trim().min(2).required(),
-  department: Joi.string().trim().min(2).required(),
-});
+// Official variants for CREATE (by role)
 
 /**
- * CREATE USER body — same shape as User model
- * Every nested object uses *Item schema (same as education → educationItem)
+ * CREATE EMPLOYEE — POST /api/employees (Employee Management)
+ * Essential: name, password, status, officialEmail, employeeCode, dateOfBirth
+ * Optional: department, designation, address (country/state/city), rest of profile
  */
-const createUserSchema = Joi.object({
+const createEmployeeSchema = Joi.object({
   name: Joi.string().trim().min(2).max(100).required(),
   password: Joi.string().min(6).max(50).required(),
-  role: Joi.string().trim().required(),
-  status: Joi.string().valid("Active", "Inactive").required(),
-  official: officialCreate.required(),
-  personal: personalItem.optional(),
+  role: Joi.string().valid("Employee").default("Employee"),
+  status: Joi.string().valid("Active", "Inactive").default("Active"),
+  official: officialItem
+    .keys({
+      officialEmail: Joi.string().trim().email().required(),
+      employeeCode: Joi.string().trim().uppercase().min(2).required(),
+      company: Joi.string().trim().min(2).required(),
+      department: Joi.string().trim().allow("").optional(),
+    })
+    .required(),
+  personal: personalItem
+    .keys({
+      dateOfBirth: Joi.date().required(),
+    })
+    .required(),
   other: otherItem.optional(),
   education: Joi.array().items(educationItem).optional(),
   accounts: Joi.array().items(accountItem).optional(),
@@ -252,17 +273,19 @@ const createUserSchema = Joi.object({
   payroll: payrollItem.optional(),
 }).unknown(false);
 
-/** One new/edited row, or the full list (replace). */
+/** One new/edited row, or the full list (replace). Used on update for array sections. */
 const listOrOne = (item) =>
   Joi.alternatives().try(item, Joi.array().items(item));
 
 /**
- * UPDATE USER body
- * At least one field required. Same *Item field checks as create.
- * education, accounts, family, nominees, experience, visas:
- *   one object → append, or update that row when _id is sent
- *   array → replace the whole list
+ * UPDATE EMPLOYEE / profile — PUT /api/employees/:id
+ * official.officialEmail and official.company are immutable (forbidden here).
  */
+const officialUpdateItem = officialItem.fork(
+  ["officialEmail", "company"],
+  (schema) => schema.forbidden()
+);
+
 const updateUserSchema = Joi.object({
   name: Joi.string().trim().min(2).max(100).optional(),
   password: Joi.string().min(6).max(50).optional(),
@@ -272,7 +295,7 @@ const updateUserSchema = Joi.object({
     .valid("Unapproved", "Approved", "Rejected")
     .optional(),
   personal: personalItem.optional(),
-  official: officialItem.optional(),
+  official: officialUpdateItem.optional(),
   other: otherItem.optional(),
   education: listOrOne(educationItem).optional(),
   accounts: listOrOne(accountItem).optional(),
@@ -285,13 +308,16 @@ const updateUserSchema = Joi.object({
   .min(1)
   .unknown(false);
 
-/** LOGIN body */
+/**
+ * LOGIN body — POST /api/auth/login
+ * Example: { "officialEmail": "hr@techculture.ai", "password": "123456" }
+ */
 const loginSchema = Joi.object({
   officialEmail: Joi.string().trim().email().required(),
   password: Joi.string().required(),
 }).unknown(false);
 
-/** Same row checks as update, keyed by the list name in the URL. */
+/** Same row checks as update, keyed by the list name in the URL path */
 const ARRAY_ITEM_SCHEMAS = {
   education: educationItem,
   accounts: accountItem,
@@ -301,36 +327,17 @@ const ARRAY_ITEM_SCHEMAS = {
   visas: visaItem,
 };
 
-/** official{} and payroll{} — same field checks as profile update. Admin only. */
-const OBJECT_SECTION_SCHEMAS = {
-  official: officialItem,
-  payroll: payrollItem,
-};
-
 const badSection = (res) =>
   res.status(400).json({
     message:
-      "section must be education, accounts, family, nominees, experience, visas, official, or payroll",
+      "section must be education, accounts, family, nominees, experience, visas, or payroll",
   });
 
-/** PUT /api/employees/:id/:section — official/payroll object, or one list row, or many rows. */
-const validateSectionEdit = (req, res, next) => {
-  const { section } = req.params;
-  const objectSchema = OBJECT_SECTION_SCHEMAS[section];
-  if (objectSchema) return validate(objectSchema.min(1))(req, res, next);
-
-  const itemSchema = ARRAY_ITEM_SCHEMAS[section];
-  if (!itemSchema) return badSection(res);
-
-  const row = itemSchema.keys({ _id: Joi.string().trim().required() });
-  return validate(Joi.alternatives().try(row, Joi.array().items(row).min(1)))(
-    req,
-    res,
-    next
-  );
-};
-
-/** DELETE /api/employees/:id/:section — one { _id }, an array of ids, or payroll clear. */
+/**
+ * DELETE /api/employees/:id/:section middleware
+ * Body: { _id }, or an array of ids / { _id } objects.
+ * payroll and official skip body checks here (controller handles clear / reject).
+ */
 const validateSectionDelete = (req, res, next) => {
   const { section } = req.params;
   if (section === "official" || section === "payroll") return next();
@@ -348,10 +355,9 @@ const validateSectionDelete = (req, res, next) => {
 };
 
 module.exports = {
-  createUserSchema,
+  createEmployeeSchema,
   updateUserSchema,
   loginSchema,
-  validateSectionEdit,
   validateSectionDelete,
   ARRAY_ITEM_SCHEMAS,
 };

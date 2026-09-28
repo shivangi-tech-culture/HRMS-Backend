@@ -1,7 +1,6 @@
 /**
- * Health check — is API + MongoDB up?
- *
- * GET /api/health  (public, no token)
+ * HEALTH ROUTES → /api/health
+ * Public readiness check (API + MongoDB)
  */
 const express = require("express");
 const mongoose = require("mongoose");
@@ -72,6 +71,7 @@ const router = express.Router();
  *               message: MongoDB is not connected
  *               mongodb: disconnected
  */
+// HEALTH CHECK — public; 200 if Mongo ready, else 503
 router.get("/", (req, res) => {
   const dbReady = mongoose.connection.readyState === 1;
 

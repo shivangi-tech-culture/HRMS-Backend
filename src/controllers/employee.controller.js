@@ -1,37 +1,19 @@
 /**
- * Employee / User controller
+ * EMPLOYEE CONTROLLER — /api/employees
  *
- * APIs:
- *   POST   /api/employees              → create user (admin)
- *   GET    /api/employees              → list users
- *   GET    /api/employees/:id          → get one user
- *   PUT    /api/employees/:id          → update profile (same API for admin + employee)
- *   PUT    /api/employees/:id/:section → edit official, payroll, one list row, or many rows
- *   DELETE /api/employees/:id/:section → delete one list row, many ids, or clear payroll
- *   DELETE /api/employees/:id          → delete user
- *   POST   /api/employees/upload               → Cloudinary file (type: education | account)
- *
- * Create mapping (same shape as User model):
- *   Required flat: name, password, role, status
- *   Required nested: official{ officialEmail, company, department, … }
- *   Optional nested: personal, other, education, accounts, family,
- *     nominees, experience, visas, payroll
- *   Login id = official.officialEmail
- *   No flat mobileNo / city / company
- *
- * Update rules:
- *   Employee  → personal, other, education, accounts, family, nominees, experience, visas
- *   Admin     → everything above + official, payroll, detailsApproval, role, status
- *   Password  → Super Admin / HR Manager only
+ * Screen: Employee Management (full HR profile, role = Employee only).
+ * Access & Control (lean login users, any role) → accessControl.controller (/api/users).
  */
 const bcrypt = require("bcryptjs");
 const mongoose = require("mongoose");
 const User = require("../models/User");
 const Role = require("../models/Role");
+const { maxGlobalAdmins } = require("./role.controller");
 const { hasAllAccess } = require("../middleware/auth");
 const { sendWelcomeEmail } = require("../utils/mail");
-const { uploadToCloudinary, UPLOAD_TYPES } = require("../middleware/upload");
 const { applyAnniversary } = require("../utils/anniversary");
+const { sendExcel } = require("../utils/excel");
+const { uploadToCloudinary, UPLOAD_TYPES } = require("../middleware/upload");
 const {
   normalizeSectionUniques,
   findUniqueConflict,
@@ -40,8 +22,60 @@ const {
 const {
   assertSameCompany,
   assertSameCompanyEmployee,
-  companyFilter,
+  isSameCompany,
+  hasGlobalCompanyAccess,
 } = require("../utils/companyScope");
+const {
+  buildListQuery,
+  mapEmployeeListRow,
+  LIST_SELECT,
+} = require("../utils/userAccount");
+
+/** True for Global Admin / Super Admin (lean login accounts, no full HR profile) */
+const isPlatformAdminRole = (role) =>
+  role === "Global Admin" || role === "Super Admin";
+
+/**
+ * After promoting someone to Global / Super Admin, strip heavy HR profile fields.
+ * Used on update only — Access & Control owns creating those roles.
+ */
+const unsetEmployeeProfileFields = async (userId, roleName) => {
+  const unset = {
+    other: 1,
+    education: 1,
+    accounts: 1,
+    family: 1,
+    nominees: 1,
+    experience: 1,
+    visas: 1,
+    payroll: 1,
+    "official.employeeCode": 1,
+    "official.designation": 1,
+    "official.reportingHead1": 1,
+    "official.reportingHead2": 1,
+    "official.jobRole": 1,
+    "official.dateOfJoining": 1,
+    "official.calculateSalaryFrom": 1,
+    "official.dateOfRetirement": 1,
+    "official.grade": 1,
+  };
+  if (roleName === "Global Admin") {
+    unset.personal = 1;
+    unset["official.company"] = 1;
+    unset["official.department"] = 1;
+  }
+  await User.collection.updateOne({ _id: userId }, { $unset: unset });
+};
+
+/** Strip password before sending a user in the API response */
+const safeUser = (doc) => {
+  if (!doc) return null;
+  applyAnniversary(doc);
+  const obj = doc.toObject ? doc.toObject() : { ...doc };
+  delete obj.password;
+  delete obj.contact;
+  return obj;
+};
 
 /** Nested profile keys accepted on update */
 const PROFILE_KEYS = [
@@ -86,6 +120,60 @@ const ARRAY_SECTIONS = new Set([
   "visas",
 ]);
 
+/**
+ * Fields that mean "same row" — used to block duplicate append/update.
+ * Example: same courseName + institute + year → education already exists.
+ */
+const ARRAY_IDENTITY = {
+  education: ["courseName", "courseType", "instituteName", "passingYear"],
+  accounts: ["accountNo"],
+  family: ["name", "relation"],
+  nominees: ["nominateFor", "nomineeName", "relation"],
+  experience: ["organization", "designation", "fromDate"],
+  visas: ["visaNumber"],
+};
+
+const normIdentityVal = (v) => {
+  if (v === undefined || v === null) return "";
+  if (v instanceof Date) return v.toISOString().slice(0, 10);
+  return String(v).trim().toLowerCase();
+};
+
+/** Build compare key for one list row; null = nothing to check (all empty) */
+const rowIdentityKey = (section, row) => {
+  const keys = ARRAY_IDENTITY[section];
+  if (!keys || !row) return null;
+  const parts = keys.map((k) => normIdentityVal(row[k]));
+  if (parts.every((p) => !p)) return null;
+  // Strong ids must be present
+  if (section === "accounts" && !parts[0]) return null;
+  if (section === "visas" && !parts[0]) return null;
+  return parts.join("|");
+};
+
+/** True if another row in the list has the same identity */
+const hasDuplicateRow = (section, rows, candidate, excludeId = "") => {
+  const key = rowIdentityKey(section, candidate);
+  if (!key) return false;
+  return rows.some((item) => {
+    if (excludeId && String(item._id) === String(excludeId)) return false;
+    return rowIdentityKey(section, item) === key;
+  });
+};
+
+/** True if the incoming list itself has two identical rows */
+const hasDuplicateWithin = (section, rows) => {
+  const seen = new Set();
+  for (const item of rows) {
+    const key = rowIdentityKey(section, item);
+    if (!key) continue;
+    if (seen.has(key)) return true;
+    seen.add(key);
+  }
+  return false;
+};
+
+/** Turn Mongoose subdocs into plain objects for list edits */
 const asPlainRows = (value) => {
   const rows = Array.isArray(value) ? value : [];
   return rows.map((row) =>
@@ -94,13 +182,16 @@ const asPlainRows = (value) => {
 };
 
 /**
- * One object without _id → append.
- * One object with _id → update that row.
- * Array → replace the whole list (use this to delete a row).
- * Returns an error message, or null.
+ * One object without _id → append (error if same row already exists).
+ * One object with _id → update that row (error if result matches another row).
+ * Array → replace list (error if list has internal duplicates).
+ * Returns error message, or null.
  */
 const applyArraySection = (employee, key, incoming) => {
   if (Array.isArray(incoming)) {
+    if (hasDuplicateWithin(key, incoming)) {
+      return `${key} already exists`;
+    }
     employee[key] = incoming;
     employee.markModified(key);
     return null;
@@ -112,6 +203,9 @@ const applyArraySection = (employee, key, incoming) => {
 
   if (!id) {
     delete row._id;
+    if (hasDuplicateRow(key, current, row)) {
+      return `${key} already exists`;
+    }
     current.push(row);
     employee[key] = current;
     employee.markModified(key);
@@ -122,7 +216,11 @@ const applyArraySection = (employee, key, incoming) => {
   if (index === -1) {
     return `${key} item not found`;
   }
-  current[index] = { ...current[index], ...row, _id: current[index]._id };
+  const merged = { ...current[index], ...row, _id: current[index]._id };
+  if (hasDuplicateRow(key, current, merged, id)) {
+    return `${key} already exists`;
+  }
+  current[index] = merged;
   employee[key] = current;
   employee.markModified(key);
   return null;
@@ -157,24 +255,8 @@ const mergeSection = (existing, incoming, sectionKey) => {
   return next;
 };
 
-/** API response: never send password; refresh anniversary for display */
-const safeUser = (doc) => {
-  if (!doc) return null;
-  applyAnniversary(doc);
-  const obj = doc.toObject ? doc.toObject() : { ...doc };
-  delete obj.password;
-  delete obj.contact; // old field no longer in schema
-  return obj;
-};
-
 /** True if the logged-in user is editing their own id */
 const isOwnRecord = (req, id) => String(req.user._id) === String(id);
-
-/** New Global Admin / Super Admin → Approved; everyone else → Unapproved */
-const defaultDetailsApproval = (role) =>
-  role === "Global Admin" || role === "Super Admin"
-    ? "Approved"
-    : "Unapproved";
 
 /**
  * Lock own profile after Approved.
@@ -187,204 +269,165 @@ const isProfileLocked = (req, employee) => {
   return employee.detailsApproval === "Approved";
 };
 
-// =============================================================================
-// CREATE USER — POST /api/employees
-// =============================================================================
+/**
+ * CREATE EMPLOYEE — POST /api/employees
+ *
+ * Who: Global Admin / Super Admin / HR Manager only (route authorize).
+ * Employee role never creates — only edits own General Info after create.
+ * Always forces role = Employee. Access & Control → POST /api/users.
+ */
 const createEmployee = async (req, res) => {
   try {
-    // Same shape as User model: account flat + nested official / personal / …
-    const { name, password, role, status } = req.body;
-
+    // 1. Read body fields
+    const { name, password, status } = req.body;
     const officialIn = { ...(req.body.official || {}) };
     const personalIn = { ...(req.body.personal || {}) };
-    delete personalIn.anniversaryDate;
+    delete personalIn.anniversaryDate; // computed server-side from DOB
 
     const email = String(officialIn.officialEmail || "")
       .toLowerCase()
       .trim();
 
+    // 2. Resolve company (Super Admin → own company; others → body + same-company check)
+    const actorCompany = String(req.user.official?.company || "").trim();
+    let company = "";
+
+    if (req.user.role === "Super Admin") {
+      if (!actorCompany) {
+        return res.status(403).json({
+          message: "Your profile has no company — cannot create users",
+        });
+      }
+      const requested = String(officialIn.company || "").trim();
+      if (requested && !isSameCompany(actorCompany, requested)) {
+        return res.status(403).json({
+          message: "Super Admin can only create employees for their own company",
+        });
+      }
+      company = actorCompany;
+    } else {
+      // Company must come from body (UI dropdown) — no silent default
+      company = String(officialIn.company || "").trim();
+      if (!company) {
+        return res.status(400).json({ message: "official.company is required" });
+      }
+      const companyErr = assertSameCompany(req.user, company);
+      if (companyErr) {
+        return res.status(403).json({ message: companyErr });
+      }
+    }
+
     const official = normalizeSectionUniques("official", {
       ...officialIn,
       officialEmail: email,
+      company,
       employeeCode: officialIn.employeeCode
         ? String(officialIn.employeeCode).trim().toUpperCase()
         : "",
     });
-
     const personal = normalizeSectionUniques("personal", personalIn);
 
-    const roleName = (role || "Employee").trim();
+    // 3. Check unique email / emp code / mobile etc.
+    const uniquePayload = {
+      "official.officialEmail": official.officialEmail,
+      "official.employeeCode": official.employeeCode,
+      "personal.mobileNo": personal.mobileNo,
+      "personal.personalEmail": personal.personalEmail,
+      "personal.panNo": personal.panNo,
+      "personal.aadhaarNo": personal.aadhaarNo,
+      "personal.drivingLicenseNo": personal.drivingLicenseNo,
+      "personal.passportNo": personal.passportNo,
+    };
 
-    // Unique check, role lookup, and password hash run together so create returns faster.
     const [createConflict, targetRole, hashedPassword] = await Promise.all([
-      findUniqueConflict({
-        "official.officialEmail": official.officialEmail,
-        "official.employeeCode": official.employeeCode,
-        "personal.mobileNo": personal.mobileNo,
-        "personal.personalEmail": personal.personalEmail,
-        "personal.panNo": personal.panNo,
-        "personal.aadhaarNo": personal.aadhaarNo,
-        "personal.drivingLicenseNo": personal.drivingLicenseNo,
-        "personal.passportNo": personal.passportNo,
-      }),
-      Role.findOne({ name: roleName, status: "Active" }),
+      findUniqueConflict(uniquePayload),
+      Role.findOne({ name: "Employee", status: "Active" }),
       bcrypt.hash(password, 10),
     ]);
     if (createConflict) {
       return res.status(400).json({ message: createConflict });
     }
-
     if (!targetRole) {
       return res.status(400).json({ message: "Role not found or inactive" });
     }
 
-    // Who can create privileged roles
-    if (roleName === "Global Admin" && req.user.role !== "Global Admin") {
-      return res.status(403).json({
-        message: "Only Global Admin can create Global Admin",
-      });
-    }
-    if (
-      roleName === "Super Admin" &&
-      !["Global Admin", "Super Admin"].includes(req.user.role)
-    ) {
-      return res.status(403).json({
-        message: "Only Global Admin / Super Admin can create Super Admin",
-      });
-    }
-
-    // Global Admin → any company; others → own company only
-    const companyErr = assertSameCompany(req.user, official.company);
-    if (companyErr) {
-      return res.status(403).json({ message: companyErr });
-    }
-
-    const employee = await User.create({
+    // Build create document (optional profile sections)
+    const createDoc = {
       name,
       password: hashedPassword,
-      role: roleName,
+      role: "Employee",
       status: status || "Active",
-      detailsApproval: defaultDetailsApproval(roleName),
-      personal,
+      detailsApproval: "Unapproved",
       official,
-      ...(req.body.other ? { other: req.body.other } : {}),
-      ...(req.body.education ? { education: withoutIds(req.body.education) } : {}),
-      ...(req.body.accounts ? { accounts: withoutIds(req.body.accounts) } : {}),
-      ...(req.body.family ? { family: withoutIds(req.body.family) } : {}),
-      ...(req.body.nominees ? { nominees: withoutIds(req.body.nominees) } : {}),
-      ...(req.body.experience ? { experience: withoutIds(req.body.experience) } : {}),
-      ...(req.body.visas ? { visas: withoutIds(req.body.visas) } : {}),
-      ...(req.body.payroll ? { payroll: req.body.payroll } : {}),
-    });
+      personal,
+    };
+    if (req.body.other) createDoc.other = req.body.other;
+    for (const key of ARRAY_SECTIONS) {
+      if (req.body[key] === undefined) continue;
+      const rows = Array.isArray(req.body[key])
+        ? req.body[key]
+        : [req.body[key]];
+      if (hasDuplicateWithin(key, rows)) {
+        return res.status(400).json({ message: `${key} already exists` });
+      }
+      createDoc[key] = withoutIds(req.body[key]);
+    }
+    if (req.body.payroll) createDoc.payroll = req.body.payroll;
 
-    // Mail goes after the response so SMTP does not hold the request.
+    // 4. Create User with role Employee (password already hashed above)
+    const employee = await User.create(createDoc);
+
+    // 5. Send welcome email (non-blocking)
     sendWelcomeEmail({
       name,
       email,
       password,
-      role: roleName,
-      company: official.company,
-      department: official.department,
+      role: "Employee",
+      company: official.company || "",
+      department: String(official.department || "").trim(),
     }).catch((mailErr) => {
       console.error("Welcome email failed:", mailErr.message);
     });
 
+    // 6. Return employee without password
+    const fresh = await User.findById(employee._id).select("-password");
     return res.status(201).json({
-      message: "User created",
-      employee: safeUser(employee),
+      message: "Employee created",
+      employee: safeUser(fresh),
     });
   } catch (err) {
-    // Mongo duplicate index → friendly message
     const dup = duplicateKeyMessage(err);
     if (dup) return res.status(400).json({ message: dup });
     return res.status(500).json({ message: err.message });
   }
 };
 
-/** Keep user text out of regex so search cannot break the query */
-const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-/** Case-insensitive exact match for dropdown filters */
-const exact = (value) => new RegExp(`^${escapeRegex(String(value).trim())}$`, "i");
-
-// =============================================================================
-// LIST USERS — GET /api/employees
-// Super Admin / HR / Manager → all users, with search, filters, pagination
-// Employee → only their own record, same query params
-// =============================================================================
+/**
+ * LIST EMPLOYEES — GET /api/employees
+ *
+ * Admin table only. Employee role uses GET /:id for own profile (not list).
+ * Query: search|q, status, department, designation, gender, company|branch, page, limit
+ * Always filters role = Employee.
+ */
 const listEmployees = async (req, res) => {
   try {
-    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
-    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100);
-    const skip = (page - 1) * limit;
-    const and = [];
-
-    // Employee can search and filter only inside their own profile
-    if (!hasAllAccess(req.user)) {
-      and.push({ _id: req.user._id });
-    } else {
-      // Global Admin → all companies; others → own company only
-      const scope = companyFilter(req.user);
-      if (scope === false) {
-        return res.status(403).json({
-          message: "Your profile has no company — cannot list employees",
-        });
-      }
-      if (scope) and.push(scope);
+    const built = buildListQuery(req, { forceRole: "Employee" });
+    if (built.error) {
+      return res.status(built.error.status).json({ message: built.error.message });
     }
 
-    const search = String(req.query.search || "").trim();
-    if (search) {
-      const rx = new RegExp(escapeRegex(search), "i");
-      and.push({
-        $or: [
-          { name: rx },
-          { "official.employeeCode": rx },
-          { "official.officialEmail": rx },
-        ],
-      });
-    }
-
-    if (req.query.role) and.push({ role: exact(req.query.role) });
-    if (req.query.status) and.push({ status: exact(req.query.status) });
-    if (req.query.department) {
-      and.push({ "official.department": exact(req.query.department) });
-    }
-    if (req.query.designation) {
-      and.push({ "official.designation": exact(req.query.designation) });
-    }
-    if (req.query.gender) and.push({ "personal.gender": exact(req.query.gender) });
-
-    const branch = req.query.branch || req.query.company;
-    if (branch) and.push({ "official.company": exact(branch) });
-
-    const filter = and.length ? { $and: and } : {};
+    const { page, limit, skip, filter, applied } = built;
     const [total, rows] = await Promise.all([
       User.countDocuments(filter),
       User.find(filter)
-        .select(
-          "name role status lastLogin official.officialEmail official.employeeCode official.department official.designation official.company personal.gender"
-        )
+        .select(LIST_SELECT)
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
     ]);
 
-    // Both screens share this list. Full profile is GET /api/employees/:id
-    const employees = rows.map((row) => ({
-      _id: row._id,
-      name: row.name || "",
-      email: row.official?.officialEmail || "",
-      role: row.role || "",
-      department: row.official?.department || "",
-      lastLogin: row.lastLogin || null,
-      status: row.status || "",
-      employeeCode: row.official?.employeeCode || "",
-      gender: row.personal?.gender || "",
-      designation: row.official?.designation || "",
-      branch: row.official?.company || "",
-    }));
+    const employees = rows.map(mapEmployeeListRow);
 
     return res.json({
       count: employees.length,
@@ -394,6 +437,7 @@ const listEmployees = async (req, res) => {
       pages: Math.max(Math.ceil(total / limit), 1),
       from: total === 0 ? 0 : skip + 1,
       to: skip + employees.length,
+      filters: applied,
       employees,
     });
   } catch (err) {
@@ -401,9 +445,67 @@ const listEmployees = async (req, res) => {
   }
 };
 
-// =============================================================================
-// GET ONE USER — GET /api/employees/:id
-// =============================================================================
+/**
+ * EXPORT EXCEL — GET /api/employees/export
+ * Same filters as list (no pagination). Admin only — not Employee role.
+ * Permission: Employee → Employee → export
+ */
+const exportEmployees = async (req, res) => {
+  try {
+    const built = buildListQuery(req, { forceRole: "Employee" });
+    if (built.error) {
+      return res
+        .status(built.error.status)
+        .json({ message: built.error.message });
+    }
+
+    const rows = await User.find(built.filter)
+      .select(LIST_SELECT)
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const data = rows.map((row) => {
+      const m = mapEmployeeListRow(row);
+      return {
+        name: m.name,
+        employeeCode: m.employeeCode,
+        gender: m.gender,
+        designation: m.designation,
+        department: m.department,
+        branch: m.branch,
+        status: m.status,
+        email: m.email,
+      };
+    });
+
+    await sendExcel(
+      res,
+      "employees.xlsx",
+      [
+        { header: "Employee Name", key: "name", width: 24 },
+        { header: "Code", key: "employeeCode", width: 14 },
+        { header: "Gender", key: "gender", width: 10 },
+        { header: "Designation", key: "designation", width: 22 },
+        { header: "Department", key: "department", width: 16 },
+        { header: "Branch", key: "branch", width: 32 },
+        { header: "Status", key: "status", width: 12 },
+        { header: "Email", key: "email", width: 28 },
+      ],
+      data
+    );
+  } catch (err) {
+    if (!res.headersSent) {
+      return res.status(500).json({ message: err.message });
+    }
+  }
+};
+
+/**
+ * GET ONE — GET /api/employees/:id
+ *
+ * Auth: Employee → own profile only; admin → same company
+ * Response: full user without password (safeUser).
+ */
 const getEmployee = async (req, res) => {
   try {
     // Employee may only open their own profile
@@ -416,8 +518,9 @@ const getEmployee = async (req, res) => {
       return res.status(404).json({ message: "Employee not found" });
     }
 
-    // Admin may only view employees in their own company
-    if (hasAllAccess(req.user)) {
+    // Global Admin → all companies / all users
+    // Super Admin / HR / Manager → own company only
+    if (hasAllAccess(req.user) && !hasGlobalCompanyAccess(req.user)) {
       const scopeErr = assertSameCompanyEmployee(req.user, employee);
       if (scopeErr) {
         return res.status(403).json({ message: scopeErr });
@@ -430,13 +533,16 @@ const getEmployee = async (req, res) => {
   }
 };
 
-// =============================================================================
-// UPDATE USER — PUT /api/employees/:id
-// One API for phones, personal, official, education, payroll, etc.
-// =============================================================================
+/**
+ * UPDATE — PUT /api/employees/:id
+ *
+ * Body: any nested sections in one request (personal, official, education, …)
+ * Auth: Employee → self only (no official/payroll); admin → same company
+ * After detailsApproval = Approved, the owner cannot edit (admins still can).
+ */
 const updateEmployee = async (req, res) => {
   try {
-    // Employee may only update self
+    // --- Access check (self vs admin, company scope, Global Admin skip) ---
     if (!hasAllAccess(req.user) && !isOwnRecord(req, req.params.id)) {
       return res.status(403).json({ message: "You can only update your own profile" });
     }
@@ -446,17 +552,17 @@ const updateEmployee = async (req, res) => {
       return res.status(404).json({ message: "Employee not found" });
     }
 
-    const isAdmin = hasAllAccess(req.user); // Super Admin / HR / Manager
+    const isAdmin = hasAllAccess(req.user); // Global / Super / HR / Manager
 
-    // Admin may only update employees in their own company
-    if (isAdmin) {
+    // Global Admin → all companies; Super Admin / HR / Manager → own company only
+    if (isAdmin && !hasGlobalCompanyAccess(req.user)) {
       const scopeErr = assertSameCompanyEmployee(req.user, employee);
       if (scopeErr) {
         return res.status(403).json({ message: scopeErr });
       }
     }
 
-    // After Approved, owner cannot edit (except Super Admin)
+    // --- Profile lock after Approved (owner only; Global/Super never locked) ---
     if (isProfileLocked(req, employee)) {
       return res.status(403).json({
         message: "Details are approved — editing is locked. Contact HR / Admin.",
@@ -464,43 +570,74 @@ const updateEmployee = async (req, res) => {
       });
     }
 
-    // --- detailsApproval (admin only) ---
+    // --- detailsApproval (HR Manager / Super / Global only) ---
     if (req.body.detailsApproval !== undefined) {
-      if (!isAdmin) {
+      const canApproveDetails = [
+        "Global Admin",
+        "Super Admin",
+        "HR Manager",
+      ].includes(req.user.role);
+      if (!canApproveDetails) {
         return res.status(403).json({
           message:
-            "Only Super Admin / HR Manager / Manager can approve or reject details",
+            "Only Global Admin / Super Admin / HR Manager can approve or reject details",
         });
       }
       employee.detailsApproval = req.body.detailsApproval;
     }
 
-    // --- simple top-level fields ---
+    // --- name / status / role / password ---
     if (req.body.name !== undefined) employee.name = req.body.name;
     if (req.body.status !== undefined && isAdmin) employee.status = req.body.status;
 
-    // --- role (admin only) ---
     if (req.body.role !== undefined) {
       if (!isAdmin) {
         return res.status(403).json({ message: "Only admin can change role" });
       }
-      if (req.body.role === "Global Admin" && req.user.role !== "Global Admin") {
-        return res.status(403).json({
-          message: "Only Global Admin can assign Global Admin",
-        });
+      const nextRole = String(req.body.role || "").trim();
+      if (nextRole === "Global Admin") {
+        if (req.user.role !== "Global Admin") {
+          return res.status(403).json({
+            message: "Only Global Admin can assign Global Admin",
+          });
+        }
+        if (employee.role !== "Global Admin") {
+          const globalCount = await User.countDocuments({
+            role: "Global Admin",
+          });
+          const max = maxGlobalAdmins();
+          if (globalCount >= max) {
+            return res.status(400).json({
+              message: `Maximum ${max} Global Admin accounts allowed`,
+            });
+          }
+        }
+        if (!employee.official) employee.official = {};
+        employee.official.company = "";
       }
       if (
-        req.body.role === "Super Admin" &&
+        nextRole === "Super Admin" &&
         !["Global Admin", "Super Admin"].includes(req.user.role)
       ) {
         return res.status(403).json({
           message: "Only Global Admin / Super Admin can assign Super Admin",
         });
       }
-      employee.role = req.body.role.trim();
+      // Super Admin may only promote users in own company (already scoped above)
+      if (nextRole === "Super Admin" && req.user.role === "Super Admin") {
+        const actorCo = String(req.user.official?.company || "").trim();
+        const targetCo = String(employee.official?.company || "").trim();
+        if (!actorCo || !isSameCompany(actorCo, targetCo)) {
+          return res.status(403).json({
+            message:
+              "Super Admin can only assign Super Admin to users in their own company",
+          });
+        }
+      }
+      employee.role = nextRole;
     }
 
-    // --- password (Global Admin / Super Admin / HR Manager only) ---
+    // Password — Global Admin / Super Admin / HR Manager only
     if (req.body.password) {
       if (
         !["Global Admin", "Super Admin", "HR Manager"].includes(req.user.role)
@@ -513,14 +650,21 @@ const updateEmployee = async (req, res) => {
       employee.password = await bcrypt.hash(req.body.password, 10);
     }
 
-    // Nested sections from body (already checked by Joi)
+    // --- official{} — ADMIN ONLY (employeeCode, designation, dept, …)
+    // Employee cannot edit official details or employee code
     const profile = pickProfile(req.body);
 
-    // official{} is always admin-only (employeeCode, officialEmail, company, …)
     if (profile.official !== undefined && !isAdmin) {
       return res.status(403).json({
         message:
-          "Only Super Admin / HR Manager / Manager can update official details (employeeCode, officialEmail, …)",
+          "Employee cannot edit official details or employee code. Contact HR / Admin.",
+      });
+    }
+
+    // payroll{} — ADMIN ONLY (check early; Employee never)
+    if (req.body.payroll !== undefined && !isAdmin) {
+      return res.status(403).json({
+        message: "Employee cannot edit payroll. Contact HR / Admin.",
       });
     }
 
@@ -530,18 +674,43 @@ const updateEmployee = async (req, res) => {
       profile.personal = normalizeSectionUniques("personal", profile.personal);
     }
     if (profile.official) {
-      profile.official = normalizeSectionUniques("official", profile.official);
+      const emailAttempt = profile.official.officialEmail;
+      const companyAttempt = profile.official.company;
+      delete profile.official.officialEmail;
+      delete profile.official.company;
 
-      // Cannot move employee to another company
-      if (profile.official.company !== undefined) {
-        const companyErr = assertSameCompany(req.user, profile.official.company);
-        if (companyErr) {
-          return res.status(403).json({ message: companyErr });
+      if (emailAttempt !== undefined) {
+        const next = String(emailAttempt || "")
+          .trim()
+          .toLowerCase();
+        const cur = String(employee.official?.officialEmail || "")
+          .trim()
+          .toLowerCase();
+        if (next && next !== cur) {
+          return res.status(400).json({
+            message: "official.officialEmail cannot be changed",
+          });
         }
       }
+      if (companyAttempt !== undefined) {
+        const next = String(companyAttempt || "").trim();
+        const cur = String(employee.official?.company || "").trim();
+        if (next && cur && !isSameCompany(next, cur)) {
+          return res.status(400).json({
+            message: "official.company cannot be changed",
+          });
+        }
+        if (next && !cur) {
+          return res.status(400).json({
+            message: "official.company cannot be changed",
+          });
+        }
+      }
+
+      profile.official = normalizeSectionUniques("official", profile.official);
     }
 
-    // Collect unique fields that actually changed (skip empty / same value)
+    // --- unique conflict checks (only fields that actually changed) ---
     const uniqueCheck = {};
     const addIfChanged = (path, nextVal, currentVal) => {
       if (nextVal === undefined || nextVal === null) return;
@@ -552,11 +721,6 @@ const updateEmployee = async (req, res) => {
     };
 
     if (profile.official) {
-      addIfChanged(
-        "official.officialEmail",
-        profile.official.officialEmail,
-        employee.official?.officialEmail
-      );
       addIfChanged(
         "official.employeeCode",
         profile.official.employeeCode,
@@ -597,6 +761,7 @@ const updateEmployee = async (req, res) => {
       return res.status(400).json({ message: conflict });
     }
 
+    // --- merge personal / official / arrays / payroll ---
     // Objects merge. One list row appends or updates. A full array replaces.
     for (const key of Object.keys(profile)) {
       if (OBJECT_SECTIONS.has(key)) {
@@ -604,24 +769,39 @@ const updateEmployee = async (req, res) => {
         employee.markModified(key);
       } else if (ARRAY_SECTIONS.has(key)) {
         const arrayError = applyArraySection(employee, key, profile[key]);
-        if (arrayError) return res.status(404).json({ message: arrayError });
+        if (arrayError) {
+          const status = arrayError.includes("not found") ? 404 : 400;
+          return res.status(status).json({ message: arrayError });
+        }
       } else {
         employee[key] = profile[key];
       }
     }
 
-    // payroll{} — admin only
+    // payroll{} — admin only (Employee already rejected above)
     if (req.body.payroll !== undefined) {
-      if (!isAdmin) {
-        return res.status(403).json({
-          message: "Payroll can only be set by Super Admin / HR Manager / Manager",
-        });
-      }
-      employee.payroll = req.body.payroll;
+      employee.payroll = mergeSection(employee.payroll, req.body.payroll, "payroll");
+      employee.markModified("payroll");
     }
 
-    // Save (pre-save hook may refresh anniversaryDate)
+    // --- save + response ---
     await employee.save();
+
+    // Role promote to Global / Super → strip heavy HR profile fields
+    if (
+      req.body.role !== undefined &&
+      isPlatformAdminRole(String(req.body.role).trim())
+    ) {
+      await unsetEmployeeProfileFields(
+        employee._id,
+        String(req.body.role).trim()
+      );
+      const fresh = await User.findById(employee._id).select("-password");
+      return res.json({
+        message: "Employee updated",
+        employee: safeUser(fresh),
+      });
+    }
 
     return res.json({
       message: "Employee updated",
@@ -646,7 +826,8 @@ const loadEditableEmployee = async (req) => {
   const employee = await User.findById(req.params.id);
   if (!employee) return { status: 404, message: "Employee not found" };
 
-  if (hasAllAccess(req.user)) {
+  // Global Admin → all companies; Super Admin / HR / Manager → own company only
+  if (hasAllAccess(req.user) && !hasGlobalCompanyAccess(req.user)) {
     const scopeErr = assertSameCompanyEmployee(req.user, employee);
     if (scopeErr) return { status: 403, message: scopeErr };
   }
@@ -662,6 +843,7 @@ const loadEditableEmployee = async (req) => {
   return { employee };
 };
 
+/** Reject if :section is not a known list section; writes 400 and returns true */
 const rejectIfBadSection = (section, res) => {
   if (ARRAY_SECTIONS.has(section)) return false;
   res.status(400).json({
@@ -671,8 +853,7 @@ const rejectIfBadSection = (section, res) => {
   return true;
 };
 
-const asRowList = (body) => (Array.isArray(body) ? body : [body]);
-
+/** Normalize delete body to an array of item id strings */
 const collectDeleteIds = (body) => {
   if (!Array.isArray(body)) return [String(body._id)];
   return body.map((entry) =>
@@ -680,64 +861,13 @@ const collectDeleteIds = (body) => {
   );
 };
 
-// =============================================================================
-// EDIT LIST ROWS — PUT /api/employees/:id/:section/items
-// One object, or an array of objects. Each object must include _id.
-// =============================================================================
-const editArrayItem = async (req, res) => {
-  try {
-    const { section } = req.params;
-    if (rejectIfBadSection(section, res)) return;
-
-    const rows = asRowList(req.body);
-    for (const row of rows) {
-      if (!mongoose.Types.ObjectId.isValid(row._id)) {
-        return res.status(400).json({ message: "Invalid item id" });
-      }
-      const fields = { ...row };
-      delete fields._id;
-      if (!Object.keys(fields).length) {
-        return res.status(400).json({ message: "Send at least one field to update" });
-      }
-    }
-
-    const loaded = await loadEditableEmployee(req);
-    if (!loaded.employee) {
-      return res.status(loaded.status).json({
-        message: loaded.message,
-        ...(loaded.detailsApproval
-          ? { detailsApproval: loaded.detailsApproval }
-          : {}),
-      });
-    }
-
-    const current = asPlainRows(loaded.employee[section]);
-    for (const row of rows) {
-      const found = current.some((item) => String(item._id) === String(row._id));
-      if (!found) {
-        return res.status(404).json({ message: `${section} item not found` });
-      }
-    }
-
-    for (const row of rows) {
-      const arrayError = applyArraySection(loaded.employee, section, row);
-      if (arrayError) return res.status(404).json({ message: arrayError });
-    }
-
-    await loaded.employee.save();
-    return res.json({
-      message: rows.length === 1 ? `${section} item updated` : `${section} items updated`,
-      employee: safeUser(loaded.employee),
-    });
-  } catch (err) {
-    return res.status(500).json({ message: err.message });
-  }
-};
-
-// =============================================================================
-// DELETE LIST ROWS — DELETE /api/employees/:id/:section/items
-// One object { _id }, an array of ids, or an array of { _id }.
-// =============================================================================
+/**
+ * DELETE LIST ROWS — DELETE /api/employees/:id/:section
+ *
+ * Params: section = education | accounts | family | nominees | experience | visas
+ * Body: one { _id }, an array of ids, or an array of { _id }
+ * Auth: same as profile update (own record / company / approved lock)
+ */
 const deleteArrayItem = async (req, res) => {
   try {
     const { section } = req.params;
@@ -782,13 +912,13 @@ const deleteArrayItem = async (req, res) => {
   }
 };
 
-/** official{} and payroll{} — Super Admin / HR Manager / Manager (and Global Admin). */
+/** official{} / payroll{} clear — admin only (Employee role blocked). */
 const loadAdminSection = async (req) => {
   if (!hasAllAccess(req.user)) {
     return {
       status: 403,
       message:
-        "Only Super Admin / HR Manager / Manager can update official details and payroll",
+        "Employee cannot clear official details or payroll. Contact HR / Admin.",
     };
   }
   if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
@@ -798,12 +928,16 @@ const loadAdminSection = async (req) => {
   const employee = await User.findById(req.params.id);
   if (!employee) return { status: 404, message: "Employee not found" };
 
-  const scopeErr = assertSameCompanyEmployee(req.user, employee);
-  if (scopeErr) return { status: 403, message: scopeErr };
+  // Global Admin → all companies; Super Admin / HR / Manager → own company only
+  if (!hasGlobalCompanyAccess(req.user)) {
+    const scopeErr = assertSameCompanyEmployee(req.user, employee);
+    if (scopeErr) return { status: 403, message: scopeErr };
+  }
 
   return { employee };
 };
 
+/** Blank payroll object used when clearing payroll via DELETE */
 const EMPTY_PAYROLL = {
   salaryGroup: "",
   salaryDate: "",
@@ -839,75 +973,12 @@ const EMPTY_PAYROLL = {
   ifsc: "",
 };
 
-// =============================================================================
-// EDIT official OR payroll — PUT /api/employees/:id/:section
-// Same field checks as profile update. Admin roles only.
-// =============================================================================
-const editObjectSection = async (req, res) => {
-  try {
-    const { section } = req.params;
-    if (section !== "official" && section !== "payroll") {
-      return res.status(400).json({ message: "section must be official or payroll" });
-    }
-
-    const loaded = await loadAdminSection(req);
-    if (!loaded.employee) {
-      return res.status(loaded.status).json({ message: loaded.message });
-    }
-
-    const employee = loaded.employee;
-
-    if (section === "official") {
-      const incoming = normalizeSectionUniques("official", { ...req.body });
-      if (incoming.company !== undefined) {
-        const companyErr = assertSameCompany(req.user, incoming.company);
-        if (companyErr) return res.status(403).json({ message: companyErr });
-      }
-
-      const uniqueCheck = {};
-      const addIfChanged = (path, nextVal, currentVal) => {
-        if (nextVal === undefined || nextVal === null) return;
-        const n = String(nextVal).trim();
-        if (!n) return;
-        if (n === String(currentVal || "").trim()) return;
-        uniqueCheck[path] = n;
-      };
-      addIfChanged(
-        "official.officialEmail",
-        incoming.officialEmail,
-        employee.official?.officialEmail
-      );
-      addIfChanged(
-        "official.employeeCode",
-        incoming.employeeCode,
-        employee.official?.employeeCode
-      );
-      const conflict = await findUniqueConflict(uniqueCheck, employee._id);
-      if (conflict) return res.status(400).json({ message: conflict });
-
-      employee.official = mergeSection(employee.official, incoming, "official");
-      employee.markModified("official");
-    } else {
-      employee.payroll = mergeSection(employee.payroll, req.body, "payroll");
-      employee.markModified("payroll");
-    }
-
-    await employee.save();
-    return res.json({
-      message: `${section} updated`,
-      employee: safeUser(employee),
-    });
-  } catch (err) {
-    const dup = duplicateKeyMessage(err);
-    if (dup) return res.status(400).json({ message: dup });
-    return res.status(500).json({ message: err.message });
-  }
-};
-
-// =============================================================================
-// CLEAR payroll — DELETE /api/employees/:id/payroll
-// official stays (it holds the login email). Admin roles only.
-// =============================================================================
+/**
+ * CLEAR PAYROLL — DELETE /api/employees/:id/payroll
+ *
+ * Auth: Super Admin / HR Manager / Manager / Global Admin (same company)
+ * official cannot be deleted (holds login email) — update fields instead.
+ */
 const deleteObjectSection = async (req, res) => {
   try {
     const { section } = req.params;
@@ -939,9 +1010,12 @@ const deleteObjectSection = async (req, res) => {
   }
 };
 
-// =============================================================================
-// DELETE USER — DELETE /api/employees/:id
-// =============================================================================
+/**
+ * DELETE USER — DELETE /api/employees/:id
+ *
+ * Auth: Global Admin, Super Admin, HR Manager, Manager (same company)
+ * Cannot delete your own account.
+ */
 const deleteEmployee = async (req, res) => {
   try {
     // Safety: do not allow deleting your own account
@@ -954,10 +1028,12 @@ const deleteEmployee = async (req, res) => {
       return res.status(404).json({ message: "Employee not found" });
     }
 
-    // Super Admin / HR / Manager → only delete within own company
-    const scopeErr = assertSameCompanyEmployee(req.user, employee);
-    if (scopeErr) {
-      return res.status(403).json({ message: scopeErr });
+    // Global Admin → all companies; Super Admin / HR / Manager → own company only
+    if (!hasGlobalCompanyAccess(req.user)) {
+      const scopeErr = assertSameCompanyEmployee(req.user, employee);
+      if (scopeErr) {
+        return res.status(403).json({ message: scopeErr });
+      }
     }
 
     await employee.deleteOne();
@@ -968,12 +1044,10 @@ const deleteEmployee = async (req, res) => {
   }
 };
 
-// =============================================================================
-// UPLOAD FILE — POST /api/employees/upload
-// No user id. Form-data: document (file) + type (education | account)
-// Same type always saves in the same Cloudinary folder (hrms/education, hrms/account).
-// Returns the URL only. Frontend saves it on Submit (PUT).
-// =============================================================================
+/**
+ * UPLOAD — POST /api/employees/upload
+ * Form-data: document + type (education|account). Returns url only.
+ */
 const uploadAttachment = async (req, res) => {
   try {
     const type = String(req.body.type || "")
@@ -1003,7 +1077,6 @@ const uploadAttachment = async (req, res) => {
       type,
       folder: uploaded.folder,
       url: uploaded.url,
-      fileName: uploaded.originalName,
     });
   } catch (err) {
     const status = err.statusCode || 500;
@@ -1012,16 +1085,12 @@ const uploadAttachment = async (req, res) => {
   }
 };
 
-/** One edit API. official/payroll for admins. Lists: one object or an array of objects. */
-const editSection = (req, res) => {
-  const { section } = req.params;
-  if (section === "official" || section === "payroll") {
-    return editObjectSection(req, res);
-  }
-  return editArrayItem(req, res);
-};
-
-/** One delete API. Lists: one { _id } or an array of ids. payroll clears. */
+/**
+ * DELETE SECTION — DELETE /api/employees/:id/:section
+ *
+ * Router entry: payroll / official → clear object; otherwise → delete list rows.
+ * Body for lists: one { _id } or an array of ids.
+ */
 const deleteSection = (req, res) => {
   const { section } = req.params;
   if (section === "official" || section === "payroll") {
@@ -1033,9 +1102,9 @@ const deleteSection = (req, res) => {
 module.exports = {
   createEmployee,
   listEmployees,
+  exportEmployees,
   getEmployee,
   updateEmployee,
-  editSection,
   deleteSection,
   deleteEmployee,
   uploadAttachment,

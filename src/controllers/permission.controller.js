@@ -1,38 +1,43 @@
 /**
- * Permission helpers and APIs
- *
- * - Catalog of modules / actions (from config/permissions.js)
- * - Current user's permissions + sidebar menu
- * - checkPermission() middleware for route-level action checks
- *
- * Catalog returns 2 records in data[]:
- *   { side: "admin", modules: [...] }
- *   { side: "employee", modules: [...] }
+ * PERMISSION CONTROLLER — catalogs, my permissions, checkPermission guard
  */
 const Role = require("../models/Role");
+
+const { hasAllAccess, classifyRoleAccess } = require("../middleware/auth");
 const {
   ADMIN_TREE,
   ESS_TREE,
   ACTIONS,
   totalForRole,
   countPermissions,
+  compactPermissions,
   findAction,
 } = require("../config/permissions");
 
 /**
- * GET /api/permissions/modules
- *
- * Two records only (side once each — not on every module):
- *
- * {
- *   actions: [...],
- *   count: 2,
- *   data: [
- *     { side: "admin", modules: [ { module, heading, subModules }, ... ] },
- *     { side: "employee", modules: [ { module, heading, subModules }, ... ] }
- *   ]
- * }
+ * Catalog added Access & Control → create; older DBs still have create:false.
+ * If role already has view+edit+delete, grant create once.
  */
+async function grantAccessCreateIfNeeded(role) {
+  if (!role || role.name === "Employee") return;
+  let changed = false;
+  for (const block of role.permissions || []) {
+    if (block.module !== "Administration") continue;
+    for (const sub of block.subModules || []) {
+      if (sub.name !== "Access & Control") continue;
+      if (sub.view && sub.edit && sub.delete && sub.create !== true) {
+        sub.create = true;
+        changed = true;
+      }
+    }
+  }
+  if (changed) {
+    role.markModified("permissions");
+    await role.save();
+  }
+}
+
+/** LIST MODULES — GET /api/permissions/modules (admin + employee catalogs) */
 const listModules = async (req, res) => {
   const data = [
     {
@@ -52,44 +57,35 @@ const listModules = async (req, res) => {
   });
 };
 
-/**
- * GET /api/permissions/my
- *
- * One list only — no separate `menu` (that was the same data twice).
- *
- * {
- *   role, side, permissionCount, count,
- *   data: [ { module, heading, subModules: [ { name, view, create, ... } ] } ]
- * }
- *
- * Sidebar: use pages where view === true from data.
- */
+/** MY PERMISSIONS — GET /api/permissions/my (compact matrix for req.user.role) */
 const myPermissions = async (req, res) => {
   try {
     const role = await Role.findOne({ name: req.user.role });
     if (!role) return res.status(404).json({ message: "Role not found for user" });
 
     const data = role.permissions || [];
-    const side = role.name === "Employee" ? "employee" : "admin";
+    const { adminAccess } = classifyRoleAccess(
+      role.name,
+      data,
+      role.catalog
+    );
+    // side = catalog chosen at create (admin|employee); modules may be subset
+    const side = role.catalog || (adminAccess ? "admin" : "employee");
 
     return res.json({
       role: role.name,
       side,
-      permissionCount: `${countPermissions(data)} of ${totalForRole(role.name)}`,
+      catalog: side,
+      permissionCount: `${countPermissions(data)} of ${totalForRole(role.name, side)}`,
       count: data.length,
-      data,
+      data: compactPermissions(data),
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
 };
 
-/**
- * Route guard: checkPermission(module, subModuleName, action)
- *
- * Example: checkPermission("Attendance", "Daily Attendance", "create")
- * Pass name = null to allow if any submodule under that module has the action.
- */
+/** Route guard: checkPermission(module, subModuleName, action) — Global/Super Admin always pass */
 const checkPermission = (module, name, action) => {
   return async (req, res, next) => {
     try {
@@ -104,6 +100,15 @@ const checkPermission = (module, name, action) => {
       const role = await Role.findOne({ name: req.user.role });
       if (!role) {
         return res.status(403).json({ message: "Role not found" });
+      }
+
+      // Older matrices had Access & Control create:false; grant if they already manage users
+      if (
+        module === "Administration" &&
+        name === "Access & Control" &&
+        action === "create"
+      ) {
+        await grantAccessCreateIfNeeded(role);
       }
 
       let ok = false;
@@ -131,8 +136,74 @@ const checkPermission = (module, name, action) => {
   };
 };
 
+/**
+ * Employee profile APIs (same PUT/GET for admin + employee).
+ * Admin (HR/Manager/…) → Employee → Employee → action
+ * Employee role → Self → General Info → action (ESS matrix)
+ * Global / Super Admin always pass.
+ */
+const checkEmployeeProfilePermission = (action) => {
+  return (req, res, next) => {
+    if (hasAllAccess(req.user)) {
+      return checkPermission("Employee", "Employee", action)(req, res, next);
+    }
+    return checkPermission("Self", "General Info", action)(req, res, next);
+  };
+};
+
+/**
+ * Master type → Masters module submodule (admin catalog).
+ * GET list/get: no matrix check (web app dropdowns — Employee + Admin).
+ * POST/PUT/DELETE: Masters → {Company|Department|…} → action
+ */
+const MASTER_TYPE_PERM = {
+  company: "Company",
+  department: "Department",
+  designation: "Designation",
+  division: "Division",
+  employeeGroup: "Employee Group",
+};
+
+/** Admin write on /api/masters — type from body, query, or :id lookup */
+const checkMasterPermission = (action) => {
+  return async (req, res, next) => {
+    try {
+      let type =
+        req.query?.type || req.body?.type || req.masterType || null;
+
+      if (!type && req.params?.id) {
+        const { findMasterByIdLean } = require("../models/Master");
+        const found = await findMasterByIdLean(req.params.id);
+        if (!found) {
+          return res.status(404).json({ message: "Not found" });
+        }
+        type = found.type;
+        req.masterType = type;
+      }
+
+      if (!type) {
+        return res.status(400).json({
+          message:
+            "type is required: company, department, designation, division, employeeGroup",
+        });
+      }
+
+      const subName = MASTER_TYPE_PERM[type];
+      if (!subName) {
+        return res.status(400).json({ message: `Invalid master type: ${type}` });
+      }
+
+      return checkPermission("Masters", subName, action)(req, res, next);
+    } catch (err) {
+      return res.status(500).json({ message: err.message });
+    }
+  };
+};
+
 module.exports = {
   listModules,
   myPermissions,
   checkPermission,
+  checkEmployeeProfilePermission,
+  checkMasterPermission,
 };

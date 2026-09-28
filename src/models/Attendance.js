@@ -1,20 +1,12 @@
 /**
- * Attendance model
- *
- * One document per employee per calendar day (YYYY-MM-DD).
- *
- * `date` is NEVER sent by the client — server always sets it to today.
- *
- * Sources (no separate verification field — use these):
- *   punchInSource  / punchOutSource
- *   web | mobile | biometric — employee
- *   manual — admin only (missed punch)
+ * ATTENDANCE MODEL — one punch record per employee per day
+ * Unique (employee, date). Date is always today (server). Validation → attendance.validation.js.
  */
 const mongoose = require("mongoose");
 
 const PUNCH_SOURCES = ["web", "mobile", "biometric", "manual"];
 
-/** Today as YYYY-MM-DD (UTC) — used for punch records */
+/** Today as YYYY-MM-DD (UTC) — used as default date */
 const todayDate = () => new Date().toISOString().slice(0, 10);
 
 const attendanceSchema = new mongoose.Schema(
@@ -22,30 +14,13 @@ const attendanceSchema = new mongoose.Schema(
     employee: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      default: null,
     },
-
-    // Auto: always today's date on create (not from API body)
-    date: {
-      type: String,
-      default: todayDate,
-    },
-
+    date: { type: String, default: todayDate },
     punchIn: { type: Date, default: null },
     punchOut: { type: Date, default: null },
-
-    punchInSource: {
-      type: String,
-      enum: PUNCH_SOURCES,
-      default: null,
-    },
-    punchOutSource: {
-      type: String,
-      enum: PUNCH_SOURCES,
-      default: null,
-    },
-
-    // Manual mark only (Mark Attendance modal)
+    punchInSource: { type: String, default: null },
+    punchOutSource: { type: String, default: null },
     reason: { type: String, default: "" },
     remarks: { type: String, default: "" },
     markedBy: {
@@ -57,10 +32,8 @@ const attendanceSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-attendanceSchema.pre("validate", function (next) {
-  if (!this.date) {
-    this.date = todayDate();
-  }
+attendanceSchema.pre("save", function (next) {
+  if (!this.date) this.date = todayDate();
   next();
 });
 
