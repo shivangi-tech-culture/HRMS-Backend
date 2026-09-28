@@ -108,6 +108,8 @@ const officialItem = only({
   calculateSalaryFrom: date(),
   dateOfRetirement: date(),
   grade: str(),
+  /** Master Shift _id — HR / Super Admin / Global Admin only */
+  shift: Joi.string().hex().length(24).allow(null, "").optional(),
 });
 
 /** other{} — blood group and passport expiry */

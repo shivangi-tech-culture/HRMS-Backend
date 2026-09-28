@@ -187,6 +187,7 @@ const ADMIN_TREE = [
       { name: "Relation", actions: CRUD },
       { name: "Nominate For", actions: CRUD },
       { name: "Visa Type", actions: CRUD },
+      { name: "WH Calculation", actions: CRUD },
     ],
   },
 

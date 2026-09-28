@@ -157,7 +157,6 @@ router.get(
  *     description: |
  *       Email + company locked. `official.employeeCode` optional — send to set/clear/edit.
  *     security: [{ bearerAuth: [] }]
- *     security: [{ bearerAuth: [] }]
  *     parameters:
  *       - $ref: '#/components/parameters/UserId'
  *     responses:

@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "HRMS API",
-    "description": "HRMS API — folders match the two dashboards.\n\n**0. Setup** — Health + login (all roles). Password: {{password}}\n**1. Admin Dashboard** — Roles, Users, Employee Management, Masters write, Mail, Manual attendance\n**2. Employee Dashboard (ESS)** — My permissions, My profile, Punch in/out, Master dropdowns\n\nbaseUrl = {{baseUrl}} (default http://localhost:9001)\n\nSeeded emails: {{globalAdminEmail}} | {{adminEmail}} | {{hrEmail}} | {{managerEmail}} | {{employeeEmail}}\n\nAuth: Bearer {{token}} after login. Custom roles: catalog admin|employee + permissions matrix gates each module.",
+    "description": "HRMS API — Admin + Employee (ESS).\n\nWork module (matches UI): Shift Management, Shift Assignments, Work Timings, Weekly Off, Holiday Calendar.\nTiming rules: early punch-in / late punch-out OK; Sat half-day (halfDayEndTime); Sun WO; holiday = HO (no punch).\nofficial.shift only on Employee Management (HR/Super Admin/Global Admin) — not Access Control.\n\nAuth: Login → Bearer {{token}}.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -396,6 +396,126 @@
     {
       "key": "nomineeName",
       "value": "Neha Iyer"
+    },
+    {
+      "key": "latitude",
+      "value": "28.6301"
+    },
+    {
+      "key": "longitude",
+      "value": "77.2242"
+    },
+    {
+      "key": "shiftId",
+      "value": ""
+    },
+    {
+      "key": "shiftName",
+      "value": "Morning Shift"
+    },
+    {
+      "key": "shiftCode",
+      "value": "MORN"
+    },
+    {
+      "key": "shiftStart",
+      "value": "10:00"
+    },
+    {
+      "key": "shiftEnd",
+      "value": "19:00"
+    },
+    {
+      "key": "halfDayEnd",
+      "value": "14:30"
+    },
+    {
+      "key": "timesheetMonth",
+      "value": "2026-09"
+    },
+    {
+      "key": "timesheetFrom",
+      "value": "2026-09-01"
+    },
+    {
+      "key": "timesheetTo",
+      "value": "2026-09-30"
+    },
+    {
+      "key": "regularizeId",
+      "value": ""
+    },
+    {
+      "key": "sheetDate",
+      "value": "2026-09-25"
+    },
+    {
+      "key": "requestedInTime",
+      "value": "09:30"
+    },
+    {
+      "key": "requestedOutTime",
+      "value": "18:30"
+    },
+    {
+      "key": "regularizeRemarks",
+      "value": "Forgot to punch out"
+    },
+    {
+      "key": "reviewStatus",
+      "value": "Approved"
+    },
+    {
+      "key": "reviewRemarks",
+      "value": "OK"
+    },
+    {
+      "key": "attendanceStatus",
+      "value": "ALL"
+    },
+    {
+      "key": "page",
+      "value": "1"
+    },
+    {
+      "key": "limit",
+      "value": "50"
+    },
+    {
+      "key": "punchStart",
+      "value": "08:00"
+    },
+    {
+      "key": "holidayId",
+      "value": ""
+    },
+    {
+      "key": "holidayName",
+      "value": "Republic Day"
+    },
+    {
+      "key": "holidayDate",
+      "value": "2026-01-26"
+    },
+    {
+      "key": "holidayType",
+      "value": "NATIONAL HOLIDAY"
+    },
+    {
+      "key": "workTimingId",
+      "value": ""
+    },
+    {
+      "key": "weeklyOffId",
+      "value": ""
+    },
+    {
+      "key": "assignmentId",
+      "value": ""
+    },
+    {
+      "key": "effectiveFrom",
+      "value": "2026-09-01"
     }
   ],
   "item": [
@@ -1121,10 +1241,10 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"name\": \"{{newUserName}}\",\n  \"password\": \"{{password}}\",\n  \"role\": \"{{userRole}}\",\n  \"status\": \"{{userStatus}}\",\n  \"personal\": {\n    \"dateOfBirth\": \"{{dateOfBirth}}\",\n    \"aadhaarNo\": \"{{aadhaarNo}}\",\n    \"panNo\": \"{{panNo}}\",\n    \"gender\": \"{{gender}}\",\n    \"fatherOrHusbandName\": \"{{fatherOrHusbandName}}\",\n    \"maritalStatus\": \"{{maritalStatus}}\",\n    \"spouseName\": \"\",\n    \"anniversaryDate\": null,\n    \"personalEmail\": \"{{personalEmail}}\",\n    \"languageKnown\": \"{{languageKnown}}\",\n    \"emergencyContact1\": \"{{emergencyContact1}}\",\n    \"emergencyContact2\": \"{{emergencyContact2}}\",\n    \"drivingLicenseNo\": \"{{drivingLicenseNo}}\",\n    \"licenseValidUpto\": null,\n    \"passportNo\": \"{{passportNo}}\",\n    \"remarks\": \"\",\n    \"mobileNo\": \"{{mobileNo}}\",\n    \"workPhone\": \"{{workPhone}}\",\n    \"workExt\": \"{{workExt}}\",\n    \"presentAddress\": {\n      \"address\": \"{{address}}\",\n      \"country\": \"{{country}}\",\n      \"state\": \"{{state}}\",\n      \"city\": \"{{city}}\",\n      \"pincode\": \"{{pincode}}\"\n    },\n    \"permanentAddress\": {\n      \"address\": \"{{address}}\",\n      \"country\": \"{{country}}\",\n      \"state\": \"{{state}}\",\n      \"city\": \"{{city}}\",\n      \"pincode\": \"{{pincode}}\"\n    }\n  },\n  \"official\": {\n    \"officialEmail\": \"{{newUserEmail}}\",\n    \"company\": \"{{company}}\",\n    \"department\": \"{{department}}\",\n    \"employeeCode\": \"{{employeeCode}}\",\n    \"designation\": \"{{designation}}\",\n    \"reportingHead1\": \"{{reportingHead1}}\",\n    \"reportingHead2\": \"{{reportingHead2}}\",\n    \"jobRole\": \"{{jobRole}}\",\n    \"dateOfJoining\": \"{{dateOfJoining}}\",\n    \"calculateSalaryFrom\": \"{{dateOfJoining}}\",\n    \"dateOfRetirement\": null,\n    \"grade\": \"{{grade}}\"\n  },\n  \"other\": {\n    \"bloodGroup\": \"{{bloodGroup}}\",\n    \"passportExpiry\": \"{{passportExpiry}}\"\n  },\n  \"education\": [\n    {\n      \"courseType\": \"{{eduCourseType}}\",\n      \"courseLevel\": \"{{eduCourseLevel}}\",\n      \"courseName\": \"{{eduCourseName}}\",\n      \"instituteName\": \"{{eduInstitute}}\",\n      \"location\": \"{{city}}\",\n      \"fromYear\": \"{{eduFromYear}}\",\n      \"passingYear\": \"{{eduPassingYear}}\",\n      \"major\": \"\",\n      \"minor\": \"\",\n      \"percentageOrGrade\": \"{{eduGrade}}\",\n      \"document\": \"{{eduDocument}}\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"accounts\": [\n    {\n      \"bankName\": \"{{bankName}}\",\n      \"accountNo\": \"{{bankAccountNo}}\",\n      \"accountHolderName\": \"{{accountHolderName}}\",\n      \"ifscCode\": \"{{ifscCode}}\",\n      \"location\": \"{{city}}\",\n      \"remarks\": \"\",\n      \"attachment\": \"\",\n      \"active\": true,\n      \"salaryAccount\": true\n    }\n  ],\n  \"family\": [\n    {\n      \"name\": \"{{familyName}}\",\n      \"relation\": \"{{familyRelation}}\",\n      \"dob\": null,\n      \"occupation\": \"{{familyOccupation}}\",\n      \"education\": \"\",\n      \"aadhaarNo\": \"\",\n      \"mobileNo\": \"{{familyMobile}}\",\n      \"mediclaim\": false\n    }\n  ],\n  \"nominees\": [\n    {\n      \"nominateFor\": \"{{nominateFor}}\",\n      \"relation\": \"{{nomineeRelation}}\",\n      \"dob\": null,\n      \"amountPercent\": {{nomineePercent}},\n      \"address\": \"{{address}}\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"experience\": [\n    {\n      \"organization\": \"{{expOrganization}}\",\n      \"designation\": \"{{expDesignation}}\",\n      \"location\": \"{{city}}\",\n      \"fromDate\": \"{{expFromDate}}\",\n      \"toDate\": \"{{expToDate}}\",\n      \"lastSalaryDrawn\": \"{{expLastSalary}}\",\n      \"description\": \"\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"visas\": [\n    {\n      \"countryName\": \"{{visaCountry}}\",\n      \"visaType\": \"{{visaType}}\",\n      \"visaNumber\": \"{{visaNumber}}\",\n      \"fromDate\": \"{{visaFromDate}}\",\n      \"toDate\": \"{{visaToDate}}\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"payroll\": {\n    \"salaryGroup\": \"\",\n    \"salaryDate\": \"\",\n    \"appraisalDuration\": \"\",\n    \"basic\": {{payrollBasic}},\n    \"annualCtc\": {{payrollCtc}},\n    \"grossSalary\": 0,\n    \"totalEarning\": 0,\n    \"totalDeduction\": 0,\n    \"appraisalDate\": null,\n    \"paymentMode\": \"{{payrollPaymentMode}}\",\n    \"ot1Rate\": 0,\n    \"ot2Rate\": 0,\n    \"remarks\": \"\",\n    \"uanNo\": \"{{payrollUan}}\",\n    \"pfApply\": false,\n    \"pfEmployerShare\": false,\n    \"pfNo\": \"\",\n    \"pfType\": \"\",\n    \"pf\": \"\",\n    \"pfApplyFrom\": null,\n    \"pfApplyTo\": null,\n    \"esiApply\": false,\n    \"esiNo\": \"\",\n    \"esiEmployerShare\": false,\n    \"esiApplyFrom\": null,\n    \"esiApplyTo\": null,\n    \"ptApply\": false,\n    \"tdsApply\": false,\n    \"taxRegime\": \"New\",\n    \"bankName\": \"{{bankName}}\",\n    \"bankAccount\": \"{{bankAccountNo}}\",\n    \"ifsc\": \"{{ifscCode}}\"\n  }\n}"
+                  "raw": "{\n  \"name\": \"{{newUserName}}\",\n  \"password\": \"{{password}}\",\n  \"role\": \"{{userRole}}\",\n  \"status\": \"{{userStatus}}\",\n  \"personal\": {\n    \"dateOfBirth\": \"{{dateOfBirth}}\",\n    \"aadhaarNo\": \"{{aadhaarNo}}\",\n    \"panNo\": \"{{panNo}}\",\n    \"gender\": \"{{gender}}\",\n    \"fatherOrHusbandName\": \"{{fatherOrHusbandName}}\",\n    \"maritalStatus\": \"{{maritalStatus}}\",\n    \"spouseName\": \"\",\n    \"anniversaryDate\": null,\n    \"personalEmail\": \"{{personalEmail}}\",\n    \"languageKnown\": \"{{languageKnown}}\",\n    \"emergencyContact1\": \"{{emergencyContact1}}\",\n    \"emergencyContact2\": \"{{emergencyContact2}}\",\n    \"drivingLicenseNo\": \"{{drivingLicenseNo}}\",\n    \"licenseValidUpto\": null,\n    \"passportNo\": \"{{passportNo}}\",\n    \"remarks\": \"\",\n    \"mobileNo\": \"{{mobileNo}}\",\n    \"workPhone\": \"{{workPhone}}\",\n    \"workExt\": \"{{workExt}}\",\n    \"presentAddress\": {\n      \"address\": \"{{address}}\",\n      \"country\": \"{{country}}\",\n      \"state\": \"{{state}}\",\n      \"city\": \"{{city}}\",\n      \"pincode\": \"{{pincode}}\"\n    },\n    \"permanentAddress\": {\n      \"address\": \"{{address}}\",\n      \"country\": \"{{country}}\",\n      \"state\": \"{{state}}\",\n      \"city\": \"{{city}}\",\n      \"pincode\": \"{{pincode}}\"\n    }\n  },\n  \"official\": {\n    \"officialEmail\": \"{{newUserEmail}}\",\n    \"company\": \"{{company}}\",\n    \"department\": \"{{department}}\",\n    \"employeeCode\": \"{{employeeCode}}\",\n    \"designation\": \"{{designation}}\",\n    \"reportingHead1\": \"{{reportingHead1}}\",\n    \"reportingHead2\": \"{{reportingHead2}}\",\n    \"jobRole\": \"{{jobRole}}\",\n    \"dateOfJoining\": \"{{dateOfJoining}}\",\n    \"calculateSalaryFrom\": \"{{dateOfJoining}}\",\n    \"dateOfRetirement\": null,\n    \"grade\": \"{{grade}}\",\n      \"shift\": \"{{shiftId}}\"\n  },\n  \"other\": {\n    \"bloodGroup\": \"{{bloodGroup}}\",\n    \"passportExpiry\": \"{{passportExpiry}}\"\n  },\n  \"education\": [\n    {\n      \"courseType\": \"{{eduCourseType}}\",\n      \"courseLevel\": \"{{eduCourseLevel}}\",\n      \"courseName\": \"{{eduCourseName}}\",\n      \"instituteName\": \"{{eduInstitute}}\",\n      \"location\": \"{{city}}\",\n      \"fromYear\": \"{{eduFromYear}}\",\n      \"passingYear\": \"{{eduPassingYear}}\",\n      \"major\": \"\",\n      \"minor\": \"\",\n      \"percentageOrGrade\": \"{{eduGrade}}\",\n      \"document\": \"{{eduDocument}}\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"accounts\": [\n    {\n      \"bankName\": \"{{bankName}}\",\n      \"accountNo\": \"{{bankAccountNo}}\",\n      \"accountHolderName\": \"{{accountHolderName}}\",\n      \"ifscCode\": \"{{ifscCode}}\",\n      \"location\": \"{{city}}\",\n      \"remarks\": \"\",\n      \"attachment\": \"\",\n      \"active\": true,\n      \"salaryAccount\": true\n    }\n  ],\n  \"family\": [\n    {\n      \"name\": \"{{familyName}}\",\n      \"relation\": \"{{familyRelation}}\",\n      \"dob\": null,\n      \"occupation\": \"{{familyOccupation}}\",\n      \"education\": \"\",\n      \"aadhaarNo\": \"\",\n      \"mobileNo\": \"{{familyMobile}}\",\n      \"mediclaim\": false\n    }\n  ],\n  \"nominees\": [\n    {\n      \"nominateFor\": \"{{nominateFor}}\",\n      \"relation\": \"{{nomineeRelation}}\",\n      \"dob\": null,\n      \"amountPercent\": {{nomineePercent}},\n      \"address\": \"{{address}}\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"experience\": [\n    {\n      \"organization\": \"{{expOrganization}}\",\n      \"designation\": \"{{expDesignation}}\",\n      \"location\": \"{{city}}\",\n      \"fromDate\": \"{{expFromDate}}\",\n      \"toDate\": \"{{expToDate}}\",\n      \"lastSalaryDrawn\": \"{{expLastSalary}}\",\n      \"description\": \"\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"visas\": [\n    {\n      \"countryName\": \"{{visaCountry}}\",\n      \"visaType\": \"{{visaType}}\",\n      \"visaNumber\": \"{{visaNumber}}\",\n      \"fromDate\": \"{{visaFromDate}}\",\n      \"toDate\": \"{{visaToDate}}\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"payroll\": {\n    \"salaryGroup\": \"\",\n    \"salaryDate\": \"\",\n    \"appraisalDuration\": \"\",\n    \"basic\": {{payrollBasic}},\n    \"annualCtc\": {{payrollCtc}},\n    \"grossSalary\": 0,\n    \"totalEarning\": 0,\n    \"totalDeduction\": 0,\n    \"appraisalDate\": null,\n    \"paymentMode\": \"{{payrollPaymentMode}}\",\n    \"ot1Rate\": 0,\n    \"ot2Rate\": 0,\n    \"remarks\": \"\",\n    \"uanNo\": \"{{payrollUan}}\",\n    \"pfApply\": false,\n    \"pfEmployerShare\": false,\n    \"pfNo\": \"\",\n    \"pfType\": \"\",\n    \"pf\": \"\",\n    \"pfApplyFrom\": null,\n    \"pfApplyTo\": null,\n    \"esiApply\": false,\n    \"esiNo\": \"\",\n    \"esiEmployerShare\": false,\n    \"esiApplyFrom\": null,\n    \"esiApplyTo\": null,\n    \"ptApply\": false,\n    \"tdsApply\": false,\n    \"taxRegime\": \"New\",\n    \"bankName\": \"{{bankName}}\",\n    \"bankAccount\": \"{{bankAccountNo}}\",\n    \"ifsc\": \"{{ifscCode}}\"\n  }\n}"
                 },
                 "url": "{{baseUrl}}/api/employees",
-                "description": "Full nested profile for Employee / HR / Manager.\nLogin as Global Admin / Super Admin / HR Manager.\n\nofficialEmail + department required; company defaults to {{company}}.\nChange {{newUserEmail}} and {{employeeCode}} before each create."
+                "description": "Full nested profile for Employee / HR / Manager.\nLogin as Global Admin / Super Admin / HR Manager.\n\nofficialEmail + department required; company defaults to {{company}}.\nChange {{newUserEmail}} and {{employeeCode}} before each create.\n\nofficial.shift = Master Shift id ({{shiftId}}). Only Global Admin / Super Admin / HR Manager."
               }
             },
             {
@@ -3256,6 +3376,95 @@
                   }
                 }
               ]
+            },
+            {
+              "name": "WH Calculation",
+              "description": "CRUD for master type=`whCalculation` (Work Timings → WH Calculation dropdown). Options: Shift Based | Fixed Hours | Flexible.",
+              "item": [
+                {
+                  "name": "List WH Calculation",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=whCalculation&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "GET /api/masters?type=whCalculation"
+                  }
+                },
+                {
+                  "name": "Get WH Calculation",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}"
+                  }
+                },
+                {
+                  "name": "Create WH Calculation",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"type\": \"whCalculation\",\n  \"name\": \"Shift Based\",\n  \"status\": \"Active\",\n  \"company\": \"{{company}}\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters",
+                    "description": "POST type=whCalculation. Name = Shift Based | Fixed Hours | Flexible"
+                  }
+                },
+                {
+                  "name": "Update WH Calculation",
+                  "request": {
+                    "method": "PUT",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"name\": \"Flexible\",\n  \"status\": \"Active\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}"
+                  }
+                },
+                {
+                  "name": "Delete WH Calculation",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}"
+                  }
+                }
+              ]
             }
           ]
         },
@@ -3305,12 +3514,12 @@
                     "value": "Bearer {{token}}"
                   }
                 ],
+                "url": "{{baseUrl}}/api/attendance/manual",
+                "description": "Admin only. Vars: userId, punchType, punchTime, punchReason, punchRemarks",
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"employeeId\": \"{{userId}}\",\n  \"punchType\": \"{{punchType}}\",\n  \"time\": \"{{punchTime}}\",\n  \"reason\": \"{{punchReason}}\",\n  \"remarks\": \"{{punchRemarks}}\"\n}"
-                },
-                "url": "{{baseUrl}}/api/attendance/manual",
-                "description": "Admin only. Vars: userId, punchType, punchTime, punchReason, punchRemarks"
+                }
               }
             },
             {
@@ -3319,12 +3528,624 @@
                 "method": "GET",
                 "header": [
                   {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
                     "key": "Authorization",
                     "value": "Bearer {{token}}"
                   }
                 ],
-                "url": "{{baseUrl}}/api/attendance?date={{attendanceDate}}&source={{punchSource}}",
-                "description": "Query vars: attendanceDate, punchSource. Remove query if not needed."
+                "url": "{{baseUrl}}/api/attendance?from={{timesheetFrom}}&to={{timesheetTo}}&status={{attendanceStatus}}&source={{punchSource}}&page={{page}}&limit={{limit}}",
+                "description": "Filters: from, to, date, status (Present|Absent|HalfDay|WeeklyOff|Pending|ALL), source, employeeId, page, limit"
+              }
+            },
+            {
+              "name": "Close Absent (no punch-out)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/attendance/close-absent",
+                "description": "Marks past days with punch-in and no punch-out as Absent. Optional body: { date, employeeId }",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"employeeId\": \"{{userId}}\"\n}"
+                }
+              }
+            },
+            {
+              "name": "List Regularizations (Admin)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/attendance/regularize?status={{attendanceStatus}}&page={{page}}&limit={{limit}}",
+                "description": "Admin list — status ALL|Pending|Approved|Rejected"
+              }
+            },
+            {
+              "name": "Get Regularization by Id",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/attendance/regularize/{{regularizeId}}",
+                "description": "View one regularization request"
+              }
+            },
+            {
+              "name": "Review Regularization (approve/reject)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/attendance/regularize/{{regularizeId}}/review",
+                "description": "Admin approve/reject. reviewStatus=Approved|Rejected. On Approve updates Attendance.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"{{reviewStatus}}\",\n  \"reviewRemarks\": \"{{reviewRemarks}}\"\n}"
+                }
+              }
+            },
+            {
+              "name": "Team Timesheet",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/timesheet/team?month={{timesheetMonth}}&page={{page}}&limit={{limit}}",
+                "description": "Admin — paginated employees with present/absent counts for month"
+              }
+            },
+            {
+              "name": "Employee Timesheet (by id)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/timesheet?employeeId={{userId}}&month={{timesheetMonth}}&page={{page}}&limit={{limit}}",
+                "description": "Admin view another employee timesheet"
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.7 Shifts (Master + Assign)",
+          "item": [
+            {
+              "name": "List Shifts",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/shifts?status=Active&page={{page}}&limit={{limit}}",
+                "description": "Work → Shift Management list"
+              }
+            },
+            {
+              "name": "Create Shift",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/shifts",
+                "description": "UI Add Shift drawer. Timing kept: Sat half-day halfDayEndTime; Sun weeklyOffDays=[0]; early in / late out OK.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"code\": \"{{shiftCode}}\",\n  \"name\": \"{{shiftName}}\",\n  \"company\": \"{{company}}\",\n  \"punchStartTime\": \"{{punchStart}}\",\n  \"startTime\": \"{{shiftStart}}\",\n  \"endTime\": \"{{shiftEnd}}\",\n  \"shiftDuration\": 9,\n  \"workDuration\": 9,\n  \"breakApplicable\": false,\n  \"nightShift\": false,\n  \"status\": \"Active\",\n  \"halfDayEndTime\": \"{{halfDayEnd}}\",\n  \"weeklyOffDays\": [0],\n  \"halfDayDays\": [6]\n}"
+                }
+              }
+            },
+            {
+              "name": "Get Shift",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/shifts/{{shiftId}}",
+                "description": ""
+              }
+            },
+            {
+              "name": "Update Shift",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/shifts/{{shiftId}}",
+                "description": "",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"punchStartTime\": \"{{punchStart}}\",\n  \"startTime\": \"{{shiftStart}}\",\n  \"endTime\": \"{{shiftEnd}}\",\n  \"halfDayEndTime\": \"{{halfDayEnd}}\",\n  \"breakApplicable\": false,\n  \"nightShift\": false,\n  \"status\": \"Active\"\n}"
+                }
+              }
+            },
+            {
+              "name": "Delete Shift",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/shifts/{{shiftId}}",
+                "description": "Fails if active assignments exist"
+              }
+            },
+            {
+              "name": "List Assignments",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/shifts/assignments?page={{page}}&limit={{limit}}&search=",
+                "description": "Work → Shift Assignments table (Employee, Shift, Timing, Weekly Off, Effective From)"
+              }
+            },
+            {
+              "name": "Assign Shift to Employee",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/shifts/assignments",
+                "description": "UI: Employee + Shift + Weekly Off + Effective From. Also mirrors User.official.shift.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"employeeId\": \"{{userId}}\",\n  \"shiftId\": \"{{shiftId}}\",\n  \"weeklyOffId\": \"{{weeklyOffId}}\",\n  \"effectiveFrom\": \"{{effectiveFrom}}\",\n  \"effectiveTo\": null,\n  \"remarks\": \"\"\n}"
+                }
+              }
+            },
+            {
+              "name": "Update Assignment",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/shifts/assignments/{{assignmentId}}",
+                "description": "",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"shiftId\": \"{{shiftId}}\",\n  \"weeklyOffId\": \"{{weeklyOffId}}\",\n  \"effectiveFrom\": \"{{effectiveFrom}}\",\n  \"remarks\": \"Updated\"\n}"
+                }
+              }
+            },
+            {
+              "name": "Delete Assignment",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/shifts/assignments/{{assignmentId}}",
+                "description": ""
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.8 Holiday Calendar",
+          "item": [
+            {
+              "name": "List Holidays",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/holidays?year=2026&page={{page}}&limit={{limit}}",
+                "description": "Work → Holiday Calendar (/organization/holiday/list). Columns: Name, Date, Type, For"
+              }
+            },
+            {
+              "name": "Create Holiday",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/holidays",
+                "description": "UI Add Holiday — NATIONAL HOLIDAY | DECLARED HOLIDAY",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"{{holidayName}}\",\n  \"date\": \"{{holidayDate}}\",\n  \"type\": \"{{holidayType}}\",\n  \"forAudience\": \"All Employees\",\n  \"company\": \"{{company}}\",\n  \"status\": \"Active\",\n  \"description\": \"\"\n}"
+                }
+              }
+            },
+            {
+              "name": "Get Holiday",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/holidays/{{holidayId}}",
+                "description": ""
+              }
+            },
+            {
+              "name": "Update Holiday",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/holidays/{{holidayId}}",
+                "description": "",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"{{holidayName}}\",\n  \"type\": \"{{holidayType}}\",\n  \"forAudience\": \"All Employees\",\n  \"status\": \"Active\"\n}"
+                }
+              }
+            },
+            {
+              "name": "Delete Holiday",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/holidays/{{holidayId}}",
+                "description": ""
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.9 Work Timings",
+          "item": [
+            {
+              "name": "List Work Timings",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/work-timings?page={{page}}&limit={{limit}}",
+                "description": ""
+              }
+            },
+            {
+              "name": "Create Work Timing",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/work-timings",
+                "description": "UI: Timing Name, Code, WH Calculation, Grace Time (Mins)",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Standard Time\",\n  \"code\": \"ST\",\n  \"company\": \"{{company}}\",\n  \"whCalculation\": \"Shift Based\",\n  \"graceTimeMins\": 15,\n  \"status\": \"Active\"\n}"
+                }
+              }
+            },
+            {
+              "name": "Get Work Timing",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/work-timings/{{workTimingId}}",
+                "description": ""
+              }
+            },
+            {
+              "name": "Update Work Timing",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/work-timings/{{workTimingId}}",
+                "description": "",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"graceTimeMins\": 15,\n  \"whCalculation\": \"Shift Based\",\n  \"status\": \"Active\"\n}"
+                }
+              }
+            },
+            {
+              "name": "Delete Work Timing",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/work-timings/{{workTimingId}}",
+                "description": ""
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.10 Weekly Off",
+          "item": [
+            {
+              "name": "List Weekly Off Policies",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/weekly-offs?page={{page}}&limit={{limit}}",
+                "description": ""
+              }
+            },
+            {
+              "name": "Create Weekly Off Policy",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/weekly-offs",
+                "description": "UI: Policy Name, Code, Working Days, Week Starts On",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"5 Day Week\",\n  \"code\": \"5DAY\",\n  \"company\": \"{{company}}\",\n  \"workingDays\": 5,\n  \"weekStartsOn\": \"Monday\",\n  \"offDays\": [0, 6],\n  \"status\": \"Active\"\n}"
+                }
+              }
+            },
+            {
+              "name": "Get Weekly Off Policy",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/weekly-offs/{{weeklyOffId}}",
+                "description": ""
+              }
+            },
+            {
+              "name": "Update Weekly Off Policy",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/weekly-offs/{{weeklyOffId}}",
+                "description": "",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"workingDays\": 5,\n  \"weekStartsOn\": \"Monday\",\n  \"offDays\": [0, 6],\n  \"status\": \"Active\"\n}"
+                }
+              }
+            },
+            {
+              "name": "Delete Weekly Off Policy",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/weekly-offs/{{weeklyOffId}}",
+                "description": ""
               }
             }
           ]
@@ -3448,12 +4269,12 @@
                     "value": "Bearer {{token}}"
                   }
                 ],
+                "url": "{{baseUrl}}/api/attendance/punch-in",
+                "description": "Self punch-in: source + lat + long only. Address fetched via Google Maps / OSM and saved in DB. Attaches assigned shift.",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"source\": \"{{punchSource}}\"\n}"
-                },
-                "url": "{{baseUrl}}/api/attendance/punch-in",
-                "description": "Self punch-in — ANY role. Body source: web | mobile | biometric. Uses {{token}}."
+                  "raw": "{\n  \"source\": \"{{punchSource}}\",\n  \"latitude\": {{latitude}},\n  \"longitude\": {{longitude}},\n  \"remarks\": \"\"\n}"
+                }
               }
             },
             {
@@ -3470,12 +4291,12 @@
                     "value": "Bearer {{token}}"
                   }
                 ],
+                "url": "{{baseUrl}}/api/attendance/punch-in",
+                "description": "Same as web — source mobile",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"source\": \"{{punchSourceMobile}}\"\n}"
-                },
-                "url": "{{baseUrl}}/api/attendance/punch-in",
-                "description": "Self punch-in — ANY role. Body source: web | mobile | biometric. Uses {{token}}."
+                  "raw": "{\n  \"source\": \"{{punchSourceMobile}}\",\n  \"latitude\": {{latitude}},\n  \"longitude\": {{longitude}}\n}"
+                }
               }
             },
             {
@@ -3492,12 +4313,12 @@
                     "value": "Bearer {{token}}"
                   }
                 ],
+                "url": "{{baseUrl}}/api/attendance/punch-out",
+                "description": "Self punch-out: source + lat + long only. Address from Map API saved in DB. Late out after shift end allowed.",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"source\": \"{{punchSourceOut}}\"\n}"
-                },
-                "url": "{{baseUrl}}/api/attendance/punch-out",
-                "description": "Self punch-out — ANY role. Must punch-in first. Uses {{token}}."
+                  "raw": "{\n  \"source\": \"{{punchSourceOut}}\",\n  \"latitude\": {{latitude}},\n  \"longitude\": {{longitude}}\n}"
+                }
               }
             },
             {
@@ -3506,11 +4327,52 @@
                 "method": "GET",
                 "header": [
                   {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
                     "key": "Authorization",
                     "value": "Bearer {{token}}"
                   }
                 ],
-                "url": "{{baseUrl}}/api/attendance/today"
+                "url": "{{baseUrl}}/api/attendance/today",
+                "description": "Today punch + assigned shift"
+              }
+            },
+            {
+              "name": "My Web Punches",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/attendance/web-punches?from={{timesheetFrom}}&to={{timesheetTo}}&status={{attendanceStatus}}&page={{page}}&limit={{limit}}",
+                "description": "Flattened IN/OUT rows with lat/long/address (ESS My Web Punches)"
+              }
+            },
+            {
+              "name": "List My Attendance",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/attendance?from={{timesheetFrom}}&to={{timesheetTo}}&page={{page}}&limit={{limit}}",
+                "description": "Own attendance list with filters + pagination"
               }
             }
           ]
@@ -3912,6 +4774,169 @@
                   }
                 }
               ]
+            }
+          ]
+        },
+        {
+          "name": "2.5 Time Sheet",
+          "item": [
+            {
+              "name": "My Time Sheet (by month)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/timesheet?month={{timesheetMonth}}&page={{page}}&limit={{limit}}",
+                "description": "Day rows + summary. Sat = HalfDay (HD) 10:00–14:30; Sun = WO. Punch-in without punch-out = Absent."
+              }
+            },
+            {
+              "name": "My Time Sheet (from–to)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/timesheet?from={{timesheetFrom}}&to={{timesheetTo}}&status={{attendanceStatus}}&page={{page}}&limit={{limit}}",
+                "description": "Filter by date range + status + pagination"
+              }
+            }
+          ]
+        },
+        {
+          "name": "2.6 Regularize Attendance",
+          "item": [
+            {
+              "name": "Create Regularization",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/attendance/regularize",
+                "description": "Employee request to fix missed punch",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"sheetDate\": \"{{sheetDate}}\",\n  \"requestedInTime\": \"{{requestedInTime}}\",\n  \"requestedOutTime\": \"{{requestedOutTime}}\",\n  \"remarks\": \"{{regularizeRemarks}}\"\n}"
+                }
+              }
+            },
+            {
+              "name": "List My Regularizations",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/attendance/regularize?status={{attendanceStatus}}&page={{page}}&limit={{limit}}",
+                "description": "Pending Request table — status ALL|Pending|Approved|Rejected"
+              }
+            },
+            {
+              "name": "Get Regularization",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/attendance/regularize/{{regularizeId}}",
+                "description": ""
+              }
+            },
+            {
+              "name": "Cancel Regularization",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/attendance/regularize/{{regularizeId}}/cancel",
+                "description": "Cancel own pending request"
+              }
+            }
+          ]
+        },
+        {
+          "name": "2.7 View Shift Roster",
+          "item": [
+            {
+              "name": "My Shift",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/shifts/roster/me",
+                "description": "Current assignment + history"
+              }
+            },
+            {
+              "name": "List Shifts (dropdown)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/shifts?status=Active&page=1&limit=50",
+                "description": "Active shifts for reference"
+              }
             }
           ]
         }

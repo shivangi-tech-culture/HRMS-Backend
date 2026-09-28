@@ -124,6 +124,16 @@ const userSchema = new mongoose.Schema(
       calculateSalaryFrom: { type: Date, default: null },
       dateOfRetirement: { type: Date, default: null },
       grade: { type: String, default: "" },
+      /**
+       * Assigned work shift (Master Shift).
+       * Set on employee create/update by Global Admin / Super Admin / HR Manager only.
+       * Employees cannot edit this field.
+       */
+      shift: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Shift",
+        default: null,
+      },
     },
     // 3. OTHER — extra personal details
 

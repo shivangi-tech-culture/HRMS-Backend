@@ -196,7 +196,7 @@ const mapEmployeeListRow = (row) => ({
 });
 
 const LIST_SELECT =
-  "name role status lastLogin official.officialEmail official.employeeCode official.department official.designation official.company personal.gender";
+  "name role status lastLogin official.officialEmail official.employeeCode official.department official.designation official.company official.shift personal.gender";
 
 module.exports = {
   visibleRolesForActor,

@@ -61,6 +61,8 @@ const UI_DROPDOWNS = {
     "Conference Visa",
     "Medical Visa",
   ],
+  // Work Timings — WH Calculation dropdown (UI)
+  whCalculation: ["Shift Based", "Fixed Hours", "Flexible"],
   // Personal / Other — shown as selects in UI; no hardcoded array in FE chunk
   gender: ["Male", "Female", "Other"],
   maritalStatus: ["Single", "Married", "Divorced", "Widowed"],

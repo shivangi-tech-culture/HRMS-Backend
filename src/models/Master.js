@@ -4,6 +4,7 @@
  * Official (org): company, department, designation, division, employeeGroup, grade, jobRole
  * General Info: gender, maritalStatus, bloodGroup, country, state, city,
  *   courseType, courseLevel, bankName, relation, nominateFor, visaType
+ * Work: whCalculation (Work Timings dropdown)
  *
  * Schema = data shape only. Request rules → validators/master.validation.js
  * Employee forms save `name` string (not _id).
@@ -39,6 +40,8 @@ const TYPES = [
   "nominateFor",
   // Visa
   "visaType",
+  // Work Timings — WH Calculation dropdown
+  "whCalculation",
 ];
 
 const COLLECTION_BY_TYPE = {
@@ -61,6 +64,7 @@ const COLLECTION_BY_TYPE = {
   relation: "relations",
   nominateFor: "nominatefors",
   visaType: "visatypes",
+  whCalculation: "whcalculations",
 };
 
 /**
@@ -111,6 +115,9 @@ const GENERAL_INFO_DROPDOWNS = {
   visas: {
     countryName: "country",
     visaType: "visaType",
+  },
+  work: {
+    whCalculation: "whCalculation",
   },
 };
 

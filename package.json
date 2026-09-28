@@ -1,12 +1,14 @@
 {
   "name": "hrms-api",
   "version": "1.0.0",
-  "description": "Simple HRMS boilerplate - Auth, Employee, Punch In/Out",
+  "description": "HRMS API - Auth, Employees, Shifts, Punch In/Out (geo), Timesheet, Regularization",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon --watch src src/server.js",
-    "seed": "node src/seed.js"
+    "seed": "node src/seed.js",
+    "seed:shifts": "node src/scripts/seedShifts.js",
+    "seed:wh-calculation": "node src/scripts/seedWhCalculationMasters.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
