@@ -129,24 +129,11 @@ const seed = async () => {
     );
   }
 
-  // 4. SEED MASTERS (dropdown labels — one collection per type)
+  // 4. SEED MASTERS — exact ESS General Info UI dropdown values (+ official org)
+  // Source: src/config/generalInfoMasters.js (matches hrms-techculture.vercel.app)
 
-  // Master.getModel(type) → separate collections (no Department.js files)
-  const masters = [
-    { type: "company", name: DEFAULT_COMPANY },
-    { type: "department", name: "Administration", company: DEFAULT_COMPANY },
-    { type: "department", name: "HR", company: DEFAULT_COMPANY },
-    { type: "department", name: "Engineering", company: DEFAULT_COMPANY },
-    { type: "department", name: "Finance", company: DEFAULT_COMPANY },
-    { type: "designation", name: "Software Engineer", company: DEFAULT_COMPANY },
-    { type: "designation", name: "HR Manager", company: DEFAULT_COMPANY },
-    { type: "designation", name: "Engineering Manager", company: DEFAULT_COMPANY },
-    { type: "designation", name: "Finance Executive", company: DEFAULT_COMPANY },
-    { type: "division", name: "HO", company: DEFAULT_COMPANY },
-    { type: "division", name: "RO", company: DEFAULT_COMPANY },
-    { type: "employeeGroup", name: "Permanent", company: DEFAULT_COMPANY },
-    { type: "employeeGroup", name: "Contract", company: DEFAULT_COMPANY },
-  ];
+  const { buildMasterSeedRows } = require("./config/generalInfoMasters");
+  const masters = buildMasterSeedRows(DEFAULT_COMPANY);
 
   for (const m of masters) {
     const Model = getModel(m.type);
@@ -225,6 +212,20 @@ const seed = async () => {
       official: {
         employeeCode: "EMP-1002",
         officialEmail: "shivig5964@gmail.com",
+        company: DEFAULT_COMPANY,
+        department: "Engineering",
+        designation: "Software Engineer",
+      },
+    },
+    {
+      name: "Demo Employee",
+      password: "123456",
+      role: "Employee",
+      status: "Active",
+      personal: { mobileNo: "9876500002", gender: "Male", maritalStatus: "Single" },
+      official: {
+        employeeCode: "EMP-1003",
+        officialEmail: "employee@gmail.com",
         company: DEFAULT_COMPANY,
         department: "Engineering",
         designation: "Software Engineer",

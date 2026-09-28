@@ -1,15 +1,14 @@
 /**
- * VALIDATE MIDDLEWARE — run a Joi schema against req.body
- * Usage: router.post("/", protect, validate(schema), handler)
+ * VALIDATE MIDDLEWARE — Joi against body or query
+ * Usage: validate(schema) | validateQuery(schema)
  */
-
-/** Express middleware: validate req.body with Joi schema */
-const validate = (schema) => {
+const run = (schema, source, opts = {}) => {
   return (req, res, next) => {
-    const { error, value } = schema.validate(req.body, {
+    const { error, value } = schema.validate(req[source], {
       abortEarly: false,
-      allowUnknown: false,
-      stripUnknown: false,
+      allowUnknown: opts.allowUnknown ?? false,
+      stripUnknown: opts.stripUnknown ?? false,
+      convert: true,
     });
 
     if (error) {
@@ -20,9 +19,17 @@ const validate = (schema) => {
       });
     }
 
-    req.body = value;
+    req[source] = value;
     next();
   };
 };
 
-module.exports = { validate };
+/** Express middleware: validate req.body (reject unknown keys) */
+const validate = (schema) =>
+  run(schema, "body", { allowUnknown: false, stripUnknown: false });
+
+/** Express middleware: validate req.query (strip unknown; convert page/limit) */
+const validateQuery = (schema) =>
+  run(schema, "query", { allowUnknown: true, stripUnknown: true });
+
+module.exports = { validate, validateQuery };

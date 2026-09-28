@@ -270,32 +270,62 @@ Clears the auth cookie.
 
 ## Masters (SaaS dropdowns)
 
-**One model file** (`Master.js`) — `type` decides Mongo **collection name** (no Department.js / Designation.js):
+**One model file** (`Master.js`) — `type` decides Mongo **collection name**.
 
-| `type` | Collection created/used |
-|--------|-------------------------|
+ESS **General Info** has **9 modules** (no Vaccination). All dropdowns load from masters:
+
+| Module | Dropdown fields → `type` |
+|--------|---------------------------|
+| Personal | `gender`, `maritalStatus`, `country`, `state`, `city` |
+| Official | `company`, `department`, `designation`, `division`, `employeeGroup`, `grade`, `jobRole` |
+| Other | `bloodGroup` |
+| Education | `courseType`, `courseLevel` |
+| Account | `bankName` |
+| Family | `relation` |
+| Nominee | `nominateFor`, `relation` (`nomineeName` = free text, not master) |
+| Experience | `designation` |
+| Visa | `country` (as `countryName`), `visaType` |
+
+| `type` | Collection |
+|--------|------------|
 | `company` | `companies` |
 | `department` | `departments` |
 | `designation` | `designations` |
 | `division` | `divisions` |
 | `employeeGroup` | `employeegroups` |
-
-Same API: `/api/masters?type=…` → CRUD us collection pe.  
-Har company ke apne departments / designations ho sakte hain.  
-Fields: `type`, `name`, `status`, `company` (no `code`).
-
-Employee pe **name** save karo (not `_id`):
+| `grade` | `grades` |
+| `jobRole` | `jobroles` |
+| `gender` | `genders` |
+| `maritalStatus` | `maritalstatuses` |
+| `bloodGroup` | `bloodgroups` |
+| `country` | `countries` |
+| `state` | `states` |
+| `city` | `cities` |
+| `courseType` | `coursetypes` |
+| `courseLevel` | `courselevels` |
+| `bankName` | `banknames` |
+| `relation` | `relations` |
+| `nominateFor` | `nominatefors` |
+| `visaType` | `visatypes` |
 
 ```http
-GET /api/masters?type=department&status=Active
-→ { count, data: [ { name: "Finance", … } ] }
+GET /api/masters/meta
+→ { types, generalInfoModules, dropdowns }
+
+GET /api/masters?type=courseType&status=Active&search=Full&page=1&limit=50
+→ { total, page, limit, pages, data, filters }
 
 POST /api/masters
-{ "type": "department", "name": "Finance" }
+{ "type": "courseType", "name": "Full Time" }
 ```
+
+List query: `type` (required), `status`, `company`, `search|q`, `page` (default 1), `limit` (default 50, max 200).
+
+Employee pe **name** save karo (not `_id`).  
 (Super Admin: company auto from login. Global Admin: send `company` in body.)
 
 ```http
+GET /api/masters/meta
 GET/POST /api/masters
 GET/PUT/DELETE /api/masters/:id
 ```

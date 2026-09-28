@@ -162,6 +162,20 @@ const MASTER_TYPE_PERM = {
   designation: "Designation",
   division: "Division",
   employeeGroup: "Employee Group",
+  grade: "Grade",
+  jobRole: "Job Role",
+  gender: "Gender",
+  maritalStatus: "Marital Status",
+  bloodGroup: "Blood Group",
+  country: "Country",
+  state: "State",
+  city: "City",
+  courseType: "Course Type",
+  courseLevel: "Course Level",
+  bankName: "Bank Name",
+  relation: "Relation",
+  nominateFor: "Nominate For",
+  visaType: "Visa Type",
 };
 
 /** Admin write on /api/masters — type from body, query, or :id lookup */
@@ -182,9 +196,9 @@ const checkMasterPermission = (action) => {
       }
 
       if (!type) {
+        const { TYPES } = require("../models/Master");
         return res.status(400).json({
-          message:
-            "type is required: company, department, designation, division, employeeGroup",
+          message: `type is required: ${TYPES.join(", ")}`,
         });
       }
 

@@ -1,20 +1,44 @@
 /**
  * Master — dropdown catalogs (one file, many Mongo collections by `type`)
  *
- * type → collection: company→companies, department→departments,
- *   designation→designations, division→divisions, employeeGroup→employeegroups
+ * Official (org): company, department, designation, division, employeeGroup, grade, jobRole
+ * General Info: gender, maritalStatus, bloodGroup, country, state, city,
+ *   courseType, courseLevel, bankName, relation, nominateFor, visaType
  *
  * Schema = data shape only. Request rules → validators/master.validation.js
  * Employee forms save `name` string (not _id).
+ *
+ * ESS General Info (9 modules — no Vaccination):
+ *   Personal | Official | Other | Education | Account | Family | Nominee | Experience | Visa
  */
 const mongoose = require("mongoose");
 
 const TYPES = [
+  // Official / org structure
   "company",
   "department",
   "designation",
   "division",
   "employeeGroup",
+  "grade",
+  "jobRole",
+  // Personal / Other
+  "gender",
+  "maritalStatus",
+  "bloodGroup",
+  "country",
+  "state",
+  "city",
+  // Education
+  "courseType",
+  "courseLevel",
+  // Accounts
+  "bankName",
+  // Family + Nominee
+  "relation",
+  "nominateFor",
+  // Visa
+  "visaType",
 ];
 
 const COLLECTION_BY_TYPE = {
@@ -23,6 +47,71 @@ const COLLECTION_BY_TYPE = {
   designation: "designations",
   division: "divisions",
   employeeGroup: "employeegroups",
+  grade: "grades",
+  jobRole: "jobroles",
+  gender: "genders",
+  maritalStatus: "maritalstatuses",
+  bloodGroup: "bloodgroups",
+  country: "countries",
+  state: "states",
+  city: "cities",
+  courseType: "coursetypes",
+  courseLevel: "courselevels",
+  bankName: "banknames",
+  relation: "relations",
+  nominateFor: "nominatefors",
+  visaType: "visatypes",
+};
+
+/**
+ * Field → master `type` for ESS General Info dropdowns.
+ * Frontend: GET /api/masters?type=<type>&status=Active
+ */
+const GENERAL_INFO_DROPDOWNS = {
+  personal: {
+    gender: "gender",
+    maritalStatus: "maritalStatus",
+    "presentAddress.country": "country",
+    "presentAddress.state": "state",
+    "presentAddress.city": "city",
+    "permanentAddress.country": "country",
+    "permanentAddress.state": "state",
+    "permanentAddress.city": "city",
+  },
+  official: {
+    company: "company",
+    department: "department",
+    designation: "designation",
+    division: "division",
+    employeeGroup: "employeeGroup",
+    grade: "grade",
+    jobRole: "jobRole",
+  },
+  other: {
+    bloodGroup: "bloodGroup",
+  },
+  education: {
+    courseType: "courseType",
+    courseLevel: "courseLevel",
+  },
+  accounts: {
+    bankName: "bankName",
+  },
+  family: {
+    relation: "relation",
+  },
+  nominees: {
+    nominateFor: "nominateFor",
+    relation: "relation",
+    // nomineeName = free text input (not a master dropdown)
+  },
+  experience: {
+    designation: "designation",
+  },
+  visas: {
+    countryName: "country",
+    visaType: "visaType",
+  },
 };
 
 const isCompanyType = (type) => type === "company";
@@ -100,6 +189,7 @@ const clearAllMasterCollections = async () => {
 module.exports = {
   TYPES,
   COLLECTION_BY_TYPE,
+  GENERAL_INFO_DROPDOWNS,
   isCompanyType,
   getModel,
   toMasterDto,

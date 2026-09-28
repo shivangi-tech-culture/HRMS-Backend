@@ -7,6 +7,7 @@
  */
 const express = require("express");
 const {
+  listMasterMeta,
   listMasters,
   getMaster,
   createMaster,
@@ -15,10 +16,11 @@ const {
 } = require("../controllers/master.controller");
 const { protect, authorize, ALL_ACCESS } = require("../middleware/auth");
 const { checkMasterPermission } = require("../controllers/permission.controller");
-const { validate } = require("../middleware/validate");
+const { validate, validateQuery } = require("../middleware/validate");
 const {
   createMasterSchema,
   updateMasterSchema,
+  listMasterQuerySchema,
 } = require("../validators/master.validation");
 
 const router = express.Router();
@@ -30,14 +32,33 @@ const router = express.Router();
  *     description: |
  *       type picks collection. Employee forms save **name** (not _id).
  *       GET open to any logged-in user (own company). Write = Masters permission by type.
+ *       ESS General Info dropdowns: GET /api/masters/meta then GET ?type=…
  */
+
+/**
+ * @swagger
+ * /api/masters/meta:
+ *   get:
+ *     tags: [Admin / Masters]
+ *     summary: Master types + General Info dropdown field map
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: types, generalInfoModules, dropdowns }
+ */
+router.get(
+  "/meta",
+  protect,
+  authorize(...ALL_ACCESS, "Employee"),
+  listMasterMeta
+);
 
 /**
  * @swagger
  * /api/masters:
  *   get:
  *     tags: [Admin / Masters]
- *     summary: List masters by type (no permission — login only)
+ *     summary: List masters by type (search + pagination)
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -46,7 +67,7 @@ const router = express.Router();
  *         required: true
  *         schema:
  *           type: string
- *           enum: [company, department, designation, division, employeeGroup]
+ *           enum: [company, department, designation, division, employeeGroup, grade, jobRole, gender, maritalStatus, bloodGroup, country, state, city, courseType, courseLevel, bankName, relation, nominateFor, visaType]
  *       - in: query
  *         name: company
  *         schema: { type: string }
@@ -55,9 +76,17 @@ const router = express.Router();
  *         schema: { type: string, enum: [Active, Inactive] }
  *       - in: query
  *         name: search
+ *         description: Case-insensitive name search (aliases q, query, keyword)
  *         schema: { type: string }
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, minimum: 1, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
  *     responses:
- *       200: { description: Master list }
+ *       200:
+ *         description: Paginated master list (total, page, limit, pages, data, filters)
  *   post:
  *     tags: [Admin / Masters]
  *     summary: Create master (Masters → type → create)
@@ -73,7 +102,7 @@ const router = express.Router();
  *             properties:
  *               type:
  *                 type: string
- *                 enum: [company, department, designation, division, employeeGroup]
+ *                 enum: [company, department, designation, division, employeeGroup, grade, jobRole, gender, maritalStatus, bloodGroup, country, state, city, courseType, courseLevel, bankName, relation, nominateFor, visaType]
  *               name: { type: string }
  *               status: { type: string, enum: [Active, Inactive] }
  *               company: { type: string }
@@ -81,7 +110,13 @@ const router = express.Router();
  *       201: { description: Created }
  */
 // GET — public for logged-in Employee + Admin (dropdowns); company scope in controller
-router.get("/", protect, authorize(...ALL_ACCESS, "Employee"), listMasters);
+router.get(
+  "/",
+  protect,
+  authorize(...ALL_ACCESS, "Employee"),
+  validateQuery(listMasterQuerySchema),
+  listMasters
+);
 router.post(
   "/",
   protect,

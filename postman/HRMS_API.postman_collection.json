@@ -258,10 +258,6 @@
       "value": "9876501234"
     },
     {
-      "key": "nomineeName",
-      "value": "Neha Iyer"
-    },
-    {
       "key": "nominateFor",
       "value": "PF"
     },
@@ -396,6 +392,10 @@
     {
       "key": "educationId",
       "value": ""
+    },
+    {
+      "key": "nomineeName",
+      "value": "Neha Iyer"
     }
   ],
   "item": [
@@ -640,15 +640,15 @@
           "item": [
             {
               "name": "Get Permission Catalogs",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": "{{baseUrl}}/api/permissions/modules",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/permissions/modules",
                 "description": "Returns both catalogs for Create Role UI:\n- side: admin → Super Admin / HR / Manager modules\n- side: employee → ESS modules\n\nPick ONE side, toggle modules/actions, then POST /api/roles with that catalog + permissions array."
               }
             },
@@ -666,18 +666,18 @@
                   }
                 }
               ],
-          "request": {
+              "request": {
                 "method": "POST",
-            "header": [
+                "header": [
                   {
                     "key": "Content-Type",
                     "value": "application/json"
                   },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"name\": \"{{roleName}}\",\n  \"description\": \"{{roleDescription}}\",\n  \"status\": \"{{roleStatus}}\",\n  \"catalog\": \"admin\",\n  \"permissions\": [\n    {\n      \"module\": \"Dashboard\",\n      \"heading\": \"Overview\",\n      \"subModules\": [\n        {\n          \"name\": \"Attendance Summary\",\n          \"view\": true,\n          \"create\": false,\n          \"edit\": false,\n          \"delete\": false,\n          \"approve\": false,\n          \"reject\": false,\n          \"download\": true,\n          \"export\": true,\n          \"import\": false,\n          \"upload\": false,\n          \"print\": true,\n          \"email\": false,\n          \"share\": false,\n          \"cancel\": false,\n          \"assign\": false\n        }\n      ]\n    },\n    {\n      \"module\": \"Attendance\",\n      \"heading\": \"Attendance & Time\",\n      \"subModules\": [\n        {\n          \"name\": \"Daily Attendance\",\n          \"view\": true,\n          \"create\": false,\n          \"edit\": false,\n          \"delete\": false,\n          \"approve\": false,\n          \"reject\": false,\n          \"download\": false,\n          \"export\": false,\n          \"import\": false,\n          \"upload\": false,\n          \"print\": false,\n          \"email\": false,\n          \"share\": false,\n          \"cancel\": false,\n          \"assign\": false\n        }\n      ]\n    }\n  ]\n}"
@@ -688,82 +688,82 @@
             },
             {
               "name": "Create Role (employee catalog)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "var j = pm.response.json();",
-                  "if (j.role && j.role.id) pm.collectionVariables.set('roleId', j.role.id);"
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "var j = pm.response.json();",
+                      "if (j.role && j.role.id) pm.collectionVariables.set('roleId', j.role.id);"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
                 ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
+                "body": {
+                  "mode": "raw",
                   "raw": "{\n  \"name\": \"Field Staff\",\n  \"description\": \"Limited ESS modules\",\n  \"status\": \"Active\",\n  \"catalog\": \"employee\",\n  \"permissions\": [\n    {\n      \"module\": \"Dashboard\",\n      \"heading\": \"\",\n      \"subModules\": [\n        {\n          \"name\": \"My Home\",\n          \"view\": true,\n          \"create\": false,\n          \"edit\": false,\n          \"delete\": false,\n          \"approve\": false,\n          \"reject\": false,\n          \"download\": false,\n          \"export\": false,\n          \"import\": false,\n          \"upload\": false,\n          \"print\": false,\n          \"email\": false,\n          \"share\": false,\n          \"cancel\": false,\n          \"assign\": false\n        }\n      ]\n    },\n    {\n      \"module\": \"Self\",\n      \"heading\": \"\",\n      \"subModules\": [\n        {\n          \"name\": \"General Info\",\n          \"view\": true,\n          \"create\": false,\n          \"edit\": true,\n          \"delete\": false,\n          \"approve\": false,\n          \"reject\": false,\n          \"download\": false,\n          \"export\": false,\n          \"import\": false,\n          \"upload\": false,\n          \"print\": false,\n          \"email\": false,\n          \"share\": false,\n          \"cancel\": false,\n          \"assign\": false\n        },\n        {\n          \"name\": \"Leave\",\n          \"view\": true,\n          \"create\": true,\n          \"edit\": false,\n          \"delete\": false,\n          \"approve\": false,\n          \"reject\": false,\n          \"download\": false,\n          \"export\": false,\n          \"import\": false,\n          \"upload\": false,\n          \"print\": false,\n          \"email\": false,\n          \"share\": false,\n          \"cancel\": true,\n          \"assign\": false\n        }\n      ]\n    }\n  ]\n}"
-            },
-            "url": "{{baseUrl}}/api/roles",
+                },
+                "url": "{{baseUrl}}/api/roles",
                 "description": "Create custom role from **employee** (ESS) catalog only.\nSend only modules you keep. Sets {{roleId}}.\nDo NOT mix admin modules when catalog=employee."
-          }
-        },
-        {
-          "name": "List Roles",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
               }
-            ],
+            },
+            {
+              "name": "List Roles",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
                 "url": "{{baseUrl}}/api/roles",
                 "description": "Global Admin login → includes Global Admin role.\nSuper Admin / HR / Manager → Global Admin hidden (no escalation)."
-          }
-        },
-        {
-          "name": "Get Role Permissions",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
               }
-            ],
+            },
+            {
+              "name": "Get Role Permissions",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
                 "url": "{{baseUrl}}/api/roles/{{roleId}}/permissions",
                 "description": "Permission matrix for {{roleId}} (array of module objects)."
-          }
-        },
-        {
-              "name": "Update Role Permissions",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
               }
-            ],
-            "body": {
-              "mode": "raw",
+            },
+            {
+              "name": "Update Role Permissions",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
                   "raw": "{\n  \"catalog\": \"{{roleCatalog}}\",\n  \"permissions\": [\n    {\n      \"module\": \"Dashboard\",\n      \"heading\": \"Overview\",\n      \"subModules\": [\n        {\n          \"name\": \"Attendance Summary\",\n          \"view\": true,\n          \"create\": false,\n          \"edit\": false,\n          \"delete\": false,\n          \"approve\": false,\n          \"reject\": false,\n          \"download\": true,\n          \"export\": true,\n          \"import\": false,\n          \"upload\": false,\n          \"print\": false,\n          \"email\": false,\n          \"share\": false,\n          \"cancel\": false,\n          \"assign\": false\n        }\n      ]\n    }\n  ]\n}"
                 },
                 "url": "{{baseUrl}}/api/roles/{{roleId}}/permissions",
@@ -780,44 +780,44 @@
                     "value": "Bearer {{token}}"
                   }
                 ],
-            "url": "{{baseUrl}}/api/roles/{{roleId}}",
+                "url": "{{baseUrl}}/api/roles/{{roleId}}",
                 "description": "Super Admin / Global Admin cannot be deleted.\nOther roles deletable when no user has that role.\nLogin as Super Admin. Set {{roleId}}."
-          }
-        }
-      ]
-    },
-    {
-          "name": "1.2 Access & Control (Users)",
-          "description": "User hierarchy — /api/users",
-      "item": [
-        {
-          "name": "Create User",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "var j = pm.response.json();",
-                      "if (j.user && j.user._id) pm.collectionVariables.set(\"userId\", j.user._id);"
-                ],
-                "type": "text/javascript"
               }
             }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
+          ]
+        },
+        {
+          "name": "1.2 Access & Control (Users)",
+          "description": "User hierarchy — /api/users",
+          "item": [
+            {
+              "name": "Create User",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "var j = pm.response.json();",
+                      "if (j.user && j.user._id) pm.collectionVariables.set(\"userId\", j.user._id);"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
                   "raw": "{\n  \"name\": \"{{newUserName}}\",\n  \"password\": \"{{password}}\",\n  \"role\": \"Employee\",\n  \"status\": \"Active\",\n  \"official\": {\n    \"officialEmail\": \"{{newUserEmail}}\",\n    \"company\": \"{{company}}\",\n    \"department\": \"{{department}}\"\n  },\n  \"personal\": {\n    \"mobileNo\": \"{{mobileNo}}\",\n    \"presentAddress\": {\n      \"city\": \"{{city}}\",\n      \"state\": \"{{state}}\",\n      \"country\": \"{{country}}\"\n    }\n  }\n}"
                 },
                 "url": "{{baseUrl}}/api/users",
@@ -909,21 +909,21 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"name\": \"Global Admin 2\",\n  \"password\": \"{{password}}\",\n  \"role\": \"Global Admin\",\n  \"status\": \"Active\",\n  \"official\": {\n    \"officialEmail\": \"globaladmin2@techculture.ai\"\n  }\n}"
-            },
-            "url": "{{baseUrl}}/api/employees",
+                },
+                "url": "{{baseUrl}}/api/employees",
                 "description": "Only Global Admin can create another Global Admin (lean, empty company).\nSoft cap MAX_GLOBAL_ADMINS (default 5). Super Admin cannot create Global Admin.\nRole appears in GET /api/roles only for Global Admin login."
-          }
-        },
-        {
-          "name": "List Users",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
               }
-            ],
+            },
+            {
+              "name": "List Users",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
                 "url": {
                   "raw": "{{baseUrl}}/api/users?search=&role=&status=&department=&company=&page=1&limit=10",
                   "host": [
@@ -1013,18 +1013,18 @@
                   ]
                 },
                 "description": "GET /api/users/export — .xlsx (Access & Control → export). Same filters as list."
-          }
-        },
-        {
-          "name": "Get User by ID",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
               }
-            ],
+            },
+            {
+              "name": "Get User by ID",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
                 "url": "{{baseUrl}}/api/users/{{userId}}",
                 "description": "GET /api/users/:id"
               }
@@ -1121,7 +1121,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"name\": \"{{newUserName}}\",\n  \"password\": \"{{password}}\",\n  \"role\": \"{{userRole}}\",\n  \"status\": \"{{userStatus}}\",\n  \"personal\": {\n    \"dateOfBirth\": \"{{dateOfBirth}}\",\n    \"aadhaarNo\": \"{{aadhaarNo}}\",\n    \"panNo\": \"{{panNo}}\",\n    \"gender\": \"{{gender}}\",\n    \"fatherOrHusbandName\": \"{{fatherOrHusbandName}}\",\n    \"maritalStatus\": \"{{maritalStatus}}\",\n    \"spouseName\": \"\",\n    \"anniversaryDate\": null,\n    \"personalEmail\": \"{{personalEmail}}\",\n    \"languageKnown\": \"{{languageKnown}}\",\n    \"emergencyContact1\": \"{{emergencyContact1}}\",\n    \"emergencyContact2\": \"{{emergencyContact2}}\",\n    \"drivingLicenseNo\": \"{{drivingLicenseNo}}\",\n    \"licenseValidUpto\": null,\n    \"passportNo\": \"{{passportNo}}\",\n    \"remarks\": \"\",\n    \"mobileNo\": \"{{mobileNo}}\",\n    \"workPhone\": \"{{workPhone}}\",\n    \"workExt\": \"{{workExt}}\",\n    \"presentAddress\": {\n      \"address\": \"{{address}}\",\n      \"country\": \"{{country}}\",\n      \"state\": \"{{state}}\",\n      \"city\": \"{{city}}\",\n      \"pincode\": \"{{pincode}}\"\n    },\n    \"permanentAddress\": {\n      \"address\": \"{{address}}\",\n      \"country\": \"{{country}}\",\n      \"state\": \"{{state}}\",\n      \"city\": \"{{city}}\",\n      \"pincode\": \"{{pincode}}\"\n    }\n  },\n  \"official\": {\n    \"officialEmail\": \"{{newUserEmail}}\",\n    \"company\": \"{{company}}\",\n    \"department\": \"{{department}}\",\n    \"employeeCode\": \"{{employeeCode}}\",\n    \"designation\": \"{{designation}}\",\n    \"reportingHead1\": \"{{reportingHead1}}\",\n    \"reportingHead2\": \"{{reportingHead2}}\",\n    \"jobRole\": \"{{jobRole}}\",\n    \"dateOfJoining\": \"{{dateOfJoining}}\",\n    \"calculateSalaryFrom\": \"{{dateOfJoining}}\",\n    \"dateOfRetirement\": null,\n    \"grade\": \"{{grade}}\"\n  },\n  \"other\": {\n    \"bloodGroup\": \"{{bloodGroup}}\",\n    \"passportExpiry\": \"{{passportExpiry}}\"\n  },\n  \"education\": [\n    {\n      \"courseType\": \"{{eduCourseType}}\",\n      \"courseLevel\": \"{{eduCourseLevel}}\",\n      \"courseName\": \"{{eduCourseName}}\",\n      \"instituteName\": \"{{eduInstitute}}\",\n      \"location\": \"{{city}}\",\n      \"fromYear\": \"{{eduFromYear}}\",\n      \"passingYear\": \"{{eduPassingYear}}\",\n      \"major\": \"\",\n      \"minor\": \"\",\n      \"percentageOrGrade\": \"{{eduGrade}}\",\n      \"document\": \"{{eduDocument}}\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"accounts\": [\n    {\n      \"bankName\": \"{{bankName}}\",\n      \"accountNo\": \"{{bankAccountNo}}\",\n      \"accountHolderName\": \"{{accountHolderName}}\",\n      \"ifscCode\": \"{{ifscCode}}\",\n      \"location\": \"{{city}}\",\n      \"remarks\": \"\",\n      \"attachment\": \"\",\n      \"active\": true,\n      \"salaryAccount\": true\n    }\n  ],\n  \"family\": [\n    {\n      \"name\": \"{{familyName}}\",\n      \"relation\": \"{{familyRelation}}\",\n      \"dob\": null,\n      \"occupation\": \"{{familyOccupation}}\",\n      \"education\": \"\",\n      \"aadhaarNo\": \"\",\n      \"mobileNo\": \"{{familyMobile}}\",\n      \"mediclaim\": false\n    }\n  ],\n  \"nominees\": [\n    {\n      \"nominateFor\": \"{{nominateFor}}\",\n      \"nomineeName\": \"{{nomineeName}}\",\n      \"relation\": \"{{nomineeRelation}}\",\n      \"dob\": null,\n      \"amountPercent\": {{nomineePercent}},\n      \"address\": \"{{address}}\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"experience\": [\n    {\n      \"organization\": \"{{expOrganization}}\",\n      \"designation\": \"{{expDesignation}}\",\n      \"location\": \"{{city}}\",\n      \"fromDate\": \"{{expFromDate}}\",\n      \"toDate\": \"{{expToDate}}\",\n      \"lastSalaryDrawn\": \"{{expLastSalary}}\",\n      \"description\": \"\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"visas\": [\n    {\n      \"countryName\": \"{{visaCountry}}\",\n      \"visaType\": \"{{visaType}}\",\n      \"visaNumber\": \"{{visaNumber}}\",\n      \"fromDate\": \"{{visaFromDate}}\",\n      \"toDate\": \"{{visaToDate}}\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"payroll\": {\n    \"salaryGroup\": \"\",\n    \"salaryDate\": \"\",\n    \"appraisalDuration\": \"\",\n    \"basic\": {{payrollBasic}},\n    \"annualCtc\": {{payrollCtc}},\n    \"grossSalary\": 0,\n    \"totalEarning\": 0,\n    \"totalDeduction\": 0,\n    \"appraisalDate\": null,\n    \"paymentMode\": \"{{payrollPaymentMode}}\",\n    \"ot1Rate\": 0,\n    \"ot2Rate\": 0,\n    \"remarks\": \"\",\n    \"uanNo\": \"{{payrollUan}}\",\n    \"pfApply\": false,\n    \"pfEmployerShare\": false,\n    \"pfNo\": \"\",\n    \"pfType\": \"\",\n    \"pf\": \"\",\n    \"pfApplyFrom\": null,\n    \"pfApplyTo\": null,\n    \"esiApply\": false,\n    \"esiNo\": \"\",\n    \"esiEmployerShare\": false,\n    \"esiApplyFrom\": null,\n    \"esiApplyTo\": null,\n    \"ptApply\": false,\n    \"tdsApply\": false,\n    \"taxRegime\": \"New\",\n    \"bankName\": \"{{bankName}}\",\n    \"bankAccount\": \"{{bankAccountNo}}\",\n    \"ifsc\": \"{{ifscCode}}\"\n  }\n}"
+                  "raw": "{\n  \"name\": \"{{newUserName}}\",\n  \"password\": \"{{password}}\",\n  \"role\": \"{{userRole}}\",\n  \"status\": \"{{userStatus}}\",\n  \"personal\": {\n    \"dateOfBirth\": \"{{dateOfBirth}}\",\n    \"aadhaarNo\": \"{{aadhaarNo}}\",\n    \"panNo\": \"{{panNo}}\",\n    \"gender\": \"{{gender}}\",\n    \"fatherOrHusbandName\": \"{{fatherOrHusbandName}}\",\n    \"maritalStatus\": \"{{maritalStatus}}\",\n    \"spouseName\": \"\",\n    \"anniversaryDate\": null,\n    \"personalEmail\": \"{{personalEmail}}\",\n    \"languageKnown\": \"{{languageKnown}}\",\n    \"emergencyContact1\": \"{{emergencyContact1}}\",\n    \"emergencyContact2\": \"{{emergencyContact2}}\",\n    \"drivingLicenseNo\": \"{{drivingLicenseNo}}\",\n    \"licenseValidUpto\": null,\n    \"passportNo\": \"{{passportNo}}\",\n    \"remarks\": \"\",\n    \"mobileNo\": \"{{mobileNo}}\",\n    \"workPhone\": \"{{workPhone}}\",\n    \"workExt\": \"{{workExt}}\",\n    \"presentAddress\": {\n      \"address\": \"{{address}}\",\n      \"country\": \"{{country}}\",\n      \"state\": \"{{state}}\",\n      \"city\": \"{{city}}\",\n      \"pincode\": \"{{pincode}}\"\n    },\n    \"permanentAddress\": {\n      \"address\": \"{{address}}\",\n      \"country\": \"{{country}}\",\n      \"state\": \"{{state}}\",\n      \"city\": \"{{city}}\",\n      \"pincode\": \"{{pincode}}\"\n    }\n  },\n  \"official\": {\n    \"officialEmail\": \"{{newUserEmail}}\",\n    \"company\": \"{{company}}\",\n    \"department\": \"{{department}}\",\n    \"employeeCode\": \"{{employeeCode}}\",\n    \"designation\": \"{{designation}}\",\n    \"reportingHead1\": \"{{reportingHead1}}\",\n    \"reportingHead2\": \"{{reportingHead2}}\",\n    \"jobRole\": \"{{jobRole}}\",\n    \"dateOfJoining\": \"{{dateOfJoining}}\",\n    \"calculateSalaryFrom\": \"{{dateOfJoining}}\",\n    \"dateOfRetirement\": null,\n    \"grade\": \"{{grade}}\"\n  },\n  \"other\": {\n    \"bloodGroup\": \"{{bloodGroup}}\",\n    \"passportExpiry\": \"{{passportExpiry}}\"\n  },\n  \"education\": [\n    {\n      \"courseType\": \"{{eduCourseType}}\",\n      \"courseLevel\": \"{{eduCourseLevel}}\",\n      \"courseName\": \"{{eduCourseName}}\",\n      \"instituteName\": \"{{eduInstitute}}\",\n      \"location\": \"{{city}}\",\n      \"fromYear\": \"{{eduFromYear}}\",\n      \"passingYear\": \"{{eduPassingYear}}\",\n      \"major\": \"\",\n      \"minor\": \"\",\n      \"percentageOrGrade\": \"{{eduGrade}}\",\n      \"document\": \"{{eduDocument}}\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"accounts\": [\n    {\n      \"bankName\": \"{{bankName}}\",\n      \"accountNo\": \"{{bankAccountNo}}\",\n      \"accountHolderName\": \"{{accountHolderName}}\",\n      \"ifscCode\": \"{{ifscCode}}\",\n      \"location\": \"{{city}}\",\n      \"remarks\": \"\",\n      \"attachment\": \"\",\n      \"active\": true,\n      \"salaryAccount\": true\n    }\n  ],\n  \"family\": [\n    {\n      \"name\": \"{{familyName}}\",\n      \"relation\": \"{{familyRelation}}\",\n      \"dob\": null,\n      \"occupation\": \"{{familyOccupation}}\",\n      \"education\": \"\",\n      \"aadhaarNo\": \"\",\n      \"mobileNo\": \"{{familyMobile}}\",\n      \"mediclaim\": false\n    }\n  ],\n  \"nominees\": [\n    {\n      \"nominateFor\": \"{{nominateFor}}\",\n      \"relation\": \"{{nomineeRelation}}\",\n      \"dob\": null,\n      \"amountPercent\": {{nomineePercent}},\n      \"address\": \"{{address}}\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"experience\": [\n    {\n      \"organization\": \"{{expOrganization}}\",\n      \"designation\": \"{{expDesignation}}\",\n      \"location\": \"{{city}}\",\n      \"fromDate\": \"{{expFromDate}}\",\n      \"toDate\": \"{{expToDate}}\",\n      \"lastSalaryDrawn\": \"{{expLastSalary}}\",\n      \"description\": \"\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"visas\": [\n    {\n      \"countryName\": \"{{visaCountry}}\",\n      \"visaType\": \"{{visaType}}\",\n      \"visaNumber\": \"{{visaNumber}}\",\n      \"fromDate\": \"{{visaFromDate}}\",\n      \"toDate\": \"{{visaToDate}}\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"payroll\": {\n    \"salaryGroup\": \"\",\n    \"salaryDate\": \"\",\n    \"appraisalDuration\": \"\",\n    \"basic\": {{payrollBasic}},\n    \"annualCtc\": {{payrollCtc}},\n    \"grossSalary\": 0,\n    \"totalEarning\": 0,\n    \"totalDeduction\": 0,\n    \"appraisalDate\": null,\n    \"paymentMode\": \"{{payrollPaymentMode}}\",\n    \"ot1Rate\": 0,\n    \"ot2Rate\": 0,\n    \"remarks\": \"\",\n    \"uanNo\": \"{{payrollUan}}\",\n    \"pfApply\": false,\n    \"pfEmployerShare\": false,\n    \"pfNo\": \"\",\n    \"pfType\": \"\",\n    \"pf\": \"\",\n    \"pfApplyFrom\": null,\n    \"pfApplyTo\": null,\n    \"esiApply\": false,\n    \"esiNo\": \"\",\n    \"esiEmployerShare\": false,\n    \"esiApplyFrom\": null,\n    \"esiApplyTo\": null,\n    \"ptApply\": false,\n    \"tdsApply\": false,\n    \"taxRegime\": \"New\",\n    \"bankName\": \"{{bankName}}\",\n    \"bankAccount\": \"{{bankAccountNo}}\",\n    \"ifsc\": \"{{ifscCode}}\"\n  }\n}"
                 },
                 "url": "{{baseUrl}}/api/employees",
                 "description": "Full nested profile for Employee / HR / Manager.\nLogin as Global Admin / Super Admin / HR Manager.\n\nofficialEmail + department required; company defaults to {{company}}.\nChange {{newUserEmail}} and {{employeeCode}} before each create."
@@ -1238,74 +1238,74 @@
                   ]
                 },
                 "description": "GET /api/employees/export — admin only (not Employee role)."
-          }
-        },
-        {
-          "name": "Update Profile (Super Admin)",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
               }
-            ],
-            "body": {
-              "mode": "raw",
-                  "raw": "{\n  \"name\": \"{{newUserName}}\",\n  \"personal\": {\n    \"dateOfBirth\": \"{{dateOfBirth}}\",\n    \"gender\": \"{{gender}}\",\n    \"maritalStatus\": \"{{maritalStatus}}\",\n    \"fatherOrHusbandName\": \"{{fatherOrHusbandName}}\",\n    \"panNo\": \"{{panNo}}\",\n    \"aadhaarNo\": \"{{aadhaarNo}}\",\n    \"personalEmail\": \"{{personalEmail}}\",\n    \"mobileNo\": \"{{mobileNo}}\",\n    \"workPhone\": \"{{workPhone}}\",\n    \"workExt\": \"{{workExt}}\",\n    \"drivingLicenseNo\": \"{{drivingLicenseNo}}\",\n    \"passportNo\": \"{{passportNo}}\",\n    \"languageKnown\": \"{{languageKnown}}\",\n    \"emergencyContact1\": \"{{emergencyContact1}}\",\n    \"emergencyContact2\": \"{{emergencyContact2}}\",\n    \"presentAddress\": {\n      \"address\": \"{{address}}\",\n      \"city\": \"{{city}}\",\n      \"state\": \"{{state}}\",\n      \"country\": \"{{country}}\",\n      \"pincode\": \"{{pincode}}\"\n    },\n    \"permanentAddress\": {\n      \"address\": \"{{address}}\",\n      \"city\": \"{{city}}\",\n      \"state\": \"{{state}}\",\n      \"country\": \"{{country}}\",\n      \"pincode\": \"{{pincode}}\"\n    }\n  },\n  \"official\": {\n    \"employeeCode\": \"{{employeeCode}}\",\n    \"officialEmail\": \"{{newUserEmail}}\",\n    \"company\": \"{{company}}\",\n    \"department\": \"{{department}}\",\n    \"designation\": \"{{designation}}\",\n    \"grade\": \"{{grade}}\",\n    \"jobRole\": \"{{jobRole}}\",\n    \"reportingHead1\": \"{{reportingHead1}}\",\n    \"reportingHead2\": \"{{reportingHead2}}\",\n    \"dateOfJoining\": \"{{dateOfJoining}}\"\n  },\n  \"other\": {\n    \"bloodGroup\": \"{{bloodGroup}}\",\n    \"passportExpiry\": \"{{passportExpiry}}\"\n  },\n  \"education\": [\n    {\n      \"courseType\": \"{{eduCourseType}}\",\n      \"courseLevel\": \"{{eduCourseLevel}}\",\n      \"courseName\": \"{{eduCourseName}}\",\n      \"instituteName\": \"{{eduInstitute}}\",\n      \"location\": \"{{city}}\",\n      \"fromYear\": \"{{eduFromYear}}\",\n      \"passingYear\": \"{{eduPassingYear}}\",\n      \"percentageOrGrade\": \"{{eduGrade}}\",\n      \"document\": \"{{eduDocument}}\"\n    }\n  ],\n  \"accounts\": [\n    {\n      \"bankName\": \"{{bankName}}\",\n      \"accountNo\": \"{{bankAccountNo}}\",\n      \"accountHolderName\": \"{{accountHolderName}}\",\n      \"ifscCode\": \"{{ifscCode}}\",\n      \"location\": \"{{city}}\",\n      \"active\": true,\n      \"salaryAccount\": true,\n      \"attachment\": \"\"\n    }\n  ],\n  \"family\": [\n    {\n      \"name\": \"{{familyName}}\",\n      \"relation\": \"{{familyRelation}}\",\n      \"mobileNo\": \"{{familyMobile}}\",\n      \"occupation\": \"{{familyOccupation}}\"\n    }\n  ],\n  \"nominees\": [\n    {\n      \"nominateFor\": \"{{nominateFor}}\",\n      \"nomineeName\": \"{{nomineeName}}\",\n      \"relation\": \"{{nomineeRelation}}\",\n      \"amountPercent\": {{nomineePercent}},\n      \"address\": \"{{address}}\"\n    }\n  ],\n  \"experience\": [\n    {\n      \"organization\": \"{{expOrganization}}\",\n      \"designation\": \"{{expDesignation}}\",\n      \"location\": \"{{city}}\",\n      \"fromDate\": \"{{expFromDate}}\",\n      \"toDate\": \"{{expToDate}}\",\n      \"lastSalaryDrawn\": \"{{expLastSalary}}\"\n    }\n  ],\n  \"visas\": [\n    {\n      \"countryName\": \"{{visaCountry}}\",\n      \"visaType\": \"{{visaType}}\",\n      \"visaNumber\": \"{{visaNumber}}\",\n      \"fromDate\": \"{{visaFromDate}}\",\n      \"toDate\": \"{{visaToDate}}\"\n    }\n  ],\n  \"payroll\": {\n    \"basic\": {{payrollBasic}},\n    \"annualCtc\": {{payrollCtc}},\n    \"paymentMode\": \"{{payrollPaymentMode}}\",\n    \"uanNo\": \"{{payrollUan}}\",\n    \"bankName\": \"{{bankName}}\",\n    \"bankAccount\": \"{{bankAccountNo}}\",\n    \"ifsc\": \"{{ifscCode}}\"\n  },\n  \"\": \"{{}}\"\n}"
             },
-            "url": "{{baseUrl}}/api/employees/{{userId}}",
+            {
+              "name": "Update Profile (Super Admin)",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"{{newUserName}}\",\n  \"personal\": {\n    \"dateOfBirth\": \"{{dateOfBirth}}\",\n    \"gender\": \"{{gender}}\",\n    \"maritalStatus\": \"{{maritalStatus}}\",\n    \"fatherOrHusbandName\": \"{{fatherOrHusbandName}}\",\n    \"panNo\": \"{{panNo}}\",\n    \"aadhaarNo\": \"{{aadhaarNo}}\",\n    \"personalEmail\": \"{{personalEmail}}\",\n    \"mobileNo\": \"{{mobileNo}}\",\n    \"workPhone\": \"{{workPhone}}\",\n    \"workExt\": \"{{workExt}}\",\n    \"drivingLicenseNo\": \"{{drivingLicenseNo}}\",\n    \"passportNo\": \"{{passportNo}}\",\n    \"languageKnown\": \"{{languageKnown}}\",\n    \"emergencyContact1\": \"{{emergencyContact1}}\",\n    \"emergencyContact2\": \"{{emergencyContact2}}\",\n    \"presentAddress\": {\n      \"address\": \"{{address}}\",\n      \"city\": \"{{city}}\",\n      \"state\": \"{{state}}\",\n      \"country\": \"{{country}}\",\n      \"pincode\": \"{{pincode}}\"\n    },\n    \"permanentAddress\": {\n      \"address\": \"{{address}}\",\n      \"city\": \"{{city}}\",\n      \"state\": \"{{state}}\",\n      \"country\": \"{{country}}\",\n      \"pincode\": \"{{pincode}}\"\n    }\n  },\n  \"official\": {\n    \"employeeCode\": \"{{employeeCode}}\",\n    \"officialEmail\": \"{{newUserEmail}}\",\n    \"company\": \"{{company}}\",\n    \"department\": \"{{department}}\",\n    \"designation\": \"{{designation}}\",\n    \"grade\": \"{{grade}}\",\n    \"jobRole\": \"{{jobRole}}\",\n    \"reportingHead1\": \"{{reportingHead1}}\",\n    \"reportingHead2\": \"{{reportingHead2}}\",\n    \"dateOfJoining\": \"{{dateOfJoining}}\"\n  },\n  \"other\": {\n    \"bloodGroup\": \"{{bloodGroup}}\",\n    \"passportExpiry\": \"{{passportExpiry}}\"\n  },\n  \"education\": [\n    {\n      \"courseType\": \"{{eduCourseType}}\",\n      \"courseLevel\": \"{{eduCourseLevel}}\",\n      \"courseName\": \"{{eduCourseName}}\",\n      \"instituteName\": \"{{eduInstitute}}\",\n      \"location\": \"{{city}}\",\n      \"fromYear\": \"{{eduFromYear}}\",\n      \"passingYear\": \"{{eduPassingYear}}\",\n      \"percentageOrGrade\": \"{{eduGrade}}\",\n      \"document\": \"{{eduDocument}}\"\n    }\n  ],\n  \"accounts\": [\n    {\n      \"bankName\": \"{{bankName}}\",\n      \"accountNo\": \"{{bankAccountNo}}\",\n      \"accountHolderName\": \"{{accountHolderName}}\",\n      \"ifscCode\": \"{{ifscCode}}\",\n      \"location\": \"{{city}}\",\n      \"active\": true,\n      \"salaryAccount\": true,\n      \"attachment\": \"\"\n    }\n  ],\n  \"family\": [\n    {\n      \"name\": \"{{familyName}}\",\n      \"relation\": \"{{familyRelation}}\",\n      \"mobileNo\": \"{{familyMobile}}\",\n      \"occupation\": \"{{familyOccupation}}\"\n    }\n  ],\n  \"nominees\": [\n    {\n      \"nominateFor\": \"{{nominateFor}}\",\n      \"relation\": \"{{nomineeRelation}}\",\n      \"amountPercent\": {{nomineePercent}},\n      \"address\": \"{{address}}\"\n    }\n  ],\n  \"experience\": [\n    {\n      \"organization\": \"{{expOrganization}}\",\n      \"designation\": \"{{expDesignation}}\",\n      \"location\": \"{{city}}\",\n      \"fromDate\": \"{{expFromDate}}\",\n      \"toDate\": \"{{expToDate}}\",\n      \"lastSalaryDrawn\": \"{{expLastSalary}}\"\n    }\n  ],\n  \"visas\": [\n    {\n      \"countryName\": \"{{visaCountry}}\",\n      \"visaType\": \"{{visaType}}\",\n      \"visaNumber\": \"{{visaNumber}}\",\n      \"fromDate\": \"{{visaFromDate}}\",\n      \"toDate\": \"{{visaToDate}}\"\n    }\n  ],\n  \"payroll\": {\n    \"basic\": {{payrollBasic}},\n    \"annualCtc\": {{payrollCtc}},\n    \"paymentMode\": \"{{payrollPaymentMode}}\",\n    \"uanNo\": \"{{payrollUan}}\",\n    \"bankName\": \"{{bankName}}\",\n    \"bankAccount\": \"{{bankAccountNo}}\",\n    \"ifsc\": \"{{ifscCode}}\"\n  },\n  \"\": \"{{}}\"\n}"
+                },
+                "url": "{{baseUrl}}/api/employees/{{userId}}",
                 "description": "PUT /api/employees/{{userId}} — ALL objects (admin).\n\npersonal | official | other | education | accounts | family | nominees | experience | visas | payroll\n\nEdit values in Collection → Variables. Login Super Admin first."
-          }
-        },
-        {
-              "name": "Change Password",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
               }
-            ],
-            "body": {
-              "mode": "raw",
-                  "raw": "{\n  \"password\": \"{{newPassword}}\"\n}"
             },
-            "url": "{{baseUrl}}/api/employees/{{userId}}",
+            {
+              "name": "Change Password",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"password\": \"{{newPassword}}\"\n}"
+                },
+                "url": "{{baseUrl}}/api/employees/{{userId}}",
                 "description": "Same PUT API — Super Admin / HR Manager only"
-          }
-        },
-        {
-              "name": "Upload Attachment",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
               }
-            ],
-            "body": {
-              "mode": "formdata",
-              "formdata": [
+            },
+            {
+              "name": "Upload Attachment",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
                     {
                       "key": "type",
                       "value": "account",
                       "type": "text",
                       "description": "education or account"
                     },
-                {
-                  "key": "document",
-                  "type": "file",
+                    {
+                      "key": "document",
+                      "type": "file",
                       "src": [
                         "C:\\Users\\owner\\Postman\\files\\EZ_Wealth_Portfolio_10L.pdf"
                       ],
@@ -1319,45 +1319,45 @@
             },
             {
               "name": "Edit List Item (via profile update)",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
                   "raw": "{\n  \"accounts\": {\n    \"_id\": \"{{itemId}}\",\n    \"bankName\": \"SBI\",\n    \"ifscCode\": \"SBIN0001234\",\n    \"active\": true\n  }\n}"
-            },
-            "url": "{{baseUrl}}/api/employees/{{userId}}",
+                },
+                "url": "{{baseUrl}}/api/employees/{{userId}}",
                 "description": "Section PUT removed. Use PUT /api/employees/:id with one nested key.\nOne object with _id updates that row; without _id appends. Array replaces the list.\nSame for education, family, nominees, experience, visas."
-          }
-        },
-        {
-              "name": "Edit Official (via profile update)",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
               }
-            ],
-            "body": {
-              "mode": "raw",
-                  "raw": "{\n  \"official\": {\n    \"designation\": \"{{designation}}\",\n    \"department\": \"{{department}}\"\n  }\n}"
             },
-            "url": "{{baseUrl}}/api/employees/{{userId}}",
+            {
+              "name": "Edit Official (via profile update)",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"official\": {\n    \"designation\": \"{{designation}}\",\n    \"department\": \"{{department}}\"\n  }\n}"
+                },
+                "url": "{{baseUrl}}/api/employees/{{userId}}",
                 "description": "Admin only. PUT /api/employees/:id with official{}. Employee gets 403."
               }
             },
@@ -1421,17 +1421,17 @@
             },
             {
               "name": "Delete Employee",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/employees/{{userId}}",
+                "description": "Super Admin / HR Manager / Manager. Cannot delete self."
               }
-            ],
-            "url": "{{baseUrl}}/api/employees/{{userId}}",
-            "description": "Super Admin / HR Manager / Manager. Cannot delete self."
-          }
             },
             {
               "name": "Employee Activity Log",
@@ -1460,15 +1460,15 @@
                 "url": "{{baseUrl}}/api/employees/activity?page=1&limit=20",
                 "description": "Admin company-wide tracking.\nGET /api/employees/activity\nOptional: company, employeeId, actorId, action, page, limit."
               }
-        }
-      ]
-    },
-    {
+            }
+          ]
+        },
+        {
           "name": "1.4 Masters (Admin write)",
-          "description": "Create / update / delete masters + lists",
-      "item": [
-        {
-              "name": "List Companies",
+          "description": "One folder per master type — List / Get / Create / Update / Delete. Same API: `/api/masters`.",
+          "item": [
+            {
+              "name": "List master meta",
               "request": {
                 "method": "GET",
                 "header": [
@@ -1477,186 +1477,1785 @@
                     "value": "Bearer {{token}}"
                   }
                 ],
-                "url": "{{baseUrl}}/api/masters?type=company&status=Active",
-                "description": "Company master: `name` is the company name (no parent company field)."
+                "url": "{{baseUrl}}/api/masters/meta",
+                "description": "All master types + General Info field→type map for ESS dropdowns."
               }
             },
             {
-              "name": "List Departments",
-              "request": {
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{token}}"
+              "name": "Company",
+              "description": "CRUD for master type=`company`. Set {{masterId}} from List/Create `_id`.",
+              "item": [
+                {
+                  "name": "List Company",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=company&status=Active&page=1&limit=50",
+                    "description": "GET /api/masters?type=company Supports search|q, page, limit. Response: total, page, limit, pages, data."
                   }
-                ],
-                "url": {
-                  "raw": "{{baseUrl}}/api/masters?type=department&company={{company}}&status=Active",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "masters"
-                  ],
-                  "query": [
-                    {
-                      "key": "type",
-                      "value": "department"
+                },
+                {
+                  "name": "Search + Paginate Company",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=company&status=Active&search=Tech&page=1&limit=10",
+                    "description": "Example: search by name + pagination. Same pattern for every master type."
+                  }
+                },
+                {
+                  "name": "Get Company",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "GET one by _id. Set {{masterId}} from list/create."
+                  }
+                },
+                {
+                  "name": "Create Company",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"type\": \"company\",\n  \"name\": \"Another Company Pvt Ltd\",\n  \"status\": \"Active\"\n}"
                     },
-                    {
-                      "key": "company",
-                      "value": "{{company}}"
+                    "url": "{{baseUrl}}/api/masters",
+                    "description": "POST type=company (Global Admin only). name = company name."
+                  }
+                },
+                {
+                  "name": "Update Company",
+                  "request": {
+                    "method": "PUT",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"name\": \"Another Company Pvt Ltd Updated\",\n  \"status\": \"Active\"\n}"
                     },
-                    {
-                      "key": "status",
-                      "value": "Active"
-                    }
-                  ]
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "PUT /api/masters/{{masterId}}"
+                  }
                 },
-                "description": "Use `data[].name` in employee create/update official.department."
-              }
-            },
-            {
-              "name": "List Designations",
-              "request": {
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{token}}"
+                {
+                  "name": "Delete Company",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "DELETE /api/masters/{{masterId}}"
                   }
-                ],
-                "url": "{{baseUrl}}/api/masters?type=designation&company={{company}}&status=Active"
-              }
+                }
+              ]
             },
             {
-              "name": "List Divisions",
-              "request": {
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{token}}"
+              "name": "Department",
+              "description": "CRUD for master type=`department`. Set {{masterId}} from List/Create `_id`.",
+              "item": [
+                {
+                  "name": "List Department",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=department&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "GET /api/masters?type=department Supports search|q, page, limit. Response: total, page, limit, pages, data."
                   }
-                ],
-                "url": "{{baseUrl}}/api/masters?type=division&company={{company}}&status=Active"
-              }
-            },
-            {
-              "name": "List Employee Groups",
-              "request": {
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{token}}"
-                  }
-                ],
-                "url": "{{baseUrl}}/api/masters?type=employeeGroup&company={{company}}&status=Active"
-              }
-            },
-            {
-              "name": "Create Company",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-                  "raw": "{\n  \"type\": \"company\",\n  \"name\": \"Another Company Pvt Ltd\",\n  \"status\": \"Active\"\n}"
-            },
-                "url": "{{baseUrl}}/api/masters",
-                "description": "Global Admin only. Body has no parent `company` — `name` is the company."
-          }
-        },
-        {
-              "name": "Create Department",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-                  "raw": "{\n  \"type\": \"department\",\n  \"name\": \"Marketing\",\n  \"status\": \"Active\",\n  \"company\": \"{{company}}\"\n}"
-            },
-                "url": "{{baseUrl}}/api/masters",
-                "description": "Writes to `departments` collection. Fields: type, name, status, company (no code)."
-          }
-        },
-        {
-              "name": "Create Designation",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-                  "raw": "{\n  \"type\": \"designation\",\n  \"name\": \"Tech Lead\",\n  \"status\": \"Active\",\n  \"company\": \"{{company}}\"\n}"
                 },
-                "url": "{{baseUrl}}/api/masters",
-                "description": "Writes to `designations` collection. Fields: type, name, status, company (no code)."
-              }
-            },
-            {
-              "name": "Update Master",
-              "request": {
-                "method": "PUT",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  },
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{token}}"
+                {
+                  "name": "Search + Paginate Department",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=department&status=Active&company={{company}}&search=HR&page=1&limit=10",
+                    "description": "Search department name with page/limit."
                   }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"name\": \"Human Resources\",\n  \"status\": \"Active\"\n}"
                 },
-                "url": "{{baseUrl}}/api/masters/{{masterId}}",
-                "description": "Set {{masterId}} from create/list response `_id`."
-              }
+                {
+                  "name": "Get Department",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "GET one by _id. Set {{masterId}} from list/create."
+                  }
+                },
+                {
+                  "name": "Create Department",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"type\": \"department\",\n  \"name\": \"Marketing\",\n  \"status\": \"Active\",\n  \"company\": \"{{company}}\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters",
+                    "description": "POST type=department. Global Admin must send company; others use login company."
+                  }
+                },
+                {
+                  "name": "Update Department",
+                  "request": {
+                    "method": "PUT",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"name\": \"Marketing Updated\",\n  \"status\": \"Active\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "PUT /api/masters/{{masterId}}"
+                  }
+                },
+                {
+                  "name": "Delete Department",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "DELETE /api/masters/{{masterId}}"
+                  }
+                }
+              ]
             },
             {
-              "name": "Delete Master",
-              "request": {
-                "method": "DELETE",
-                "header": [
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{token}}"
+              "name": "Designation",
+              "description": "CRUD for master type=`designation`. Set {{masterId}} from List/Create `_id`.",
+              "item": [
+                {
+                  "name": "List Designation",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=designation&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "GET /api/masters?type=designation Supports search|q, page, limit. Response: total, page, limit, pages, data."
                   }
-                ],
-                "url": "{{baseUrl}}/api/masters/{{masterId}}"
-              }
+                },
+                {
+                  "name": "Get Designation",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "GET one by _id. Set {{masterId}} from list/create."
+                  }
+                },
+                {
+                  "name": "Create Designation",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"type\": \"designation\",\n  \"name\": \"Tech Lead\",\n  \"status\": \"Active\",\n  \"company\": \"{{company}}\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters",
+                    "description": "POST type=designation. Global Admin must send company; others use login company."
+                  }
+                },
+                {
+                  "name": "Update Designation",
+                  "request": {
+                    "method": "PUT",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"name\": \"Tech Lead Updated\",\n  \"status\": \"Active\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "PUT /api/masters/{{masterId}}"
+                  }
+                },
+                {
+                  "name": "Delete Designation",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "DELETE /api/masters/{{masterId}}"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Division",
+              "description": "CRUD for master type=`division`. Set {{masterId}} from List/Create `_id`.",
+              "item": [
+                {
+                  "name": "List Division",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=division&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "GET /api/masters?type=division Supports search|q, page, limit. Response: total, page, limit, pages, data."
+                  }
+                },
+                {
+                  "name": "Get Division",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "GET one by _id. Set {{masterId}} from list/create."
+                  }
+                },
+                {
+                  "name": "Create Division",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"type\": \"division\",\n  \"name\": \"HO\",\n  \"status\": \"Active\",\n  \"company\": \"{{company}}\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters",
+                    "description": "POST type=division. Global Admin must send company; others use login company."
+                  }
+                },
+                {
+                  "name": "Update Division",
+                  "request": {
+                    "method": "PUT",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"name\": \"HO Updated\",\n  \"status\": \"Active\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "PUT /api/masters/{{masterId}}"
+                  }
+                },
+                {
+                  "name": "Delete Division",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "DELETE /api/masters/{{masterId}}"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Employee Group",
+              "description": "CRUD for master type=`employeeGroup`. Set {{masterId}} from List/Create `_id`.",
+              "item": [
+                {
+                  "name": "List Employee Group",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=employeeGroup&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "GET /api/masters?type=employeeGroup Supports search|q, page, limit. Response: total, page, limit, pages, data."
+                  }
+                },
+                {
+                  "name": "Get Employee Group",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "GET one by _id. Set {{masterId}} from list/create."
+                  }
+                },
+                {
+                  "name": "Create Employee Group",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"type\": \"employeeGroup\",\n  \"name\": \"Permanent\",\n  \"status\": \"Active\",\n  \"company\": \"{{company}}\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters",
+                    "description": "POST type=employeeGroup. Global Admin must send company; others use login company."
+                  }
+                },
+                {
+                  "name": "Update Employee Group",
+                  "request": {
+                    "method": "PUT",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"name\": \"Permanent Updated\",\n  \"status\": \"Active\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "PUT /api/masters/{{masterId}}"
+                  }
+                },
+                {
+                  "name": "Delete Employee Group",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "DELETE /api/masters/{{masterId}}"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Grade",
+              "description": "CRUD for master type=`grade`. Set {{masterId}} from List/Create `_id`.",
+              "item": [
+                {
+                  "name": "List Grade",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=grade&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "GET /api/masters?type=grade Supports search|q, page, limit. Response: total, page, limit, pages, data."
+                  }
+                },
+                {
+                  "name": "Get Grade",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "GET one by _id. Set {{masterId}} from list/create."
+                  }
+                },
+                {
+                  "name": "Create Grade",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"type\": \"grade\",\n  \"name\": \"G4\",\n  \"status\": \"Active\",\n  \"company\": \"{{company}}\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters",
+                    "description": "POST type=grade. Global Admin must send company; others use login company."
+                  }
+                },
+                {
+                  "name": "Update Grade",
+                  "request": {
+                    "method": "PUT",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"name\": \"G4 Updated\",\n  \"status\": \"Active\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "PUT /api/masters/{{masterId}}"
+                  }
+                },
+                {
+                  "name": "Delete Grade",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "DELETE /api/masters/{{masterId}}"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Job Role",
+              "description": "CRUD for master type=`jobRole`. Set {{masterId}} from List/Create `_id`.",
+              "item": [
+                {
+                  "name": "List Job Role",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=jobRole&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "GET /api/masters?type=jobRole Supports search|q, page, limit. Response: total, page, limit, pages, data."
+                  }
+                },
+                {
+                  "name": "Get Job Role",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "GET one by _id. Set {{masterId}} from list/create."
+                  }
+                },
+                {
+                  "name": "Create Job Role",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"type\": \"jobRole\",\n  \"name\": \"Executive\",\n  \"status\": \"Active\",\n  \"company\": \"{{company}}\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters",
+                    "description": "POST type=jobRole. Global Admin must send company; others use login company."
+                  }
+                },
+                {
+                  "name": "Update Job Role",
+                  "request": {
+                    "method": "PUT",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"name\": \"Executive Updated\",\n  \"status\": \"Active\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "PUT /api/masters/{{masterId}}"
+                  }
+                },
+                {
+                  "name": "Delete Job Role",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "DELETE /api/masters/{{masterId}}"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Gender",
+              "description": "CRUD for master type=`gender`. Set {{masterId}} from List/Create `_id`.",
+              "item": [
+                {
+                  "name": "List Gender",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=gender&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "GET /api/masters?type=gender Supports search|q, page, limit. Response: total, page, limit, pages, data."
+                  }
+                },
+                {
+                  "name": "Get Gender",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "GET one by _id. Set {{masterId}} from list/create."
+                  }
+                },
+                {
+                  "name": "Create Gender",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"type\": \"gender\",\n  \"name\": \"Male\",\n  \"status\": \"Active\",\n  \"company\": \"{{company}}\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters",
+                    "description": "POST type=gender. Global Admin must send company; others use login company."
+                  }
+                },
+                {
+                  "name": "Update Gender",
+                  "request": {
+                    "method": "PUT",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"name\": \"Male Updated\",\n  \"status\": \"Active\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "PUT /api/masters/{{masterId}}"
+                  }
+                },
+                {
+                  "name": "Delete Gender",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "DELETE /api/masters/{{masterId}}"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Marital Status",
+              "description": "CRUD for master type=`maritalStatus`. Set {{masterId}} from List/Create `_id`.",
+              "item": [
+                {
+                  "name": "List Marital Status",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=maritalStatus&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "GET /api/masters?type=maritalStatus Supports search|q, page, limit. Response: total, page, limit, pages, data."
+                  }
+                },
+                {
+                  "name": "Get Marital Status",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "GET one by _id. Set {{masterId}} from list/create."
+                  }
+                },
+                {
+                  "name": "Create Marital Status",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"type\": \"maritalStatus\",\n  \"name\": \"Single\",\n  \"status\": \"Active\",\n  \"company\": \"{{company}}\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters",
+                    "description": "POST type=maritalStatus. Global Admin must send company; others use login company."
+                  }
+                },
+                {
+                  "name": "Update Marital Status",
+                  "request": {
+                    "method": "PUT",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"name\": \"Single Updated\",\n  \"status\": \"Active\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "PUT /api/masters/{{masterId}}"
+                  }
+                },
+                {
+                  "name": "Delete Marital Status",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "DELETE /api/masters/{{masterId}}"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Blood Group",
+              "description": "CRUD for master type=`bloodGroup`. Set {{masterId}} from List/Create `_id`.",
+              "item": [
+                {
+                  "name": "List Blood Group",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=bloodGroup&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "GET /api/masters?type=bloodGroup Supports search|q, page, limit. Response: total, page, limit, pages, data."
+                  }
+                },
+                {
+                  "name": "Get Blood Group",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "GET one by _id. Set {{masterId}} from list/create."
+                  }
+                },
+                {
+                  "name": "Create Blood Group",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"type\": \"bloodGroup\",\n  \"name\": \"B+\",\n  \"status\": \"Active\",\n  \"company\": \"{{company}}\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters",
+                    "description": "POST type=bloodGroup. Global Admin must send company; others use login company."
+                  }
+                },
+                {
+                  "name": "Update Blood Group",
+                  "request": {
+                    "method": "PUT",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"name\": \"B+ Updated\",\n  \"status\": \"Active\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "PUT /api/masters/{{masterId}}"
+                  }
+                },
+                {
+                  "name": "Delete Blood Group",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "DELETE /api/masters/{{masterId}}"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Country",
+              "description": "CRUD for master type=`country`. Set {{masterId}} from List/Create `_id`.",
+              "item": [
+                {
+                  "name": "List Country",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=country&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "GET /api/masters?type=country Supports search|q, page, limit. Response: total, page, limit, pages, data."
+                  }
+                },
+                {
+                  "name": "Get Country",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "GET one by _id. Set {{masterId}} from list/create."
+                  }
+                },
+                {
+                  "name": "Create Country",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"type\": \"country\",\n  \"name\": \"United Arab Emirates\",\n  \"status\": \"Active\",\n  \"company\": \"{{company}}\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters",
+                    "description": "POST type=country. Global Admin must send company; others use login company."
+                  }
+                },
+                {
+                  "name": "Update Country",
+                  "request": {
+                    "method": "PUT",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"name\": \"India Updated\",\n  \"status\": \"Active\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "PUT /api/masters/{{masterId}}"
+                  }
+                },
+                {
+                  "name": "Delete Country",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "DELETE /api/masters/{{masterId}}"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "State",
+              "description": "CRUD for master type=`state`. Set {{masterId}} from List/Create `_id`.",
+              "item": [
+                {
+                  "name": "List State",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=state&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "GET /api/masters?type=state Supports search|q, page, limit. Response: total, page, limit, pages, data."
+                  }
+                },
+                {
+                  "name": "Get State",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "GET one by _id. Set {{masterId}} from list/create."
+                  }
+                },
+                {
+                  "name": "Create State",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"type\": \"state\",\n  \"name\": \"Delhi\",\n  \"status\": \"Active\",\n  \"company\": \"{{company}}\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters",
+                    "description": "POST type=state. Global Admin must send company; others use login company."
+                  }
+                },
+                {
+                  "name": "Update State",
+                  "request": {
+                    "method": "PUT",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"name\": \"Delhi Updated\",\n  \"status\": \"Active\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "PUT /api/masters/{{masterId}}"
+                  }
+                },
+                {
+                  "name": "Delete State",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "DELETE /api/masters/{{masterId}}"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "City",
+              "description": "CRUD for master type=`city`. Set {{masterId}} from List/Create `_id`.",
+              "item": [
+                {
+                  "name": "List City",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=city&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "GET /api/masters?type=city Supports search|q, page, limit. Response: total, page, limit, pages, data."
+                  }
+                },
+                {
+                  "name": "Get City",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "GET one by _id. Set {{masterId}} from list/create."
+                  }
+                },
+                {
+                  "name": "Create City",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"type\": \"city\",\n  \"name\": \"Noida\",\n  \"status\": \"Active\",\n  \"company\": \"{{company}}\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters",
+                    "description": "POST type=city. Global Admin must send company; others use login company."
+                  }
+                },
+                {
+                  "name": "Update City",
+                  "request": {
+                    "method": "PUT",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"name\": \"Noida Updated\",\n  \"status\": \"Active\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "PUT /api/masters/{{masterId}}"
+                  }
+                },
+                {
+                  "name": "Delete City",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "DELETE /api/masters/{{masterId}}"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Course Type",
+              "description": "CRUD for master type=`courseType`. Set {{masterId}} from List/Create `_id`.",
+              "item": [
+                {
+                  "name": "List Course Type",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=courseType&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "GET /api/masters?type=courseType Supports search|q, page, limit. Response: total, page, limit, pages, data."
+                  }
+                },
+                {
+                  "name": "Get Course Type",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "GET one by _id. Set {{masterId}} from list/create."
+                  }
+                },
+                {
+                  "name": "Create Course Type",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"type\": \"courseType\",\n  \"name\": \"Full Time\",\n  \"status\": \"Active\",\n  \"company\": \"{{company}}\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters",
+                    "description": "POST type=courseType. Global Admin must send company; others use login company."
+                  }
+                },
+                {
+                  "name": "Update Course Type",
+                  "request": {
+                    "method": "PUT",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"name\": \"Full Time Updated\",\n  \"status\": \"Active\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "PUT /api/masters/{{masterId}}"
+                  }
+                },
+                {
+                  "name": "Delete Course Type",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "DELETE /api/masters/{{masterId}}"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Course Level",
+              "description": "CRUD for master type=`courseLevel`. Set {{masterId}} from List/Create `_id`.",
+              "item": [
+                {
+                  "name": "List Course Level",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=courseLevel&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "GET /api/masters?type=courseLevel Supports search|q, page, limit. Response: total, page, limit, pages, data."
+                  }
+                },
+                {
+                  "name": "Get Course Level",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "GET one by _id. Set {{masterId}} from list/create."
+                  }
+                },
+                {
+                  "name": "Create Course Level",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"type\": \"courseLevel\",\n  \"name\": \"10th\",\n  \"status\": \"Active\",\n  \"company\": \"{{company}}\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters",
+                    "description": "POST type=courseLevel. Global Admin must send company; others use login company."
+                  }
+                },
+                {
+                  "name": "Update Course Level",
+                  "request": {
+                    "method": "PUT",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"name\": \"Graduation Updated\",\n  \"status\": \"Active\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "PUT /api/masters/{{masterId}}"
+                  }
+                },
+                {
+                  "name": "Delete Course Level",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "DELETE /api/masters/{{masterId}}"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Bank Name",
+              "description": "CRUD for master type=`bankName`. Set {{masterId}} from List/Create `_id`.",
+              "item": [
+                {
+                  "name": "List Bank Name",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=bankName&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "GET /api/masters?type=bankName Supports search|q, page, limit. Response: total, page, limit, pages, data."
+                  }
+                },
+                {
+                  "name": "Get Bank Name",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "GET one by _id. Set {{masterId}} from list/create."
+                  }
+                },
+                {
+                  "name": "Create Bank Name",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"type\": \"bankName\",\n  \"name\": \"HDFC BANK\",\n  \"status\": \"Active\",\n  \"company\": \"{{company}}\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters",
+                    "description": "POST type=bankName. Global Admin must send company; others use login company."
+                  }
+                },
+                {
+                  "name": "Update Bank Name",
+                  "request": {
+                    "method": "PUT",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"name\": \"HDFC Bank Updated\",\n  \"status\": \"Active\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "PUT /api/masters/{{masterId}}"
+                  }
+                },
+                {
+                  "name": "Delete Bank Name",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "DELETE /api/masters/{{masterId}}"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Relation",
+              "description": "CRUD for master type=`relation`. Set {{masterId}} from List/Create `_id`.",
+              "item": [
+                {
+                  "name": "List Relation",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=relation&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "GET /api/masters?type=relation Supports search|q, page, limit. Response: total, page, limit, pages, data."
+                  }
+                },
+                {
+                  "name": "Get Relation",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "GET one by _id. Set {{masterId}} from list/create."
+                  }
+                },
+                {
+                  "name": "Create Relation",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"type\": \"relation\",\n  \"name\": \"Father\",\n  \"status\": \"Active\",\n  \"company\": \"{{company}}\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters",
+                    "description": "POST type=relation. Global Admin must send company; others use login company."
+                  }
+                },
+                {
+                  "name": "Update Relation",
+                  "request": {
+                    "method": "PUT",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"name\": \"Father Updated\",\n  \"status\": \"Active\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "PUT /api/masters/{{masterId}}"
+                  }
+                },
+                {
+                  "name": "Delete Relation",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "DELETE /api/masters/{{masterId}}"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Nominate For",
+              "description": "CRUD for master type=`nominateFor`. Set {{masterId}} from List/Create `_id`.",
+              "item": [
+                {
+                  "name": "List Nominate For",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=nominateFor&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "GET /api/masters?type=nominateFor Supports search|q, page, limit. Response: total, page, limit, pages, data."
+                  }
+                },
+                {
+                  "name": "Get Nominate For",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "GET one by _id. Set {{masterId}} from list/create."
+                  }
+                },
+                {
+                  "name": "Create Nominate For",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"type\": \"nominateFor\",\n  \"name\": \"PF\",\n  \"status\": \"Active\",\n  \"company\": \"{{company}}\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters",
+                    "description": "POST type=nominateFor. Global Admin must send company; others use login company."
+                  }
+                },
+                {
+                  "name": "Update Nominate For",
+                  "request": {
+                    "method": "PUT",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"name\": \"PF Updated\",\n  \"status\": \"Active\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "PUT /api/masters/{{masterId}}"
+                  }
+                },
+                {
+                  "name": "Delete Nominate For",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "DELETE /api/masters/{{masterId}}"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Visa Type",
+              "description": "CRUD for master type=`visaType`. Set {{masterId}} from List/Create `_id`.",
+              "item": [
+                {
+                  "name": "List Visa Type",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=visaType&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "GET /api/masters?type=visaType Supports search|q, page, limit. Response: total, page, limit, pages, data."
+                  }
+                },
+                {
+                  "name": "Get Visa Type",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "GET one by _id. Set {{masterId}} from list/create."
+                  }
+                },
+                {
+                  "name": "Create Visa Type",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"type\": \"visaType\",\n  \"name\": \"Employment Visa\",\n  \"status\": \"Active\",\n  \"company\": \"{{company}}\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters",
+                    "description": "POST type=visaType. Global Admin must send company; others use login company."
+                  }
+                },
+                {
+                  "name": "Update Visa Type",
+                  "request": {
+                    "method": "PUT",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"name\": \"Business Updated\",\n  \"status\": \"Active\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "PUT /api/masters/{{masterId}}"
+                  }
+                },
+                {
+                  "name": "Delete Visa Type",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "DELETE /api/masters/{{masterId}}"
+                  }
+                }
+              ]
             }
           ]
         },
@@ -1692,28 +3291,28 @@
           "name": "1.6 Attendance (Admin)",
           "description": "Manual mark + list attendance",
           "item": [
-        {
-          "name": "Mark Attendance (manual)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
+            {
+              "name": "Mark Attendance (manual)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"employeeId\": \"{{userId}}\",\n  \"punchType\": \"{{punchType}}\",\n  \"time\": \"{{punchTime}}\",\n  \"reason\": \"{{punchReason}}\",\n  \"remarks\": \"{{punchRemarks}}\"\n}"
+                },
+                "url": "{{baseUrl}}/api/attendance/manual",
+                "description": "Admin only. Vars: userId, punchType, punchTime, punchReason, punchRemarks"
               }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"employeeId\": \"{{userId}}\",\n  \"punchType\": \"{{punchType}}\",\n  \"time\": \"{{punchTime}}\",\n  \"reason\": \"{{punchReason}}\",\n  \"remarks\": \"{{punchRemarks}}\"\n}"
             },
-            "url": "{{baseUrl}}/api/attendance/manual",
-            "description": "Admin only. Vars: userId, punchType, punchTime, punchReason, punchRemarks"
-          }
-        },
             {
               "name": "List Attendance",
               "request": {
@@ -1776,7 +3375,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"personal\": {\n    \"dateOfBirth\": \"{{dateOfBirth}}\",\n    \"gender\": \"{{gender}}\",\n    \"maritalStatus\": \"{{maritalStatus}}\",\n    \"fatherOrHusbandName\": \"{{fatherOrHusbandName}}\",\n    \"panNo\": \"{{panNo}}\",\n    \"aadhaarNo\": \"{{aadhaarNo}}\",\n    \"personalEmail\": \"{{personalEmail}}\",\n    \"mobileNo\": \"{{mobileNo}}\",\n    \"workPhone\": \"{{workPhone}}\",\n    \"workExt\": \"{{workExt}}\",\n    \"drivingLicenseNo\": \"{{drivingLicenseNo}}\",\n    \"passportNo\": \"{{passportNo}}\",\n    \"languageKnown\": \"{{languageKnown}}\",\n    \"emergencyContact1\": \"{{emergencyContact1}}\",\n    \"emergencyContact2\": \"{{emergencyContact2}}\",\n    \"presentAddress\": {\n      \"address\": \"{{address}}\",\n      \"city\": \"{{city}}\",\n      \"state\": \"{{state}}\",\n      \"country\": \"{{country}}\",\n      \"pincode\": \"{{pincode}}\"\n    },\n    \"permanentAddress\": {\n      \"address\": \"{{address}}\",\n      \"city\": \"{{city}}\",\n      \"state\": \"{{state}}\",\n      \"country\": \"{{country}}\",\n      \"pincode\": \"{{pincode}}\"\n    }\n  },\n  \"other\": {\n    \"bloodGroup\": \"{{bloodGroup}}\",\n    \"passportExpiry\": \"{{passportExpiry}}\"\n  },\n  \"education\": [\n    {\n      \"courseType\": \"{{eduCourseType}}\",\n      \"courseLevel\": \"{{eduCourseLevel}}\",\n      \"courseName\": \"{{eduCourseName}}\",\n      \"instituteName\": \"{{eduInstitute}}\",\n      \"location\": \"{{city}}\",\n      \"fromYear\": \"{{eduFromYear}}\",\n      \"passingYear\": \"{{eduPassingYear}}\",\n      \"percentageOrGrade\": \"{{eduGrade}}\",\n      \"document\": \"{{eduDocument}}\"\n    }\n  ],\n  \"accounts\": [\n    {\n      \"bankName\": \"{{bankName}}\",\n      \"accountNo\": \"{{bankAccountNo}}\",\n      \"accountHolderName\": \"{{accountHolderName}}\",\n      \"ifscCode\": \"{{ifscCode}}\",\n      \"location\": \"{{city}}\",\n      \"active\": true,\n      \"salaryAccount\": true,\n      \"attachment\": \"\"\n    }\n  ],\n  \"family\": [\n    {\n      \"name\": \"{{familyName}}\",\n      \"relation\": \"{{familyRelation}}\",\n      \"mobileNo\": \"{{familyMobile}}\",\n      \"occupation\": \"{{familyOccupation}}\"\n    }\n  ],\n  \"nominees\": [\n    {\n      \"nominateFor\": \"{{nominateFor}}\",\n      \"nomineeName\": \"{{nomineeName}}\",\n      \"relation\": \"{{nomineeRelation}}\",\n      \"amountPercent\": {{nomineePercent}},\n      \"address\": \"{{address}}\"\n    }\n  ],\n  \"experience\": [\n    {\n      \"organization\": \"{{expOrganization}}\",\n      \"designation\": \"{{expDesignation}}\",\n      \"location\": \"{{city}}\",\n      \"fromDate\": \"{{expFromDate}}\",\n      \"toDate\": \"{{expToDate}}\",\n      \"lastSalaryDrawn\": \"{{expLastSalary}}\"\n    }\n  ],\n  \"visas\": [\n    {\n      \"countryName\": \"{{visaCountry}}\",\n      \"visaType\": \"{{visaType}}\",\n      \"visaNumber\": \"{{visaNumber}}\",\n      \"fromDate\": \"{{visaFromDate}}\",\n      \"toDate\": \"{{visaToDate}}\"\n    }\n  ]\n}"
+                  "raw": "{\n  \"personal\": {\n    \"dateOfBirth\": \"{{dateOfBirth}}\",\n    \"gender\": \"{{gender}}\",\n    \"maritalStatus\": \"{{maritalStatus}}\",\n    \"fatherOrHusbandName\": \"{{fatherOrHusbandName}}\",\n    \"panNo\": \"{{panNo}}\",\n    \"aadhaarNo\": \"{{aadhaarNo}}\",\n    \"personalEmail\": \"{{personalEmail}}\",\n    \"mobileNo\": \"{{mobileNo}}\",\n    \"workPhone\": \"{{workPhone}}\",\n    \"workExt\": \"{{workExt}}\",\n    \"drivingLicenseNo\": \"{{drivingLicenseNo}}\",\n    \"passportNo\": \"{{passportNo}}\",\n    \"languageKnown\": \"{{languageKnown}}\",\n    \"emergencyContact1\": \"{{emergencyContact1}}\",\n    \"emergencyContact2\": \"{{emergencyContact2}}\",\n    \"presentAddress\": {\n      \"address\": \"{{address}}\",\n      \"city\": \"{{city}}\",\n      \"state\": \"{{state}}\",\n      \"country\": \"{{country}}\",\n      \"pincode\": \"{{pincode}}\"\n    },\n    \"permanentAddress\": {\n      \"address\": \"{{address}}\",\n      \"city\": \"{{city}}\",\n      \"state\": \"{{state}}\",\n      \"country\": \"{{country}}\",\n      \"pincode\": \"{{pincode}}\"\n    }\n  },\n  \"other\": {\n    \"bloodGroup\": \"{{bloodGroup}}\",\n    \"passportExpiry\": \"{{passportExpiry}}\"\n  },\n  \"education\": [\n    {\n      \"courseType\": \"{{eduCourseType}}\",\n      \"courseLevel\": \"{{eduCourseLevel}}\",\n      \"courseName\": \"{{eduCourseName}}\",\n      \"instituteName\": \"{{eduInstitute}}\",\n      \"location\": \"{{city}}\",\n      \"fromYear\": \"{{eduFromYear}}\",\n      \"passingYear\": \"{{eduPassingYear}}\",\n      \"percentageOrGrade\": \"{{eduGrade}}\",\n      \"document\": \"{{eduDocument}}\"\n    }\n  ],\n  \"accounts\": [\n    {\n      \"bankName\": \"{{bankName}}\",\n      \"accountNo\": \"{{bankAccountNo}}\",\n      \"accountHolderName\": \"{{accountHolderName}}\",\n      \"ifscCode\": \"{{ifscCode}}\",\n      \"location\": \"{{city}}\",\n      \"active\": true,\n      \"salaryAccount\": true,\n      \"attachment\": \"\"\n    }\n  ],\n  \"family\": [\n    {\n      \"name\": \"{{familyName}}\",\n      \"relation\": \"{{familyRelation}}\",\n      \"mobileNo\": \"{{familyMobile}}\",\n      \"occupation\": \"{{familyOccupation}}\"\n    }\n  ],\n  \"nominees\": [\n    {\n      \"nominateFor\": \"{{nominateFor}}\",\n      \"relation\": \"{{nomineeRelation}}\",\n      \"amountPercent\": {{nomineePercent}},\n      \"address\": \"{{address}}\"\n    }\n  ],\n  \"experience\": [\n    {\n      \"organization\": \"{{expOrganization}}\",\n      \"designation\": \"{{expDesignation}}\",\n      \"location\": \"{{city}}\",\n      \"fromDate\": \"{{expFromDate}}\",\n      \"toDate\": \"{{expToDate}}\",\n      \"lastSalaryDrawn\": \"{{expLastSalary}}\"\n    }\n  ],\n  \"visas\": [\n    {\n      \"countryName\": \"{{visaCountry}}\",\n      \"visaType\": \"{{visaType}}\",\n      \"visaNumber\": \"{{visaNumber}}\",\n      \"fromDate\": \"{{visaFromDate}}\",\n      \"toDate\": \"{{visaToDate}}\"\n    }\n  ]\n}"
                 },
                 "url": "{{baseUrl}}/api/employees/{{userId}}",
                 "description": "PUT /api/employees/{{userId}} — employee objects.\n\npersonal | other | education | accounts | family | nominees | experience | visas\n\nNO official / payroll . Login Employee first."
@@ -1901,41 +3500,27 @@
                 "description": "Self punch-out — ANY role. Must punch-in first. Uses {{token}}."
               }
             },
-        {
-          "name": "My Today",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
+            {
+              "name": "My Today",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/attendance/today"
               }
-            ],
-            "url": "{{baseUrl}}/api/attendance/today"
-          }
             }
           ]
         },
         {
           "name": "2.4 Masters (Dropdowns)",
-          "description": "Read-only lists for forms",
+          "description": "ESS read-only dropdown lists — one folder per type. Use `List master meta` for field map.",
           "item": [
             {
-              "name": "List Companies",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-                "url": "{{baseUrl}}/api/masters?type=company&status=Active",
-                "description": "Company master: `name` is the company name (no parent company field)."
-              }
-            },
-            {
-              "name": "List Departments",
+              "name": "List master meta",
               "request": {
                 "method": "GET",
                 "header": [
@@ -1944,71 +3529,389 @@
                     "value": "Bearer {{token}}"
                   }
                 ],
-                "url": {
-                  "raw": "{{baseUrl}}/api/masters?type=department&company={{company}}&status=Active",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "masters"
-                  ],
-                  "query": [
-                    {
-                      "key": "type",
-                      "value": "department"
-                    },
-                    {
-                      "key": "company",
-                      "value": "{{company}}"
-                    },
-                    {
-                      "key": "status",
-                      "value": "Active"
-                    }
-                  ]
-                },
-                "description": "Use `data[].name` in employee create/update official.department."
+                "url": "{{baseUrl}}/api/masters/meta",
+                "description": "All master types + General Info field→type map for ESS dropdowns."
               }
             },
             {
-              "name": "List Designations",
-              "request": {
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{token}}"
+              "name": "Company",
+              "description": "Dropdown list for type=`company` (ESS — read only).",
+              "item": [
+                {
+                  "name": "List Company",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=company&status=Active&page=1&limit=50",
+                    "description": "Employee / Admin dropdown: type=company Supports search|q, page, limit. Response: total, page, limit, pages, data."
                   }
-                ],
-                "url": "{{baseUrl}}/api/masters?type=designation&company={{company}}&status=Active"
-              }
+                }
+              ]
             },
             {
-              "name": "List Divisions",
-              "request": {
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{token}}"
+              "name": "Department",
+              "description": "Dropdown list for type=`department` (ESS — read only).",
+              "item": [
+                {
+                  "name": "List Department",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=department&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "Employee / Admin dropdown: type=department Supports search|q, page, limit. Response: total, page, limit, pages, data."
                   }
-                ],
-                "url": "{{baseUrl}}/api/masters?type=division&company={{company}}&status=Active"
-              }
+                }
+              ]
             },
             {
-              "name": "List Employee Groups",
-              "request": {
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{token}}"
+              "name": "Designation",
+              "description": "Dropdown list for type=`designation` (ESS — read only).",
+              "item": [
+                {
+                  "name": "List Designation",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=designation&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "Employee / Admin dropdown: type=designation Supports search|q, page, limit. Response: total, page, limit, pages, data."
                   }
-                ],
-                "url": "{{baseUrl}}/api/masters?type=employeeGroup&company={{company}}&status=Active"
-              }
+                }
+              ]
+            },
+            {
+              "name": "Division",
+              "description": "Dropdown list for type=`division` (ESS — read only).",
+              "item": [
+                {
+                  "name": "List Division",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=division&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "Employee / Admin dropdown: type=division Supports search|q, page, limit. Response: total, page, limit, pages, data."
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Employee Group",
+              "description": "Dropdown list for type=`employeeGroup` (ESS — read only).",
+              "item": [
+                {
+                  "name": "List Employee Group",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=employeeGroup&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "Employee / Admin dropdown: type=employeeGroup Supports search|q, page, limit. Response: total, page, limit, pages, data."
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Grade",
+              "description": "Dropdown list for type=`grade` (ESS — read only).",
+              "item": [
+                {
+                  "name": "List Grade",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=grade&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "Employee / Admin dropdown: type=grade Supports search|q, page, limit. Response: total, page, limit, pages, data."
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Job Role",
+              "description": "Dropdown list for type=`jobRole` (ESS — read only).",
+              "item": [
+                {
+                  "name": "List Job Role",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=jobRole&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "Employee / Admin dropdown: type=jobRole Supports search|q, page, limit. Response: total, page, limit, pages, data."
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Gender",
+              "description": "Dropdown list for type=`gender` (ESS — read only).",
+              "item": [
+                {
+                  "name": "List Gender",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=gender&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "Employee / Admin dropdown: type=gender Supports search|q, page, limit. Response: total, page, limit, pages, data."
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Marital Status",
+              "description": "Dropdown list for type=`maritalStatus` (ESS — read only).",
+              "item": [
+                {
+                  "name": "List Marital Status",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=maritalStatus&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "Employee / Admin dropdown: type=maritalStatus Supports search|q, page, limit. Response: total, page, limit, pages, data."
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Blood Group",
+              "description": "Dropdown list for type=`bloodGroup` (ESS — read only).",
+              "item": [
+                {
+                  "name": "List Blood Group",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=bloodGroup&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "Employee / Admin dropdown: type=bloodGroup Supports search|q, page, limit. Response: total, page, limit, pages, data."
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Country",
+              "description": "Dropdown list for type=`country` (ESS — read only).",
+              "item": [
+                {
+                  "name": "List Country",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=country&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "Employee / Admin dropdown: type=country Supports search|q, page, limit. Response: total, page, limit, pages, data."
+                  }
+                }
+              ]
+            },
+            {
+              "name": "State",
+              "description": "Dropdown list for type=`state` (ESS — read only).",
+              "item": [
+                {
+                  "name": "List State",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=state&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "Employee / Admin dropdown: type=state Supports search|q, page, limit. Response: total, page, limit, pages, data."
+                  }
+                }
+              ]
+            },
+            {
+              "name": "City",
+              "description": "Dropdown list for type=`city` (ESS — read only).",
+              "item": [
+                {
+                  "name": "List City",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=city&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "Employee / Admin dropdown: type=city Supports search|q, page, limit. Response: total, page, limit, pages, data."
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Course Type",
+              "description": "Dropdown list for type=`courseType` (ESS — read only).",
+              "item": [
+                {
+                  "name": "List Course Type",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=courseType&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "Employee / Admin dropdown: type=courseType Supports search|q, page, limit. Response: total, page, limit, pages, data."
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Course Level",
+              "description": "Dropdown list for type=`courseLevel` (ESS — read only).",
+              "item": [
+                {
+                  "name": "List Course Level",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=courseLevel&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "Employee / Admin dropdown: type=courseLevel Supports search|q, page, limit. Response: total, page, limit, pages, data."
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Bank Name",
+              "description": "Dropdown list for type=`bankName` (ESS — read only).",
+              "item": [
+                {
+                  "name": "List Bank Name",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=bankName&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "Employee / Admin dropdown: type=bankName Supports search|q, page, limit. Response: total, page, limit, pages, data."
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Relation",
+              "description": "Dropdown list for type=`relation` (ESS — read only).",
+              "item": [
+                {
+                  "name": "List Relation",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=relation&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "Employee / Admin dropdown: type=relation Supports search|q, page, limit. Response: total, page, limit, pages, data."
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Nominate For",
+              "description": "Dropdown list for type=`nominateFor` (ESS — read only).",
+              "item": [
+                {
+                  "name": "List Nominate For",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=nominateFor&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "Employee / Admin dropdown: type=nominateFor Supports search|q, page, limit. Response: total, page, limit, pages, data."
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Visa Type",
+              "description": "Dropdown list for type=`visaType` (ESS — read only).",
+              "item": [
+                {
+                  "name": "List Visa Type",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=visaType&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "Employee / Admin dropdown: type=visaType Supports search|q, page, limit. Response: total, page, limit, pages, data."
+                  }
+                }
+              ]
             }
           ]
         }

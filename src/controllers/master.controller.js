@@ -12,6 +12,7 @@ const {
   toMasterDto,
   findMasterById,
   findMasterByIdLean,
+  GENERAL_INFO_DROPDOWNS,
 } = require("../models/Master");
 const {
   hasGlobalCompanyAccess,
@@ -35,51 +36,124 @@ const assertOwnCompanyRow = (req, type, companyName) => {
   return null;
 };
 
-/** GET /api/masters?type=&status=&search=&company= */
+/**
+ * GET /api/masters/meta — types + General Info field→type map (ESS dropdown wiring)
+ * No Masters permission — any logged-in user.
+ */
+const listMasterMeta = async (_req, res) => {
+  try {
+    return res.json({
+      types: TYPES,
+      generalInfoModules: [
+        "personal",
+        "official",
+        "other",
+        "education",
+        "accounts",
+        "family",
+        "nominees",
+        "experience",
+        "visas",
+      ],
+      dropdowns: GENERAL_INFO_DROPDOWNS,
+      note: "Save master name strings on employee profile (not _id). nomineeName is free text. Vaccination is not a General Info module.",
+    });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+/** Escape user text so it is safe inside RegExp */
+const escapeRegex = (value) =>
+  String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * GET /api/masters?type=&status=&search|q=&company=&page=&limit=
+ * Query validated by listMasterQuerySchema (type/status/page/limit/search).
+ */
 const listMasters = async (req, res) => {
   try {
-    const { type, status, search } = req.query;
-
-    if (!type) {
-      return res.status(400).json({
-        message: `type is required: ${TYPES.join(", ")}`,
-      });
-    }
-    if (!TYPES.includes(type)) {
-      return res.status(400).json({
-        message: `type must be: ${TYPES.join(", ")}`,
-      });
-    }
+    const { type, status, company, page, limit } = req.query;
+    const searchRaw =
+      req.query.search ?? req.query.q ?? req.query.query ?? req.query.keyword;
+    const search = searchRaw != null ? String(searchRaw).trim() : "";
+    const skip = (page - 1) * limit;
 
     const Model = getModel(type);
-    const filter = {};
+    const and = [];
 
-    if (status) filter.status = status;
-    if (search) filter.name = new RegExp(String(search).trim(), "i");
+    if (status) and.push({ status });
 
+    let scopedCompany = "";
     if (!hasGlobalCompanyAccess(req.user)) {
-      const own = getUserCompany(req.user);
+      const ownRaw = String(req.user?.official?.company || "").trim();
+      const own = normalizeCompany(ownRaw);
       if (!own) {
         return res.status(403).json({ message: "Your profile has no company" });
       }
-      const esc = own.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      scopedCompany = ownRaw;
       if (isCompanyType(type)) {
-        filter.name = new RegExp(`^${esc}$`, "i");
+        and.push({ name: new RegExp(`^${escapeRegex(ownRaw)}$`, "i") });
       } else {
-        filter.company = new RegExp(`^${esc}$`, "i");
+        and.push({ company: new RegExp(`^${escapeRegex(ownRaw)}$`, "i") });
       }
-    } else if (req.query.company && !isCompanyType(type)) {
-      const co = String(req.query.company).trim();
-      filter.company = new RegExp(
-        `^${co.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
-        "i"
-      );
+    } else if (company && !isCompanyType(type)) {
+      const co = String(company).trim();
+      if (co) {
+        scopedCompany = co;
+        and.push({ company: new RegExp(`^${escapeRegex(co)}$`, "i") });
+      }
     }
 
-    let rows = await Model.find(filter).sort({ name: 1 }).lean();
-    rows = rows.map((r) => toMasterDto(type, r));
+    if (search) {
+      if (
+        isCompanyType(type) &&
+        scopedCompany &&
+        !hasGlobalCompanyAccess(req.user)
+      ) {
+        if (!scopedCompany.toLowerCase().includes(search.toLowerCase())) {
+          return res.json({
+            total: 0,
+            page,
+            limit,
+            pages: 1,
+            data: [],
+            filters: {
+              type,
+              status: status || "",
+              search,
+              company: scopedCompany,
+            },
+          });
+        }
+      } else {
+        and.push({ name: new RegExp(escapeRegex(search), "i") });
+      }
+    }
 
-    return res.json({ count: rows.length, data: rows });
+    const filter =
+      and.length === 0 ? {} : and.length === 1 ? and[0] : { $and: and };
+
+    const [total, rows] = await Promise.all([
+      Model.countDocuments(filter),
+      Model.find(filter).sort({ name: 1 }).skip(skip).limit(limit).lean(),
+    ]);
+
+    const data = rows.map((r) => toMasterDto(type, r));
+
+    return res.json({
+      total,
+      page,
+      limit,
+      pages: Math.max(Math.ceil(total / limit), 1),
+      data,
+      filters: {
+        type,
+        status: status || "",
+        search,
+        company: scopedCompany || company || "",
+      },
+    });
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
@@ -117,14 +191,22 @@ const getMaster = async (req, res) => {
 
 /**
  * Parent company for department / designation / …
- * Global Admin → from body (required). Others → from login profile only (secure).
+ * Global Admin → from body (required + must exist). Others → login profile only.
  */
-const resolveScopedCompany = (req, bodyCompany) => {
+const resolveScopedCompany = async (req, bodyCompany) => {
   if (hasGlobalCompanyAccess(req.user)) {
     const co = String(bodyCompany || "").trim();
     if (!co) {
       return {
         error: "company is required (which company this master belongs to)",
+        status: 400,
+      };
+    }
+    const exists = await companyMasterExists(co);
+    if (!exists) {
+      return {
+        error: `company "${co}" not found in company master — create company first`,
+        status: 400,
       };
     }
     return { company: co };
@@ -134,18 +216,43 @@ const resolveScopedCompany = (req, bodyCompany) => {
   if (!own) {
     return {
       error: "Your profile has no company — cannot manage masters",
+      status: 403,
     };
   }
 
-  // Frontend must not target another company
   const sent = String(bodyCompany || "").trim();
   if (sent && normalizeCompany(sent) !== normalizeCompany(own)) {
     return {
       error: "You can only manage masters for your own company",
+      status: 403,
     };
   }
 
   return { company: own };
+};
+
+/** Case-insensitive duplicate name within the same collection/company */
+const findDuplicateName = async (Model, { name, company, excludeId, isCompany }) => {
+  const filter = {
+    name: new RegExp(`^${escapeRegex(name)}$`, "i"),
+  };
+  if (!isCompany) {
+    filter.company = new RegExp(`^${escapeRegex(company || "")}$`, "i");
+  }
+  if (excludeId) {
+    filter._id = { $ne: excludeId };
+  }
+  return Model.findOne(filter).lean();
+};
+
+/** True if a company master row exists with this name */
+const companyMasterExists = async (companyName) => {
+  const Company = getModel("company");
+  const row = await Company.findOne({
+    name: new RegExp(`^${escapeRegex(companyName)}$`, "i"),
+    status: "Active",
+  }).lean();
+  return Boolean(row);
 };
 
 /** POST /api/masters — company from login (non–Global) or body (Global Admin) */
@@ -153,6 +260,7 @@ const createMaster = async (req, res) => {
   try {
     const { type, name, status } = req.body;
     const Model = getModel(type);
+    const trimmedName = String(name).trim();
 
     if (isCompanyType(type) && !hasGlobalCompanyAccess(req.user)) {
       return res.status(403).json({
@@ -161,19 +269,30 @@ const createMaster = async (req, res) => {
     }
 
     const payload = {
-      name: String(name).trim(),
+      name: trimmedName,
       status: status || "Active",
       company: "",
     };
 
     if (!isCompanyType(type)) {
-      const resolved = resolveScopedCompany(req, req.body.company);
+      const resolved = await resolveScopedCompany(req, req.body.company);
       if (resolved.error) {
-        return res
-          .status(resolved.error.includes("required") ? 400 : 403)
-          .json({ message: resolved.error });
+        return res.status(resolved.status || 400).json({ message: resolved.error });
       }
       payload.company = resolved.company;
+    }
+
+    const dup = await findDuplicateName(Model, {
+      name: trimmedName,
+      company: payload.company,
+      isCompany: isCompanyType(type),
+    });
+    if (dup) {
+      return res.status(400).json({
+        message: isCompanyType(type)
+          ? `Company "${trimmedName}" already exists`
+          : `"${trimmedName}" already exists for this company`,
+      });
     }
 
     const created = await Model.create(payload);
@@ -198,7 +317,7 @@ const updateMaster = async (req, res) => {
     const found = await findMasterById(req.params.id);
     if (!found) return res.status(404).json({ message: "Not found" });
 
-    const { type, row } = found;
+    const { type, row, Model } = found;
 
     if (isCompanyType(type) && !hasGlobalCompanyAccess(req.user)) {
       return res.status(403).json({
@@ -212,12 +331,17 @@ const updateMaster = async (req, res) => {
       return res.status(403).json({ message: scopeErr });
     }
 
-    if (req.body.name !== undefined) row.name = String(req.body.name).trim();
+    if (req.body.name !== undefined) {
+      const nextName = String(req.body.name).trim();
+      if (!nextName) {
+        return res.status(400).json({ message: "name is required" });
+      }
+      row.name = nextName;
+    }
     if (req.body.status !== undefined) row.status = req.body.status;
 
     if (req.body.company !== undefined && !isCompanyType(type)) {
       if (!hasGlobalCompanyAccess(req.user)) {
-        // Keep locked to login company — ignore move attempts
         row.company = String(req.user.official?.company || "").trim();
       } else {
         const nextCompany = String(req.body.company || "").trim();
@@ -227,8 +351,28 @@ const updateMaster = async (req, res) => {
               "company is required (which company this master belongs to)",
           });
         }
+        const exists = await companyMasterExists(nextCompany);
+        if (!exists) {
+          return res.status(400).json({
+            message: `company "${nextCompany}" not found in company master — create company first`,
+          });
+        }
         row.company = nextCompany;
       }
+    }
+
+    const dup = await findDuplicateName(Model, {
+      name: row.name,
+      company: isCompanyType(type) ? "" : row.company,
+      excludeId: row._id,
+      isCompany: isCompanyType(type),
+    });
+    if (dup) {
+      return res.status(400).json({
+        message: isCompanyType(type)
+          ? `Company "${row.name}" already exists`
+          : `"${row.name}" already exists for this company`,
+      });
     }
 
     await row.save();
@@ -275,6 +419,7 @@ const deleteMaster = async (req, res) => {
 };
 
 module.exports = {
+  listMasterMeta,
   listMasters,
   getMaster,
   createMaster,

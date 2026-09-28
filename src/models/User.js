@@ -187,9 +187,11 @@ const userSchema = new mongoose.Schema(
 
     nominees: [
       {
-        /** Benefit type, e.g. PF, Gratuity */
+        /** Benefit type from master type=nominateFor (e.g. PF, Gratuity) */
         nominateFor: { type: String, default: "" },
+        /** Free text — not a master dropdown */
         nomineeName: { type: String, default: "" },
+        /** Relation from master type=relation */
         relation: { type: String, default: "" },
         dob: { type: Date, default: null },
         /** Share of benefit (0–100) */

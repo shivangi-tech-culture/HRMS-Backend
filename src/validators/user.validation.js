@@ -163,7 +163,7 @@ const familyItem = only({
   mediclaim: bool(),
 });
 
-/** nominees[] row — PF / insurance nominees */
+/** nominees[] row — PF / insurance; nomineeName = free text (not master) */
 const nomineeItem = only({
   _id: str(),
   nominateFor: str(),

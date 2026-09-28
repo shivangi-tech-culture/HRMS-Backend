@@ -162,7 +162,8 @@ const ADMIN_TREE = [
     ],
   },
 
-  // Masters — /api/masters?type=… (admin CRUD; GET is open to logged-in Employee too)
+  // Masters — /api/masters?type=… (admin CRUD; GET open to Employee for ESS dropdowns)
+  // Covers Official + all General Info dropdowns (9 modules; no Vaccination)
   {
     module: "Masters",
     heading: "Masters",
@@ -172,6 +173,20 @@ const ADMIN_TREE = [
       { name: "Designation", actions: CRUD },
       { name: "Division", actions: CRUD },
       { name: "Employee Group", actions: CRUD },
+      { name: "Grade", actions: CRUD },
+      { name: "Job Role", actions: CRUD },
+      { name: "Gender", actions: CRUD },
+      { name: "Marital Status", actions: CRUD },
+      { name: "Blood Group", actions: CRUD },
+      { name: "Country", actions: CRUD },
+      { name: "State", actions: CRUD },
+      { name: "City", actions: CRUD },
+      { name: "Course Type", actions: CRUD },
+      { name: "Course Level", actions: CRUD },
+      { name: "Bank Name", actions: CRUD },
+      { name: "Relation", actions: CRUD },
+      { name: "Nominate For", actions: CRUD },
+      { name: "Visa Type", actions: CRUD },
     ],
   },
 
