@@ -1,9 +1,9 @@
 /**
- * MAIL UTILS — send email via Zoho SMTP (nodemailer)
- * sendWelcomeEmail (user / employee create) · sendEmail (generic)
+ * MAIL UTILS — send email
+ * Prefer HTTPS APIs on Render (Brevo / Resend) — SMTP ports 465/587 are blocked on free tier.
+ * Local: Zoho SMTP still works when no BREVO_API_KEY / RESEND_API_KEY is set.
  *
- * Create APIs must NOT await SMTP — Render often blocks/times out Zoho ports
- * (587/465), which made create take ~60s. Welcome mail is fire-and-forget.
+ * Create APIs use queueWelcomeEmail (fire-and-forget) so SMTP timeouts never block the response.
  */
 const nodemailer = require("nodemailer");
 
@@ -11,7 +11,7 @@ const mailUser = () => process.env.EMAIL_USER_EZ;
 const mailPass = () => String(process.env.EMAIL_PASS_EZ || "").replace(/\s+/g, "");
 const mailHost = () => process.env.SMTP_HOST_EZ || "smtp.zoho.com";
 
-/** Build one Zoho transporter (port 465 = SSL, 587 = STARTTLS). Force IPv4 for Render. */
+/** Build one Zoho transporter (port 465 = SSL, 587 = STARTTLS). Force IPv4. */
 function createTransporter(portOverride) {
   const user = mailUser();
   const pass = mailPass();
@@ -51,8 +51,139 @@ function smtpPortsToTry() {
   return [preferred];
 }
 
-/** Send with optional port fallback when connection times out. */
+/** Normalize to/cc/bcc into string arrays */
+function listAddresses(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value.map((v) => String(v).trim()).filter(Boolean);
+  }
+  return String(value)
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Brevo (Sendinblue) HTTPS API — works on Render free tier (port 443).
+ * Env: BREVO_API_KEY. Sender must be verified in Brevo (usually EMAIL_USER_EZ).
+ */
+async function sendViaBrevo(mailOptions) {
+  const apiKey = process.env.BREVO_API_KEY;
+  if (!apiKey) return null;
+
+  const { fromName, fromEmail } = fromAddress();
+  const to = listAddresses(mailOptions.to).map((email) => ({ email }));
+  const cc = listAddresses(mailOptions.cc).map((email) => ({ email }));
+  const bcc = listAddresses(mailOptions.bcc).map((email) => ({ email }));
+
+  if (!to.length) throw new Error("Brevo send: missing to address");
+
+  const payload = {
+    sender: { name: fromName, email: fromEmail },
+    to,
+    subject: mailOptions.subject,
+    htmlContent: mailOptions.html || undefined,
+    textContent: mailOptions.text || undefined,
+  };
+  if (cc.length) payload.cc = cc;
+  if (bcc.length) payload.bcc = bcc;
+  if (mailOptions.replyTo) {
+    payload.replyTo = { email: String(mailOptions.replyTo) };
+  }
+
+  const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/json",
+      "api-key": apiKey,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(
+      data.message || data.error || `Brevo HTTP ${res.status}`
+    );
+  }
+
+  return {
+    messageId: data.messageId || `brevo-${Date.now()}`,
+    accepted: to.map((t) => t.email),
+    rejected: [],
+    response: "Brevo accepted",
+    _usedPort: "https-brevo",
+  };
+}
+
+/**
+ * Resend HTTPS API — works on Render free tier.
+ * Env: RESEND_API_KEY. From domain must be verified in Resend (or use onboarding domain).
+ */
+async function sendViaResend(mailOptions) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return null;
+
+  const { from } = fromAddress();
+  const payload = {
+    from,
+    to: listAddresses(mailOptions.to),
+    subject: mailOptions.subject,
+    html: mailOptions.html || undefined,
+    text: mailOptions.text || undefined,
+  };
+  const cc = listAddresses(mailOptions.cc);
+  const bcc = listAddresses(mailOptions.bcc);
+  if (cc.length) payload.cc = cc;
+  if (bcc.length) payload.bcc = bcc;
+  if (mailOptions.replyTo) payload.reply_to = String(mailOptions.replyTo);
+
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.message || data.error || `Resend HTTP ${res.status}`);
+  }
+
+  return {
+    messageId: data.id || `resend-${Date.now()}`,
+    accepted: payload.to,
+    rejected: [],
+    response: "Resend accepted",
+    _usedPort: "https-resend",
+  };
+}
+
+/** Prefer HTTPS APIs (Render-safe), then Zoho SMTP (local). */
 async function sendMailWithFallback(mailOptions) {
+  if (process.env.BREVO_API_KEY) {
+    try {
+      const viaBrevo = await sendViaBrevo(mailOptions);
+      if (viaBrevo) return viaBrevo;
+    } catch (err) {
+      console.error("Brevo HTTPS failed:", err.message);
+      throw err;
+    }
+  }
+
+  if (process.env.RESEND_API_KEY) {
+    try {
+      const viaResend = await sendViaResend(mailOptions);
+      if (viaResend) return viaResend;
+    } catch (err) {
+      console.error("Resend HTTPS failed:", err.message);
+      throw err;
+    }
+  }
+
   const ports = smtpPortsToTry();
   let lastErr;
   for (const port of ports) {
@@ -72,11 +203,17 @@ async function sendMailWithFallback(mailOptions) {
           msg
         );
       console.error(`SMTP port ${port} failed:`, msg);
-      if (!retryable || ports.length === 1) throw err;
+      if (!retryable || ports.length === 1) {
+        const hint =
+          /timeout|ETIMEDOUT/i.test(msg)
+            ? " Render free tier blocks SMTP (465/587). Set BREVO_API_KEY or RESEND_API_KEY for HTTPS mail, or upgrade the Render instance."
+            : "";
+        throw new Error(`${msg}${hint}`);
+      }
     }
   }
   throw new Error(
-    `SMTP connection failed on ports ${ports.join(" & ")} from this host (often blocked on Render). Last error: ${lastErr && lastErr.message}. Set SMTP_PORT_EZ=465 on Render, or use an HTTPS mail provider.`
+    `SMTP connection failed on ports ${ports.join(" & ")} from this host. Last error: ${lastErr && lastErr.message}. Set BREVO_API_KEY or RESEND_API_KEY on Render.`
   );
 }
 
@@ -97,7 +234,7 @@ const escapeHtml = (value) =>
 
 /**
  * Welcome email after user create (includes login credentials).
- * Throws if SMTP rejects or env is missing — callers should catch.
+ * Throws if SMTP/API rejects or env is missing — callers should catch.
  */
 const sendWelcomeEmail = async ({
   name,
@@ -293,7 +430,7 @@ const sendWelcomeEmailSafe = async (payload) => {
       "Welcome email sent →",
       emailTo,
       info.messageId || "",
-      "port:",
+      "via:",
       info._usedPort || "",
       "accepted:",
       (info.accepted || []).join(",") || "(none)"

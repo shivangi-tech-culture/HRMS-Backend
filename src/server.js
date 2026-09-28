@@ -28,6 +28,9 @@ const healthRoutes = require("./routes/health.routes");
 
 const app = express();
 
+/** Render / reverse proxy — needed for express-rate-limit + X-Forwarded-For */
+app.set("trust proxy", 1);
+
 // NO HTTP CACHE — API responses always fresh (avoid 304 Not Modified)
 
 /** Disable ETag so APIs always return 200 + body (no 304 empty cache) */
