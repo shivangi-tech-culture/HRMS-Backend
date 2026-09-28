@@ -146,6 +146,9 @@ const createAccessUserAccount = async (req) => {
       .trim();
     const roleName = String(role || "").trim();
     const department = String(officialIn.department || "").trim();
+    const employeeCode = String(officialIn.employeeCode || "")
+      .trim()
+      .toUpperCase();
     const mobileNo = String(personalIn.mobileNo || "").trim();
     const city = String(addrIn.city || "").trim();
     const state = String(addrIn.state || "").trim();
@@ -193,6 +196,7 @@ const createAccessUserAccount = async (req) => {
 
     const uniquePayload = { "official.officialEmail": email };
     if (mobileNo) uniquePayload["personal.mobileNo"] = mobileNo;
+    if (employeeCode) uniquePayload["official.employeeCode"] = employeeCode;
 
     const [createConflict, targetRole, hashedPassword] = await Promise.all([
       findUniqueConflict(uniquePayload),
@@ -208,11 +212,15 @@ const createAccessUserAccount = async (req) => {
 
     const official =
       roleName === "Global Admin"
-        ? { officialEmail: email }
+        ? {
+            officialEmail: email,
+            ...(employeeCode ? { employeeCode } : {}),
+          }
         : {
             officialEmail: email,
             company,
             ...(department ? { department } : {}),
+            ...(employeeCode ? { employeeCode } : {}),
           };
 
     const createDoc = {
@@ -418,6 +426,24 @@ const updateUser = async (req, res) => {
     if (req.body.official?.department !== undefined) {
       if (!user.official) user.official = {};
       user.official.department = String(req.body.official.department || "").trim();
+      user.markModified("official");
+    }
+
+    if (req.body.official?.employeeCode !== undefined) {
+      if (!user.official) user.official = {};
+      const code = String(req.body.official.employeeCode || "")
+        .trim()
+        .toUpperCase();
+      if (code) {
+        const conflict = await findUniqueConflict(
+          { "official.employeeCode": code },
+          user._id
+        );
+        if (conflict) {
+          return res.status(400).json({ message: conflict });
+        }
+      }
+      user.official.employeeCode = code;
       user.markModified("official");
     }
 

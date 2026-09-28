@@ -818,7 +818,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"name\": \"{{newUserName}}\",\n  \"password\": \"{{password}}\",\n  \"role\": \"Employee\",\n  \"status\": \"Active\",\n  \"official\": {\n    \"officialEmail\": \"{{newUserEmail}}\",\n    \"company\": \"{{company}}\",\n    \"department\": \"{{department}}\"\n  },\n  \"personal\": {\n    \"mobileNo\": \"{{mobileNo}}\",\n    \"presentAddress\": {\n      \"city\": \"{{city}}\",\n      \"state\": \"{{state}}\",\n      \"country\": \"{{country}}\"\n    }\n  }\n}"
+                  "raw": "{\n  \"name\": \"{{newUserName}}\",\n  \"password\": \"{{password}}\",\n  \"role\": \"Employee\",\n  \"status\": \"Active\",\n  \"official\": {\n    \"officialEmail\": \"{{newUserEmail}}\",\n    \"employeeCode\": \"{{employeeCode}}\",\n    \"company\": \"{{company}}\",\n    \"department\": \"{{department}}\"\n  },\n  \"personal\": {\n    \"mobileNo\": \"{{mobileNo}}\",\n    \"presentAddress\": {\n      \"city\": \"{{city}}\",\n      \"state\": \"{{state}}\",\n      \"country\": \"{{country}}\"\n    }\n  }\n}"
                 },
                 "url": "{{baseUrl}}/api/users",
                 "description": "POST /api/users — create lean user (any role). Sets {{userId}}."
@@ -1045,7 +1045,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"name\": \"Vivek\",\n  \"role\": \"Super Admin\",\n  \"status\": \"Active\",\n  \"password\": \"\",\n  \"official\": {\n    \"department\": \"Administration\"\n  },\n  \"personal\": {\n    \"mobileNo\": \"9876543210\",\n    \"presentAddress\": {\n      \"city\": \"Noida\",\n      \"state\": \"DELHI\",\n      \"country\": \"India\"\n    }\n  }\n}"
+                  "raw": "{\n  \"name\": \"Vivek\",\n  \"role\": \"Super Admin\",\n  \"status\": \"Active\",\n  \"password\": \"\",\n  \"official\": {\n    \"employeeCode\": \"{{employeeCode}}\",\n    \"department\": \"Administration\"\n  },\n  \"personal\": {\n    \"mobileNo\": \"9876543210\",\n    \"presentAddress\": {\n      \"city\": \"Noida\",\n      \"state\": \"DELHI\",\n      \"country\": \"India\"\n    }\n  }\n}"
                 },
                 "url": "{{baseUrl}}/api/users/{{userId}}",
                 "description": "PUT /api/users/:id — Edit drawer. Email + company locked. Blank password = keep."

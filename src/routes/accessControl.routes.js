@@ -40,6 +40,8 @@ const ACCESS_ROLES = ["Global Admin", "Super Admin", "HR Manager", "Manager"];
  *   post:
  *     tags: [Admin / Users]
  *     summary: Create user (Access & Control)
+ *     description: |
+ *       Lean drawer fields. `official.employeeCode` optional (editable, unique when set).
  *     security: [{ bearerAuth: [] }]
  *     responses:
  *       201: { description: User created }
@@ -152,6 +154,9 @@ router.get(
  *   put:
  *     tags: [Admin / Users]
  *     summary: Update user (Edit drawer)
+ *     description: |
+ *       Email + company locked. `official.employeeCode` optional — send to set/clear/edit.
+ *     security: [{ bearerAuth: [] }]
  *     security: [{ bearerAuth: [] }]
  *     parameters:
  *       - $ref: '#/components/parameters/UserId'

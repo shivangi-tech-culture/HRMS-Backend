@@ -17,18 +17,21 @@ const only = (keys) => Joi.object(keys).unknown(false);
 
 const officialGlobalAdmin = only({
   officialEmail: Joi.string().trim().email().required(),
+  employeeCode: Joi.string().trim().uppercase().allow("").optional(),
   company: Joi.string().trim().allow("").optional(),
   department: Joi.string().trim().allow("").optional(),
 });
 
 const officialSuperAdmin = only({
   officialEmail: Joi.string().trim().email().required(),
+  employeeCode: Joi.string().trim().uppercase().allow("").optional(),
   company: Joi.string().trim().min(2).allow("").optional(),
   department: Joi.string().trim().allow("").optional(),
 });
 
 const officialAccessStaff = only({
   officialEmail: Joi.string().trim().email().required(),
+  employeeCode: Joi.string().trim().uppercase().allow("").optional(),
   company: Joi.string().trim().min(2).required(),
   department: Joi.string().trim().allow("").optional(),
 });
@@ -70,6 +73,7 @@ const updateAccessUserSchema = Joi.object({
   role: Joi.string().trim().optional(),
   status: Joi.string().valid("Active", "Inactive").optional(),
   official: only({
+    employeeCode: Joi.string().trim().uppercase().allow("").optional(),
     department: str(),
   }).optional(),
   personal: personalAccessLean.optional(),
