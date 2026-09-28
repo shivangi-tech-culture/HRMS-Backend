@@ -7,7 +7,7 @@ const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 const Role = require("../models/Role");
 const { maxGlobalAdmins } = require("./role.controller");
-const { sendWelcomeEmail, sendEmail } = require("../utils/mail");
+const { sendWelcomeEmailSafe, sendEmail } = require("../utils/mail");
 const { applyAnniversary } = require("../utils/anniversary");
 const { sendExcel } = require("../utils/excel");
 const {
@@ -237,19 +237,22 @@ const createAccessUserAccount = async (req) => {
 
     const user = await User.create(createDoc);
 
-    sendWelcomeEmail({
+    const mail = await sendWelcomeEmailSafe({
       name: createDoc.name,
       email,
       password,
       role: roleName,
       company: roleName === "Global Admin" ? "All companies" : company,
       department,
-    }).catch((mailErr) => {
-      console.error("Welcome email failed:", mailErr.message);
     });
 
     const fresh = await User.findById(user._id).select("-password");
-    return { ok: true, user: safeUser(fresh) };
+    return {
+      ok: true,
+      user: safeUser(fresh),
+      emailSent: mail.emailSent,
+      ...(mail.emailError ? { emailError: mail.emailError } : {}),
+    };
   } catch (err) {
     const dup = duplicateKeyMessage(err);
     if (dup) return { ok: false, status: 400, message: dup };
@@ -264,7 +267,11 @@ const createUser = async (req, res) => {
     return res.status(result.status).json({ message: result.message });
   }
   return res.status(201).json({
-    message: "User created",
+    message: result.emailSent
+      ? "User created. Welcome email sent."
+      : "User created. Welcome email failed — check server logs / SMTP env.",
+    emailSent: !!result.emailSent,
+    ...(result.emailError ? { emailError: result.emailError } : {}),
     user: result.user,
   });
 };

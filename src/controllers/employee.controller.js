@@ -10,7 +10,7 @@ const User = require("../models/User");
 const Role = require("../models/Role");
 const { maxGlobalAdmins } = require("./role.controller");
 const { hasAllAccess } = require("../middleware/auth");
-const { sendWelcomeEmail } = require("../utils/mail");
+const { sendWelcomeEmailSafe } = require("../utils/mail");
 const { applyAnniversary } = require("../utils/anniversary");
 const { sendExcel } = require("../utils/excel");
 const { uploadToCloudinary, UPLOAD_TYPES } = require("../middleware/upload");
@@ -377,22 +377,24 @@ const createEmployee = async (req, res) => {
     // 4. Create User with role Employee (password already hashed above)
     const employee = await User.create(createDoc);
 
-    // 5. Send welcome email (non-blocking)
-    sendWelcomeEmail({
+    // 5. Welcome email — await so Render does not drop the SMTP job after response
+    const mail = await sendWelcomeEmailSafe({
       name,
       email,
       password,
       role: "Employee",
       company: official.company || "",
       department: String(official.department || "").trim(),
-    }).catch((mailErr) => {
-      console.error("Welcome email failed:", mailErr.message);
     });
 
     // 6. Return employee without password
     const fresh = await User.findById(employee._id).select("-password");
     return res.status(201).json({
-      message: "Employee created",
+      message: mail.emailSent
+        ? "Employee created. Welcome email sent."
+        : "Employee created. Welcome email failed — check server logs / SMTP env.",
+      emailSent: mail.emailSent,
+      ...(mail.emailError ? { emailError: mail.emailError } : {}),
       employee: safeUser(fresh),
     });
   } catch (err) {

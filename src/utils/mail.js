@@ -1,6 +1,6 @@
 /**
  * MAIL UTILS — send email via Zoho SMTP (nodemailer)
- * sendWelcomeEmail (user create) · sendEmail (POST /api/mail/send)
+ * sendWelcomeEmail (user / employee create) · sendEmail (generic)
  */
 const nodemailer = require("nodemailer");
 
@@ -13,7 +13,7 @@ function createTransporter() {
 
   if (!user || !pass) {
     throw new Error(
-      "Mail not configured. Set EMAIL_USER_EZ and EMAIL_PASS_EZ in .env"
+      "Mail not configured. Set EMAIL_USER_EZ and EMAIL_PASS_EZ in .env (and on Render)"
     );
   }
 
@@ -21,7 +21,12 @@ function createTransporter() {
     host,
     port,
     secure: port === 465, // 465 = SSL, 587 = STARTTLS
+    requireTLS: port === 587,
     auth: { user, pass },
+    tls: { minVersion: "TLSv1.2" },
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 20000,
   });
 }
 
@@ -40,8 +45,25 @@ const escapeHtml = (value) =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 
-/** Welcome email after user create (includes login credentials) */
-const sendWelcomeEmail = async ({ name, email, password, role, company, department }) => {
+/**
+ * Welcome email after user create (includes login credentials).
+ * Throws if SMTP rejects or env is missing — callers should catch.
+ */
+const sendWelcomeEmail = async ({
+  name,
+  email,
+  password,
+  role,
+  company,
+  department,
+}) => {
+  const to = String(email || "")
+    .toLowerCase()
+    .trim();
+  if (!to) {
+    throw new Error("Welcome email skipped — official email is empty");
+  }
+
   const { fromName, from } = fromAddress();
   const appUrl = process.env.APP_URL || "https://hrms-techculture.vercel.app";
   const roleLabel = role || "Employee";
@@ -50,7 +72,7 @@ const sendWelcomeEmail = async ({ name, email, password, role, company, departme
 
   const safe = {
     name: escapeHtml(name),
-    email: escapeHtml(email),
+    email: escapeHtml(to),
     password: escapeHtml(password),
     role: escapeHtml(roleLabel),
     brand: escapeHtml(brand),
@@ -76,8 +98,6 @@ const sendWelcomeEmail = async ({ name, email, password, role, company, departme
     <tr>
       <td align="center">
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 12px 40px rgba(15,23,42,0.12);">
-
-          <!-- Header -->
           <tr>
             <td style="background:linear-gradient(135deg,#0b3d4a 0%,#0f766e 55%,#14b8a6 100%);padding:36px 36px 32px;">
               <p style="margin:0 0 10px;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:rgba(255,255,255,0.72);font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-weight:600;">
@@ -91,8 +111,6 @@ const sendWelcomeEmail = async ({ name, email, password, role, company, departme
               </p>
             </td>
           </tr>
-
-          <!-- Body -->
           <tr>
             <td style="padding:36px 36px 28px;">
               <p style="margin:0 0 12px;font-size:16px;color:#0f172a;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
@@ -102,16 +120,12 @@ const sendWelcomeEmail = async ({ name, email, password, role, company, departme
                 Welcome to <strong style="color:#0f172a;">${safe.brand}</strong>${department ? ` (${safe.dept})` : ""}.
                 Your login is ready. Use these details to open the HR portal for the first time:
               </p>
-
-              <!-- Simple 3 steps -->
               <p style="margin:0 0 16px;font-size:13px;line-height:1.6;color:#64748b;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
                 <strong style="color:#0f172a;">How to sign in</strong><br/>
                 1. Open the HR portal (button below)<br/>
                 2. Enter your email and password<br/>
                 3. Change your password after first login
               </p>
-
-              <!-- Credentials card -->
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
                 <tr>
                   <td style="padding:14px 20px;background:#0f172a;">
@@ -124,39 +138,24 @@ const sendWelcomeEmail = async ({ name, email, password, role, company, departme
                   <td style="padding:4px 20px 8px;">
                     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                       <tr>
-                        <td style="padding:14px 0;border-bottom:1px solid #e2e8f0;font-size:12px;color:#64748b;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;width:88px;vertical-align:top;">
-                          Email
-                        </td>
-                        <td style="padding:14px 0;border-bottom:1px solid #e2e8f0;font-size:14px;color:#0f172a;font-family:Consolas,Monaco,monospace;font-weight:600;word-break:break-all;">
-                          ${safe.email}
-                        </td>
+                        <td style="padding:14px 0;border-bottom:1px solid #e2e8f0;font-size:12px;color:#64748b;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;width:88px;vertical-align:top;">Email</td>
+                        <td style="padding:14px 0;border-bottom:1px solid #e2e8f0;font-size:14px;color:#0f172a;font-family:Consolas,Monaco,monospace;font-weight:600;word-break:break-all;">${safe.email}</td>
                       </tr>
                       <tr>
-                        <td style="padding:14px 0;border-bottom:1px solid #e2e8f0;font-size:12px;color:#64748b;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;width:88px;vertical-align:top;">
-                          Password
-                        </td>
-                        <td style="padding:14px 0;border-bottom:1px solid #e2e8f0;font-size:14px;color:#0f172a;font-family:Consolas,Monaco,monospace;font-weight:600;">
-                          ${safe.password}
-                        </td>
+                        <td style="padding:14px 0;border-bottom:1px solid #e2e8f0;font-size:12px;color:#64748b;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;width:88px;vertical-align:top;">Password</td>
+                        <td style="padding:14px 0;border-bottom:1px solid #e2e8f0;font-size:14px;color:#0f172a;font-family:Consolas,Monaco,monospace;font-weight:600;">${safe.password}</td>
                       </tr>
                       <tr>
-                        <td style="padding:14px 0;font-size:12px;color:#64748b;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;width:88px;vertical-align:top;">
-                          Your role
-                        </td>
+                        <td style="padding:14px 0;font-size:12px;color:#64748b;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;width:88px;vertical-align:top;">Your role</td>
                         <td style="padding:14px 0;">
-                          <span style="display:inline-block;background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;border-radius:999px;padding:4px 12px;font-size:12px;font-weight:700;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
-                            ${safe.role}
-                          </span>
+                          <span style="display:inline-block;background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;border-radius:999px;padding:4px 12px;font-size:12px;font-weight:700;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;">${safe.role}</span>
                         </td>
                       </tr>
                     </table>
                   </td>
                 </tr>
               </table>
-
               ${deptLine}
-
-              <!-- Security note -->
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:24px 0 28px;">
                 <tr>
                   <td style="padding:14px 16px;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;font-size:13px;line-height:1.55;color:#92400e;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
@@ -164,8 +163,6 @@ const sendWelcomeEmail = async ({ name, email, password, role, company, departme
                   </td>
                 </tr>
               </table>
-
-              <!-- CTA -->
               <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 32px;">
                 <tr>
                   <td align="center" style="border-radius:10px;background:#0f766e;">
@@ -175,7 +172,6 @@ const sendWelcomeEmail = async ({ name, email, password, role, company, departme
                   </td>
                 </tr>
               </table>
-
               <p style="margin:0;font-size:14px;line-height:1.6;color:#64748b;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
                 Need help? Contact your HR team.<br/><br/>
                 Warm regards,<br/>
@@ -184,8 +180,6 @@ const sendWelcomeEmail = async ({ name, email, password, role, company, departme
               </p>
             </td>
           </tr>
-
-          <!-- Footer -->
           <tr>
             <td style="padding:18px 36px;background:#f1f5f9;border-top:1px solid #e2e8f0;text-align:center;">
               <p style="margin:0;font-size:11px;line-height:1.5;color:#94a3b8;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
@@ -201,13 +195,40 @@ const sendWelcomeEmail = async ({ name, email, password, role, company, departme
 </html>
   `;
 
-  return transporter.sendMail({
+  const info = await transporter.sendMail({
     from,
-    to: email,
+    to,
     subject: `Welcome to ${brand} — your account is ready`,
-    text: `Hi ${name},\n\nWelcome to your HR portal at ${brand}. Your account is ready.\n\nHow to sign in:\n1. Open ${appUrl}\n2. Email: ${email}\n3. Password: ${password}\n4. Your role: ${roleLabel}\n\nPlease change your password after first login.\n\nRegards,\n${fromName}`,
+    text: `Hi ${name},\n\nWelcome to your HR portal at ${brand}. Your account is ready.\n\nHow to sign in:\n1. Open ${appUrl}\n2. Email: ${to}\n3. Password: ${password}\n4. Your role: ${roleLabel}\n\nPlease change your password after first login.\n\nRegards,\n${fromName}`,
     html,
   });
+
+  if (info.rejected && info.rejected.length) {
+    throw new Error(`SMTP rejected: ${info.rejected.join(", ")}`);
+  }
+
+  return info;
+};
+
+/**
+ * Fire welcome mail; never throws to the create API.
+ * Returns { emailSent, emailError? } for the JSON response.
+ */
+const sendWelcomeEmailSafe = async (payload) => {
+  try {
+    const info = await sendWelcomeEmail(payload);
+    console.log(
+      "Welcome email sent →",
+      payload.email,
+      info.messageId || "",
+      (info.accepted || []).join(",")
+    );
+    return { emailSent: true };
+  } catch (err) {
+    console.error("Welcome email failed:", err.message);
+    if (err.response) console.error("SMTP response:", err.response);
+    return { emailSent: false, emailError: err.message };
+  }
 };
 
 /** Generic send used by POST /api/mail/send */
@@ -244,4 +265,9 @@ const sendEmail = async ({ to, subject, body, cc, bcc, isHtml = false }) => {
   };
 };
 
-module.exports = { sendWelcomeEmail, sendEmail, createTransporter };
+module.exports = {
+  sendWelcomeEmail,
+  sendWelcomeEmailSafe,
+  sendEmail,
+  createTransporter,
+};
