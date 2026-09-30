@@ -44,12 +44,31 @@ const manualMarkSchema = Joi.object({
 }).unknown(false);
 
 const listAttendanceQuerySchema = Joi.object({
+  /** Single day (Daily Attendance UI date picker) YYYY-MM-DD */
   date: dateStr.optional(),
   from: dateStr.optional(),
   to: dateStr.optional(),
+  /** Search name or employee code */
+  search: Joi.string().trim().allow("").max(100).optional(),
+  /** official.department name */
+  department: Joi.string().trim().allow("").max(100).optional(),
+  /** Match punch address text (office / geo label) */
+  location: Joi.string().trim().allow("").max(200).optional(),
+  /** Shift master id */
+  shiftId: Joi.string().hex().length(24).allow("", null).optional(),
+  /**
+   * Punch mode / verification:
+   * web | mobile | biometric | manual
+   * aliases: face→biometric, location→web
+   */
+  mode: Joi.string().trim().allow("").max(40).optional(),
   source: Joi.string()
     .valid("web", "mobile", "biometric", "manual")
     .optional(),
+  /**
+   * Status tab / dropdown:
+   * ALL | Present | Absent | Late | Working | HalfDay | WeeklyOff | Holiday | Pending | OnLeave | WFH
+   */
   status: Joi.string()
     .valid(
       "Pending",
@@ -59,6 +78,10 @@ const listAttendanceQuerySchema = Joi.object({
       "WeeklyOff",
       "Holiday",
       "MissedPunch",
+      "Working",
+      "Late",
+      "OnLeave",
+      "WFH",
       "ALL"
     )
     .optional(),
@@ -85,6 +108,8 @@ const createRegularizationSchema = Joi.object({
   sheetDate: dateStr.required(),
   requestedInTime: timeHm.allow(null, "").optional(),
   requestedOutTime: timeHm.allow(null, "").optional(),
+  /** UI type: Missed Punch Out | Late Mark | Missed Punch In | Early Exit | Wrong Status */
+  type: Joi.string().trim().allow("").max(60).optional(),
   remarks: Joi.string().trim().min(2).max(500).required(),
 })
   .or("requestedInTime", "requestedOutTime")
@@ -99,7 +124,13 @@ const listRegularizationQuerySchema = Joi.object({
   status: Joi.string()
     .valid("Pending", "Approved", "Rejected", "Cancelled", "ALL")
     .default("ALL"),
+  /** Filter by request type (UI "All types") */
+  type: Joi.string().trim().allow("").max(60).optional(),
+  /** Search employee name or code */
+  search: Joi.string().trim().allow("").max(100).optional(),
   year: Joi.string().trim().allow("").optional(),
+  from: dateStr.optional(),
+  to: dateStr.optional(),
   employeeId: Joi.string().hex().length(24).optional(),
   page: Joi.number().integer().min(1).default(1),
   limit: Joi.number().integer().min(1).max(100).default(20),

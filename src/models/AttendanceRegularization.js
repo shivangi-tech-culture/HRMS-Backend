@@ -17,6 +17,11 @@ const regularizationSchema = new mongoose.Schema(
     /** Requested corrected times HH:mm */
     requestedInTime: { type: String, default: null },
     requestedOutTime: { type: String, default: null },
+    /**
+     * UI type filter: Missed Punch Out | Late Mark | Missed Punch In | Early Exit | Wrong Status
+     * Auto-set on create if omitted
+     */
+    type: { type: String, default: "" },
     remarks: { type: String, default: "" },
     status: { type: String, default: "Pending" },
     submittedBy: {

@@ -24,10 +24,22 @@ const combineDateTime = (dateStr, timeStr) => {
   return d;
 };
 
+/** Infer UI type when client does not send type */
+const inferRegType = (inTime, outTime, explicit) => {
+  if (explicit && String(explicit).trim()) return String(explicit).trim();
+  const hasIn = !!(inTime && String(inTime).trim());
+  const hasOut = !!(outTime && String(outTime).trim());
+  if (hasIn && !hasOut) return "Missed Punch In";
+  if (!hasIn && hasOut) return "Missed Punch Out";
+  if (hasIn && hasOut) return "Wrong Status";
+  return "";
+};
+
 /** CREATE — POST /api/attendance/regularize */
 const createRegularization = async (req, res) => {
   try {
-    const { sheetDate, requestedInTime, requestedOutTime, remarks } = req.body;
+    const { sheetDate, requestedInTime, requestedOutTime, remarks, type } =
+      req.body;
     const employeeId = req.user._id;
 
     const existing = await AttendanceRegularization.findOne({
@@ -47,6 +59,7 @@ const createRegularization = async (req, res) => {
       sheetDate,
       requestedInTime: requestedInTime || null,
       requestedOutTime: requestedOutTime || null,
+      type: inferRegType(requestedInTime, requestedOutTime, type),
       remarks,
       status: "Pending",
       submittedBy: employeeId,
@@ -64,10 +77,14 @@ const createRegularization = async (req, res) => {
   }
 };
 
-/** LIST — GET /api/attendance/regularize */
+/** LIST — GET /api/attendance/regularize
+ * Filters: status, type, search (name/code), year, from, to, employeeId, page, limit
+ * Matches UI: https://hrms-techculture.vercel.app/attendance/regularization
+ */
 const listRegularizations = async (req, res) => {
   try {
-    const { status, year, employeeId, page, limit } = req.query;
+    const { status, type, search, year, from, to, employeeId, page, limit } =
+      req.query;
     const filter = {};
 
     if (!hasAllAccess(req.user)) {
@@ -85,9 +102,54 @@ const listRegularizations = async (req, res) => {
       }
     }
 
+    // Search name / employee code → employee ids
+    if (search && String(search).trim()) {
+      const q = String(search).trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const userFilter = {
+        $or: [
+          { name: new RegExp(q, "i") },
+          { "official.employeeCode": new RegExp(q, "i") },
+        ],
+      };
+      if (filter.employee) {
+        if (filter.employee.$in) userFilter._id = { $in: filter.employee.$in };
+        else userFilter._id = filter.employee;
+      }
+      const matched = await User.find(userFilter).select("_id").lean();
+      filter.employee = { $in: matched.map((u) => u._id) };
+      if (matched.length === 0) {
+        return res.json({
+          total: 0,
+          page,
+          limit,
+          pages: 1,
+          data: [],
+          filters: {
+            status: status || "ALL",
+            type: type || "",
+            search: search || "",
+            year: year || "",
+            from: from || null,
+            to: to || null,
+          },
+        });
+      }
+    }
+
     if (status && status !== "ALL") filter.status = status;
-    if (year) {
-      // year like 2026 or 2026-27 → match sheetDate prefix
+    if (type && String(type).trim()) {
+      filter.type = new RegExp(
+        `^${String(type).trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
+        "i"
+      );
+    }
+
+    // Date filters on sheetDate
+    if (from || to) {
+      filter.sheetDate = {};
+      if (from) filter.sheetDate.$gte = from;
+      if (to) filter.sheetDate.$lte = to;
+    } else if (year) {
       const y = String(year).slice(0, 4);
       filter.sheetDate = new RegExp(`^${y}`);
     }
@@ -96,7 +158,10 @@ const listRegularizations = async (req, res) => {
     const [total, data] = await Promise.all([
       AttendanceRegularization.countDocuments(filter),
       AttendanceRegularization.find(filter)
-        .populate("employee", "name role official.employeeCode official.department")
+        .populate(
+          "employee",
+          "name role official.employeeCode official.department"
+        )
         .populate("reviewedBy", "name role")
         .sort({ submitDate: -1 })
         .skip(skip)
@@ -108,6 +173,14 @@ const listRegularizations = async (req, res) => {
       page,
       limit,
       pages: Math.max(1, Math.ceil(total / limit)),
+      filters: {
+        status: status || "ALL",
+        type: type || "",
+        search: search || "",
+        year: year || "",
+        from: from || null,
+        to: to || null,
+      },
       data,
     });
   } catch (err) {

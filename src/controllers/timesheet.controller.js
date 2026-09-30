@@ -97,8 +97,7 @@ const getTimesheet = async (req, res) => {
     const ShiftAssignment = require("../models/ShiftAssignment");
     const Holiday = require("../models/Holiday");
     const emp = await User.findById(employeeId)
-      .select("official.company official.shift")
-      .populate("official.shift")
+      .select("official.company")
       .lean();
 
     const assignments = await ShiftAssignment.find({
@@ -126,6 +125,8 @@ const getTimesheet = async (req, res) => {
     const holidayMap = {};
     for (const h of holidays) holidayMap[h.date] = h;
 
+    const { effectiveEndTime, dayTypeOf, DEFAULT_SHIFT } = require("../utils/shiftTiming");
+
     const shiftForDate = (date) => {
       let match = null;
       for (const a of assignments) {
@@ -137,21 +138,19 @@ const getTimesheet = async (req, res) => {
         }
       }
       if (match?.shift) {
+        if (match.shift.status && match.shift.status !== "Active") {
+          return { ...DEFAULT_SHIFT };
+        }
         const weeklyOffDays = match.weeklyOffPolicy?.offDays?.length
           ? match.weeklyOffPolicy.offDays
-          : match.weeklyOffDays?.length
-            ? match.weeklyOffDays
-            : match.shift.weeklyOffDays;
+          : match.shift.weeklyOffDays ?? [0];
         return {
           ...match.shift,
           weeklyOffDays,
         };
       }
-      const fallback = emp?.official?.shift;
-      if (fallback && (!fallback.status || fallback.status === "Active")) {
-        return fallback;
-      }
-      return null;
+      // No assignment → default 10:00–19:00 grace 10
+      return { ...DEFAULT_SHIFT };
     };
 
     const rows = [];
@@ -167,8 +166,6 @@ const getTimesheet = async (req, res) => {
     let salaryDays = 0;
 
     const pastIncomplete = [];
-
-    const { effectiveEndTime, dayTypeOf } = require("../utils/shiftTiming");
 
     for (const date of allDates) {
       const shift = shiftForDate(date) || attendanceMap[date]?.shift || null;

@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "HRMS API",
-    "description": "HRMS API — Admin + Employee (ESS).\n\nWork module (matches UI): Shift Management, Shift Assignments, Work Timings, Weekly Off, Holiday Calendar.\nTiming rules: early punch-in / late punch-out OK; Sat half-day (halfDayEndTime); Sun WO; holiday = HO (no punch).\nofficial.shift only on Employee Management (HR/Super Admin/Global Admin) — not Access Control.\n\nAuth: Login → Bearer {{token}}.",
+    "description": "HRMS API folders:\n1. ADMIN → List Attendance (day rows), manual, shifts, etc.\n2. EMPLOYEE → Punch + My Web Punches (NOT duplicate GET /api/attendance).\nEmployee day summary → Time Sheet API.\nAuth: Bearer {{token}}.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -516,6 +516,66 @@
     {
       "key": "effectiveFrom",
       "value": "2026-09-01"
+    },
+    {
+      "key": "graceMinutes",
+      "value": "10",
+      "type": "string"
+    },
+    {
+      "key": "punchRemarksSelf",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "effectiveTo",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "rosterMonth",
+      "value": "2026-09",
+      "type": "string"
+    },
+    {
+      "key": "closeAbsentDate",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "biometricSource",
+      "value": "biometric",
+      "type": "string"
+    },
+    {
+      "key": "attendanceDepartment",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "attendanceLocation",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "attendanceMode",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "attendanceSearch",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "regType",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "regSearch",
+      "value": "",
+      "type": "string"
     }
   ],
   "item": [
@@ -751,8 +811,8 @@
       ]
     },
     {
-      "name": "1. Admin Dashboard",
-      "description": "ADMIN side APIs (catalog: admin). Login as Global / Super / HR / Manager / custom admin role. Each action still checked via permissions.",
+      "name": "1. ADMIN",
+      "description": "Admin / HR / Manager APIs only. Login as Admin first. Do NOT mix with Employee folder.",
       "item": [
         {
           "name": "1.1 Roles & Permissions",
@@ -3497,8 +3557,8 @@
           ]
         },
         {
-          "name": "1.6 Attendance (Admin)",
-          "description": "Manual mark + list attendance",
+          "name": "1.6 Attendance (ADMIN only)",
+          "description": "ADMIN folder\n• List Attendance (Admin) = day rows for team/company\n• Manual mark / Close absent / Review regularization\n• Team timesheet\n\nEmployee punch-in/out → go to folder 2. EMPLOYEE",
           "item": [
             {
               "name": "Mark Attendance (manual)",
@@ -3515,7 +3575,7 @@
                   }
                 ],
                 "url": "{{baseUrl}}/api/attendance/manual",
-                "description": "Admin only. Vars: userId, punchType, punchTime, punchReason, punchRemarks",
+                "description": "Admin: employeeId, punchType (in|out), time (HH:mm), reason (required), remarks optional.",
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"employeeId\": \"{{userId}}\",\n  \"punchType\": \"{{punchType}}\",\n  \"time\": \"{{punchTime}}\",\n  \"reason\": \"{{punchReason}}\",\n  \"remarks\": \"{{punchRemarks}}\"\n}"
@@ -3523,7 +3583,7 @@
               }
             },
             {
-              "name": "List Attendance",
+              "name": "List Attendance (Admin — all / filter employee)",
               "request": {
                 "method": "GET",
                 "header": [
@@ -3536,8 +3596,86 @@
                     "value": "Bearer {{token}}"
                   }
                 ],
-                "url": "{{baseUrl}}/api/attendance?from={{timesheetFrom}}&to={{timesheetTo}}&status={{attendanceStatus}}&source={{punchSource}}&page={{page}}&limit={{limit}}",
-                "description": "Filters: from, to, date, status (Present|Absent|HalfDay|WeeklyOff|Pending|ALL), source, employeeId, page, limit"
+                "url": {
+                  "raw": "{{baseUrl}}/api/attendance?date={{attendanceDate}}&search={{attendanceSearch}}&department={{attendanceDepartment}}&location={{attendanceLocation}}&shiftId={{shiftId}}&mode={{attendanceMode}}&status={{attendanceStatus}}&page={{page}}&limit={{limit}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "attendance"
+                  ],
+                  "query": [
+                    {
+                      "key": "date",
+                      "value": "{{attendanceDate}}",
+                      "description": "Daily Attendance single day YYYY-MM-DD (preferred)"
+                    },
+                    {
+                      "key": "from",
+                      "value": "{{timesheetFrom}}",
+                      "disabled": true,
+                      "description": "range start if not using date"
+                    },
+                    {
+                      "key": "to",
+                      "value": "{{timesheetTo}}",
+                      "disabled": true,
+                      "description": "range end if not using date"
+                    },
+                    {
+                      "key": "search",
+                      "value": "{{attendanceSearch}}",
+                      "description": "employee name / code / email"
+                    },
+                    {
+                      "key": "department",
+                      "value": "{{attendanceDepartment}}",
+                      "description": "exact department name e.g. Engineering"
+                    },
+                    {
+                      "key": "location",
+                      "value": "{{attendanceLocation}}",
+                      "description": "match punch address text"
+                    },
+                    {
+                      "key": "shiftId",
+                      "value": "{{shiftId}}",
+                      "description": "Shift master ObjectId"
+                    },
+                    {
+                      "key": "mode",
+                      "value": "{{attendanceMode}}",
+                      "description": "web|mobile|biometric|manual|face|location"
+                    },
+                    {
+                      "key": "source",
+                      "value": "{{punchSource}}",
+                      "disabled": true,
+                      "description": "alias of mode"
+                    },
+                    {
+                      "key": "status",
+                      "value": "{{attendanceStatus}}",
+                      "description": "ALL|Present|Absent|Late|Working|HalfDay|OnLeave|WFH|Pending|WeeklyOff|Holiday"
+                    },
+                    {
+                      "key": "employeeId",
+                      "value": "{{userId}}",
+                      "disabled": true,
+                      "description": "filter one employee"
+                    },
+                    {
+                      "key": "page",
+                      "value": "{{page}}"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "{{limit}}"
+                    }
+                  ]
+                },
+                "description": "ADMIN Daily Attendance list.\nUI filters: date, search, department, location, shiftId, mode, status tabs.\nResponse includes summary counts: all, present, absent, late, working, halfDay, onLeave, wfh."
               }
             },
             {
@@ -3555,10 +3693,15 @@
                   }
                 ],
                 "url": "{{baseUrl}}/api/attendance/close-absent",
-                "description": "Marks past days with punch-in and no punch-out as Absent. Optional body: { date, employeeId }",
+                "description": "Optional: employeeId and/or date (YYYY-MM-DD). Empty date = all past incomplete days. Marks Absent for punch-in without punch-out.",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"employeeId\": \"{{userId}}\"\n}"
+                  "raw": "{\n  \"employeeId\": \"{{userId}}\",\n  \"date\": \"{{closeAbsentDate}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 }
               }
             },
@@ -3576,8 +3719,61 @@
                     "value": "Bearer {{token}}"
                   }
                 ],
-                "url": "{{baseUrl}}/api/attendance/regularize?status={{attendanceStatus}}&page={{page}}&limit={{limit}}",
-                "description": "Admin list — status ALL|Pending|Approved|Rejected"
+                "url": {
+                  "raw": "{{baseUrl}}/api/attendance/regularize?status={{attendanceStatus}}&type={{regType}}&search={{regSearch}}&from={{timesheetFrom}}&to={{timesheetTo}}&page={{page}}&limit={{limit}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "attendance",
+                    "regularize"
+                  ],
+                  "query": [
+                    {
+                      "key": "status",
+                      "value": "{{attendanceStatus}}",
+                      "description": "Pending|Approved|Rejected|Cancelled|ALL"
+                    },
+                    {
+                      "key": "type",
+                      "value": "{{regType}}",
+                      "description": "Missed Punch Out|Late Mark|Missed Punch In|Early Exit|Wrong Status"
+                    },
+                    {
+                      "key": "search",
+                      "value": "{{regSearch}}",
+                      "description": "employee name or code"
+                    },
+                    {
+                      "key": "from",
+                      "value": "{{timesheetFrom}}"
+                    },
+                    {
+                      "key": "to",
+                      "value": "{{timesheetTo}}"
+                    },
+                    {
+                      "key": "year",
+                      "value": "",
+                      "disabled": true
+                    },
+                    {
+                      "key": "employeeId",
+                      "value": "{{userId}}",
+                      "disabled": true
+                    },
+                    {
+                      "key": "page",
+                      "value": "{{page}}"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "{{limit}}"
+                    }
+                  ]
+                },
+                "description": "ADMIN Attendance Regularization list — search, status, type, date range."
               }
             },
             {
@@ -3694,10 +3890,15 @@
                   }
                 ],
                 "url": "{{baseUrl}}/api/shifts",
-                "description": "UI Add Shift drawer. Timing kept: Sat half-day halfDayEndTime; Sun weeklyOffDays=[0]; early in / late out OK.",
+                "description": "Create Shift master. graceMinutes used for late count on punch. Employee Weekly Off comes from Assign Shift (weeklyOffId).",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"code\": \"{{shiftCode}}\",\n  \"name\": \"{{shiftName}}\",\n  \"company\": \"{{company}}\",\n  \"punchStartTime\": \"{{punchStart}}\",\n  \"startTime\": \"{{shiftStart}}\",\n  \"endTime\": \"{{shiftEnd}}\",\n  \"shiftDuration\": 9,\n  \"workDuration\": 9,\n  \"breakApplicable\": false,\n  \"nightShift\": false,\n  \"status\": \"Active\",\n  \"halfDayEndTime\": \"{{halfDayEnd}}\",\n  \"weeklyOffDays\": [0],\n  \"halfDayDays\": [6]\n}"
+                  "raw": "{\n  \"code\": \"{{shiftCode}}\",\n  \"name\": \"{{shiftName}}\",\n  \"company\": \"{{company}}\",\n  \"punchStartTime\": \"{{punchStart}}\",\n  \"startTime\": \"{{shiftStart}}\",\n  \"endTime\": \"{{shiftEnd}}\",\n  \"shiftDuration\": 9,\n  \"workDuration\": 9,\n  \"breakApplicable\": false,\n  \"nightShift\": false,\n  \"status\": \"Active\",\n  \"halfDayEndTime\": \"{{halfDayEnd}}\",\n  \"graceMinutes\": {{graceMinutes}},\n  \"allowEarlyPunchIn\": true,\n  \"allowLatePunchOut\": true,\n  \"weeklyOffDays\": [0],\n  \"halfDayDays\": [6],\n  \"description\": \"\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 }
               }
             },
@@ -3734,10 +3935,15 @@
                   }
                 ],
                 "url": "{{baseUrl}}/api/shifts/{{shiftId}}",
-                "description": "",
+                "description": "Partial update. Include graceMinutes for late policy.",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"punchStartTime\": \"{{punchStart}}\",\n  \"startTime\": \"{{shiftStart}}\",\n  \"endTime\": \"{{shiftEnd}}\",\n  \"halfDayEndTime\": \"{{halfDayEnd}}\",\n  \"breakApplicable\": false,\n  \"nightShift\": false,\n  \"status\": \"Active\"\n}"
+                  "raw": "{\n  \"punchStartTime\": \"{{punchStart}}\",\n  \"startTime\": \"{{shiftStart}}\",\n  \"endTime\": \"{{shiftEnd}}\",\n  \"halfDayEndTime\": \"{{halfDayEnd}}\",\n  \"graceMinutes\": {{graceMinutes}},\n  \"allowEarlyPunchIn\": true,\n  \"allowLatePunchOut\": true,\n  \"breakApplicable\": false,\n  \"nightShift\": false,\n  \"status\": \"Active\",\n  \"description\": \"\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 }
               }
             },
@@ -3773,7 +3979,46 @@
                     "value": "Bearer {{token}}"
                   }
                 ],
-                "url": "{{baseUrl}}/api/shifts/assignments?page={{page}}&limit={{limit}}&search=",
+                "url": {
+                  "raw": "{{baseUrl}}/api/shifts/assignments?page={{page}}&limit={{limit}}&search=&employeeId={{userId}}&shiftId={{shiftId}}&company={{company}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "shifts",
+                    "assignments"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "{{page}}"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "{{limit}}"
+                    },
+                    {
+                      "key": "search",
+                      "value": ""
+                    },
+                    {
+                      "key": "employeeId",
+                      "value": "{{userId}}",
+                      "description": "optional"
+                    },
+                    {
+                      "key": "shiftId",
+                      "value": "{{shiftId}}",
+                      "description": "optional"
+                    },
+                    {
+                      "key": "company",
+                      "value": "{{company}}",
+                      "description": "optional"
+                    }
+                  ]
+                },
                 "description": "Work → Shift Assignments table (Employee, Shift, Timing, Weekly Off, Effective From)"
               }
             },
@@ -3792,10 +4037,15 @@
                   }
                 ],
                 "url": "{{baseUrl}}/api/shifts/assignments",
-                "description": "UI: Employee + Shift + Weekly Off + Effective From. Also mirrors User.official.shift.",
+                "description": "UI: Employee + Shift + Weekly Off (weeklyOffId) + Effective From. effectiveTo optional (null = open). Punch uses this; no assignment → default 10:00–19:00 grace 10.",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"employeeId\": \"{{userId}}\",\n  \"shiftId\": \"{{shiftId}}\",\n  \"weeklyOffId\": \"{{weeklyOffId}}\",\n  \"effectiveFrom\": \"{{effectiveFrom}}\",\n  \"effectiveTo\": null,\n  \"remarks\": \"\"\n}"
+                  "raw": "{\n  \"employeeId\": \"{{userId}}\",\n  \"shiftId\": \"{{shiftId}}\",\n  \"weeklyOffId\": \"{{weeklyOffId}}\",\n  \"effectiveFrom\": \"{{effectiveFrom}}\",\n  \"effectiveTo\": null,\n  \"remarks\": \"\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 }
               }
             },
@@ -3814,10 +4064,15 @@
                   }
                 ],
                 "url": "{{baseUrl}}/api/shifts/assignments/{{assignmentId}}",
-                "description": "",
+                "description": "Optional: shiftId, weeklyOffId, effectiveFrom, effectiveTo, remarks (at least one required).",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"shiftId\": \"{{shiftId}}\",\n  \"weeklyOffId\": \"{{weeklyOffId}}\",\n  \"effectiveFrom\": \"{{effectiveFrom}}\",\n  \"remarks\": \"Updated\"\n}"
+                  "raw": "{\n  \"shiftId\": \"{{shiftId}}\",\n  \"weeklyOffId\": \"{{weeklyOffId}}\",\n  \"effectiveFrom\": \"{{effectiveFrom}}\",\n  \"effectiveTo\": null,\n  \"remarks\": \"Updated\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 }
               }
             },
@@ -3880,7 +4135,12 @@
                 "description": "UI Add Holiday — NATIONAL HOLIDAY | DECLARED HOLIDAY",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"name\": \"{{holidayName}}\",\n  \"date\": \"{{holidayDate}}\",\n  \"type\": \"{{holidayType}}\",\n  \"forAudience\": \"All Employees\",\n  \"company\": \"{{company}}\",\n  \"status\": \"Active\",\n  \"description\": \"\"\n}"
+                  "raw": "{\n  \"name\": \"{{holidayName}}\",\n  \"date\": \"{{holidayDate}}\",\n  \"type\": \"{{holidayType}}\",\n  \"forAudience\": \"All Employees\",\n  \"applicableOn\": \"All\",\n  \"company\": \"{{company}}\",\n  \"status\": \"Active\",\n  \"description\": \"\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 }
               }
             },
@@ -3980,7 +4240,7 @@
                   }
                 ],
                 "url": "{{baseUrl}}/api/work-timings",
-                "description": "UI: Timing Name, Code, WH Calculation, Grace Time (Mins)",
+                "description": "Master only. Punch late grace uses Shift.graceMinutes — Work Timing not wired to punch yet.",
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"name\": \"Standard Time\",\n  \"code\": \"ST\",\n  \"company\": \"{{company}}\",\n  \"whCalculation\": \"Shift Based\",\n  \"graceTimeMins\": 15,\n  \"status\": \"Active\"\n}"
@@ -4083,10 +4343,15 @@
                   }
                 ],
                 "url": "{{baseUrl}}/api/weekly-offs",
-                "description": "UI: Policy Name, Code, Working Days, Week Starts On",
+                "description": "offDays: 0=Sun … 6=Sat. Assign Shift uses weeklyOffId pointing here.",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"name\": \"5 Day Week\",\n  \"code\": \"5DAY\",\n  \"company\": \"{{company}}\",\n  \"workingDays\": 5,\n  \"weekStartsOn\": \"Monday\",\n  \"offDays\": [0, 6],\n  \"status\": \"Active\"\n}"
+                  "raw": "{\n  \"name\": \"5 Day Week\",\n  \"code\": \"5DAY\",\n  \"company\": \"{{company}}\",\n  \"workingDays\": 5,\n  \"weekStartsOn\": \"Monday\",\n  \"offDays\": [0, 6],\n  \"status\": \"Active\",\n  \"description\": \"\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 }
               }
             },
@@ -4153,8 +4418,8 @@
       ]
     },
     {
-      "name": "2. Employee Dashboard (ESS)",
-      "description": "EMPLOYEE / ESS side APIs (catalog: employee). Login as Employee (or custom ESS role). Use own {{userId}} for profile.",
+      "name": "2. EMPLOYEE (ESS)",
+      "description": "Employee self-service APIs only. Login as Employee. Punch + My Web Punches + My Timesheet live here.",
       "item": [
         {
           "name": "2.1 My Permissions",
@@ -4252,8 +4517,8 @@
           ]
         },
         {
-          "name": "2.3 Attendance (Self)",
-          "description": "Punch in/out + my today — any logged-in user",
+          "name": "2.3 Attendance (EMPLOYEE only)",
+          "description": "EMPLOYEE Attendance APIs only:\n• Punch In / Out\n• My Today\n• My Web Punches ← ESS 'View Web Punches' screen (IN/OUT rows + location)\n\nDay summary for employee = Time Sheet (folder 2.5), NOT GET /api/attendance.\nGET /api/attendance (day rows) = ADMIN folder only.",
           "item": [
             {
               "name": "Punch In (web)",
@@ -4270,10 +4535,15 @@
                   }
                 ],
                 "url": "{{baseUrl}}/api/attendance/punch-in",
-                "description": "Self punch-in: source + lat + long only. Address fetched via Google Maps / OSM and saved in DB. Attaches assigned shift.",
+                "description": "Required: source (web|mobile|biometric), latitude, longitude. Optional: remarks. Address via Map API. Assigned shift or DEFAULT 10:00–19:00 grace 10.",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"source\": \"{{punchSource}}\",\n  \"latitude\": {{latitude}},\n  \"longitude\": {{longitude}},\n  \"remarks\": \"\"\n}"
+                  "raw": "{\n  \"source\": \"{{punchSource}}\",\n  \"latitude\": {{latitude}},\n  \"longitude\": {{longitude}},\n  \"remarks\": \"{{punchRemarksSelf}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 }
               }
             },
@@ -4292,11 +4562,43 @@
                   }
                 ],
                 "url": "{{baseUrl}}/api/attendance/punch-in",
-                "description": "Same as web — source mobile",
+                "description": "Required: source (web|mobile|biometric), latitude, longitude. Optional: remarks. Address via Map API. Assigned shift or DEFAULT 10:00–19:00 grace 10.",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"source\": \"{{punchSourceMobile}}\",\n  \"latitude\": {{latitude}},\n  \"longitude\": {{longitude}}\n}"
+                  "raw": "{\n  \"source\": \"{{punchSourceMobile}}\",\n  \"latitude\": {{latitude}},\n  \"longitude\": {{longitude}},\n  \"remarks\": \"{{punchRemarksSelf}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 }
+              }
+            },
+            {
+              "name": "Punch In (biometric)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"source\": \"{{biometricSource}}\",\n  \"latitude\": {{latitude}},\n  \"longitude\": {{longitude}},\n  \"remarks\": \"{{punchRemarksSelf}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": "{{baseUrl}}/api/attendance/punch-in",
+                "description": "Self punch-in. source + lat + long required. remarks optional."
               }
             },
             {
@@ -4314,15 +4616,74 @@
                   }
                 ],
                 "url": "{{baseUrl}}/api/attendance/punch-out",
-                "description": "Self punch-out: source + lat + long only. Address from Map API saved in DB. Late out after shift end allowed.",
+                "description": "Required: source, latitude, longitude. Optional remarks. Must punch-in first.",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"source\": \"{{punchSourceOut}}\",\n  \"latitude\": {{latitude}},\n  \"longitude\": {{longitude}}\n}"
+                  "raw": "{\n  \"source\": \"{{punchSourceOut}}\",\n  \"latitude\": {{latitude}},\n  \"longitude\": {{longitude}},\n  \"remarks\": \"{{punchRemarksSelf}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 }
               }
             },
             {
-              "name": "My Today",
+              "name": "Punch Out (mobile)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"source\": \"{{punchSourceMobile}}\",\n  \"latitude\": {{latitude}},\n  \"longitude\": {{longitude}},\n  \"remarks\": \"{{punchRemarksSelf}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": "{{baseUrl}}/api/attendance/punch-out",
+                "description": "Self punch-out. Needs prior punch-in."
+              }
+            },
+            {
+              "name": "Punch Out (biometric)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"source\": \"{{biometricSource}}\",\n  \"latitude\": {{latitude}},\n  \"longitude\": {{longitude}},\n  \"remarks\": \"{{punchRemarksSelf}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": "{{baseUrl}}/api/attendance/punch-out",
+                "description": "Self punch-out. Needs prior punch-in."
+              }
+            },
+            {
+              "name": "My Today (EMPLOYEE)",
               "request": {
                 "method": "GET",
                 "header": [
@@ -4336,11 +4697,11 @@
                   }
                 ],
                 "url": "{{baseUrl}}/api/attendance/today",
-                "description": "Today punch + assigned shift"
+                "description": "Returns date, shift summary (assigned OR default with isDefault:true), and attendance record."
               }
             },
             {
-              "name": "My Web Punches",
+              "name": "My Web Punches (1 row = 1 IN or OUT)",
               "request": {
                 "method": "GET",
                 "header": [
@@ -4353,26 +4714,45 @@
                     "value": "Bearer {{token}}"
                   }
                 ],
-                "url": "{{baseUrl}}/api/attendance/web-punches?from={{timesheetFrom}}&to={{timesheetTo}}&status={{attendanceStatus}}&page={{page}}&limit={{limit}}",
-                "description": "Flattened IN/OUT rows with lat/long/address (ESS My Web Punches)"
-              }
-            },
-            {
-              "name": "List My Attendance",
-              "request": {
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  },
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{token}}"
-                  }
-                ],
-                "url": "{{baseUrl}}/api/attendance?from={{timesheetFrom}}&to={{timesheetTo}}&page={{page}}&limit={{limit}}",
-                "description": "Own attendance list with filters + pagination"
+                "url": {
+                  "raw": "{{baseUrl}}/api/attendance/web-punches?from={{timesheetFrom}}&to={{timesheetTo}}&status={{attendanceStatus}}&page={{page}}&limit={{limit}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "attendance",
+                    "web-punches"
+                  ],
+                  "query": [
+                    {
+                      "key": "from",
+                      "value": "{{timesheetFrom}}"
+                    },
+                    {
+                      "key": "to",
+                      "value": "{{timesheetTo}}"
+                    },
+                    {
+                      "key": "date",
+                      "value": "",
+                      "disabled": true
+                    },
+                    {
+                      "key": "status",
+                      "value": "{{attendanceStatus}}"
+                    },
+                    {
+                      "key": "page",
+                      "value": "{{page}}"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "{{limit}}"
+                    }
+                  ]
+                },
+                "description": "EMPLOYEE — ESS My Web Punches screen.\n1 row = 1 IN or OUT + lat/long/address + source.\nThis is the only attendance LIST API needed for employee.\nAdmin day-list is GET /api/attendance in ADMIN folder."
               }
             }
           ]
@@ -4839,7 +5219,7 @@
                 "description": "Employee request to fix missed punch",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"sheetDate\": \"{{sheetDate}}\",\n  \"requestedInTime\": \"{{requestedInTime}}\",\n  \"requestedOutTime\": \"{{requestedOutTime}}\",\n  \"remarks\": \"{{regularizeRemarks}}\"\n}"
+                  "raw": "{\n  \"sheetDate\": \"{{sheetDate}}\",\n  \"requestedInTime\": \"{{requestedInTime}}\",\n  \"requestedOutTime\": \"{{requestedOutTime}}\",\n  \"type\": \"{{regType}}\",\n  \"remarks\": \"{{regularizeRemarks}}\"\n}"
                 }
               }
             },
@@ -4857,7 +5237,35 @@
                     "value": "Bearer {{token}}"
                   }
                 ],
-                "url": "{{baseUrl}}/api/attendance/regularize?status={{attendanceStatus}}&page={{page}}&limit={{limit}}",
+                "url": {
+                  "raw": "{{baseUrl}}/api/attendance/regularize?status={{attendanceStatus}}&type={{regType}}&page={{page}}&limit={{limit}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "attendance",
+                    "regularize"
+                  ],
+                  "query": [
+                    {
+                      "key": "status",
+                      "value": "{{attendanceStatus}}"
+                    },
+                    {
+                      "key": "type",
+                      "value": "{{regType}}"
+                    },
+                    {
+                      "key": "page",
+                      "value": "{{page}}"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "{{limit}}"
+                    }
+                  ]
+                },
                 "description": "Pending Request table — status ALL|Pending|Approved|Rejected"
               }
             },
@@ -4916,8 +5324,26 @@
                     "value": "Bearer {{token}}"
                   }
                 ],
-                "url": "{{baseUrl}}/api/shifts/roster/me",
-                "description": "Current assignment + history"
+                "url": {
+                  "raw": "{{baseUrl}}/api/shifts/roster/me?month={{rosterMonth}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "shifts",
+                    "roster",
+                    "me"
+                  ],
+                  "query": [
+                    {
+                      "key": "month",
+                      "value": "{{rosterMonth}}",
+                      "description": "YYYY-MM calendar (WO/HO/HD/shift labels)"
+                    }
+                  ]
+                },
+                "description": "ESS roster. Optional month=YYYY-MM. Weekly Off from policy id on assignment."
               }
             },
             {

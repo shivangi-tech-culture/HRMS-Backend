@@ -24,7 +24,7 @@ const { todayDate } = require("../utils/shiftTiming");
 
 const okId = (id) => mongoose.Types.ObjectId.isValid(id);
 
-/** Resolve Weekly Off policy by id → display + offDays */
+/** Resolve Weekly Off by id only — no name/days copy on assignment */
 const resolveWeeklyOffPolicy = async (weeklyOffId, reqUser) => {
   if (!okId(weeklyOffId)) {
     return { error: "Invalid weeklyOffId" };
@@ -38,18 +38,7 @@ const resolveWeeklyOffPolicy = async (weeklyOffId, reqUser) => {
       return { error: "Weekly off policy belongs to another company" };
     }
   }
-  const weeklyOffDays =
-    policy.offDays?.length > 0
-      ? policy.offDays
-      : Number(policy.workingDays) >= 6
-        ? [0]
-        : [0, 6];
-  return {
-    policy,
-    weeklyOffPolicy: policy._id,
-    weeklyOff: policy.name || formatWeeklyOffLabel(weeklyOffDays),
-    weeklyOffDays,
-  };
+  return { policy, weeklyOffPolicy: policy._id };
 };
 
 const parseHm = (hm) => {
@@ -69,18 +58,21 @@ const calcDurationHrs = (startTime, endTime, nightShift) => {
 const withDurations = (body) => {
   const nightShift = body.nightShift === true;
   const auto = calcDurationHrs(body.startTime, body.endTime, nightShift);
+  const shiftDuration =
+    body.shiftDuration != null && body.shiftDuration !== ""
+      ? Number(body.shiftDuration)
+      : auto ?? 9;
+  // workDuration = shiftDuration unless UI sends a different value (no duplicate logic)
+  const workDuration =
+    body.workDuration != null && body.workDuration !== ""
+      ? Number(body.workDuration)
+      : shiftDuration;
   return {
     ...body,
     code: String(body.code || "").trim().toUpperCase(),
     name: String(body.name || "").trim(),
-    shiftDuration:
-      body.shiftDuration != null && body.shiftDuration !== ""
-        ? Number(body.shiftDuration)
-        : auto ?? 9,
-    workDuration:
-      body.workDuration != null && body.workDuration !== ""
-        ? Number(body.workDuration)
-        : auto ?? 9,
+    shiftDuration,
+    workDuration,
   };
 };
 
@@ -295,9 +287,7 @@ const assignShift = async (req, res) => {
       employee: employeeId,
       shift: shiftId,
       company: String(employee.official?.company || shift.company || ""),
-      weeklyOffPolicy: wo.weeklyOffPolicy,
-      weeklyOff: wo.weeklyOff,
-      weeklyOffDays: wo.weeklyOffDays,
+      weeklyOffPolicy: wo.weeklyOffPolicy, // id only — name/days from WeeklyOff
       effectiveFrom,
       effectiveTo: toDate,
       assignedBy: req.user._id,
@@ -381,12 +371,20 @@ const listAssignments = async (req, res) => {
     }
 
     const total = data.length;
-    const pageData = data.slice(skip, skip + limit).map((row) => ({
-      ...row,
-      timing: row.shift
-        ? `${row.shift.startTime} - ${row.shift.endTime}`
-        : null,
-    }));
+    const pageData = data.slice(skip, skip + limit).map((row) => {
+      const policy = row.weeklyOffPolicy;
+      return {
+        ...row,
+        timing: row.shift
+          ? `${row.shift.startTime} - ${row.shift.endTime}`
+          : null,
+        // Display from policy id populate (not stored copy)
+        weeklyOff:
+          policy?.name ||
+          formatWeeklyOffLabel(policy?.offDays) ||
+          null,
+      };
+    });
 
     return res.json({
       total,
@@ -428,9 +426,7 @@ const updateAssignment = async (req, res) => {
     if (req.body.weeklyOffId) {
       const wo = await resolveWeeklyOffPolicy(req.body.weeklyOffId, req.user);
       if (wo.error) return res.status(400).json({ message: wo.error });
-      row.weeklyOffPolicy = wo.weeklyOffPolicy;
-      row.weeklyOff = wo.weeklyOff;
-      row.weeklyOffDays = wo.weeklyOffDays;
+      row.weeklyOffPolicy = wo.weeklyOffPolicy; // id only
     }
     if (req.body.effectiveFrom) row.effectiveFrom = req.body.effectiveFrom;
     if (req.body.effectiveTo !== undefined) {
@@ -515,56 +511,26 @@ const myRoster = async (req, res) => {
       .lean();
     const company = String(emp?.official?.company || "").trim();
 
-    // Always fetch Weekly Off policy fresh by id (source of truth)
-    let policy = current?.weeklyOffPolicy || null;
+    // Always fetch Weekly Off policy fresh by id (single source of truth)
+    let policy = null;
     if (current?.weeklyOffPolicy?._id) {
       policy = await WeeklyOff.findById(current.weeklyOffPolicy._id)
         .select("name code workingDays weekStartsOn offDays status")
         .lean();
       if (policy && policy.status !== "Active") policy = null;
-    } else if (current && !policy && company) {
-      // Legacy assignment (no policy id) — attach matching Active policy once
-      const candidates = await WeeklyOff.find({
-        status: "Active",
-        company: new RegExp(`^${escapeRegex(company)}$`, "i"),
-      }).lean();
-      const want = (current.weeklyOffDays || []).slice().sort().join(",");
-      policy =
-        candidates.find(
-          (p) => (p.offDays || []).slice().sort().join(",") === want
-        ) ||
-        candidates.find((p) => p.code === "5DAY") ||
-        candidates[0] ||
-        null;
-      if (policy) {
-        await ShiftAssignment.updateOne(
-          { _id: current._id },
-          {
-            $set: {
-              weeklyOffPolicy: policy._id,
-              weeklyOff: policy.name,
-              weeklyOffDays: policy.offDays?.length
-                ? policy.offDays
-                : current.weeklyOffDays,
-            },
-          }
-        );
-      }
     }
 
     const shift = current?.shift || null;
+    // Off days from policy id only (no assignment copy fields)
     const weeklyOffDays = policy?.offDays?.length
       ? policy.offDays
-      : current?.weeklyOffDays?.length
-        ? current.weeklyOffDays
-        : shift?.weeklyOffDays || [0];
-    const weeklyOff =
-      policy?.name || current?.weeklyOff || formatWeeklyOffLabel(weeklyOffDays);
+      : shift?.weeklyOffDays || [0];
+    const weeklyOff = policy?.name || formatWeeklyOffLabel(weeklyOffDays);
 
     const payload = {
       today,
       about:
-        "View Shift Roster = expected calendar. Weekly Off comes from Work → Weekly Off policy (by id).",
+        "View Shift Roster = expected calendar. Weekly Off from policy id only.",
       current: current
         ? {
             _id: current._id,

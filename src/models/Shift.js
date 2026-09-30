@@ -1,53 +1,68 @@
 /**
- * SHIFT MASTER — matches Work → Shift Management UI
- * Fields: code, name, punchStartTime, start/end, durations, break/night, Active
- * Employee link: User.official.shift (HR / Super Admin / Global Admin only)
+ * SHIFT MASTER — Work → Shift Management
  *
- * Timing rules kept:
- * - Early punch-in (after punchStartTime, before startTime) accepted
- * - Late punch-out after end accepted
- * - Sat = half day (halfDayEndTime 14:30); Sun = weekly off
+ * UI fields: code, name, punchStart, start, end, durations, break, night, Active
+ * Punch uses: punchStartTime, startTime, endTime, graceMinutes, halfDay*, allow*
+ * Weekly Off is NOT chosen here — Assign Shift pe WeeklyOff policy id
  */
 const mongoose = require("mongoose");
 
+/** Validate "HH:mm" 24h times */
 const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 const shiftSchema = new mongoose.Schema(
   {
-    /** UI: Shift Code e.g. FIRST */
+    /** Short code e.g. FIRST */
     code: { type: String, default: "" },
-    /** UI: Shift Name e.g. First Shift */
+    /** Display name e.g. First Shift */
     name: { type: String, default: "" },
+    /** Company name/scope for this shift */
     company: { type: String, default: "" },
-    /** UI: Punch Start Time — earliest punch-in allowed (e.g. 08:00) */
+
+    /** Earliest allowed punch-in (gate opens) e.g. 08:00 */
     punchStartTime: { type: String, default: "08:00" },
-    /** UI: Shift Start (e.g. 09:00 / 10:00) */
+    /** Official duty start — late counted from here (+ grace) */
     startTime: { type: String, default: "10:00" },
-    /** UI: Shift End (e.g. 18:00 / 19:00) */
+    /** Official duty end — early leave / late out vs this */
     endTime: { type: String, default: "19:00" },
-    /** UI: Shift Duration (hrs) */
+
+    /** Length of shift window (hrs) — often auto from start/end */
     shiftDuration: { type: Number, default: 9 },
-    /** UI: Work Duration (hrs) */
+    /** Expected work hours (hrs) — defaults to shiftDuration if omitted */
     workDuration: { type: Number, default: 9 },
-    /** UI: Break Applicable */
+
+    /** Break applicable flag (UI) */
     breakApplicable: { type: Boolean, default: false },
-    /** UI: Night Shift */
+    /** Crosses midnight (night shift) */
     nightShift: { type: Boolean, default: false },
-    /** UI: Active checkbox → Active | Inactive */
+    /** Active | Inactive — inactive not used for punch */
     status: { type: String, default: "Active" },
 
-    // Attendance timing (kept — not all shown on Add Shift drawer)
+    /** Half-day end time (e.g. Sat) when day is halfDay */
     halfDayEndTime: { type: String, default: "14:30" },
+    /**
+     * Grace after startTime before counting late (minutes).
+     * Prefer setting on Shift UI — punch reads THIS field (not Work Timings)
+     */
     graceMinutes: { type: Number, default: 0 },
+    /** If false → cannot punch-in before startTime */
     allowEarlyPunchIn: { type: Boolean, default: true },
+    /** If false → cannot punch-out after endTime */
     allowLatePunchOut: { type: Boolean, default: true },
-    weeklyOffDays: { type: [Number], default: [0] }, // Sunday off
-    halfDayDays: { type: [Number], default: [6] }, // Saturday half day
+
+    /**
+     * Fallback WO days if assignment has no weeklyOffPolicy
+     * 0=Sun … 6=Sat — prefer WeeklyOff policy via assignment
+     */
+    weeklyOffDays: { type: [Number], default: [0] },
+    /** Which weekdays are half days (default Sat) */
+    halfDayDays: { type: [Number], default: [6] },
     description: { type: String, default: "" },
   },
   { timestamps: true }
 );
 
+/** Unique code per company (case-insensitive) */
 shiftSchema.index(
   { company: 1, code: 1 },
   { unique: true, collation: { locale: "en", strength: 2 } }

@@ -1,16 +1,24 @@
 /**
- * ATTENDANCE ROUTES → /api/attendance
- * Punch in/out (geo), manual, today, list, web punches, regularize, close-absent
+ * ATTENDANCE ROUTES → mounted at /api/attendance
+ *
+ * Self (ESS):
+ *   POST /punch-in, /punch-out
+ *   GET  /today, /web-punches
+ *   Regularize APIs
+ *
+ * Admin:
+ *   POST /manual, /close-absent
+ *   GET  / (list)
  */
 const express = require("express");
 const {
-  punchIn,
-  punchOut,
-  markManual,
-  myToday,
-  listAttendance,
-  listWebPunches,
-  closeAbsent,
+  punchIn, // self punch in
+  punchOut, // self punch out
+  markManual, // admin set in/out time
+  myToday, // today's record + shift
+  listAttendance, // list with filters
+  listWebPunches, // flattened IN/OUT rows
+  closeAbsent, // past incomplete → Absent
 } = require("../controllers/attendance.controller");
 const {
   createRegularization,
@@ -23,7 +31,7 @@ const { protect, authorize, ALL_ACCESS } = require("../middleware/auth");
 const { checkPermission } = require("../controllers/permission.controller");
 const { validate, validateQuery } = require("../middleware/validate");
 const {
-  punchSchema,
+  punchSchema, // source + lat + long
   manualMarkSchema,
   listAttendanceQuerySchema,
   createRegularizationSchema,
@@ -47,10 +55,10 @@ const router = express.Router();
  * /api/attendance/punch-in:
  *   post:
  *     tags: [Employee / ESS]
- *     summary: Punch in (self) with lat/long/address
+ *     summary: Punch in (self) with lat/long
  *     description: |
- *       Saves geolocation. If address omitted, reverse-geocodes via Map API.
- *       Attaches employee's assigned shift. Early punch-in before shift start is accepted.
+ *       Uses Shift Assignment or default 10:00–19:00.
+ *       Address from Map API. Early in after punchStart allowed by default.
  *     security: [{ bearerAuth: [] }]
  *     requestBody:
  *       required: true
@@ -59,8 +67,9 @@ const router = express.Router();
  *           schema: { $ref: '#/components/schemas/PunchBody' }
  *     responses:
  *       201: { description: Punched in }
- *       400: { description: Already punched in / validation failed }
+ *       400: { description: Already punched in / window failed }
  */
+// Auth + Joi body → punchIn controller
 router.post("/punch-in", protect, validate(punchSchema), punchIn);
 
 /**
@@ -68,8 +77,8 @@ router.post("/punch-in", protect, validate(punchSchema), punchIn);
  * /api/attendance/punch-out:
  *   post:
  *     tags: [Employee / ESS]
- *     summary: Punch out (self) with lat/long/address
- *     description: Late punch-out after shift end is accepted. Missing punch-out → Absent on timesheet.
+ *     summary: Punch out (self) with lat/long
+ *     description: Needs prior punch-in. Late out allowed by default.
  *     security: [{ bearerAuth: [] }]
  *     requestBody:
  *       required: true
@@ -81,6 +90,7 @@ router.post("/punch-in", protect, validate(punchSchema), punchIn);
  */
 router.post("/punch-out", protect, validate(punchSchema), punchOut);
 
+/** Admin manual In/Out with HH:mm + reason */
 router.post(
   "/manual",
   protect,
@@ -89,6 +99,7 @@ router.post(
   markManual
 );
 
+/** Logged-in user's today attendance + resolved shift */
 router.get("/today", protect, myToday);
 
 /**
@@ -104,6 +115,7 @@ router.get(
   protect,
   validateQuery(listAttendanceQuerySchema),
   (req, res, next) => {
+    // Admin sees Daily Attendance permission; employee sees My Web Punches
     if (ALL_ACCESS.includes(req.user?.role)) {
       return checkPermission("Attendance", "Daily Attendance", "view")(
         req,
@@ -116,9 +128,7 @@ router.get(
   listWebPunches
 );
 
-/**
- * Regularize Attendance
- */
+/** Employee creates regularization request */
 router.post(
   "/regularize",
   protect,
@@ -127,6 +137,7 @@ router.post(
   createRegularization
 );
 
+/** List regularization (self or admin permission) */
 router.get(
   "/regularize",
   protect,
@@ -157,6 +168,7 @@ router.post(
   cancelRegularization
 );
 
+/** Admin approve / reject */
 router.post(
   "/regularize/:id/review",
   protect,
@@ -174,6 +186,7 @@ router.post(
   reviewRegularization
 );
 
+/** Mark past in-without-out as Absent */
 router.post(
   "/close-absent",
   protect,
