@@ -565,7 +565,12 @@
     },
     {
       "key": "regType",
-      "value": "",
+      "value": "Missed Punch Out",
+      "type": "string"
+    },
+    {
+      "key": "regReason",
+      "value": "Forgot to Punch",
       "type": "string"
     },
     {
@@ -5925,10 +5930,10 @@
                   }
                 ],
                 "url": "{{baseUrl}}/api/attendance/regularize",
-                "description": "Employee request to fix missed punch",
+                "description": "ESS Regularize Attendance.\n\nRequired: sheetDate|date, requestedInTime and/or requestedOutTime, reason.\n\ntype (Correction Type): Missed Punch In | Missed Punch Out | Late Mark | Early Exit | Wrong Status\nreason (Master regularizationReason): Forgot to Punch | Biometric Issue | Client Visit | …\n\nGET /api/attendance/regularize/meta for dropdowns. Do NOT put reason in type.",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"sheetDate\": \"{{sheetDate}}\",\n  \"requestedInTime\": \"{{requestedInTime}}\",\n  \"requestedOutTime\": \"{{requestedOutTime}}\",\n  \"type\": \"{{regType}}\",\n  \"remarks\": \"{{regularizeRemarks}}\"\n}"
+                  "raw": "{\n  \"sheetDate\": \"{{sheetDate}}\",\n  \"requestedInTime\": \"{{requestedInTime}}\",\n  \"requestedOutTime\": \"{{requestedOutTime}}\",\n  \"type\": \"{{regType}}\",\n  \"reason\": \"{{regReason}}\",\n  \"remarks\": \"{{regularizeRemarks}}\"\n}"
                 }
               }
             },
