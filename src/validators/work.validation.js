@@ -1,5 +1,5 @@
 /**
- * HOLIDAY / WORK TIMING / WEEKLY OFF validation
+ * HOLIDAY / WEEKLY OFF validation
  */
 const Joi = require("joi");
 const { HOLIDAY_TYPES } = require("../models/Holiday");
@@ -39,29 +39,6 @@ const listHolidayQuerySchema = Joi.object({
   limit: Joi.number().integer().min(1).max(200).default(50),
 }).unknown(true);
 
-const createWorkTimingSchema = Joi.object({
-  name: Joi.string().trim().min(2).max(100).required(),
-  code: Joi.string().trim().uppercase().min(1).max(20).required(),
-  company: Joi.string().trim().allow("").max(200).optional(),
-  whCalculation: Joi.string().trim().min(2).max(50).default("Shift Based"),
-  graceTimeMins: Joi.number().integer().min(0).max(240).default(15),
-  status: Joi.string().valid("Active", "Inactive").default("Active"),
-  description: Joi.string().trim().allow("").max(500).optional(),
-}).unknown(false);
-
-const updateWorkTimingSchema = createWorkTimingSchema
-  .fork(["name", "code"], (s) => s.optional())
-  .min(1)
-  .unknown(false);
-
-const listWorkTimingQuerySchema = Joi.object({
-  status: Joi.string().valid("Active", "Inactive").optional(),
-  company: Joi.string().trim().allow("").optional(),
-  search: Joi.string().trim().allow("").optional(),
-  page: Joi.number().integer().min(1).default(1),
-  limit: Joi.number().integer().min(1).max(200).default(50),
-}).unknown(true);
-
 const createWeeklyOffSchema = Joi.object({
   name: Joi.string().trim().min(2).max(100).required(),
   code: Joi.string().trim().uppercase().min(1).max(20).required(),
@@ -82,15 +59,18 @@ const updateWeeklyOffSchema = createWeeklyOffSchema
   .min(1)
   .unknown(false);
 
-const listWeeklyOffQuerySchema = listWorkTimingQuerySchema;
+const listWeeklyOffQuerySchema = Joi.object({
+  status: Joi.string().valid("Active", "Inactive").optional(),
+  company: Joi.string().trim().allow("").optional(),
+  search: Joi.string().trim().allow("").optional(),
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(200).default(50),
+}).unknown(true);
 
 module.exports = {
   createHolidaySchema,
   updateHolidaySchema,
   listHolidayQuerySchema,
-  createWorkTimingSchema,
-  updateWorkTimingSchema,
-  listWorkTimingQuerySchema,
   createWeeklyOffSchema,
   updateWeeklyOffSchema,
   listWeeklyOffQuerySchema,

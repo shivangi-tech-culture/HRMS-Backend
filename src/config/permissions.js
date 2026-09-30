@@ -187,7 +187,8 @@ const ADMIN_TREE = [
       { name: "Relation", actions: CRUD },
       { name: "Nominate For", actions: CRUD },
       { name: "Visa Type", actions: CRUD },
-      { name: "WH Calculation", actions: CRUD },
+      { name: "Regularization Reason", actions: CRUD },
+      { name: "Mark Attendance Reason", actions: CRUD },
     ],
   },
 
@@ -201,7 +202,6 @@ const ADMIN_TREE = [
         name: "Shift Assignments",
         actions: ["view", "create", "edit", "delete", "assign"],
       },
-      { name: "Work Timings", actions: ["view", "create", "edit", "delete"] },
       { name: "Weekly Off", actions: ["view", "create", "edit", "delete"] },
       { name: "Holiday Calendar", actions: ["view", "create", "edit", "delete"] },
     ],

@@ -25,7 +25,6 @@ const attendanceRoutes = require("./routes/attendance.routes");
 const shiftRoutes = require("./routes/shift.routes");
 const timesheetRoutes = require("./routes/timesheet.routes");
 const holidayRoutes = require("./routes/holiday.routes");
-const workTimingRoutes = require("./routes/workTiming.routes");
 const weeklyOffRoutes = require("./routes/weeklyOff.routes");
 const mailRoutes = require("./routes/mail.routes");
 const masterRoutes = require("./routes/master.routes");
@@ -156,6 +155,7 @@ app.get("/", (req, res) => {
 app.use("/api/health", healthRoutes); // public health check (API + MongoDB)
 app.use("/api/auth/login", loginLimiter); // count login attempts (max 20 / window)
 app.use("/api/auth", authRoutes); // login / logout
+app.use("/api/account", require("./routes/account.routes")); // My Profile (admin + ESS)
 app.use("/api/roles", roleRoutes); // role CRUD + permission matrix
 app.use("/api/permissions", require("./routes/permission.routes")); // catalogs + my permissions
 app.use("/api/employees", employeeRoutes); // employees only (role = Employee)
@@ -163,8 +163,8 @@ app.use("/api/users", accessControlRoutes); // Access & Control (any role)
 app.use("/api/attendance", attendanceRoutes); // punch in/out + geo + regularize
 app.use("/api/shifts", shiftRoutes); // shift master + assignments
 app.use("/api/timesheet", timesheetRoutes); // employee time sheet
+app.use("/api/reports/attendance", require("./routes/attendanceReport.routes")); // Attendance Reports
 app.use("/api/holidays", holidayRoutes); // Holiday Calendar
-app.use("/api/work-timings", workTimingRoutes); // Work Timings
 app.use("/api/weekly-offs", weeklyOffRoutes); // Weekly Off policies
 app.use("/api/mail", mailRoutes); // Organization → Mail send
 app.use("/api/masters", masterRoutes); // SaaS masters (typed collections)

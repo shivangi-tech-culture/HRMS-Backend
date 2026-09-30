@@ -8,7 +8,8 @@
     "dev": "nodemon --watch src src/server.js",
     "seed": "node src/seed.js",
     "seed:shifts": "node src/scripts/seedShifts.js",
-    "seed:wh-calculation": "node src/scripts/seedWhCalculationMasters.js"
+    "seed:attendance-reasons": "node src/scripts/seedAttendanceReasonMasters.js",
+    "sync:admin-perms": "node src/scripts/syncAdminRolePermissions.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -28,6 +29,7 @@
     "multer": "^2.4.0",
     "nodemailer": "^10.0.10",
     "nodemon": "^3.1.14",
+    "pdfkit": "^0.20.2",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1"
   }

@@ -19,7 +19,18 @@ const DAY_STATUSES = [
   "WeeklyOff", // weekly off, no punch
   "Holiday", // holiday, no punch
   "MissedPunch", // reserved
+  "OnLeave", // on approved leave
+  "WFH", // work from home day
 ];
+
+/** Optional break segments for punch timeline UI */
+const breakSchema = new mongoose.Schema(
+  {
+    start: { type: Date, default: null },
+    end: { type: Date, default: null },
+  },
+  { _id: false }
+);
 
 /** Geo saved on punch (lat/long from client, address from Map API) */
 const locationSchema = new mongoose.Schema(
@@ -60,6 +71,10 @@ const attendanceSchema = new mongoose.Schema(
     workedMinutes: { type: Number, default: 0 }, // out − in
     lateByMinutes: { type: Number, default: 0 }, // late vs start (+ grace)
     earlyByMinutes: { type: Number, default: 0 }, // left before end
+    /** WFO | WFH | Hybrid — UI Work Mode badge */
+    workMode: { type: String, default: "WFO" },
+    /** Break segments for detail timeline (optional) */
+    breaks: { type: [breakSchema], default: [] },
     reason: { type: String, default: "" }, // e.g. missing out / manual reason
     remarks: { type: String, default: "" }, // optional note
     /** Admin who used manual mark (null for self punch) */

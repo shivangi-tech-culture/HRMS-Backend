@@ -39,7 +39,10 @@ const manualMarkSchema = Joi.object({
   employeeId: Joi.string().hex().length(24).required(),
   punchType: Joi.string().valid("in", "out").required(),
   time: timeHm.required(),
+  /** From Master type=markAttendanceReason */
   reason: Joi.string().trim().min(2).max(200).required(),
+  /** Optional — defaults to today */
+  date: dateStr.optional(),
   remarks: Joi.string().trim().allow("").max(500).optional(),
 }).unknown(false);
 
@@ -105,15 +108,42 @@ const timesheetQuerySchema = Joi.object({
 }).unknown(true);
 
 const createRegularizationSchema = Joi.object({
-  sheetDate: dateStr.required(),
+  /** Preferred: sheetDate — UI also sends date */
+  sheetDate: dateStr.optional(),
+  date: dateStr.optional(),
+  /** Admin Daily Attendance modal: pick employee */
+  employeeId: Joi.string().hex().length(24).optional(),
+  employee: Joi.string().hex().length(24).optional(),
+  /** HH:mm — aliases accepted for UI field names */
   requestedInTime: timeHm.allow(null, "").optional(),
   requestedOutTime: timeHm.allow(null, "").optional(),
-  /** UI type: Missed Punch Out | Late Mark | Missed Punch In | Early Exit | Wrong Status */
+  requestedPunchIn: timeHm.allow(null, "").optional(),
+  requestedPunchOut: timeHm.allow(null, "").optional(),
+  punchIn: timeHm.allow(null, "").optional(),
+  punchOut: timeHm.allow(null, "").optional(),
+  /** Correction Type: Late Mark | Missed Punch In | … */
   type: Joi.string().trim().allow("").max(60).optional(),
-  remarks: Joi.string().trim().min(2).max(500).required(),
+  /** Reason dropdown — required by UI */
+  reason: Joi.string().trim().min(2).max(200).required(),
+  remarks: Joi.string().trim().allow("").max(500).optional(),
 })
-  .or("requestedInTime", "requestedOutTime")
+  .or("sheetDate", "date")
+  .or(
+    "requestedInTime",
+    "requestedOutTime",
+    "requestedPunchIn",
+    "requestedPunchOut",
+    "punchIn",
+    "punchOut"
+  )
   .unknown(false);
+
+const historyQuerySchema = Joi.object({
+  employeeId: Joi.string().hex().length(24).optional(),
+  date: dateStr.optional(),
+  from: dateStr.optional(),
+  to: dateStr.optional(),
+}).unknown(true);
 
 const reviewRegularizationSchema = Joi.object({
   status: Joi.string().valid("Approved", "Rejected").required(),
@@ -136,6 +166,80 @@ const listRegularizationQuerySchema = Joi.object({
   limit: Joi.number().integer().min(1).max(100).default(20),
 }).unknown(true);
 
+const calendarQuerySchema = Joi.object({
+  month: Joi.string()
+    .pattern(/^\d{4}-\d{2}$/)
+    .optional()
+    .messages({ "string.pattern.base": "month must be YYYY-MM" }),
+  date: dateStr.optional(),
+  search: Joi.string().trim().allow("").max(100).optional(),
+  department: Joi.string().trim().allow("").max(100).optional(),
+  status: Joi.string().trim().allow("").optional(),
+  employeeId: Joi.string().hex().length(24).optional(),
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(200).default(50),
+}).unknown(true);
+
+const detailsQuerySchema = Joi.object({
+  employeeId: Joi.string().hex().length(24).optional(),
+  date: dateStr.optional(),
+}).unknown(true);
+
+const lateEarlyQuerySchema = Joi.object({
+  /** late | early | all */
+  type: Joi.string()
+    .valid("late", "early", "all", "Late", "Early", "ALL")
+    .default("late"),
+  date: dateStr.optional(),
+  from: dateStr.optional(),
+  to: dateStr.optional(),
+  search: Joi.string().trim().allow("").max(100).optional(),
+  department: Joi.string().trim().allow("").max(100).optional(),
+  shiftId: Joi.string().hex().length(24).allow("", null).optional(),
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(200).default(10),
+}).unknown(true);
+
+const overtimeQuerySchema = Joi.object({
+  status: Joi.string()
+    .valid(
+      "Pending",
+      "Approved",
+      "Rejected",
+      "Comp Off Credited",
+      "ALL"
+    )
+    .optional(),
+  type: Joi.string().trim().allow("").max(40).optional(),
+  search: Joi.string().trim().allow("").max(100).optional(),
+  from: dateStr.optional(),
+  to: dateStr.optional(),
+  month: Joi.string()
+    .pattern(/^\d{4}-\d{2}$/)
+    .optional(),
+  employeeId: Joi.string().hex().length(24).optional(),
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(100).default(20),
+}).unknown(true);
+
+const createOvertimeSchema = Joi.object({
+  date: dateStr.required(),
+  type: Joi.string()
+    .valid("Overtime Pay", "Comp Off")
+    .default("Overtime Pay"),
+  reason: Joi.string().trim().min(2).max(500).required(),
+  otHours: Joi.alternatives()
+    .try(Joi.string().trim().allow(""), Joi.number())
+    .optional(),
+  otMinutes: Joi.number().integer().min(0).optional(),
+  employeeId: Joi.string().hex().length(24).optional(),
+}).unknown(false);
+
+const reviewOvertimeSchema = Joi.object({
+  status: Joi.string().valid("Approved", "Rejected").required(),
+  reviewRemarks: Joi.string().trim().allow("").max(500).optional(),
+}).unknown(false);
+
 module.exports = {
   punchSchema,
   manualMarkSchema,
@@ -144,5 +248,12 @@ module.exports = {
   createRegularizationSchema,
   reviewRegularizationSchema,
   listRegularizationQuerySchema,
+  calendarQuerySchema,
+  detailsQuerySchema,
+  lateEarlyQuerySchema,
+  overtimeQuerySchema,
+  createOvertimeSchema,
+  reviewOvertimeSchema,
+  historyQuerySchema,
   SELF_SOURCES,
 };

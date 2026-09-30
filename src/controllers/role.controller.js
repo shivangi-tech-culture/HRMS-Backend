@@ -45,10 +45,13 @@ const maxGlobalAdmins = () => {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : 5;
 };
 
-/** Locked roles always keep the full admin permission matrix */
+/** Locked roles always keep the full admin permission matrix (from permissions.js) */
 async function forceFullAdminAccess(role) {
   const full = permissionsForRole(role.name);
-  if (countPermissions(role.permissions) !== countPermissions(full)) {
+  const stale =
+    countPermissions(role.permissions) !== countPermissions(full) ||
+    JSON.stringify(role.permissions) !== JSON.stringify(full);
+  if (stale) {
     role.permissions = full;
     await role.save();
   }

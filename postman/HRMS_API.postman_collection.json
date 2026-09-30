@@ -502,10 +502,6 @@
       "value": "NATIONAL HOLIDAY"
     },
     {
-      "key": "workTimingId",
-      "value": ""
-    },
-    {
       "key": "weeklyOffId",
       "value": ""
     },
@@ -814,6 +810,67 @@
       "name": "1. ADMIN",
       "description": "Admin / HR / Manager APIs only. Login as Admin first. Do NOT mix with Employee folder.",
       "item": [
+        {
+          "name": "1.0 My Profile (Account)",
+          "description": "UI: https://hrms-techculture.vercel.app/account/profile\nLogged-in Admin / ESS — name, email, role, company, department, status",
+          "item": [
+            {
+              "name": "Get My Profile",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/account/profile",
+                "description": "My Profile cards: fullName, workEmail, role, company, department, status"
+              }
+            },
+            {
+              "name": "Get Me (profile + permissions)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/account/me",
+                "description": "Same profile + compact permissions (like login user object)"
+              }
+            },
+            {
+              "name": "Update My Profile (name)",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/account/profile",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Shivangi Gupta\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Update display name (email/role/company not editable here)"
+              }
+            }
+          ]
+        },
         {
           "name": "1.1 Roles & Permissions",
           "description": "Permission catalogs + role CRUD + matrix",
@@ -1645,7 +1702,7 @@
         },
         {
           "name": "1.4 Masters (Admin write)",
-          "description": "One folder per master type — List / Get / Create / Update / Delete. Same API: `/api/masters`.",
+          "description": "One folder per master type — List / Get / Create / Update / Delete. Same API: `/api/masters`.\nIncludes Attendance: Regularization Reason + Mark Attendance Reason.",
           "item": [
             {
               "name": "List master meta",
@@ -3438,11 +3495,11 @@
               ]
             },
             {
-              "name": "WH Calculation",
-              "description": "CRUD for master type=`whCalculation` (Work Timings → WH Calculation dropdown). Options: Shift Based | Fixed Hours | Flexible.",
+              "name": "Regularization Reason",
+              "description": "CRUD for master type=`regularizationReason`. Set {{masterId}} from List/Create `_id`.\nUI: Masters → Regularization Reason",
               "item": [
                 {
-                  "name": "List WH Calculation",
+                  "name": "List Regularization Reason",
                   "request": {
                     "method": "GET",
                     "header": [
@@ -3451,12 +3508,12 @@
                         "value": "Bearer {{token}}"
                       }
                     ],
-                    "url": "{{baseUrl}}/api/masters?type=whCalculation&status=Active&company={{company}}&page=1&limit=50",
-                    "description": "GET /api/masters?type=whCalculation"
+                    "url": "{{baseUrl}}/api/masters?type=regularizationReason&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "GET /api/masters?type=regularizationReason Supports search|q, page, limit. Response: total, page, limit, pages, data."
                   }
                 },
                 {
-                  "name": "Get WH Calculation",
+                  "name": "Get Regularization Reason",
                   "request": {
                     "method": "GET",
                     "header": [
@@ -3465,11 +3522,12 @@
                         "value": "Bearer {{token}}"
                       }
                     ],
-                    "url": "{{baseUrl}}/api/masters/{{masterId}}"
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "GET one by _id. Set {{masterId}} from list/create."
                   }
                 },
                 {
-                  "name": "Create WH Calculation",
+                  "name": "Create Regularization Reason",
                   "request": {
                     "method": "POST",
                     "header": [
@@ -3484,14 +3542,14 @@
                     ],
                     "body": {
                       "mode": "raw",
-                      "raw": "{\n  \"type\": \"whCalculation\",\n  \"name\": \"Shift Based\",\n  \"status\": \"Active\",\n  \"company\": \"{{company}}\"\n}"
+                      "raw": "{\n  \"type\": \"regularizationReason\",\n  \"name\": \"Forgot to Punch\",\n  \"status\": \"Active\",\n  \"company\": \"{{company}}\"\n}"
                     },
                     "url": "{{baseUrl}}/api/masters",
-                    "description": "POST type=whCalculation. Name = Shift Based | Fixed Hours | Flexible"
+                    "description": "POST type=regularizationReason. Global Admin must send company; others use login company."
                   }
                 },
                 {
-                  "name": "Update WH Calculation",
+                  "name": "Update Regularization Reason",
                   "request": {
                     "method": "PUT",
                     "header": [
@@ -3506,13 +3564,14 @@
                     ],
                     "body": {
                       "mode": "raw",
-                      "raw": "{\n  \"name\": \"Flexible\",\n  \"status\": \"Active\"\n}"
+                      "raw": "{\n  \"name\": \"Forgot to Punch Updated\",\n  \"status\": \"Active\"\n}"
                     },
-                    "url": "{{baseUrl}}/api/masters/{{masterId}}"
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "PUT /api/masters/{{masterId}}"
                   }
                 },
                 {
-                  "name": "Delete WH Calculation",
+                  "name": "Delete Regularization Reason",
                   "request": {
                     "method": "DELETE",
                     "header": [
@@ -3521,7 +3580,100 @@
                         "value": "Bearer {{token}}"
                       }
                     ],
-                    "url": "{{baseUrl}}/api/masters/{{masterId}}"
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "DELETE /api/masters/{{masterId}}"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Mark Attendance Reason",
+              "description": "CRUD for master type=`markAttendanceReason`. Set {{masterId}} from List/Create `_id`.\nUI: Masters → Mark Attendance Reason",
+              "item": [
+                {
+                  "name": "List Mark Attendance Reason",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=markAttendanceReason&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "GET /api/masters?type=markAttendanceReason Supports search|q, page, limit. Response: total, page, limit, pages, data."
+                  }
+                },
+                {
+                  "name": "Get Mark Attendance Reason",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "GET one by _id. Set {{masterId}} from list/create."
+                  }
+                },
+                {
+                  "name": "Create Mark Attendance Reason",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"type\": \"markAttendanceReason\",\n  \"name\": \"Missed Punch\",\n  \"status\": \"Active\",\n  \"company\": \"{{company}}\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters",
+                    "description": "POST type=markAttendanceReason. Global Admin must send company; others use login company."
+                  }
+                },
+                {
+                  "name": "Update Mark Attendance Reason",
+                  "request": {
+                    "method": "PUT",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"name\": \"Missed Punch Updated\",\n  \"status\": \"Active\"\n}"
+                    },
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "PUT /api/masters/{{masterId}}"
+                  }
+                },
+                {
+                  "name": "Delete Mark Attendance Reason",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters/{{masterId}}",
+                    "description": "DELETE /api/masters/{{masterId}}"
                   }
                 }
               ]
@@ -3557,305 +3709,924 @@
           ]
         },
         {
-          "name": "1.6 Attendance (ADMIN only)",
-          "description": "ADMIN folder\n• List Attendance (Admin) = day rows for team/company\n• Manual mark / Close absent / Review regularization\n• Team timesheet\n\nEmployee punch-in/out → go to folder 2. EMPLOYEE",
+          "name": "1.6 Attendance (ADMIN)",
+          "description": "Matches UI: https://hrms-techculture.vercel.app/attendance\n\nSub-modules (same as green nav):\n• Daily Attendance\n• Attendance Calendar\n• Attendance Regularization\n• Late & Early Departures\n• Overtime\n• Attendance Reports\n\nOnly APIs used by Admin Attendance screens — no ESS punch APIs here.",
           "item": [
             {
-              "name": "Mark Attendance (manual)",
-              "request": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  },
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{token}}"
+              "name": "Daily Attendance",
+              "description": "UI: Attendance → Daily Attendance\nList + details + View History + Regularize modal + Mark Attendance + Close Absent",
+              "item": [
+                {
+                  "name": "List Daily Attendance",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/attendance?date={{attendanceDate}}&search={{attendanceSearch}}&department={{attendanceDepartment}}&location={{attendanceLocation}}&shiftId={{shiftId}}&mode={{attendanceMode}}&status={{attendanceStatus}}&page={{page}}&limit={{limit}}",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "attendance"
+                      ],
+                      "query": [
+                        {
+                          "key": "date",
+                          "value": "{{attendanceDate}}",
+                          "description": "YYYY-MM-DD"
+                        },
+                        {
+                          "key": "search",
+                          "value": "{{attendanceSearch}}"
+                        },
+                        {
+                          "key": "department",
+                          "value": "{{attendanceDepartment}}"
+                        },
+                        {
+                          "key": "location",
+                          "value": "{{attendanceLocation}}"
+                        },
+                        {
+                          "key": "shiftId",
+                          "value": "{{shiftId}}"
+                        },
+                        {
+                          "key": "mode",
+                          "value": "{{attendanceMode}}",
+                          "description": "web|mobile|biometric|manual|face"
+                        },
+                        {
+                          "key": "status",
+                          "value": "{{attendanceStatus}}",
+                          "description": "ALL|Present|Absent|Late|Working|HalfDay|OnLeave|WFH"
+                        },
+                        {
+                          "key": "page",
+                          "value": "{{page}}"
+                        },
+                        {
+                          "key": "limit",
+                          "value": "{{limit}}"
+                        }
+                      ]
+                    },
+                    "description": "Daily Attendance table. Filters: date, search, department, location, shift, mode, status tabs.\nReturns enriched rows + summary counts."
                   }
-                ],
-                "url": "{{baseUrl}}/api/attendance/manual",
-                "description": "Admin: employeeId, punchType (in|out), time (HH:mm), reason (required), remarks optional.",
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"employeeId\": \"{{userId}}\",\n  \"punchType\": \"{{punchType}}\",\n  \"time\": \"{{punchTime}}\",\n  \"reason\": \"{{punchReason}}\",\n  \"remarks\": \"{{punchRemarks}}\"\n}"
-                }
-              }
-            },
-            {
-              "name": "List Attendance (Admin — all / filter employee)",
-              "request": {
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  },
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{token}}"
-                  }
-                ],
-                "url": {
-                  "raw": "{{baseUrl}}/api/attendance?date={{attendanceDate}}&search={{attendanceSearch}}&department={{attendanceDepartment}}&location={{attendanceLocation}}&shiftId={{shiftId}}&mode={{attendanceMode}}&status={{attendanceStatus}}&page={{page}}&limit={{limit}}",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "attendance"
-                  ],
-                  "query": [
-                    {
-                      "key": "date",
-                      "value": "{{attendanceDate}}",
-                      "description": "Daily Attendance single day YYYY-MM-DD (preferred)"
-                    },
-                    {
-                      "key": "from",
-                      "value": "{{timesheetFrom}}",
-                      "disabled": true,
-                      "description": "range start if not using date"
-                    },
-                    {
-                      "key": "to",
-                      "value": "{{timesheetTo}}",
-                      "disabled": true,
-                      "description": "range end if not using date"
-                    },
-                    {
-                      "key": "search",
-                      "value": "{{attendanceSearch}}",
-                      "description": "employee name / code / email"
-                    },
-                    {
-                      "key": "department",
-                      "value": "{{attendanceDepartment}}",
-                      "description": "exact department name e.g. Engineering"
-                    },
-                    {
-                      "key": "location",
-                      "value": "{{attendanceLocation}}",
-                      "description": "match punch address text"
-                    },
-                    {
-                      "key": "shiftId",
-                      "value": "{{shiftId}}",
-                      "description": "Shift master ObjectId"
-                    },
-                    {
-                      "key": "mode",
-                      "value": "{{attendanceMode}}",
-                      "description": "web|mobile|biometric|manual|face|location"
-                    },
-                    {
-                      "key": "source",
-                      "value": "{{punchSource}}",
-                      "disabled": true,
-                      "description": "alias of mode"
-                    },
-                    {
-                      "key": "status",
-                      "value": "{{attendanceStatus}}",
-                      "description": "ALL|Present|Absent|Late|Working|HalfDay|OnLeave|WFH|Pending|WeeklyOff|Holiday"
-                    },
-                    {
-                      "key": "employeeId",
-                      "value": "{{userId}}",
-                      "disabled": true,
-                      "description": "filter one employee"
-                    },
-                    {
-                      "key": "page",
-                      "value": "{{page}}"
-                    },
-                    {
-                      "key": "limit",
-                      "value": "{{limit}}"
-                    }
-                  ]
                 },
-                "description": "ADMIN Daily Attendance list.\nUI filters: date, search, department, location, shiftId, mode, status tabs.\nResponse includes summary counts: all, present, absent, late, working, halfDay, onLeave, wfh."
-              }
-            },
-            {
-              "name": "Close Absent (no punch-out)",
-              "request": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  },
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{token}}"
+                {
+                  "name": "Get Attendance Details (side panel)",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/attendance/details/{{attendanceId}}",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "attendance",
+                        "details",
+                        "{{attendanceId}}"
+                      ],
+                      "query": []
+                    },
+                    "description": "Side panel: todaysPunch, workInfo, timeline, attendanceSummary, verificationDetail."
                   }
-                ],
-                "url": "{{baseUrl}}/api/attendance/close-absent",
-                "description": "Optional: employeeId and/or date (YYYY-MM-DD). Empty date = all past incomplete days. Marks Absent for punch-in without punch-out.",
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"employeeId\": \"{{userId}}\",\n  \"date\": \"{{closeAbsentDate}}\"\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                }
-              }
-            },
-            {
-              "name": "List Regularizations (Admin)",
-              "request": {
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  },
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{token}}"
-                  }
-                ],
-                "url": {
-                  "raw": "{{baseUrl}}/api/attendance/regularize?status={{attendanceStatus}}&type={{regType}}&search={{regSearch}}&from={{timesheetFrom}}&to={{timesheetTo}}&page={{page}}&limit={{limit}}",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "attendance",
-                    "regularize"
-                  ],
-                  "query": [
-                    {
-                      "key": "status",
-                      "value": "{{attendanceStatus}}",
-                      "description": "Pending|Approved|Rejected|Cancelled|ALL"
-                    },
-                    {
-                      "key": "type",
-                      "value": "{{regType}}",
-                      "description": "Missed Punch Out|Late Mark|Missed Punch In|Early Exit|Wrong Status"
-                    },
-                    {
-                      "key": "search",
-                      "value": "{{regSearch}}",
-                      "description": "employee name or code"
-                    },
-                    {
-                      "key": "from",
-                      "value": "{{timesheetFrom}}"
-                    },
-                    {
-                      "key": "to",
-                      "value": "{{timesheetTo}}"
-                    },
-                    {
-                      "key": "year",
-                      "value": "",
-                      "disabled": true
-                    },
-                    {
-                      "key": "employeeId",
-                      "value": "{{userId}}",
-                      "disabled": true
-                    },
-                    {
-                      "key": "page",
-                      "value": "{{page}}"
-                    },
-                    {
-                      "key": "limit",
-                      "value": "{{limit}}"
-                    }
-                  ]
                 },
-                "description": "ADMIN Attendance Regularization list — search, status, type, date range."
-              }
-            },
-            {
-              "name": "Get Regularization by Id",
-              "request": {
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  },
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{token}}"
+                {
+                  "name": "Get Attendance Details (by employee + date)",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/attendance/details?employeeId={{userId}}&date={{attendanceDate}}",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "attendance",
+                        "details"
+                      ],
+                      "query": [
+                        {
+                          "key": "employeeId",
+                          "value": "{{userId}}"
+                        },
+                        {
+                          "key": "date",
+                          "value": "{{attendanceDate}}"
+                        }
+                      ]
+                    },
+                    "description": "Same side panel payload using employeeId + date"
                   }
-                ],
-                "url": "{{baseUrl}}/api/attendance/regularize/{{regularizeId}}",
-                "description": "View one regularization request"
-              }
-            },
-            {
-              "name": "Review Regularization (approve/reject)",
-              "request": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  },
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{token}}"
+                },
+                {
+                  "name": "Mark Attendance (manual)",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/attendance/manual",
+                    "description": "UI button: + Mark Attendance. punchType: in|out, time: HH:mm",
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"employeeId\": \"{{userId}}\",\n  \"punchType\": \"in\",\n  \"time\": \"{{punchTime}}\",\n  \"reason\": \"{{punchReason}}\",\n  \"remarks\": \"{{punchRemarks}}\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    }
                   }
-                ],
-                "url": "{{baseUrl}}/api/attendance/regularize/{{regularizeId}}/review",
-                "description": "Admin approve/reject. reviewStatus=Approved|Rejected. On Approve updates Attendance.",
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"status\": \"{{reviewStatus}}\",\n  \"reviewRemarks\": \"{{reviewRemarks}}\"\n}"
+                },
+                {
+                  "name": "Close Absent (no punch-out)",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/attendance/close-absent",
+                    "description": "Past days: punch-in without punch-out → mark Absent. Optional employeeId/date.",
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"employeeId\": \"{{userId}}\",\n  \"date\": \"{{closeAbsentDate}}\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "Regularize META (dropdowns)",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/attendance/regularize/meta",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "attendance",
+                        "regularize",
+                        "meta"
+                      ]
+                    },
+                    "description": "Correction Type + Reason dropdowns for Regularize Attendance modal"
+                  }
+                },
+                {
+                  "name": "Submit Regularize (Daily Attendance modal)",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/attendance/regularize",
+                    "description": "UI modal: Regularize Attendance from Daily Attendance row action.\nFields: employeeId, date, type (Late Mark), requestedPunchIn/Out, reason, remarks",
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"employeeId\": \"{{userId}}\",\n  \"date\": \"{{attendanceDate}}\",\n  \"type\": \"Late Mark\",\n  \"requestedPunchIn\": \"09:24\",\n  \"requestedPunchOut\": \"18:42\",\n  \"reason\": \"Forgot to Punch\",\n  \"remarks\": \"Additional notes...\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "View History (week side panel)",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/attendance/history?employeeId={{userId}}&date={{attendanceDate}}",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "attendance",
+                        "history"
+                      ],
+                      "query": [
+                        {
+                          "key": "employeeId",
+                          "value": "{{userId}}"
+                        },
+                        {
+                          "key": "date",
+                          "value": "{{attendanceDate}}"
+                        }
+                      ]
+                    },
+                    "description": "UI: View History — week strip (P/A/L/WFH/H) + daily logs"
+                  }
+                },
+                {
+                  "name": "Mark Attendance META (reasons master)",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/attendance/manual/meta",
+                    "description": "Mark Attendance modal reasons from Master type=markAttendanceReason\nAlso: GET /api/masters?type=markAttendanceReason"
+                  }
+                },
+                {
+                  "name": "List Mark Attendance Reasons (Master)",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/masters?type=markAttendanceReason&status=Active",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "masters"
+                      ],
+                      "query": [
+                        {
+                          "key": "type",
+                          "value": "markAttendanceReason"
+                        },
+                        {
+                          "key": "status",
+                          "value": "Active"
+                        }
+                      ]
+                    }
+                  }
                 }
-              }
+              ]
             },
             {
-              "name": "Team Timesheet",
-              "request": {
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  },
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{token}}"
+              "name": "Attendance Calendar",
+              "description": "UI: Attendance → Attendance Calendar\nMonth calendar + day summary + employee list for selected date",
+              "item": [
+                {
+                  "name": "Get Attendance Calendar",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/attendance/calendar?month={{timesheetMonth}}&date={{attendanceDate}}&search={{attendanceSearch}}&department={{attendanceDepartment}}&status={{attendanceStatus}}&page={{page}}&limit={{limit}}",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "attendance",
+                        "calendar"
+                      ],
+                      "query": [
+                        {
+                          "key": "month",
+                          "value": "{{timesheetMonth}}",
+                          "description": "YYYY-MM"
+                        },
+                        {
+                          "key": "date",
+                          "value": "{{attendanceDate}}",
+                          "description": "selected day YYYY-MM-DD"
+                        },
+                        {
+                          "key": "search",
+                          "value": "{{attendanceSearch}}"
+                        },
+                        {
+                          "key": "department",
+                          "value": "{{attendanceDepartment}}"
+                        },
+                        {
+                          "key": "status",
+                          "value": "{{attendanceStatus}}"
+                        },
+                        {
+                          "key": "page",
+                          "value": "{{page}}"
+                        },
+                        {
+                          "key": "limit",
+                          "value": "{{limit}}"
+                        }
+                      ]
+                    },
+                    "description": "Returns: calendar[] day counts, summary (present/absent/late/onLeave), employees[] for selected date (full roster)."
                   }
-                ],
-                "url": "{{baseUrl}}/api/timesheet/team?month={{timesheetMonth}}&page={{page}}&limit={{limit}}",
-                "description": "Admin — paginated employees with present/absent counts for month"
-              }
+                }
+              ]
             },
             {
-              "name": "Employee Timesheet (by id)",
-              "request": {
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  },
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{token}}"
+              "name": "Attendance Regularization",
+              "description": "UI: Attendance → Attendance Regularization\nAdmin list + approve/reject",
+              "item": [
+                {
+                  "name": "Regularize META (dropdowns)",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/attendance/regularize/meta",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "attendance",
+                        "regularize",
+                        "meta"
+                      ]
+                    },
+                    "description": "Correction Type + Reason dropdowns for Regularize Attendance modal"
                   }
-                ],
-                "url": "{{baseUrl}}/api/timesheet?employeeId={{userId}}&month={{timesheetMonth}}&page={{page}}&limit={{limit}}",
-                "description": "Admin view another employee timesheet"
-              }
+                },
+                {
+                  "name": "List Regularizations",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/attendance/regularize?status={{attendanceStatus}}&type={{regType}}&search={{regSearch}}&from={{timesheetFrom}}&to={{timesheetTo}}&page={{page}}&limit={{limit}}",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "attendance",
+                        "regularize"
+                      ],
+                      "query": [
+                        {
+                          "key": "status",
+                          "value": "{{attendanceStatus}}",
+                          "description": "Pending|Approved|Rejected|Cancelled|ALL"
+                        },
+                        {
+                          "key": "type",
+                          "value": "{{regType}}"
+                        },
+                        {
+                          "key": "search",
+                          "value": "{{regSearch}}"
+                        },
+                        {
+                          "key": "from",
+                          "value": "{{timesheetFrom}}"
+                        },
+                        {
+                          "key": "to",
+                          "value": "{{timesheetTo}}"
+                        },
+                        {
+                          "key": "page",
+                          "value": "{{page}}"
+                        },
+                        {
+                          "key": "limit",
+                          "value": "{{limit}}"
+                        }
+                      ]
+                    },
+                    "description": "Admin regularization inbox"
+                  }
+                },
+                {
+                  "name": "Get Regularization by Id",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/attendance/regularize/{{regularizeId}}",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "attendance",
+                        "regularize",
+                        "{{regularizeId}}"
+                      ],
+                      "query": []
+                    },
+                    "description": "Single regularization detail"
+                  }
+                },
+                {
+                  "name": "Review Regularization (approve/reject)",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/attendance/regularize/{{regularizeId}}/review",
+                    "description": "status: Approved | Rejected",
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"status\": \"Approved\",\n  \"reviewRemarks\": \"OK\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "List Regularization Reasons (Master)",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/masters?type=regularizationReason&status=Active",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "masters"
+                      ],
+                      "query": [
+                        {
+                          "key": "type",
+                          "value": "regularizationReason"
+                        },
+                        {
+                          "key": "status",
+                          "value": "Active"
+                        }
+                      ]
+                    },
+                    "description": "CRUD via /api/masters. Meta: GET /api/attendance/regularize/meta uses this list."
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Late & Early Departures",
+              "description": "UI: Attendance → Late & Early Departures\nLate Arrivals / Early Exit tabs",
+              "item": [
+                {
+                  "name": "List Late Arrivals",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/attendance/late-early?type=late&date={{attendanceDate}}&search={{attendanceSearch}}&department={{attendanceDepartment}}&page={{page}}&limit={{limit}}",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "attendance",
+                        "late-early"
+                      ],
+                      "query": [
+                        {
+                          "key": "type",
+                          "value": "late"
+                        },
+                        {
+                          "key": "date",
+                          "value": "{{attendanceDate}}"
+                        },
+                        {
+                          "key": "search",
+                          "value": "{{attendanceSearch}}"
+                        },
+                        {
+                          "key": "department",
+                          "value": "{{attendanceDepartment}}"
+                        },
+                        {
+                          "key": "page",
+                          "value": "{{page}}"
+                        },
+                        {
+                          "key": "limit",
+                          "value": "{{limit}}"
+                        }
+                      ]
+                    },
+                    "description": "type=late → Late Arrivals table"
+                  }
+                },
+                {
+                  "name": "List Early Departures",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/attendance/late-early?type=early&date={{attendanceDate}}&search={{attendanceSearch}}&department={{attendanceDepartment}}&page={{page}}&limit={{limit}}",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "attendance",
+                        "late-early"
+                      ],
+                      "query": [
+                        {
+                          "key": "type",
+                          "value": "early"
+                        },
+                        {
+                          "key": "date",
+                          "value": "{{attendanceDate}}"
+                        },
+                        {
+                          "key": "search",
+                          "value": "{{attendanceSearch}}"
+                        },
+                        {
+                          "key": "department",
+                          "value": "{{attendanceDepartment}}"
+                        },
+                        {
+                          "key": "page",
+                          "value": "{{page}}"
+                        },
+                        {
+                          "key": "limit",
+                          "value": "{{limit}}"
+                        }
+                      ]
+                    },
+                    "description": "type=early → Early Exit table"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Overtime",
+              "description": "UI: Attendance → Overtime / Comp Off\nList + Submit OT + Approve/Reject",
+              "item": [
+                {
+                  "name": "List Overtime",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/attendance/overtime?status=ALL&type=ALL&search={{attendanceSearch}}&month={{timesheetMonth}}&page={{page}}&limit={{limit}}",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "attendance",
+                        "overtime"
+                      ],
+                      "query": [
+                        {
+                          "key": "status",
+                          "value": "ALL",
+                          "description": "Pending|Approved|Rejected|Comp Off Credited|ALL"
+                        },
+                        {
+                          "key": "type",
+                          "value": "ALL",
+                          "description": "Overtime Pay|Comp Off|ALL"
+                        },
+                        {
+                          "key": "search",
+                          "value": "{{attendanceSearch}}"
+                        },
+                        {
+                          "key": "month",
+                          "value": "{{timesheetMonth}}"
+                        },
+                        {
+                          "key": "page",
+                          "value": "{{page}}"
+                        },
+                        {
+                          "key": "limit",
+                          "value": "{{limit}}"
+                        }
+                      ]
+                    },
+                    "description": "OT / Comp Off table"
+                  }
+                },
+                {
+                  "name": "Submit OT Request",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/attendance/overtime",
+                    "description": "UI: + Submit OT Request. type: Overtime Pay | Comp Off",
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"employeeId\": \"{{userId}}\",\n  \"date\": \"{{attendanceDate}}\",\n  \"type\": \"Overtime Pay\",\n  \"otHours\": \"2h 30m\",\n  \"reason\": \"Sprint deadline\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "Get Overtime by Id",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/attendance/overtime/{{overtimeId}}",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "attendance",
+                        "overtime",
+                        "{{overtimeId}}"
+                      ],
+                      "query": []
+                    },
+                    "description": "Single OT request"
+                  }
+                },
+                {
+                  "name": "Review Overtime (approve/reject)",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/attendance/overtime/{{overtimeId}}/review",
+                    "description": "Comp Off + Approved → status becomes Comp Off Credited",
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"status\": \"Approved\",\n  \"reviewRemarks\": \"OK\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Attendance Reports",
+              "description": "UI: https://hrms-techculture.vercel.app/reports/attendance\n\nOnly 4 APIs needed:\n1. List table\n2. Generate (+ button)\n3. Download\n4. Regenerate\n\nSet attendanceReportId = lastReportId from List response.",
+              "item": [
+                {
+                  "name": "1. List Attendance Reports",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/reports/attendance?search=&format=ALL&page={{page}}&limit={{limit}}",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "reports",
+                        "attendance"
+                      ],
+                      "query": [
+                        {
+                          "key": "search",
+                          "value": ""
+                        },
+                        {
+                          "key": "format",
+                          "value": "ALL",
+                          "description": "PDF|Excel|ALL"
+                        },
+                        {
+                          "key": "page",
+                          "value": "{{page}}"
+                        },
+                        {
+                          "key": "limit",
+                          "value": "{{limit}}"
+                        }
+                      ]
+                    },
+                    "description": "Table rows + lastReportId for Download/Regenerate"
+                  }
+                },
+                {
+                  "name": "2. Generate Report",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/reports/attendance/generate",
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"reportKey\": \"monthly_summary\",\n  \"month\": \"{{timesheetMonth}}\",\n  \"format\": \"PDF\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "description": "reportKey: monthly_summary | daily_punch | late_early | absent_missed\nUI: + Generate Report"
+                  }
+                },
+                {
+                  "name": "3. Download Report",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/reports/attendance/{{attendanceReportId}}/download",
+                    "description": "Use lastReportId from List (or Generate response _id)"
+                  }
+                },
+                {
+                  "name": "4. Regenerate Report",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/reports/attendance/{{attendanceReportId}}/regenerate",
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "description": "UI: Regenerate button — same range/format as last run"
+                  }
+                }
+              ]
             }
           ]
         },
         {
-          "name": "1.7 Shifts (Master + Assign)",
+          "name": "1.7 Shifts (Work → Shift Management)",
           "item": [
             {
               "name": "List Shifts",
@@ -4094,7 +4865,8 @@
                 "description": ""
               }
             }
-          ]
+          ],
+          "description": "NOT under Attendance module.\nUI: Work → Shift Management + Shift Assignments.\nMaster CRUD + assign APIs only."
         },
         {
           "name": "1.8 Holiday Calendar",
@@ -4199,109 +4971,6 @@
                   }
                 ],
                 "url": "{{baseUrl}}/api/holidays/{{holidayId}}",
-                "description": ""
-              }
-            }
-          ]
-        },
-        {
-          "name": "1.9 Work Timings",
-          "item": [
-            {
-              "name": "List Work Timings",
-              "request": {
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  },
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{token}}"
-                  }
-                ],
-                "url": "{{baseUrl}}/api/work-timings?page={{page}}&limit={{limit}}",
-                "description": ""
-              }
-            },
-            {
-              "name": "Create Work Timing",
-              "request": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  },
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{token}}"
-                  }
-                ],
-                "url": "{{baseUrl}}/api/work-timings",
-                "description": "Master only. Punch late grace uses Shift.graceMinutes — Work Timing not wired to punch yet.",
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"name\": \"Standard Time\",\n  \"code\": \"ST\",\n  \"company\": \"{{company}}\",\n  \"whCalculation\": \"Shift Based\",\n  \"graceTimeMins\": 15,\n  \"status\": \"Active\"\n}"
-                }
-              }
-            },
-            {
-              "name": "Get Work Timing",
-              "request": {
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  },
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{token}}"
-                  }
-                ],
-                "url": "{{baseUrl}}/api/work-timings/{{workTimingId}}",
-                "description": ""
-              }
-            },
-            {
-              "name": "Update Work Timing",
-              "request": {
-                "method": "PUT",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  },
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{token}}"
-                  }
-                ],
-                "url": "{{baseUrl}}/api/work-timings/{{workTimingId}}",
-                "description": "",
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"graceTimeMins\": 15,\n  \"whCalculation\": \"Shift Based\",\n  \"status\": \"Active\"\n}"
-                }
-              }
-            },
-            {
-              "name": "Delete Work Timing",
-              "request": {
-                "method": "DELETE",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  },
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{token}}"
-                  }
-                ],
-                "url": "{{baseUrl}}/api/work-timings/{{workTimingId}}",
                 "description": ""
               }
             }
@@ -4759,7 +5428,7 @@
         },
         {
           "name": "2.4 Masters (Dropdowns)",
-          "description": "ESS read-only dropdown lists — one folder per type. Use `List master meta` for field map.",
+          "description": "ESS read-only dropdown lists — one folder per type. Use `List master meta` for field map.\nIncludes Attendance: Regularization Reason + Mark Attendance Reason.",
           "item": [
             {
               "name": "List master meta",
@@ -5151,6 +5820,46 @@
                     ],
                     "url": "{{baseUrl}}/api/masters?type=visaType&status=Active&company={{company}}&page=1&limit=50",
                     "description": "Employee / Admin dropdown: type=visaType Supports search|q, page, limit. Response: total, page, limit, pages, data."
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Regularization Reason",
+              "description": "Dropdown list for type=`regularizationReason` (ESS — read only).",
+              "item": [
+                {
+                  "name": "List Regularization Reason",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=regularizationReason&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "Employee / Admin dropdown: type=regularizationReason Supports search|q, page, limit. Response: total, page, limit, pages, data."
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Mark Attendance Reason",
+              "description": "Dropdown list for type=`markAttendanceReason` (ESS — read only).",
+              "item": [
+                {
+                  "name": "List Mark Attendance Reason",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/masters?type=markAttendanceReason&status=Active&company={{company}}&page=1&limit=50",
+                    "description": "Employee / Admin dropdown: type=markAttendanceReason Supports search|q, page, limit. Response: total, page, limit, pages, data."
                   }
                 }
               ]

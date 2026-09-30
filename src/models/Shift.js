@@ -42,7 +42,7 @@ const shiftSchema = new mongoose.Schema(
     halfDayEndTime: { type: String, default: "14:30" },
     /**
      * Grace after startTime before counting late (minutes).
-     * Prefer setting on Shift UI — punch reads THIS field (not Work Timings)
+     * Prefer setting on Shift UI — punch reads THIS field
      */
     graceMinutes: { type: Number, default: 0 },
     /** If false → cannot punch-in before startTime */

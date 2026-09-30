@@ -1,10 +1,32 @@
 /**
- * ATTENDANCE REGULARIZATION — employee requests fix for missed / wrong punches
+ * ATTENDANCE REGULARIZATION — employee / admin requests fix for missed / wrong punches
  * Admin approves/rejects → updates Attendance when approved.
+ *
+ * UI: Attendance → Attendance Regularization → New Regularization Request
  */
 const mongoose = require("mongoose");
 
 const STATUSES = ["Pending", "Approved", "Rejected", "Cancelled"];
+
+/** Type dropdown (New Regularization Request form) */
+const REG_TYPES = [
+  "Missed Punch In",
+  "Missed Punch Out",
+  "Late Mark",
+  "Early Exit",
+  "Wrong Status",
+];
+
+/** Reason dropdown — fallback; live list from Master type=regularizationReason */
+const REG_REASONS = [
+  "Forgot to Punch",
+  "Biometric Issue",
+  "System Downtime",
+  "Client Visit",
+  "Power Outage",
+  "Incorrect Shift Mapping",
+  "Other",
+];
 
 const regularizationSchema = new mongoose.Schema(
   {
@@ -13,15 +35,17 @@ const regularizationSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
-    sheetDate: { type: String, required: true }, // YYYY-MM-DD
+    /** Attendance day YYYY-MM-DD */
+    sheetDate: { type: String, required: true },
     /** Requested corrected times HH:mm */
     requestedInTime: { type: String, default: null },
     requestedOutTime: { type: String, default: null },
     /**
-     * UI type filter: Missed Punch Out | Late Mark | Missed Punch In | Early Exit | Wrong Status
-     * Auto-set on create if omitted
+     * UI type: Missed Punch In | Missed Punch Out | Late Mark | Early Exit | Wrong Status
      */
     type: { type: String, default: "" },
+    /** Reason dropdown value e.g. Forgot to Punch */
+    reason: { type: String, default: "" },
     remarks: { type: String, default: "" },
     status: { type: String, default: "Pending" },
     submittedBy: {
@@ -43,6 +67,9 @@ const regularizationSchema = new mongoose.Schema(
 
 regularizationSchema.index({ employee: 1, sheetDate: -1 });
 regularizationSchema.index({ status: 1 });
+regularizationSchema.index({ type: 1, status: 1 });
 
 module.exports = mongoose.model("AttendanceRegularization", regularizationSchema);
 module.exports.STATUSES = STATUSES;
+module.exports.REG_TYPES = REG_TYPES;
+module.exports.REG_REASONS = REG_REASONS;

@@ -61,8 +61,6 @@ const UI_DROPDOWNS = {
     "Conference Visa",
     "Medical Visa",
   ],
-  // Work Timings — WH Calculation dropdown (UI)
-  whCalculation: ["Shift Based", "Fixed Hours", "Flexible"],
   // Personal / Other — shown as selects in UI; no hardcoded array in FE chunk
   gender: ["Male", "Female", "Other"],
   maritalStatus: ["Single", "Married", "Divorced", "Widowed"],
@@ -85,6 +83,29 @@ const OFFICIAL_DROPDOWNS = {
 };
 
 /**
+ * Attendance UI reason dropdowns (separate masters)
+ * Regularization: /attendance/regularization
+ * Mark Attendance: Daily Attendance → Mark Attendance modal
+ */
+const ATTENDANCE_DROPDOWNS = {
+  regularizationReason: [
+    "Forgot to Punch",
+    "Biometric Issue",
+    "System Downtime",
+    "Client Visit",
+    "Power Outage",
+    "Incorrect Shift Mapping",
+    "Other",
+  ],
+  markAttendanceReason: [
+    "Missed Punch",
+    "Device Issue",
+    "Official Travel",
+    "Other",
+  ],
+};
+
+/**
  * Flatten to seed rows: { type, name, company? }
  * company type has no company field.
  */
@@ -103,6 +124,9 @@ const buildMasterSeedRows = (company = DEFAULT_COMPANY) => {
   for (const [type, names] of Object.entries(UI_DROPDOWNS)) {
     add(type, names);
   }
+  for (const [type, names] of Object.entries(ATTENDANCE_DROPDOWNS)) {
+    add(type, names);
+  }
 
   return rows;
 };
@@ -110,5 +134,6 @@ const buildMasterSeedRows = (company = DEFAULT_COMPANY) => {
 module.exports = {
   UI_DROPDOWNS,
   OFFICIAL_DROPDOWNS,
+  ATTENDANCE_DROPDOWNS,
   buildMasterSeedRows,
 };

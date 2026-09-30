@@ -1,8 +1,17 @@
 /**
  * REGULARIZATION CONTROLLER — /api/attendance/regularize
- * Employee create/cancel; Admin approve/reject (updates Attendance)
+ *
+ * UI: Attendance → Attendance Regularization
+ *   - List + filters
+ *   - New Regularization Request (admin can pick employee)
+ *   - Approve / Reject / Cancel
  */
 const AttendanceRegularization = require("../models/AttendanceRegularization");
+const {
+  REG_TYPES,
+  REG_REASONS,
+  STATUSES,
+} = require("../models/AttendanceRegularization");
 const Attendance = require("../models/Attendance");
 const User = require("../models/User");
 const { hasAllAccess } = require("../middleware/auth");
@@ -14,7 +23,10 @@ const {
 const {
   getAssignedShift,
   computeDayMetrics,
+  todayDate,
 } = require("../utils/shiftTiming");
+const { formatDisplayDate } = require("../utils/attendanceView");
+const { listAttendanceMasterNames } = require("../utils/attendanceMasters");
 
 const combineDateTime = (dateStr, timeStr) => {
   if (!timeStr) return null;
@@ -32,59 +44,186 @@ const inferRegType = (inTime, outTime, explicit) => {
   if (hasIn && !hasOut) return "Missed Punch In";
   if (!hasIn && hasOut) return "Missed Punch Out";
   if (hasIn && hasOut) return "Wrong Status";
-  return "";
+  return "Missed Punch In";
 };
 
-/** CREATE — POST /api/attendance/regularize */
-const createRegularization = async (req, res) => {
+/** Normalize create body aliases from UI form */
+const normalizeCreateBody = (body = {}) => {
+  const sheetDate = body.sheetDate || body.date || null;
+  const requestedInTime =
+    body.requestedInTime || body.requestedPunchIn || body.punchIn || null;
+  const requestedOutTime =
+    body.requestedOutTime || body.requestedPunchOut || body.punchOut || null;
+  const employeeId = body.employeeId || body.employee || null;
+  const type = body.type || "";
+  const reason = body.reason || "";
+  const remarks = body.remarks || "";
+  return {
+    sheetDate,
+    requestedInTime: requestedInTime || null,
+    requestedOutTime: requestedOutTime || null,
+    employeeId,
+    type,
+    reason,
+    remarks,
+  };
+};
+
+const enrichRegRow = (row) => {
+  const o = row.toObject ? row.toObject() : { ...row };
+  const emp = o.employee || {};
+  return {
+    ...o,
+    displayDate: formatDisplayDate(o.sheetDate),
+    requestedInDisplay: o.requestedInTime || null,
+    requestedOutDisplay: o.requestedOutTime || null,
+    requestedDisplay: [o.requestedInTime, o.requestedOutTime]
+      .filter(Boolean)
+      .join(" — ") || "—",
+    employee: {
+      _id: emp._id,
+      name: emp.name || "",
+      employeeCode: emp.official?.employeeCode || "",
+      department: emp.official?.department || "",
+      role: emp.role || "",
+    },
+  };
+};
+
+/**
+ * META — GET /api/attendance/regularize/meta
+ * Types hardcoded; reasons from Master type=regularizationReason
+ */
+const getRegularizationMeta = async (req, res) => {
   try {
-    const { sheetDate, requestedInTime, requestedOutTime, remarks, type } =
-      req.body;
-    const employeeId = req.user._id;
-
-    const existing = await AttendanceRegularization.findOne({
-      employee: employeeId,
-      sheetDate,
-      status: "Pending",
-    });
-    if (existing) {
-      return res.status(400).json({
-        message: "A pending regularization already exists for this date",
-        data: existing,
-      });
-    }
-
-    const row = await AttendanceRegularization.create({
-      employee: employeeId,
-      sheetDate,
-      requestedInTime: requestedInTime || null,
-      requestedOutTime: requestedOutTime || null,
-      type: inferRegType(requestedInTime, requestedOutTime, type),
-      remarks,
-      status: "Pending",
-      submittedBy: employeeId,
-      submitDate: new Date(),
-    });
-
-    await row.populate("employee", "name official.employeeCode");
-
-    return res.status(201).json({
-      message: "Regularization request submitted",
-      data: row,
+    const reasons = await listAttendanceMasterNames(
+      "regularizationReason",
+      req.user
+    );
+    return res.json({
+      types: REG_TYPES,
+      reasons: reasons.length ? reasons : REG_REASONS,
+      reasonMasterType: "regularizationReason",
+      statuses: STATUSES,
+      today: todayDate(),
+      note: "Reasons from Masters → type=regularizationReason (GET /api/masters?type=regularizationReason)",
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
 };
 
-/** LIST — GET /api/attendance/regularize
- * Filters: status, type, search (name/code), year, from, to, employeeId, page, limit
- * Matches UI: https://hrms-techculture.vercel.app/attendance/regularization
+/**
+ * CREATE — POST /api/attendance/regularize
+ * Body (UI form):
+ *   employeeId? (admin), date/sheetDate, type, requestedInTime, requestedOutTime,
+ *   reason (required), remarks?
+ */
+const createRegularization = async (req, res) => {
+  try {
+    const {
+      sheetDate,
+      requestedInTime,
+      requestedOutTime,
+      employeeId,
+      type,
+      reason,
+      remarks,
+    } = normalizeCreateBody(req.body);
+
+    if (!sheetDate) {
+      return res.status(400).json({ message: "date / sheetDate is required" });
+    }
+    if (!reason || !String(reason).trim()) {
+      return res.status(400).json({ message: "reason is required" });
+    }
+    if (!requestedInTime && !requestedOutTime) {
+      return res.status(400).json({
+        message: "Provide requestedPunchIn and/or requestedPunchOut (HH:mm)",
+      });
+    }
+
+    let targetId = req.user._id;
+
+    // Admin can submit for another employee (Employee dropdown)
+    if (employeeId && String(employeeId) !== String(req.user._id)) {
+      if (!hasAllAccess(req.user)) {
+        return res.status(403).json({
+          message: "Only admin can create regularization for another employee",
+        });
+      }
+      const emp = await User.findById(employeeId).select(
+        "_id name status role official.company official.employeeCode"
+      );
+      if (!emp) return res.status(404).json({ message: "Employee not found" });
+      if (emp.status !== "Active") {
+        return res.status(400).json({ message: "Employee is inactive" });
+      }
+      if (!hasGlobalCompanyAccess(req.user)) {
+        const errMsg = assertSameCompanyEmployee(req.user, emp);
+        if (errMsg) return res.status(403).json({ message: errMsg });
+      }
+      targetId = emp._id;
+    }
+
+    const existing = await AttendanceRegularization.findOne({
+      employee: targetId,
+      sheetDate,
+      status: "Pending",
+    });
+    if (existing) {
+      return res.status(400).json({
+        message: "A pending regularization already exists for this date",
+        data: enrichRegRow(existing),
+      });
+    }
+
+    const row = await AttendanceRegularization.create({
+      employee: targetId,
+      sheetDate,
+      requestedInTime: requestedInTime || null,
+      requestedOutTime: requestedOutTime || null,
+      type: inferRegType(requestedInTime, requestedOutTime, type),
+      reason: String(reason).trim(),
+      remarks: remarks || "",
+      status: "Pending",
+      submittedBy: req.user._id,
+      submitDate: new Date(),
+    });
+
+    await row.populate(
+      "employee",
+      "name role official.employeeCode official.department"
+    );
+    await row.populate("submittedBy", "name role");
+
+    return res.status(201).json({
+      message: "Regularization request submitted",
+      data: enrichRegRow(row),
+    });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+/**
+ * LIST — GET /api/attendance/regularize
+ * Filters: status, type, search, reason, year, from, to, employeeId, page, limit
  */
 const listRegularizations = async (req, res) => {
   try {
-    const { status, type, search, year, from, to, employeeId, page, limit } =
-      req.query;
+    const {
+      status,
+      type,
+      reason,
+      search,
+      year,
+      from,
+      to,
+      employeeId,
+      page,
+      limit,
+    } = req.query;
     const filter = {};
 
     if (!hasAllAccess(req.user)) {
@@ -102,7 +241,6 @@ const listRegularizations = async (req, res) => {
       }
     }
 
-    // Search name / employee code → employee ids
     if (search && String(search).trim()) {
       const q = String(search).trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const userFilter = {
@@ -127,6 +265,7 @@ const listRegularizations = async (req, res) => {
           filters: {
             status: status || "ALL",
             type: type || "",
+            reason: reason || "",
             search: search || "",
             year: year || "",
             from: from || null,
@@ -143,8 +282,13 @@ const listRegularizations = async (req, res) => {
         "i"
       );
     }
+    if (reason && String(reason).trim()) {
+      filter.reason = new RegExp(
+        `^${String(reason).trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
+        "i"
+      );
+    }
 
-    // Date filters on sheetDate
     if (from || to) {
       filter.sheetDate = {};
       if (from) filter.sheetDate.$gte = from;
@@ -155,7 +299,7 @@ const listRegularizations = async (req, res) => {
     }
 
     const skip = (page - 1) * limit;
-    const [total, data] = await Promise.all([
+    const [total, rows] = await Promise.all([
       AttendanceRegularization.countDocuments(filter),
       AttendanceRegularization.find(filter)
         .populate(
@@ -163,6 +307,7 @@ const listRegularizations = async (req, res) => {
           "name role official.employeeCode official.department"
         )
         .populate("reviewedBy", "name role")
+        .populate("submittedBy", "name role")
         .sort({ submitDate: -1 })
         .skip(skip)
         .limit(limit),
@@ -176,12 +321,13 @@ const listRegularizations = async (req, res) => {
       filters: {
         status: status || "ALL",
         type: type || "",
+        reason: reason || "",
         search: search || "",
         year: year || "",
         from: from || null,
         to: to || null,
       },
-      data,
+      data: rows.map(enrichRegRow),
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -192,38 +338,53 @@ const listRegularizations = async (req, res) => {
 const getRegularization = async (req, res) => {
   try {
     const row = await AttendanceRegularization.findById(req.params.id)
-      .populate("employee", "name role official.employeeCode official.department")
+      .populate(
+        "employee",
+        "name role official.employeeCode official.department"
+      )
       .populate("reviewedBy", "name role")
       .populate("submittedBy", "name role");
 
     if (!row) return res.status(404).json({ message: "Request not found" });
 
-    if (!hasAllAccess(req.user) && String(row.employee._id) !== String(req.user._id)) {
+    if (
+      !hasAllAccess(req.user) &&
+      String(row.employee._id) !== String(req.user._id)
+    ) {
       return res.status(403).json({ message: "Access denied" });
     }
 
-    return res.json({ data: row });
+    return res.json({ data: enrichRegRow(row) });
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
 };
 
-/** CANCEL — POST /api/attendance/regularize/:id/cancel (employee own pending) */
+/** CANCEL — POST /api/attendance/regularize/:id/cancel */
 const cancelRegularization = async (req, res) => {
   try {
     const row = await AttendanceRegularization.findById(req.params.id);
     if (!row) return res.status(404).json({ message: "Request not found" });
 
-    if (String(row.employee) !== String(req.user._id) && !hasAllAccess(req.user)) {
+    if (
+      String(row.employee) !== String(req.user._id) &&
+      !hasAllAccess(req.user)
+    ) {
       return res.status(403).json({ message: "Access denied" });
     }
     if (row.status !== "Pending") {
-      return res.status(400).json({ message: "Only pending requests can be cancelled" });
+      return res
+        .status(400)
+        .json({ message: "Only pending requests can be cancelled" });
     }
 
     row.status = "Cancelled";
     await row.save();
-    return res.json({ message: "Request cancelled", data: row });
+    await row.populate(
+      "employee",
+      "name role official.employeeCode official.department"
+    );
+    return res.json({ message: "Request cancelled", data: enrichRegRow(row) });
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
@@ -239,7 +400,9 @@ const reviewRegularization = async (req, res) => {
     const row = await AttendanceRegularization.findById(req.params.id);
     if (!row) return res.status(404).json({ message: "Request not found" });
     if (row.status !== "Pending") {
-      return res.status(400).json({ message: `Request is already ${row.status}` });
+      return res
+        .status(400)
+        .json({ message: `Request is already ${row.status}` });
     }
 
     const employee = await User.findById(row.employee).select(
@@ -269,7 +432,9 @@ const reviewRegularization = async (req, res) => {
       }
 
       const assigned = await getAssignedShift(row.employee, row.sheetDate);
-      if (assigned?.shift) attendance.shift = assigned.shift._id;
+      if (assigned?.shift && !assigned.shift.isDefault) {
+        attendance.shift = assigned.shift._id;
+      }
 
       if (row.requestedInTime) {
         attendance.punchIn = combineDateTime(row.sheetDate, row.requestedInTime);
@@ -283,8 +448,10 @@ const reviewRegularization = async (req, res) => {
         attendance.punchOutSource = "manual";
       }
 
-      attendance.reason = row.remarks;
-      attendance.remarks = `Regularized: ${row.remarks}`;
+      attendance.reason = row.reason || row.remarks || "";
+      attendance.remarks = `Regularized: ${row.reason || ""}${
+        row.remarks ? ` — ${row.remarks}` : ""
+      }`.trim();
       attendance.markedBy = req.user._id;
 
       const metrics = computeDayMetrics(
@@ -299,12 +466,15 @@ const reviewRegularization = async (req, res) => {
       await attendance.save();
     }
 
-    await row.populate("employee", "name official.employeeCode");
+    await row.populate(
+      "employee",
+      "name role official.employeeCode official.department"
+    );
     await row.populate("reviewedBy", "name role");
 
     return res.json({
       message: `Request ${req.body.status.toLowerCase()}`,
-      data: row,
+      data: enrichRegRow(row),
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -312,6 +482,7 @@ const reviewRegularization = async (req, res) => {
 };
 
 module.exports = {
+  getRegularizationMeta,
   createRegularization,
   listRegularizations,
   getRegularization,

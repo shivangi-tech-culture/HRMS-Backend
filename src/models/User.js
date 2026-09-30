@@ -44,6 +44,8 @@ const userSchema = new mongoose.Schema(
     status: { type: String, default: "Active" },
     /** Updated on every successful login */
     lastLogin: { type: Date, default: null },
+    /** Optional profile photo URL (Cloudinary / CDN) — My Profile avatar */
+    avatar: { type: String, default: "" },
 
     // 1. PERSONAL — employee can update (phones, emails, addresses, IDs)
 
