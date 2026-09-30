@@ -479,6 +479,7 @@ const updateUser = async (req, res) => {
     }
 
     await user.save();
+
     const fresh = await User.findById(user._id).select("-password");
     return res.json({
       message: "User updated",

@@ -176,6 +176,8 @@ const MASTER_TYPE_PERM = {
   relation: "Relation",
   nominateFor: "Nominate For",
   visaType: "Visa Type",
+  regularizationReason: "Regularization Reason",
+  markAttendanceReason: "Mark Attendance Reason",
 };
 
 /** Admin write on /api/masters — type from body, query, or :id lookup */

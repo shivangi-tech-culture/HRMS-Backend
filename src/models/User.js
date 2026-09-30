@@ -44,6 +44,8 @@ const userSchema = new mongoose.Schema(
     status: { type: String, default: "Active" },
     /** Updated on every successful login */
     lastLogin: { type: Date, default: null },
+    /** Optional profile photo URL (Cloudinary / CDN) — My Profile avatar */
+    avatar: { type: String, default: "" },
 
     // 1. PERSONAL — employee can update (phones, emails, addresses, IDs)
 
@@ -124,6 +126,16 @@ const userSchema = new mongoose.Schema(
       calculateSalaryFrom: { type: Date, default: null },
       dateOfRetirement: { type: Date, default: null },
       grade: { type: String, default: "" },
+      /**
+       * Assigned work shift (Master Shift).
+       * Set on employee create/update by Global Admin / Super Admin / HR Manager only.
+       * Employees cannot edit this field.
+       */
+      shift: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Shift",
+        default: null,
+      },
     },
     // 3. OTHER — extra personal details
 

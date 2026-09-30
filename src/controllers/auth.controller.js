@@ -9,15 +9,29 @@ const {
   countPermissions,
   totalForRole,
   compactPermissions,
+  permissionsForRole,
 } = require("../config/permissions");
 const { setAuthCookie, clearAuthCookie } = require("../utils/authCookie");
 const { signToken } = require("../utils/jwt");
+
+const LOCKED_ROLES = new Set(["Super Admin", "Global Admin"]);
 
 /** Build a short label like "42 of 120" for the UI */
 const permLabel = (roleDoc) => {
   if (!roleDoc) return "0 of 0";
   return `${countPermissions(roleDoc.permissions)} of ${totalForRole(roleDoc.name)}`;
 };
+
+/** Keep Super / Global Admin matrix in sync with permissions.js catalog */
+async function refreshLockedRole(roleDoc) {
+  if (!roleDoc || !LOCKED_ROLES.has(roleDoc.name)) return roleDoc;
+  const full = permissionsForRole(roleDoc.name);
+  if (JSON.stringify(roleDoc.permissions) !== JSON.stringify(full)) {
+    roleDoc.permissions = full;
+    await roleDoc.save();
+  }
+  return roleDoc;
+}
 
 /** Find one user by login email (case-insensitive) */
 const findByOfficialEmail = (officialEmail) =>
@@ -47,7 +61,8 @@ const login = async (req, res) => {
     user.lastLogin = new Date();
     await user.save();
 
-    const roleDoc = await Role.findOne({ name: user.role });
+    let roleDoc = await Role.findOne({ name: user.role });
+    roleDoc = await refreshLockedRole(roleDoc);
     const token = signToken(user._id);
     setAuthCookie(res, token);
 

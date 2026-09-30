@@ -39,6 +39,9 @@ const TYPES = [
   "nominateFor",
   // Visa
   "visaType",
+  // Attendance dropdowns (Admin Attendance screens)
+  "regularizationReason",
+  "markAttendanceReason",
 ];
 
 const COLLECTION_BY_TYPE = {
@@ -61,6 +64,8 @@ const COLLECTION_BY_TYPE = {
   relation: "relations",
   nominateFor: "nominatefors",
   visaType: "visatypes",
+  regularizationReason: "regularizationreasons",
+  markAttendanceReason: "markattendancereasons",
 };
 
 /**

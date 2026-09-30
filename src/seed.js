@@ -307,6 +307,7 @@ const seed = async () => {
   console.log("  Global Admin  → all companies (login only, no profile fields)");
   console.log("  Super Admin   → own company access (login + company, no profile)");
   console.log("  HR / Manager / Employee → full employee profile + company");
+  console.log("  Shifts        → run separately: npm run seed:shifts");
   process.exit(0);
 };
 

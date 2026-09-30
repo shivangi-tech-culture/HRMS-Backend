@@ -32,6 +32,10 @@ const {
   mapEmployeeListRow,
   LIST_SELECT,
 } = require("../utils/userAccount");
+const {
+  canManageShift,
+  resolveOfficialShift,
+} = require("../utils/officialShift");
 
 /** True for Global Admin / Super Admin (lean login accounts, no full HR profile) */
 const isPlatformAdminRole = (role) =>
@@ -60,6 +64,7 @@ const unsetEmployeeProfileFields = async (userId, roleName) => {
     "official.calculateSalaryFrom": 1,
     "official.dateOfRetirement": 1,
     "official.grade": 1,
+    "official.shift": 1,
   };
   if (roleName === "Global Admin") {
     unset.personal = 1;
@@ -316,6 +321,24 @@ const createEmployee = async (req, res) => {
         ? String(officialIn.employeeCode).trim().toUpperCase()
         : "",
     });
+
+    // official.shift — Global Admin / Super Admin / HR Manager only
+    if (officialIn.shift !== undefined) {
+      if (!canManageShift(req.user)) {
+        return res.status(403).json({
+          message:
+            "Only Global Admin / Super Admin / HR Manager can assign official.shift",
+        });
+      }
+      const resolved = await resolveOfficialShift(officialIn.shift, company);
+      if (resolved.error) {
+        return res.status(resolved.status).json({ message: resolved.error });
+      }
+      official.shift = resolved.shiftId;
+    } else {
+      delete official.shift;
+    }
+
     const personal = normalizeSectionUniques("personal", personalIn);
 
     // 3. Check unique email / emp code / mobile etc.
@@ -386,7 +409,9 @@ const createEmployee = async (req, res) => {
     });
 
     // 6. Return employee without password
-    const fresh = await User.findById(employee._id).select("-password");
+    const fresh = await User.findById(employee._id)
+      .select("-password")
+      .populate("official.shift");
     return res.status(201).json({
       message: `Employee created. Welcome email queued for ${mail.emailTo}.`,
       emailQueued: true,
@@ -511,7 +536,9 @@ const getEmployee = async (req, res) => {
       return res.status(403).json({ message: "You can only view your own profile" });
     }
 
-    const employee = await User.findById(req.params.id).select("-password");
+    const employee = await User.findById(req.params.id)
+      .select("-password")
+      .populate("official.shift");
     if (!employee) {
       return res.status(404).json({ message: "Employee not found" });
     }
@@ -636,6 +663,24 @@ const updateEmployee = async (req, res) => {
         message:
           "Employee cannot edit official details or employee code. Contact HR / Admin.",
       });
+    }
+
+    // official.shift — only Global Admin / Super Admin / HR Manager (not Manager / Employee)
+    if (profile.official && Object.prototype.hasOwnProperty.call(profile.official, "shift")) {
+      if (!canManageShift(req.user)) {
+        return res.status(403).json({
+          message:
+            "Only Global Admin / Super Admin / HR Manager can change official.shift",
+        });
+      }
+      const resolved = await resolveOfficialShift(
+        profile.official.shift,
+        employee.official?.company
+      );
+      if (resolved.error) {
+        return res.status(resolved.status).json({ message: resolved.error });
+      }
+      profile.official.shift = resolved.shiftId;
     }
 
     // payroll{} — ADMIN ONLY (check early; Employee never)
@@ -781,16 +826,21 @@ const updateEmployee = async (req, res) => {
         employee._id,
         String(req.body.role).trim()
       );
-      const fresh = await User.findById(employee._id).select("-password");
+      const fresh = await User.findById(employee._id)
+        .select("-password")
+        .populate("official.shift");
       return res.json({
         message: "Employee updated",
         employee: safeUser(fresh),
       });
     }
 
+    const fresh = await User.findById(employee._id)
+      .select("-password")
+      .populate("official.shift");
     return res.json({
       message: "Employee updated",
-      employee: safeUser(employee),
+      employee: safeUser(fresh),
     });
   } catch (err) {
     const dup = duplicateKeyMessage(err);
