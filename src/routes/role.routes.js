@@ -10,36 +10,35 @@ const {
   deleteRole,
   getPermissions,
   savePermissions,
+  getHierarchy,
 } = require("../controllers/role.controller");
-const { protect, authorize } = require("../middleware/auth");
+const { protect, authorize, ALL_ACCESS } = require("../middleware/auth");
 const { checkPermission } = require("../controllers/permission.controller");
 const { validate } = require("../middleware/validate");
 const {
   createRoleSchema,
   savePermissionsSchema,
 } = require("../validators/role.validation");
+const { SUPER_ADMIN, ADMIN } = require("../config/roles");
 
 const router = express.Router();
 
-/**
- * System admin names for authorize — custom admin-side roles also pass
- * when HR Manager / Manager is listed (see auth.authorize). Action still via checkPermission.
- */
-const ADMIN = ["Global Admin", "Super Admin", "HR Manager", "Manager"];
-
+/** System admin names; custom admin roles also admitted by authorize */
+const ADMIN_ROLES = ALL_ACCESS;
+const PLATFORM = [SUPER_ADMIN, ADMIN];
 
 /**
  * @swagger
  * /api/roles:
  *   post:
  *     tags: [Admin / Roles]
- *     summary: Create role with permissions (required)
+ *     summary: Create role with admin permissions (hide/show)
  *     description: |
- *       1. `GET /api/permissions/modules` → pick **admin** OR **employee** catalog
- *       2. Decide modules/actions (hide unused)
- *       3. `POST /api/roles` with required `catalog` + `permissions`
- *       DB stores only granted (true) actions. Later: `PUT /api/roles/:id/permissions` to hide/show.
- *       Route guards use `checkPermission` against this role's saved matrix (works for custom roles too).
+ *       Always uses **admin** permission catalog (not employee ESS).
+ *       1. `GET /api/permissions/modules` → use `side: admin` only
+ *       2. Hide modules you don't want (omit or all actions false)
+ *       3. `POST /api/roles` with `permissions` (catalog optional — forced admin)
+ *       Later: `PUT /api/roles/:id/permissions` to hide/show again.
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -56,7 +55,7 @@ const ADMIN = ["Global Admin", "Super Admin", "HR Manager", "Manager"];
 router.post(
   "/",
   protect,
-  authorize(...ADMIN),
+  authorize(...ADMIN_ROLES),
   checkPermission("Administration", "Roles & Permissions", "create"),
   validate(createRoleSchema),
   createRole
@@ -82,6 +81,22 @@ router.get(
   protect,
   checkPermission("Administration", "Roles & Permissions", "view"),
   listRoles
+);
+
+/**
+ * @swagger
+ * /api/roles/hierarchy:
+ *   get:
+ *     tags: [Admin / Roles]
+ *     summary: Role hierarchy ladder (easy overview)
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get(
+  "/hierarchy",
+  protect,
+  checkPermission("Administration", "Roles & Permissions", "view"),
+  getHierarchy
 );
 
 /**
@@ -149,7 +164,7 @@ router.get(
 router.put(
   "/:id/permissions",
   protect,
-  authorize(...ADMIN),
+  authorize(...ADMIN_ROLES),
   checkPermission("Administration", "Roles & Permissions", "edit"),
   validate(savePermissionsSchema),
   savePermissions
@@ -192,11 +207,11 @@ router.get(
  *     responses:
  *       200: { description: Deleted }
  */
-// DELETE ROLE — Global Admin / Super Admin only
+// DELETE ROLE — Super Admin / Admin only
 router.delete(
   "/:id",
   protect,
-  authorize("Global Admin", "Super Admin"),
+  authorize(...PLATFORM),
   checkPermission("Administration", "Roles & Permissions", "delete"),
   deleteRole
 );

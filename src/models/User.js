@@ -33,7 +33,8 @@ const userSchema = new mongoose.Schema(
     password: { type: String, default: "" },
     /**
      * Access role string (must match Role.name / authorize lists).
-     * Typical: Global Admin | Super Admin | HR Manager | Manager | Employee
+     * Hierarchy: Super Admin | Admin | HR Manager | Reporting Manager | Employee
+     * (see src/config/roles.js)
      */
     role: {
       type: String,
@@ -103,10 +104,17 @@ const userSchema = new mongoose.Schema(
         trim: true,
       },
       /**
-       * Company name string (matches Master type=company `name`).
-       * Used by companyScope for tenant isolation.
+       * Primary company name (matches Master type=company `name`).
+       * Used by companyScope for tenant isolation + display.
        */
       company: { type: String, default: "TechCulture.Ai Private Limited" },
+      /**
+       * Extra companies HR Manager / Manager (HOD) may access.
+       * Assigned only by Global Admin / Super Admin.
+       * Always includes primary `company` when set via Access & Control.
+       * Global Admin / Super Admin ignore this (they see all companies).
+       */
+      companies: { type: [String], default: undefined },
       /** Department name from masters (string, not ObjectId) */
       department: { type: String, default: "" },
       /** Designation name from masters */
@@ -126,16 +134,6 @@ const userSchema = new mongoose.Schema(
       calculateSalaryFrom: { type: Date, default: null },
       dateOfRetirement: { type: Date, default: null },
       grade: { type: String, default: "" },
-      /**
-       * Assigned work shift (Master Shift).
-       * Set on employee create/update by Global Admin / Super Admin / HR Manager only.
-       * Employees cannot edit this field.
-       */
-      shift: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Shift",
-        default: null,
-      },
     },
     // 3. OTHER — extra personal details
 

@@ -17,7 +17,7 @@ const CRUD = ["view", "create", "edit", "delete", "export", "import", "upload", 
 const LIST = ["view", "edit", "delete", "export", "import", "upload", "download", "email"];
 const ATT = ["view", "create", "edit", "export", "import", "upload", "download", "print"];
 
-// ADMIN — Super Admin / HR Manager / Manager (same)
+// ADMIN — Super Admin / Admin / HR Manager / Reporting Manager
 
 const ADMIN_TREE = [
   // Dashboard
@@ -197,11 +197,6 @@ const ADMIN_TREE = [
     module: "Work",
     heading: "Work Schedule",
     subModules: [
-      { name: "Shift Management", actions: ["view", "create", "edit", "delete"] },
-      {
-        name: "Shift Assignments",
-        actions: ["view", "create", "edit", "delete", "assign"],
-      },
       { name: "Weekly Off", actions: ["view", "create", "edit", "delete"] },
       { name: "Holiday Calendar", actions: ["view", "create", "edit", "delete"] },
     ],
@@ -282,7 +277,6 @@ const ESS_TREE = [
       { name: "Leave", actions: VCC }, // Self Service → Leave (UI)
       { name: "My Web Punches", actions: V },
       { name: "On Tour/On Duty Entries", actions: VC },
-      { name: "View Shift Roster", actions: V },
       { name: "Additional Request", actions: VCC },
       { name: "Offboarding", actions: V },
     ],
@@ -401,7 +395,7 @@ function buildFromTree(tree) {
 /** Get full permissions for a role name */
 function permissionsForRole(role) {
   if (role === "Employee") return buildFromTree(ESS_TREE);
-  return buildFromTree(ADMIN_TREE); // Super Admin, HR Manager, Manager, Global Admin
+  return buildFromTree(ADMIN_TREE); // Super Admin, Admin, HR Manager, Reporting Manager
 }
 
 /** Max permission count for a role (optional catalog for custom roles) */
@@ -409,14 +403,16 @@ function totalForRole(role, catalog) {
   if (role === "Employee" || catalog === "employee") return EMPLOYEE_TOTAL;
   if (
     role === "Super Admin" ||
+    role === "Admin" ||
     role === "HR Manager" ||
-    role === "Manager" ||
-    role === "Global Admin" ||
+    role === "Reporting Manager" ||
+    role === "Manager" || // legacy
+    role === "Global Admin" || // legacy alias
     catalog === "admin"
   ) {
     return TOTAL_PERMISSIONS;
   }
-  return COMBINED_TOTAL; // legacy custom without catalog
+  return COMBINED_TOTAL;
 }
 
 /** Count how many flags are true on a permissions array */

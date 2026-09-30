@@ -7,9 +7,10 @@
     "start": "node src/server.js",
     "dev": "nodemon --watch src src/server.js",
     "seed": "node src/seed.js",
-    "seed:shifts": "node src/scripts/seedShifts.js",
     "seed:attendance-reasons": "node src/scripts/seedAttendanceReasonMasters.js",
-    "sync:admin-perms": "node src/scripts/syncAdminRolePermissions.js"
+    "sync:admin-perms": "node src/scripts/syncAdminRolePermissions.js",
+    "migrate:roles": "node src/scripts/migrateRoles.js",
+    "migrate:masters-global": "node src/scripts/migrateMastersGlobal.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

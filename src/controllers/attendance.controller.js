@@ -12,10 +12,9 @@ const Attendance = require("../models/Attendance"); // daily punch document
 const User = require("../models/User"); // employee lookup (manual / scope)
 const { hasAllAccess } = require("../middleware/auth"); // admin/HR/manager roles
 const {
-  assertSameCompanyEmployee, // same company check
-  companyFilter, // company scope for list
-  hasGlobalCompanyAccess, // global admin?
+  hasGlobalCompanyAccess, // Super Admin / Admin?
 } = require("../utils/companyScope");
+const { listScopeFilter, assertTeamOrCompanyEmployee } = require("../utils/teamScope");
 const { SELF_SOURCES } = require("../validators/attendance.validation"); // web|mobile|biometric
 const { resolvePunchLocation } = require("../utils/geocode"); // lat/long → address
 const {
@@ -286,7 +285,7 @@ const markManual = async (req, res) => {
 
     // Company-scoped admin cannot mark other company
     if (hasAllAccess(req.user) && !hasGlobalCompanyAccess(req.user)) {
-      const scopeErr = assertSameCompanyEmployee(req.user, employee);
+      const scopeErr = assertTeamOrCompanyEmployee(req.user, employee);
       if (scopeErr) {
         return res.status(403).json({ message: scopeErr });
       }
@@ -412,7 +411,7 @@ const buildEmployeeScope = async (req) => {
     return { employee: req.query.employeeId }; // filter one employee
   }
   if (!hasGlobalCompanyAccess(req.user)) {
-    const scope = companyFilter(req.user);
+    const scope = listScopeFilter(req.user);
     if (scope === false) {
       return { error: "Your profile has no company — cannot list attendance" };
     }
@@ -788,7 +787,7 @@ const getAttendanceDetails = async (req, res) => {
         return res.status(403).json({ message: "Forbidden" });
       }
     } else if (!hasGlobalCompanyAccess(req.user)) {
-      const err = assertSameCompanyEmployee(req.user, record.employee);
+      const err = assertTeamOrCompanyEmployee(req.user, record.employee);
       if (err) return res.status(403).json({ message: err });
     }
 
@@ -1289,7 +1288,7 @@ const closeAbsent = async (req, res) => {
     if (req.body?.employeeId) filter.employee = req.body.employeeId;
     else if (req.body?.date) filter.date = req.body.date;
     else if (!hasGlobalCompanyAccess(req.user)) {
-      const scope = companyFilter(req.user);
+      const scope = listScopeFilter(req.user);
       if (scope === false) {
         return res.status(403).json({ message: "Your profile has no company" });
       }
@@ -1337,7 +1336,7 @@ const getAttendanceHistory = async (req, res) => {
     if (!emp) return res.status(404).json({ message: "Employee not found" });
 
     if (hasAllAccess(req.user) && !hasGlobalCompanyAccess(req.user)) {
-      const err = assertSameCompanyEmployee(req.user, emp);
+      const err = assertTeamOrCompanyEmployee(req.user, emp);
       if (err) return res.status(403).json({ message: err });
     }
 

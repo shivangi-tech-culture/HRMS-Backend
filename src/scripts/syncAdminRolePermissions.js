@@ -1,8 +1,8 @@
 /**
- * Sync locked admin roles (Super Admin / Global Admin) to live permissions.js.
+ * Sync locked admin roles (Super Admin / Admin) to live permissions.js.
  * Does NOT wipe users/masters. Safe to re-run.
  *
- * Run: node src/scripts/syncAdminRolePermissions.js
+ * Run: npm run sync:admin-perms
  */
 require("dotenv").config();
 const connectDB = require("../config/db");
@@ -12,12 +12,11 @@ const {
   countPermissions,
   totalForRole,
 } = require("../config/permissions");
-
-const LOCKED = ["Super Admin", "Global Admin"];
+const { LOCKED_ROLES } = require("../config/roles");
 
 (async () => {
   await connectDB();
-  for (const name of LOCKED) {
+  for (const name of LOCKED_ROLES) {
     const role = await Role.findOne({ name });
     if (!role) {
       console.log(`Skip — role not found: ${name}`);
@@ -29,7 +28,7 @@ const LOCKED = ["Super Admin", "Global Admin"];
     await role.save();
     const after = countPermissions(role.permissions);
     console.log(
-      `${name}: ${before} → ${after} of ${totalForRole(name)} (Work Timings removed; Masters +2 reasons)`
+      `${name}: ${before} → ${after} of ${totalForRole(name)}`
     );
   }
   process.exit(0);

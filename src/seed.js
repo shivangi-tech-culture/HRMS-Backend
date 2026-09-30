@@ -1,6 +1,8 @@
 /**
  * DATABASE SEED — wipe + recreate demo roles, masters, users
  * Password for all sample users: 123456. Run: npm run seed
+ *
+ * Hierarchy: src/config/roles.js
  */
 require("dotenv").config();
 const bcrypt = require("bcryptjs");
@@ -20,10 +22,19 @@ const {
   totalForRole,
   countPermissions,
 } = require("./config/permissions");
+const {
+  SUPER_ADMIN,
+  ADMIN,
+  HR,
+  REPORTING_MANAGER,
+  EMPLOYEE,
+  SYSTEM_ROLES,
+  ROLE_DESCRIPTIONS,
+  isPlatformRole,
+} = require("./config/roles");
 const { sendWelcomeEmail } = require("./utils/mail");
 const { DEFAULT_COMPANY } = require("./utils/companyScope");
 
-/** Paths removed after create for Global Admin / Super Admin (lean login accounts) */
 const EMPLOYEE_PROFILE_UNSET = {
   personal: 1,
   other: 1,
@@ -34,201 +45,163 @@ const EMPLOYEE_PROFILE_UNSET = {
   experience: 1,
   visas: 1,
   payroll: 1,
+  "official.employeeCode": 1,
+  "official.company": 1,
+  "official.companies": 1,
+  "official.department": 1,
+  "official.designation": 1,
+  "official.reportingHead1": 1,
+  "official.reportingHead2": 1,
+  "official.jobRole": 1,
+  "official.dateOfJoining": 1,
+  "official.calculateSalaryFrom": 1,
+  "official.dateOfRetirement": 1,
+  "official.grade": 1,
 };
-
-const isPlatformAdmin = (role) =>
-  role === "Global Admin" || role === "Super Admin";
 
 const seed = async () => {
   await connectDB();
 
-  // 1. CLEAR OLD DATA
-
   await User.deleteMany({});
   await Role.deleteMany({});
-  // Clear typed collections created via Master.getModel(type)
   await clearAllMasterCollections();
   try {
     await mongoose.connection.dropCollection("masters");
     console.log("Dropped legacy collection: masters");
-  } catch (_) {
-    // may not exist
-  }
+  } catch (_) {}
   for (const name of ["modules", "headings", "submodules"]) {
     try {
       await mongoose.connection.dropCollection(name);
       console.log(`Dropped collection: ${name}`);
-    } catch (_) {
-      // collection may not exist
-    }
+    } catch (_) {}
   }
-
-  // Drop legacy unique indexes that no longer match the nested User schema
   for (const idx of ["email_1", "personal.officialEmail_1"]) {
     try {
       await User.collection.dropIndex(idx);
       console.log(`Dropped legacy index: ${idx}`);
-    } catch (_) {
-      // index may not exist
-    }
+    } catch (_) {}
   }
 
   console.log("Old data cleared");
   console.log(`Default company → ${DEFAULT_COMPANY}`);
-
-  // 2. LOG PERMISSION CATALOGS (from permissions.js)
+  console.log("\nHierarchy:");
+  console.log("  Super Admin (1) → Admin (many) → HR / Reporting Manager → Employee");
 
   console.log("\nAdmin blocks (permissions.js):");
   for (const b of ADMIN_TREE) {
     console.log(`  ${b.module} | ${b.heading} → ${b.subModules.length} subs`);
   }
-  console.log("ESS blocks (permissions.js):");
-  for (const b of ESS_TREE) {
-    console.log(`  ${b.module} | ${b.heading} → ${b.subModules.length} subs`);
-  }
 
-  // 3. CREATE DEFAULT ROLES
-
-  const roles = [
-    {
-      name: "Global Admin",
-      description: "All companies, full access. Account only — no employee profile.",
-      catalog: "admin",
-      permissions: permissionsForRole("Global Admin"),
-    },
-    {
-      name: "Super Admin",
-      description: "Own company full access. Account only — no employee profile.",
-      catalog: "admin",
-      permissions: permissionsForRole("Super Admin"),
-    },
-    {
-      name: "HR Manager",
-      description: "Own company; admin modules via permission matrix.",
-      catalog: "admin",
-      permissions: permissionsForRole("HR Manager"),
-    },
-    {
-      name: "Manager",
-      description: "Own company; admin modules via permission matrix.",
-      catalog: "admin",
-      permissions: permissionsForRole("Manager"),
-    },
-    {
-      name: "Employee",
-      description: "ESS: Self, Team, Request, Tasks.",
-      catalog: "employee",
-      permissions: permissionsForRole("Employee"),
-    },
-  ];
-
-  for (const r of roles) {
-    const role = await Role.create({ ...r, status: "Active" });
+  for (const name of SYSTEM_ROLES) {
+    const role = await Role.create({
+      name,
+      description: ROLE_DESCRIPTIONS[name] || "",
+      catalog: name === EMPLOYEE ? "employee" : "admin",
+      permissions: permissionsForRole(name),
+      status: "Active",
+    });
     console.log(
       `Role → ${role.name} (${countPermissions(role.permissions)} of ${totalForRole(role.name)})`
     );
   }
-
-  // 4. SEED MASTERS — exact ESS General Info UI dropdown values (+ official org)
-  // Source: src/config/generalInfoMasters.js (matches hrms-techculture.vercel.app)
 
   const { buildMasterSeedRows } = require("./config/generalInfoMasters");
   const masters = buildMasterSeedRows(DEFAULT_COMPANY);
 
   for (const m of masters) {
     const Model = getModel(m.type);
-    const payload =
-      m.type === "company"
-        ? { name: m.name, company: "", status: "Active" }
-        : { name: m.name, company: m.company, status: "Active" };
-    await Model.create(payload);
+    await Model.create({
+      name: m.name,
+      company: "",
+      status: "Active",
+    });
     console.log(
       `Master → ${m.type} (${COLLECTION_BY_TYPE[m.type]}): ${m.name}`
     );
   }
 
-  // 5. SEED SAMPLE USERS (password for all demos: 123456)
-
-  /**
-   * platformAdmin: true → only name/password/role/status + official.officialEmail
-   *   (+ company for Super Admin). Profile fields are $unset after create.
-   */
   const users = [
     {
-      name: "Global Admin",
+      name: "Super Admin",
       password: "123456",
-      role: "Global Admin",
+      role: SUPER_ADMIN,
       status: "Active",
       platformAdmin: true,
       official: {
-        officialEmail: "globaladmin@techculture.ai",
+        officialEmail: "superadmin@gmail.com",
       },
     },
     {
-      name: "Shivangi Gupta",
+      name: "Admin User",
       password: "123456",
-      role: "Super Admin",
+      role: ADMIN,
       status: "Active",
       platformAdmin: true,
       official: {
-        officialEmail: "shivangi@techculture.ai",
-        company: DEFAULT_COMPANY,
+        officialEmail: "admin@gmail.com",
       },
     },
     {
-      name: "Priya Sharma",
+      name: "HR Manager",
       password: "123456",
-      role: "HR Manager",
+      role: HR,
       status: "Active",
       personal: { mobileNo: "9876500100" },
       official: {
         employeeCode: "EMP-HR01",
-        officialEmail: "hr@techculture.ai",
+        officialEmail: "hr@gmail.com",
         company: DEFAULT_COMPANY,
+        companies: [DEFAULT_COMPANY],
         department: "HR",
         designation: "HR Manager",
       },
     },
     {
-      name: "Amit Verma",
+      name: "Reporting Manager",
       password: "123456",
-      role: "Manager",
+      role: REPORTING_MANAGER,
       status: "Active",
       personal: { mobileNo: "9876500200" },
       official: {
         employeeCode: "EMP-MG01",
-        officialEmail: "manager@techculture.ai",
+        officialEmail: "manager@gmail.com",
         company: DEFAULT_COMPANY,
         department: "Engineering",
         designation: "Engineering Manager",
       },
     },
     {
-      name: "Shivi Gupta",
+      name: "Employee One",
       password: "123456",
-      role: "Employee",
+      role: EMPLOYEE,
       status: "Active",
       personal: { mobileNo: "9876500001" },
       official: {
         employeeCode: "EMP-1002",
-        officialEmail: "shivig5964@gmail.com",
+        officialEmail: "employee1@gmail.com",
         company: DEFAULT_COMPANY,
         department: "Engineering",
         designation: "Software Engineer",
+        reportingHead1: "manager@gmail.com",
       },
     },
     {
-      name: "Demo Employee",
+      name: "Employee Two",
       password: "123456",
-      role: "Employee",
+      role: EMPLOYEE,
       status: "Active",
-      personal: { mobileNo: "9876500002", gender: "Male", maritalStatus: "Single" },
+      personal: {
+        mobileNo: "9876500002",
+        gender: "Male",
+        maritalStatus: "Single",
+      },
       official: {
         employeeCode: "EMP-1003",
         officialEmail: "employee@gmail.com",
         company: DEFAULT_COMPANY,
         department: "Engineering",
         designation: "Software Engineer",
+        reportingHead1: "manager@gmail.com",
       },
     },
   ];
@@ -236,7 +209,7 @@ const seed = async () => {
   for (const u of users) {
     const hashed = await bcrypt.hash(u.password, 10);
     const email = String(u.official.officialEmail).toLowerCase().trim();
-    const platform = u.platformAdmin || isPlatformAdmin(u.role);
+    const platform = u.platformAdmin || isPlatformRole(u.role);
 
     const doc = {
       name: u.name,
@@ -253,34 +226,10 @@ const seed = async () => {
     const created = await User.create(doc);
 
     if (platform) {
-      // Remove empty employee-profile blocks (not needed for Global / Super Admin)
-      const unset = { ...EMPLOYEE_PROFILE_UNSET };
-      if (u.role === "Global Admin") {
-        unset["official.employeeCode"] = 1;
-        unset["official.company"] = 1;
-        unset["official.department"] = 1;
-        unset["official.designation"] = 1;
-        unset["official.reportingHead1"] = 1;
-        unset["official.reportingHead2"] = 1;
-        unset["official.jobRole"] = 1;
-        unset["official.dateOfJoining"] = 1;
-        unset["official.calculateSalaryFrom"] = 1;
-        unset["official.dateOfRetirement"] = 1;
-        unset["official.grade"] = 1;
-      } else if (u.role === "Super Admin") {
-        // Keep official.company for company scope; drop other official HR fields
-        unset["official.employeeCode"] = 1;
-        unset["official.department"] = 1;
-        unset["official.designation"] = 1;
-        unset["official.reportingHead1"] = 1;
-        unset["official.reportingHead2"] = 1;
-        unset["official.jobRole"] = 1;
-        unset["official.dateOfJoining"] = 1;
-        unset["official.calculateSalaryFrom"] = 1;
-        unset["official.dateOfRetirement"] = 1;
-        unset["official.grade"] = 1;
-      }
-      await User.collection.updateOne({ _id: created._id }, { $unset: unset });
+      await User.collection.updateOne(
+        { _id: created._id },
+        { $unset: EMPLOYEE_PROFILE_UNSET }
+      );
     }
 
     console.log(`User → ${email} / ${u.password} (${u.role})`);
@@ -291,10 +240,7 @@ const seed = async () => {
         email,
         password: u.password,
         role: u.role,
-        company:
-          u.role === "Global Admin"
-            ? "All companies"
-            : u.official.company || DEFAULT_COMPANY,
+        company: platform ? "All companies" : u.official.company || DEFAULT_COMPANY,
         department: u.official.department || "",
       });
       console.log(`  Mail sent → ${email}`);
@@ -303,11 +249,13 @@ const seed = async () => {
     }
   }
 
-  console.log("\nSeed done!");
-  console.log("  Global Admin  → all companies (login only, no profile fields)");
-  console.log("  Super Admin   → own company access (login + company, no profile)");
-  console.log("  HR / Manager / Employee → full employee profile + company");
-  console.log("  Shifts        → run separately: npm run seed:shifts");
+  console.log("\nSeed done! Password for all: 123456");
+  console.log("  Super Admin        → superadmin@gmail.com");
+  console.log("  Admin              → admin@gmail.com");
+  console.log("  HR Manager         → hr@gmail.com");
+  console.log("  Reporting Manager  → manager@gmail.com");
+  console.log("  Employee           → employee@gmail.com / employee1@gmail.com");
+  console.log("  Next               → npm run sync:admin-perms (refresh role matrices)");
   process.exit(0);
 };
 

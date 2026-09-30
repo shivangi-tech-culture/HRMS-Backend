@@ -4,6 +4,8 @@
 const {
   hasGlobalCompanyAccess,
   getUserCompany,
+  getAccessibleCompanies,
+  canAccessCompany,
   withDefaultCompany,
   normalizeCompany,
 } = require("./companyScope");
@@ -15,16 +17,27 @@ const resolveCompany = (req, bodyCompany) => {
   if (hasGlobalCompanyAccess(req.user)) {
     return withDefaultCompany(bodyCompany || getUserCompany(req.user));
   }
+
+  const sent = String(bodyCompany || "").trim();
+  if (sent) {
+    if (!canAccessCompany(req.user, sent)) {
+      return String(req.user?.official?.company || "").trim() || withDefaultCompany("");
+    }
+    return sent;
+  }
+
   const own = String(req.user?.official?.company || "").trim();
   return own || withDefaultCompany("");
 };
 
 const assertOwnCompany = (req, companyName) => {
   if (hasGlobalCompanyAccess(req.user)) return null;
-  if (normalizeCompany(companyName) !== getUserCompany(req.user)) {
-    return "Access denied for this company";
-  }
-  return null;
+  if (canAccessCompany(req.user, companyName)) return null;
+
+  const accessible = getAccessibleCompanies(req.user) || [];
+  return accessible.length > 1
+    ? "Access denied for this company"
+    : "Access denied for this company";
 };
 
 /** "Sat, Sun" | "Sun" | "Sat-Sun" → [0,6] */
@@ -68,5 +81,7 @@ module.exports = {
   formatWeeklyOffLabel,
   hasGlobalCompanyAccess,
   getUserCompany,
+  getAccessibleCompanies,
+  canAccessCompany,
   normalizeCompany,
 };

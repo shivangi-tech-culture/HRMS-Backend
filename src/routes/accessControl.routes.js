@@ -25,7 +25,7 @@ const {
 const router = express.Router();
 
 /** System names; custom admin roles also admitted by authorize + checkPermission */
-const ACCESS_ROLES = ["Global Admin", "Super Admin", "HR Manager", "Manager"];
+const ACCESS_ROLES = require("../middleware/auth").ALL_ACCESS;
 
 /**
  * @swagger

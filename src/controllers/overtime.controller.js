@@ -6,10 +6,9 @@ const Attendance = require("../models/Attendance");
 const User = require("../models/User");
 const { hasAllAccess } = require("../middleware/auth");
 const {
-  companyFilter,
   hasGlobalCompanyAccess,
-  assertSameCompanyEmployee,
 } = require("../utils/companyScope");
+const { listScopeFilter, assertTeamOrCompanyEmployee } = require("../utils/teamScope");
 const {
   formatDuration,
   computeOvertimeMinutes,
@@ -54,7 +53,7 @@ const listOvertime = async (req, res) => {
     } else if (employeeId) {
       filter.employee = employeeId;
     } else if (!hasGlobalCompanyAccess(req.user)) {
-      const scope = companyFilter(req.user);
+      const scope = listScopeFilter(req.user);
       if (scope === false) {
         return res.status(403).json({ message: "Your profile has no company" });
       }
@@ -172,7 +171,7 @@ const createOvertime = async (req, res) => {
       );
       if (!emp) return res.status(404).json({ message: "Employee not found" });
       if (!hasGlobalCompanyAccess(req.user)) {
-        const errMsg = assertSameCompanyEmployee(req.user, emp);
+        const errMsg = assertTeamOrCompanyEmployee(req.user, emp);
         if (errMsg) return res.status(403).json({ message: errMsg });
       }
       targetId = emp._id;

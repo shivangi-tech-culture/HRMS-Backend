@@ -8,7 +8,15 @@ const bcrypt = require("bcryptjs");
 const mongoose = require("mongoose");
 const User = require("../models/User");
 const Role = require("../models/Role");
-const { maxGlobalAdmins } = require("./role.controller");
+const {
+  SUPER_ADMIN,
+  ADMIN,
+  HR,
+  isPlatformRole,
+  isSuperAdmin,
+  normalizeRoleName,
+  canManageRole,
+} = require("../config/roles");
 const { hasAllAccess } = require("../middleware/auth");
 const { queueWelcomeEmail } = require("../utils/mail");
 const { logEmployeeActivity } = require("../utils/activityLog");
@@ -23,23 +31,18 @@ const {
 } = require("../utils/uniqueFields");
 const {
   assertSameCompany,
-  assertSameCompanyEmployee,
   isSameCompany,
   hasGlobalCompanyAccess,
 } = require("../utils/companyScope");
+const { assertTeamOrCompanyEmployee } = require("../utils/teamScope");
 const {
   buildListQuery,
   mapEmployeeListRow,
   LIST_SELECT,
 } = require("../utils/userAccount");
-const {
-  canManageShift,
-  resolveOfficialShift,
-} = require("../utils/officialShift");
 
-/** True for Global Admin / Super Admin (lean login accounts, no full HR profile) */
-const isPlatformAdminRole = (role) =>
-  role === "Global Admin" || role === "Super Admin";
+/** True for Super Admin / Admin (lean login accounts) */
+const isPlatformAdminRole = (role) => isPlatformRole(role);
 
 /**
  * After promoting someone to Global / Super Admin, strip heavy HR profile fields.
@@ -64,11 +67,11 @@ const unsetEmployeeProfileFields = async (userId, roleName) => {
     "official.calculateSalaryFrom": 1,
     "official.dateOfRetirement": 1,
     "official.grade": 1,
-    "official.shift": 1,
   };
-  if (roleName === "Global Admin") {
+  if (isPlatformRole(roleName)) {
     unset.personal = 1;
     unset["official.company"] = 1;
+    unset["official.companies"] = 1;
     unset["official.department"] = 1;
   }
   await User.collection.updateOne({ _id: userId }, { $unset: unset });
@@ -284,26 +287,14 @@ const createEmployee = async (req, res) => {
       .toLowerCase()
       .trim();
 
-    // 2. Resolve company (Super Admin → own company; others → body + same-company check)
-    const actorCompany = String(req.user.official?.company || "").trim();
-    let company = "";
+    // 2. Resolve company (Global/Super → any; HR/Manager → assigned companies)
+    let company = String(officialIn.company || "").trim();
 
-    if (req.user.role === "Super Admin") {
-      if (!actorCompany) {
-        return res.status(403).json({
-          message: "Your profile has no company — cannot create users",
-        });
+    if (hasGlobalCompanyAccess(req.user)) {
+      if (!company) {
+        return res.status(400).json({ message: "official.company is required" });
       }
-      const requested = String(officialIn.company || "").trim();
-      if (requested && !isSameCompany(actorCompany, requested)) {
-        return res.status(403).json({
-          message: "Super Admin can only create employees for their own company",
-        });
-      }
-      company = actorCompany;
     } else {
-      // Company must come from body (UI dropdown) — no silent default
-      company = String(officialIn.company || "").trim();
       if (!company) {
         return res.status(400).json({ message: "official.company is required" });
       }
@@ -321,23 +312,6 @@ const createEmployee = async (req, res) => {
         ? String(officialIn.employeeCode).trim().toUpperCase()
         : "",
     });
-
-    // official.shift — Global Admin / Super Admin / HR Manager only
-    if (officialIn.shift !== undefined) {
-      if (!canManageShift(req.user)) {
-        return res.status(403).json({
-          message:
-            "Only Global Admin / Super Admin / HR Manager can assign official.shift",
-        });
-      }
-      const resolved = await resolveOfficialShift(officialIn.shift, company);
-      if (resolved.error) {
-        return res.status(resolved.status).json({ message: resolved.error });
-      }
-      official.shift = resolved.shiftId;
-    } else {
-      delete official.shift;
-    }
 
     const personal = normalizeSectionUniques("personal", personalIn);
 
@@ -411,7 +385,7 @@ const createEmployee = async (req, res) => {
     // 6. Return employee without password
     const fresh = await User.findById(employee._id)
       .select("-password")
-      .populate("official.shift");
+      ;
     return res.status(201).json({
       message: `Employee created. Welcome email queued for ${mail.emailTo}.`,
       emailQueued: true,
@@ -538,7 +512,7 @@ const getEmployee = async (req, res) => {
 
     const employee = await User.findById(req.params.id)
       .select("-password")
-      .populate("official.shift");
+      ;
     if (!employee) {
       return res.status(404).json({ message: "Employee not found" });
     }
@@ -546,7 +520,7 @@ const getEmployee = async (req, res) => {
     // Global Admin → all companies / all users
     // Super Admin / HR / Manager → own company only
     if (hasAllAccess(req.user) && !hasGlobalCompanyAccess(req.user)) {
-      const scopeErr = assertSameCompanyEmployee(req.user, employee);
+      const scopeErr = assertTeamOrCompanyEmployee(req.user, employee);
       if (scopeErr) {
         return res.status(403).json({ message: scopeErr });
       }
@@ -580,7 +554,7 @@ const updateEmployee = async (req, res) => {
 
     // Global Admin → all companies; Super Admin / HR / Manager → own company only
     if (isAdmin && !hasGlobalCompanyAccess(req.user)) {
-      const scopeErr = assertSameCompanyEmployee(req.user, employee);
+      const scopeErr = assertTeamOrCompanyEmployee(req.user, employee);
       if (scopeErr) {
         return res.status(403).json({ message: scopeErr });
       }
@@ -598,57 +572,39 @@ const updateEmployee = async (req, res) => {
       if (!isAdmin) {
         return res.status(403).json({ message: "Only admin can change role" });
       }
-      const nextRole = String(req.body.role || "").trim();
-      if (nextRole === "Global Admin") {
-        if (req.user.role !== "Global Admin") {
-          return res.status(403).json({
-            message: "Only Global Admin can assign Global Admin",
-          });
-        }
-        if (employee.role !== "Global Admin") {
-          const globalCount = await User.countDocuments({
-            role: "Global Admin",
-          });
-          const max = maxGlobalAdmins();
-          if (globalCount >= max) {
-            return res.status(400).json({
-              message: `Maximum ${max} Global Admin accounts allowed`,
-            });
-          }
-        }
-        if (!employee.official) employee.official = {};
-        employee.official.company = "";
-      }
-      if (
-        nextRole === "Super Admin" &&
-        !["Global Admin", "Super Admin"].includes(req.user.role)
-      ) {
+      const nextRole = normalizeRoleName(String(req.body.role || "").trim());
+
+      if (nextRole === SUPER_ADMIN) {
         return res.status(403).json({
-          message: "Only Global Admin / Super Admin can assign Super Admin",
+          message: "Cannot assign Super Admin — only one Super Admin allowed",
         });
       }
-      // Super Admin may only promote users in own company (already scoped above)
-      if (nextRole === "Super Admin" && req.user.role === "Super Admin") {
-        const actorCo = String(req.user.official?.company || "").trim();
-        const targetCo = String(employee.official?.company || "").trim();
-        if (!actorCo || !isSameCompany(actorCo, targetCo)) {
-          return res.status(403).json({
-            message:
-              "Super Admin can only assign Super Admin to users in their own company",
-          });
-        }
+      if (nextRole === ADMIN && !isSuperAdmin(req.user)) {
+        return res.status(403).json({
+          message: "Only Super Admin can assign Admin",
+        });
+      }
+      if (!canManageRole(req.user.role, nextRole)) {
+        return res.status(403).json({
+          message: "You cannot assign this role",
+        });
+      }
+      if (isPlatformRole(nextRole)) {
+        if (!employee.official) employee.official = {};
+        employee.official.company = "";
+        employee.official.companies = undefined;
       }
       employee.role = nextRole;
     }
 
-    // Password — Global Admin / Super Admin / HR Manager only
+    // Password — Super Admin / Admin / HR Manager only
     if (req.body.password) {
       if (
-        !["Global Admin", "Super Admin", "HR Manager"].includes(req.user.role)
+        ![SUPER_ADMIN, ADMIN, HR].includes(normalizeRoleName(req.user.role))
       ) {
         return res.status(403).json({
           message:
-            "Only Global Admin / Super Admin / HR Manager can change password",
+            "Only Super Admin / Admin / HR Manager can change password",
         });
       }
       employee.password = await bcrypt.hash(req.body.password, 10);
@@ -663,24 +619,6 @@ const updateEmployee = async (req, res) => {
         message:
           "Employee cannot edit official details or employee code. Contact HR / Admin.",
       });
-    }
-
-    // official.shift — only Global Admin / Super Admin / HR Manager (not Manager / Employee)
-    if (profile.official && Object.prototype.hasOwnProperty.call(profile.official, "shift")) {
-      if (!canManageShift(req.user)) {
-        return res.status(403).json({
-          message:
-            "Only Global Admin / Super Admin / HR Manager can change official.shift",
-        });
-      }
-      const resolved = await resolveOfficialShift(
-        profile.official.shift,
-        employee.official?.company
-      );
-      if (resolved.error) {
-        return res.status(resolved.status).json({ message: resolved.error });
-      }
-      profile.official.shift = resolved.shiftId;
     }
 
     // payroll{} — ADMIN ONLY (check early; Employee never)
@@ -828,7 +766,7 @@ const updateEmployee = async (req, res) => {
       );
       const fresh = await User.findById(employee._id)
         .select("-password")
-        .populate("official.shift");
+        ;
       return res.json({
         message: "Employee updated",
         employee: safeUser(fresh),
@@ -837,7 +775,7 @@ const updateEmployee = async (req, res) => {
 
     const fresh = await User.findById(employee._id)
       .select("-password")
-      .populate("official.shift");
+      ;
     return res.json({
       message: "Employee updated",
       employee: safeUser(fresh),
@@ -863,7 +801,7 @@ const loadEditableEmployee = async (req) => {
 
   // Global Admin → all companies; Super Admin / HR / Manager → own company only
   if (hasAllAccess(req.user) && !hasGlobalCompanyAccess(req.user)) {
-    const scopeErr = assertSameCompanyEmployee(req.user, employee);
+    const scopeErr = assertTeamOrCompanyEmployee(req.user, employee);
     if (scopeErr) return { status: 403, message: scopeErr };
   }
 
@@ -963,7 +901,7 @@ const loadAdminSection = async (req) => {
 
   // Global Admin → all companies; Super Admin / HR / Manager → own company only
   if (!hasGlobalCompanyAccess(req.user)) {
-    const scopeErr = assertSameCompanyEmployee(req.user, employee);
+    const scopeErr = assertTeamOrCompanyEmployee(req.user, employee);
     if (scopeErr) return { status: 403, message: scopeErr };
   }
 
@@ -1072,7 +1010,7 @@ const deleteEmployee = async (req, res) => {
 
     // Global Admin → all companies; Super Admin / HR / Manager → own company only
     if (!hasGlobalCompanyAccess(req.user)) {
-      const scopeErr = assertSameCompanyEmployee(req.user, employee);
+      const scopeErr = assertTeamOrCompanyEmployee(req.user, employee);
       if (scopeErr) {
         return res.status(403).json({ message: scopeErr });
       }
@@ -1171,7 +1109,7 @@ const listEmployeeActivity = async (req, res) => {
     }
 
     if (hasAllAccess(req.user) && !hasGlobalCompanyAccess(req.user)) {
-      const scopeErr = assertSameCompanyEmployee(req.user, employee);
+      const scopeErr = assertTeamOrCompanyEmployee(req.user, employee);
       if (scopeErr) {
         return res.status(403).json({ message: scopeErr });
       }

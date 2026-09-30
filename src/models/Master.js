@@ -1,20 +1,14 @@
 /**
- * Master — dropdown catalogs (one file, many Mongo collections by `type`)
+ * Master — dropdown catalogs (global across all companies)
  *
- * Official (org): company, department, designation, division, employeeGroup, grade, jobRole
- * General Info: gender, maritalStatus, bloodGroup, country, state, city,
- *   courseType, courseLevel, bankName, relation, nominateFor, visaType
+ * type=company → list of companies (tenant names)
+ * all other types → shared globally (no company column / filter)
  *
- * Schema = data shape only. Request rules → validators/master.validation.js
  * Employee forms save `name` string (not _id).
- *
- * ESS General Info (9 modules — no Vaccination):
- *   Personal | Official | Other | Education | Account | Family | Nominee | Experience | Visa
  */
 const mongoose = require("mongoose");
 
 const TYPES = [
-  // Official / org structure
   "company",
   "department",
   "designation",
@@ -22,24 +16,18 @@ const TYPES = [
   "employeeGroup",
   "grade",
   "jobRole",
-  // Personal / Other
   "gender",
   "maritalStatus",
   "bloodGroup",
   "country",
   "state",
   "city",
-  // Education
   "courseType",
   "courseLevel",
-  // Accounts
   "bankName",
-  // Family + Nominee
   "relation",
   "nominateFor",
-  // Visa
   "visaType",
-  // Attendance dropdowns (Admin Attendance screens)
   "regularizationReason",
   "markAttendanceReason",
 ];
@@ -68,10 +56,6 @@ const COLLECTION_BY_TYPE = {
   markAttendanceReason: "markattendancereasons",
 };
 
-/**
- * Field → master `type` for ESS General Info dropdowns.
- * Frontend: GET /api/masters?type=<type>&status=Active
- */
 const GENERAL_INFO_DROPDOWNS = {
   personal: {
     gender: "gender",
@@ -108,7 +92,6 @@ const GENERAL_INFO_DROPDOWNS = {
   nominees: {
     nominateFor: "nominateFor",
     relation: "relation",
-    // nomineeName = free text input (not a master dropdown)
   },
   experience: {
     designation: "designation",
@@ -133,41 +116,35 @@ const getModel = (type) => {
 
   const schema = new mongoose.Schema(
     {
-      name: { type: String, default: "" }, // dropdown label
-      company: { type: String, default: "" }, // parent company; "" for type=company
-      status: { type: String, default: "Active" }, // Active | Inactive (Joi)
+      name: { type: String, default: "" },
+      /** Legacy field — always "" now (masters are global) */
+      company: { type: String, default: "" },
+      status: { type: String, default: "Active" },
     },
     { timestamps: true, collection }
   );
 
-  if (isCompanyType(type)) {
-    schema.index(
-      { name: 1 },
-      { unique: true, collation: { locale: "en", strength: 2 } }
-    );
-  } else {
-    schema.index(
-      { company: 1, name: 1 },
-      { unique: true, collation: { locale: "en", strength: 2 } }
-    );
-    schema.index({ company: 1, status: 1 });
-  }
+  // Global uniqueness by name (not per-company)
+  schema.index(
+    { name: 1 },
+    { unique: true, collation: { locale: "en", strength: 2 } }
+  );
+  schema.index({ status: 1 });
 
   return mongoose.model(modelName, schema, collection);
 };
 
-/** Add `type` on API response */
+/** API DTO — omit company for UI (masters are global) */
 const toMasterDto = (type, doc) => {
   if (!doc) return null;
   const row = typeof doc.toObject === "function" ? doc.toObject() : { ...doc };
+  const { company, ...rest } = row;
   return {
-    ...row,
+    ...rest,
     type,
-    company: isCompanyType(type) ? "" : row.company || "",
   };
 };
 
-/** Find row by _id across all master collections */
 const findMasterById = async (id) => {
   for (const type of TYPES) {
     const Model = getModel(type);
@@ -186,7 +163,6 @@ const findMasterByIdLean = async (id) => {
   return null;
 };
 
-/** Clear all master collections (seed) */
 const clearAllMasterCollections = async () => {
   await Promise.all(TYPES.map((type) => getModel(type).deleteMany({})));
 };

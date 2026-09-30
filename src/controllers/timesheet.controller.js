@@ -6,10 +6,9 @@ const Attendance = require("../models/Attendance");
 const User = require("../models/User");
 const { hasAllAccess } = require("../middleware/auth");
 const {
-  companyFilter,
   hasGlobalCompanyAccess,
-  assertSameCompanyEmployee,
 } = require("../utils/companyScope");
+const { listScopeFilter, assertTeamOrCompanyEmployee } = require("../utils/teamScope");
 const {
   todayDate,
   computeDayMetrics,
@@ -71,7 +70,7 @@ const getTimesheet = async (req, res) => {
       );
       if (!emp) return res.status(404).json({ message: "Employee not found" });
       if (!hasGlobalCompanyAccess(req.user)) {
-        const err = assertSameCompanyEmployee(req.user, emp);
+        const err = assertTeamOrCompanyEmployee(req.user, emp);
         if (err) return res.status(403).json({ message: err });
       }
       employeeId = emp._id;
@@ -358,7 +357,7 @@ const listTeamTimesheet = async (req, res) => {
     let userFilter = { role: "Employee", status: "Active" };
 
     if (!hasGlobalCompanyAccess(req.user)) {
-      const scope = companyFilter(req.user);
+      const scope = listScopeFilter(req.user);
       if (scope === false) {
         return res.status(403).json({ message: "Your profile has no company" });
       }

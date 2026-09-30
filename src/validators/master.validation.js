@@ -1,16 +1,10 @@
 /**
- * Master Joi — body + list query checks
- *
- * company:
- *   type=company → ignore / optional
- *   other types  → optional in Joi; controller sets it securely:
- *     Global Admin → required from body (+ must exist in company master)
- *     Super Admin / HR / Manager → always from login profile
+ * Master Joi — body + list query
+ * Masters are global — company field ignored / stripped.
  */
 const Joi = require("joi");
 const { TYPES } = require("../models/Master");
 
-/** Name label for dropdowns — letters/digits + common punctuation */
 const masterName = Joi.string()
   .trim()
   .min(1)
@@ -25,13 +19,11 @@ const masterName = Joi.string()
     "any.required": "name is required",
   });
 
-const statusField = Joi.string()
-  .valid("Active", "Inactive")
-  .messages({
-    "any.only": "status must be Active or Inactive",
-  });
+const statusField = Joi.string().valid("Active", "Inactive").messages({
+  "any.only": "status must be Active or Inactive",
+});
 
-/** POST /api/masters */
+/** POST /api/masters — company not needed */
 const createMasterSchema = Joi.object({
   type: Joi.string()
     .valid(...TYPES)
@@ -42,16 +34,9 @@ const createMasterSchema = Joi.object({
     }),
   name: masterName.required(),
   status: statusField.default("Active"),
+  /** Accepted but ignored (masters are global) */
   company: Joi.string().trim().max(150).allow("").optional(),
-})
-  .unknown(false)
-  .custom((value, helpers) => {
-    // type=company must not send a parent company
-    if (value.type === "company" && value.company) {
-      return helpers.message("company field is not allowed when type is company");
-    }
-    return value;
-  });
+}).unknown(false);
 
 /** PUT /api/masters/:id */
 const updateMasterSchema = Joi.object({
@@ -62,10 +47,10 @@ const updateMasterSchema = Joi.object({
   .min(1)
   .unknown(false)
   .messages({
-    "object.min": "Provide at least one of: name, status, company",
+    "object.min": "Provide at least one of: name, status",
   });
 
-/** GET /api/masters query */
+/** GET /api/masters query — company filter ignored */
 const listMasterQuerySchema = Joi.object({
   type: Joi.string()
     .valid(...TYPES)

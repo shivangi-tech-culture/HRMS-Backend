@@ -12,7 +12,7 @@ const {
   permissionsForRole,
 } = require("../config/permissions");
 
-const LOCKED_ROLES = new Set(["Super Admin", "Global Admin"]);
+const LOCKED_ROLES = new Set(["Super Admin", "Admin"]);
 
 const permLabel = (roleDoc) => {
   if (!roleDoc) return "0 of 0";
@@ -37,6 +37,15 @@ async function refreshLockedRole(roleDoc) {
 const toProfilePayload = (user, roleDoc) => {
   const official = user.official || {};
   const personal = user.personal || {};
+  const isPlatform =
+    user.role === "Super Admin" || user.role === "Admin";
+  const companies = isPlatform
+    ? []
+    : Array.isArray(official.companies) && official.companies.length
+      ? official.companies
+      : official.company
+        ? [official.company]
+        : [];
   return {
     id: user._id,
     fullName: user.name || "",
@@ -44,7 +53,8 @@ const toProfilePayload = (user, roleDoc) => {
     workEmail: official.officialEmail || "",
     officialEmail: official.officialEmail || "",
     role: user.role || "",
-    company: official.company || "",
+    company: isPlatform ? "All companies" : official.company || "",
+    companies,
     department: official.department || "",
     designation: official.designation || "",
     employeeCode: official.employeeCode || "",

@@ -1,13 +1,24 @@
 /**
  * ACCESS & CONTROL CONTROLLER — /api/users
- * CRUD + filters/pagination + Excel export + send mail.
- * Lean login users (any role). Full HR profiles → employee.controller.
+ * Hierarchy: src/config/roles.js
  */
 const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 const Role = require("../models/Role");
-const { maxGlobalAdmins } = require("./role.controller");
-const { queueWelcomeEmail, sendEmail } = require("../utils/mail");
+const {
+  SUPER_ADMIN,
+  ADMIN,
+  REPORTING_MANAGER,
+  PLATFORM_ROLES,
+  maxSuperAdmins,
+  canManageRole,
+  normalizeRoleName,
+  isSuperAdmin,
+  isPlatformRole,
+  isMultiCompanyRole,
+  canAssignCompanies,
+} = require("../config/roles");
+const { voidWelcomeEmail, sendEmail } = require("../utils/mail");
 const { applyAnniversary } = require("../utils/anniversary");
 const { sendExcel } = require("../utils/excel");
 const {
@@ -16,10 +27,10 @@ const {
 } = require("../utils/uniqueFields");
 const {
   assertSameCompany,
-  assertSameCompanyEmployee,
   hasGlobalCompanyAccess,
-  isSameCompany,
+  mergeAssignedCompanies,
 } = require("../utils/companyScope");
+const { assertTeamOrCompanyEmployee } = require("../utils/teamScope");
 const {
   visibleRolesForActor,
   buildListQuery,
@@ -27,7 +38,6 @@ const {
   LIST_SELECT,
 } = require("../utils/userAccount");
 
-/** Strip password before API response */
 const safeUser = (doc) => {
   if (!doc) return null;
   applyAnniversary(doc);
@@ -37,17 +47,11 @@ const safeUser = (doc) => {
   return obj;
 };
 
-/** Hierarchy: can actor see / manage this target role? */
-const canManageRole = (actorRole, targetRole) => {
-  if (actorRole === "Global Admin") return true;
-  if (actorRole === "Super Admin") return targetRole !== "Global Admin";
-  return !["Global Admin", "Super Admin"].includes(targetRole);
-};
-
-/** Load user + company + role hierarchy checks */
 const loadManagedUser = async (req, id) => {
   if (String(req.user._id) === String(id)) {
-    return { error: { status: 400, message: "You cannot delete your own account" } };
+    return {
+      error: { status: 400, message: "You cannot delete your own account" },
+    };
   }
 
   const user = await User.findById(id);
@@ -57,15 +61,12 @@ const loadManagedUser = async (req, id) => {
 
   if (!canManageRole(req.user.role, user.role)) {
     return {
-      error: {
-        status: 403,
-        message: "You cannot manage this role",
-      },
+      error: { status: 403, message: "You cannot manage this role" },
     };
   }
 
   if (!hasGlobalCompanyAccess(req.user)) {
-    const scopeErr = assertSameCompanyEmployee(req.user, user);
+    const scopeErr = assertTeamOrCompanyEmployee(req.user, user);
     if (scopeErr) {
       return { error: { status: 403, message: scopeErr } };
     }
@@ -74,45 +75,14 @@ const loadManagedUser = async (req, id) => {
   return { user };
 };
 
-/**
- * Pick company for a new Access user (hierarchy rules).
- */
 const resolveAccessCompany = (req, roleName, officialIn) => {
-  const actorCompanyRaw = String(req.user.official?.company || "").trim();
+  const role = normalizeRoleName(roleName);
 
-  if (roleName === "Global Admin") {
-    return { ok: true, company: "" };
-  }
-
-  if (req.user.role === "Super Admin") {
-    if (!actorCompanyRaw) {
-      return {
-        ok: false,
-        status: 403,
-        message: "Your profile has no company — cannot create users",
-      };
-    }
-    const requested = String(officialIn.company || "").trim();
-    if (requested && !isSameCompany(actorCompanyRaw, requested)) {
-      return {
-        ok: false,
-        status: 403,
-        message: "Super Admin can only create users for their own company",
-      };
-    }
-    return { ok: true, company: actorCompanyRaw };
-  }
-
-  if (roleName === "Super Admin") {
-    const company = String(officialIn.company || "").trim();
-    if (!company) {
-      return {
-        ok: false,
-        status: 400,
-        message: "official.company is required when creating Super Admin",
-      };
-    }
-    return { ok: true, company };
+  if (PLATFORM_ROLES.includes(role)) {
+    return {
+      ok: true,
+      company: String(officialIn.company || "").trim(),
+    };
   }
 
   const company = String(officialIn.company || "").trim();
@@ -123,6 +93,11 @@ const resolveAccessCompany = (req, roleName, officialIn) => {
       message: "official.company is required",
     };
   }
+
+  if (hasGlobalCompanyAccess(req.user)) {
+    return { ok: true, company };
+  }
+
   const companyErr = assertSameCompany(req.user, company);
   if (companyErr) {
     return { ok: false, status: 403, message: companyErr };
@@ -130,10 +105,88 @@ const resolveAccessCompany = (req, roleName, officialIn) => {
   return { ok: true, company };
 };
 
-/**
- * CREATE ACCESS USER — POST /api/users
- * Lean account only (drawer fields).
- */
+/** HR multi-company — Super Admin only. Reporting Manager = primary only. */
+const resolveAssignedCompanies = (
+  req,
+  roleName,
+  primaryCompany,
+  companiesIn
+) => {
+  const role = normalizeRoleName(roleName);
+
+  if (role === REPORTING_MANAGER) {
+    return {
+      ok: true,
+      companies: primaryCompany ? [primaryCompany] : [],
+    };
+  }
+
+  if (!isMultiCompanyRole(role)) {
+    return { ok: true, companies: [] };
+  }
+
+  if (companiesIn === undefined) {
+    return {
+      ok: true,
+      companies: primaryCompany ? [primaryCompany] : [],
+    };
+  }
+
+  if (!canAssignCompanies(req.user)) {
+    return {
+      ok: false,
+      status: 403,
+      message: "Only Super Admin can assign multiple companies to HR",
+    };
+  }
+
+  const companies = mergeAssignedCompanies(primaryCompany, companiesIn);
+  if (!companies.length) {
+    return {
+      ok: false,
+      status: 400,
+      message: "At least one company is required for HR",
+    };
+  }
+
+  return { ok: true, companies };
+};
+
+/** Enforce Super Admin / Admin create rules */
+const assertCanCreateRole = async (actor, roleName) => {
+  const role = normalizeRoleName(roleName);
+  const actorRole = normalizeRoleName(actor.role);
+
+  if (role === SUPER_ADMIN) {
+    return {
+      ok: false,
+      status: 403,
+      message:
+        "Cannot create Super Admin via API — only one Super Admin exists (seed / ops)",
+    };
+  }
+
+  if (role === ADMIN) {
+    if (!isSuperAdmin(actor)) {
+      return {
+        ok: false,
+        status: 403,
+        message: "Only Super Admin can create Admin",
+      };
+    }
+  }
+
+  if (!canManageRole(actorRole, role)) {
+    return {
+      ok: false,
+      status: 403,
+      message: "You cannot create this role",
+    };
+  }
+
+  return { ok: true, role };
+};
+
 const createAccessUserAccount = async (req) => {
   try {
     const { name, password, role, status } = req.body;
@@ -144,7 +197,11 @@ const createAccessUserAccount = async (req) => {
     const email = String(officialIn.officialEmail || "")
       .toLowerCase()
       .trim();
-    const roleName = String(role || "").trim();
+    const rawRole = String(role || "").trim();
+    const gate = await assertCanCreateRole(req.user, rawRole);
+    if (!gate.ok) return gate;
+    const roleName = gate.role;
+
     const department = String(officialIn.department || "").trim();
     const employeeCode = String(officialIn.employeeCode || "")
       .trim()
@@ -154,45 +211,18 @@ const createAccessUserAccount = async (req) => {
     const state = String(addrIn.state || "").trim();
     const country = String(addrIn.country || "").trim();
 
-    if (roleName === "Global Admin") {
-      if (req.user.role !== "Global Admin") {
-        return {
-          ok: false,
-          status: 403,
-          message: "Only Global Admin can create Global Admin",
-        };
-      }
-      const globalCount = await User.countDocuments({ role: "Global Admin" });
-      const max = maxGlobalAdmins();
-      if (globalCount >= max) {
-        return {
-          ok: false,
-          status: 400,
-          message: `Maximum ${max} Global Admin accounts allowed`,
-        };
-      }
-    }
-    if (
-      roleName === "Super Admin" &&
-      !["Global Admin", "Super Admin"].includes(req.user.role)
-    ) {
-      return {
-        ok: false,
-        status: 403,
-        message: "Only Global Admin / Super Admin can create Super Admin",
-      };
-    }
-    if (!canManageRole(req.user.role, roleName)) {
-      return {
-        ok: false,
-        status: 403,
-        message: "You cannot create this role",
-      };
-    }
-
     const companyRes = resolveAccessCompany(req, roleName, officialIn);
     if (!companyRes.ok) return companyRes;
     const company = companyRes.company;
+
+    const companiesRes = resolveAssignedCompanies(
+      req,
+      roleName,
+      company,
+      officialIn.companies
+    );
+    if (!companiesRes.ok) return companiesRes;
+    const companies = companiesRes.companies;
 
     const uniquePayload = { "official.officialEmail": email };
     if (mobileNo) uniquePayload["personal.mobileNo"] = mobileNo;
@@ -210,18 +240,21 @@ const createAccessUserAccount = async (req) => {
       return { ok: false, status: 400, message: "Role not found or inactive" };
     }
 
-    const official =
-      roleName === "Global Admin"
-        ? {
-            officialEmail: email,
-            ...(employeeCode ? { employeeCode } : {}),
-          }
-        : {
-            officialEmail: email,
-            company,
-            ...(department ? { department } : {}),
-            ...(employeeCode ? { employeeCode } : {}),
-          };
+    const platform = isPlatformRole(roleName);
+
+    const official = platform
+      ? {
+          officialEmail: email,
+          ...(employeeCode ? { employeeCode } : {}),
+          ...(company ? { company } : {}),
+        }
+      : {
+          officialEmail: email,
+          company,
+          ...(companies.length ? { companies } : {}),
+          ...(department ? { department } : {}),
+          ...(employeeCode ? { employeeCode } : {}),
+        };
 
     const createDoc = {
       name: String(name).trim(),
@@ -241,13 +274,17 @@ const createAccessUserAccount = async (req) => {
 
     const user = await User.create(createDoc);
 
-    // Welcome email in background (Render SMTP timeouts must not block create)
-    const mail = queueWelcomeEmail({
+    const mailCompany = platform
+      ? "All companies"
+      : companies.length > 1
+        ? companies.join(", ")
+        : company;
+    const mail = voidWelcomeEmail({
       name: createDoc.name,
       email,
       password,
       role: roleName,
-      company: roleName === "Global Admin" ? "All companies" : company,
+      company: mailCompany,
       department,
     });
 
@@ -265,7 +302,6 @@ const createAccessUserAccount = async (req) => {
   }
 };
 
-/** CREATE — POST /api/users */
 const createUser = async (req, res) => {
   const result = await createAccessUserAccount(req);
   if (!result.ok) {
@@ -279,7 +315,6 @@ const createUser = async (req, res) => {
   });
 };
 
-/** LIST — GET /api/users (search + filters + pagination) */
 const listUsers = async (req, res) => {
   try {
     const roleScope = visibleRolesForActor(req.user);
@@ -301,25 +336,22 @@ const listUsers = async (req, res) => {
         .lean(),
     ]);
 
-    const users = rows.map(mapListRow);
-
     return res.json({
-      count: users.length,
+      count: rows.length,
       total,
       page,
       limit,
       pages: Math.max(Math.ceil(total / limit), 1),
       from: total === 0 ? 0 : skip + 1,
-      to: skip + users.length,
+      to: skip + rows.length,
       filters: applied,
-      users,
+      users: rows.map(mapListRow),
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
 };
 
-/** GET ONE — GET /api/users/:id */
 const getUser = async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select("-password");
@@ -332,7 +364,7 @@ const getUser = async (req, res) => {
     }
 
     if (!hasGlobalCompanyAccess(req.user)) {
-      const scopeErr = assertSameCompanyEmployee(req.user, user);
+      const scopeErr = assertTeamOrCompanyEmployee(req.user, user);
       if (scopeErr) {
         return res.status(403).json({ message: scopeErr });
       }
@@ -344,11 +376,6 @@ const getUser = async (req, res) => {
   }
 };
 
-/**
- * UPDATE — PUT /api/users/:id
- * Lean Access & Control drawer fields only.
- * Email + company locked. Password optional (blank = keep).
- */
 const updateUser = async (req, res) => {
   try {
     if (req.body.password === "") delete req.body.password;
@@ -363,7 +390,7 @@ const updateUser = async (req, res) => {
     }
 
     if (!hasGlobalCompanyAccess(req.user)) {
-      const scopeErr = assertSameCompanyEmployee(req.user, user);
+      const scopeErr = assertTeamOrCompanyEmployee(req.user, user);
       if (scopeErr) {
         return res.status(403).json({ message: scopeErr });
       }
@@ -377,44 +404,35 @@ const updateUser = async (req, res) => {
     }
 
     if (req.body.role !== undefined) {
-      const nextRole = String(req.body.role || "").trim();
+      const nextRole = normalizeRoleName(String(req.body.role || "").trim());
+
+      if (nextRole === SUPER_ADMIN) {
+        return res.status(403).json({
+          message: "Cannot assign Super Admin — only one Super Admin allowed",
+        });
+      }
+
+      if (nextRole === ADMIN && !isSuperAdmin(req.user)) {
+        return res.status(403).json({
+          message: "Only Super Admin can assign Admin",
+        });
+      }
+
       if (!canManageRole(req.user.role, nextRole)) {
         return res.status(403).json({ message: "You cannot assign this role" });
       }
-      if (nextRole === "Global Admin") {
-        if (req.user.role !== "Global Admin") {
-          return res.status(403).json({
-            message: "Only Global Admin can assign Global Admin",
-          });
-        }
-        if (user.role !== "Global Admin") {
-          const globalCount = await User.countDocuments({
-            role: "Global Admin",
-          });
-          const max = maxGlobalAdmins();
-          if (globalCount >= max) {
-            return res.status(400).json({
-              message: `Maximum ${max} Global Admin accounts allowed`,
-            });
-          }
-        }
-        if (!user.official) user.official = {};
-        user.official.company = "";
-      }
-      if (
-        nextRole === "Super Admin" &&
-        !["Global Admin", "Super Admin"].includes(req.user.role)
-      ) {
-        return res.status(403).json({
-          message: "Only Global Admin / Super Admin can assign Super Admin",
-        });
-      }
+
       const activeRole = await Role.findOne({
         name: nextRole,
         status: "Active",
       });
       if (!activeRole) {
         return res.status(400).json({ message: "Role not found or inactive" });
+      }
+
+      if (!user.official) user.official = {};
+      if (isPlatformRole(nextRole)) {
+        user.official.companies = undefined;
       }
       user.role = nextRole;
     }
@@ -425,7 +443,42 @@ const updateUser = async (req, res) => {
 
     if (req.body.official?.department !== undefined) {
       if (!user.official) user.official = {};
-      user.official.department = String(req.body.official.department || "").trim();
+      user.official.department = String(
+        req.body.official.department || ""
+      ).trim();
+      user.markModified("official");
+    }
+
+    if (req.body.official?.companies !== undefined) {
+      const targetRole = normalizeRoleName(user.role);
+      if (!isMultiCompanyRole(targetRole)) {
+        return res.status(400).json({
+          message: "official.companies can only be set for HR Manager",
+        });
+      }
+      if (!canAssignCompanies(req.user)) {
+        return res.status(403).json({
+          message: "Only Super Admin can assign multiple companies",
+        });
+      }
+      if (!user.official) user.official = {};
+      const primary =
+        String(user.official.company || "").trim() ||
+        mergeAssignedCompanies("", req.body.official.companies)[0] ||
+        "";
+      const companiesRes = resolveAssignedCompanies(
+        req,
+        targetRole,
+        primary,
+        req.body.official.companies
+      );
+      if (!companiesRes.ok) {
+        return res
+          .status(companiesRes.status)
+          .json({ message: companiesRes.message });
+      }
+      user.official.company = companiesRes.companies[0] || primary;
+      user.official.companies = companiesRes.companies;
       user.markModified("official");
     }
 
@@ -466,7 +519,9 @@ const updateUser = async (req, res) => {
       if (addr) {
         user.personal.presentAddress = {
           ...(user.personal.presentAddress || {}),
-          ...(addr.city !== undefined ? { city: String(addr.city || "").trim() } : {}),
+          ...(addr.city !== undefined
+            ? { city: String(addr.city || "").trim() }
+            : {}),
           ...(addr.state !== undefined
             ? { state: String(addr.state || "").trim() }
             : {}),
@@ -492,10 +547,6 @@ const updateUser = async (req, res) => {
   }
 };
 
-/**
- * DELETE — DELETE /api/users/:id
- * Separate delete API (Access & Control trash icon).
- */
 const deleteUser = async (req, res) => {
   try {
     const loaded = await loadManagedUser(req, req.params.id);
@@ -503,6 +554,12 @@ const deleteUser = async (req, res) => {
       return res
         .status(loaded.error.status)
         .json({ message: loaded.error.message });
+    }
+
+    if (normalizeRoleName(loaded.user.role) === SUPER_ADMIN) {
+      return res.status(403).json({
+        message: "Cannot delete Super Admin",
+      });
     }
 
     await loaded.user.deleteOne();
@@ -515,10 +572,6 @@ const deleteUser = async (req, res) => {
   }
 };
 
-/**
- * EXPORT EXCEL — GET /api/users/export
- * Same filters as list (no pagination). Permission: Access & Control → export
- */
 const exportUsers = async (req, res) => {
   try {
     const roleScope = visibleRolesForActor(req.user);
@@ -542,6 +595,9 @@ const exportUsers = async (req, res) => {
         role: mapped.role,
         department: mapped.department,
         company: mapped.company,
+        companies: Array.isArray(mapped.companies)
+          ? mapped.companies.join(", ")
+          : mapped.company,
         status: mapped.status,
         lastLogin: mapped.lastLogin
           ? new Date(mapped.lastLogin).toISOString()
@@ -558,6 +614,7 @@ const exportUsers = async (req, res) => {
         { header: "Role", key: "role", width: 16 },
         { header: "Department", key: "department", width: 18 },
         { header: "Company", key: "company", width: 32 },
+        { header: "Companies", key: "companies", width: 40 },
         { header: "Status", key: "status", width: 12 },
         { header: "Last login", key: "lastLogin", width: 24 },
       ],
@@ -570,15 +627,10 @@ const exportUsers = async (req, res) => {
   }
 };
 
-/**
- * SEND MAIL — POST /api/users/:id/mail
- * Row mail icon → email that user's officialEmail.
- * Permission: Access & Control → email
- */
 const sendUserMail = async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select(
-      "name role official.officialEmail official.company"
+      "name role official.officialEmail official.company official.reportingHead1 official.reportingHead2"
     );
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -589,7 +641,7 @@ const sendUserMail = async (req, res) => {
     }
 
     if (!hasGlobalCompanyAccess(req.user)) {
-      const scopeErr = assertSameCompanyEmployee(req.user, user);
+      const scopeErr = assertTeamOrCompanyEmployee(req.user, user);
       if (scopeErr) {
         return res.status(403).json({ message: scopeErr });
       }
@@ -631,4 +683,5 @@ module.exports = {
   deleteUser,
   exportUsers,
   sendUserMail,
+  maxSuperAdmins,
 };

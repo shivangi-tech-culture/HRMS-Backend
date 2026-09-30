@@ -5,8 +5,11 @@ const mongoose = require("mongoose");
 const Shift = require("../models/Shift");
 const { normalizeCompany } = require("./companyScope");
 
-const SHIFT_MANAGERS = ["Global Admin", "Super Admin", "HR Manager"];
-const canManageShift = (user) => SHIFT_MANAGERS.includes(user?.role);
+const SHIFT_MANAGERS = ["Super Admin", "Admin", "HR Manager"];
+const canManageShift = (user) => {
+  const { normalizeRoleName } = require("../config/roles");
+  return SHIFT_MANAGERS.includes(normalizeRoleName(user?.role));
+};
 
 /** Validate Active shift for company */
 const resolveOfficialShift = async (shiftId, companyName) => {

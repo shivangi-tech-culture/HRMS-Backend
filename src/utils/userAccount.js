@@ -1,11 +1,16 @@
 /**
  * List helpers for Employee Management & Access & Control tables
  * (search, filters, pagination, row mapping).
- *
- * Access & Control UI: search, role, department, company, status
- * Employee UI: search (name/code), status, department, designation, gender
  */
 const { hasAllAccess } = require("../middleware/auth");
+const {
+  visibleRoleFilter,
+  normalizeRoleName,
+  isTeamScopedRole,
+  REPORTING_MANAGER,
+  EMPLOYEE,
+} = require("../config/roles");
+const { listScopeFilter } = require("./teamScope");
 const { companyFilter } = require("./companyScope");
 
 const escapeRegex = (value) =>
@@ -16,7 +21,6 @@ const exact = (value) =>
 
 /**
  * Ignore empty / "All …" dropdown placeholders from the UI.
- * e.g. "All roles", "All Status", "all", ""
  */
 const isAllFilter = (value) => {
   const v = String(value || "")
@@ -40,27 +44,12 @@ const filterValue = (req, ...keys) => {
 
 /**
  * Who may appear on GET /api/users (role hierarchy).
- * Global Admin → everyone
- * Super Admin  → all except Global Admin (same company)
- * HR / Manager → all except Global Admin + Super Admin (same company)
+ * Prefer hierarchy.visibleRoleFilter; keep export name for callers.
  */
-const visibleRolesForActor = (actor) => {
-  if (actor.role === "Global Admin") return null;
-  if (actor.role === "Super Admin") {
-    return { role: { $ne: "Global Admin" } };
-  }
-  return { role: { $nin: ["Global Admin", "Super Admin"] } };
-};
+const visibleRolesForActor = (actor) => visibleRoleFilter(actor.role);
 
 /**
  * Shared table search + filters + pagination.
- *
- * Query (Access & Control):
- *   search|q, role, status, department, company|branch, page, limit
- *
- * Query (Employee Management):
- *   search|q (name, code, email), status, department, designation, gender,
- *   company|branch, page, limit
  */
 const buildListQuery = (req, { forceRole, roleScope } = {}) => {
   const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
@@ -71,7 +60,13 @@ const buildListQuery = (req, { forceRole, roleScope } = {}) => {
   if (!hasAllAccess(req.user)) {
     and.push({ _id: req.user._id });
   } else {
-    const scope = companyFilter(req.user);
+    const role = normalizeRoleName(req.user.role);
+    // Reporting Manager → team only; others → company / all
+    const scope =
+      isTeamScopedRole(role) || role === REPORTING_MANAGER
+        ? listScopeFilter(req.user)
+        : companyFilter(req.user);
+
     if (scope === false) {
       return {
         error: {
@@ -89,12 +84,10 @@ const buildListQuery = (req, { forceRole, roleScope } = {}) => {
     and.push(roleScope);
   }
 
-  // --- SEARCH (Access: name/email/dept/role | Employee: name/code/email) ---
   const search = filterValue(req, "search", "q", "query", "keyword");
   if (search) {
     const rx = new RegExp(escapeRegex(search), "i");
-    if (forceRole === "Employee") {
-      // Employee module: "Search name, code..."
+    if (forceRole === EMPLOYEE || forceRole === "Employee") {
       and.push({
         $or: [
           { name: rx },
@@ -105,7 +98,6 @@ const buildListQuery = (req, { forceRole, roleScope } = {}) => {
         ],
       });
     } else {
-      // Access & Control: "Search..."
       and.push({
         $or: [
           { name: rx },
@@ -119,7 +111,6 @@ const buildListQuery = (req, { forceRole, roleScope } = {}) => {
     }
   }
 
-  // --- FILTERS (skip "All roles" / "All Status" / …) ---
   const role = !forceRole ? filterValue(req, "role") : null;
   if (role) {
     if (roleScope?.role?.$ne && role === roleScope.role.$ne) {
@@ -180,6 +171,11 @@ const mapListRow = (row) => ({
   lastLogin: row.lastLogin || null,
   status: row.status || "",
   company: row.official?.company || "",
+  companies: Array.isArray(row.official?.companies)
+    ? row.official.companies
+    : row.official?.company
+      ? [row.official.company]
+      : [],
 });
 
 /** Employee Management table row */
@@ -196,7 +192,7 @@ const mapEmployeeListRow = (row) => ({
 });
 
 const LIST_SELECT =
-  "name role status lastLogin official.officialEmail official.employeeCode official.department official.designation official.company official.shift personal.gender";
+  "name role status lastLogin official.officialEmail official.employeeCode official.department official.designation official.company official.companies personal.gender";
 
 module.exports = {
   visibleRolesForActor,

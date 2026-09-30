@@ -37,22 +37,37 @@ async function grantAccessCreateIfNeeded(role) {
   }
 }
 
-/** LIST MODULES — GET /api/permissions/modules (admin + employee catalogs) */
+/** LIST MODULES — GET /api/permissions/modules
+ * Create Role UI → use side:"admin" only (hide/show).
+ * side:"employee" is for system Employee role reference only.
+ */
 const listModules = async (req, res) => {
-  const data = [
-    {
-      side: "admin", // Super Admin / HR Manager / Manager — once
-      modules: ADMIN_TREE,
-    },
-    {
-      side: "employee", // Employee ESS — once
-      modules: ESS_TREE,
-    },
-  ];
+  const only = String(req.query.catalog || req.query.side || "")
+    .trim()
+    .toLowerCase();
+
+  const adminBlock = {
+    side: "admin",
+    forCreateRole: true,
+    note: "Create Role always uses this catalog — hide/show modules here",
+    modules: ADMIN_TREE,
+  };
+  const employeeBlock = {
+    side: "employee",
+    forCreateRole: false,
+    note: "System Employee ESS only — not used for Create Role",
+    modules: ESS_TREE,
+  };
+
+  let data;
+  if (only === "admin") data = [adminBlock];
+  else if (only === "employee") data = [employeeBlock];
+  else data = [adminBlock, employeeBlock];
 
   return res.json({
     actions: ACTIONS,
-    count: data.length, // 2
+    createRoleCatalog: "admin",
+    count: data.length,
     data,
   });
 };
@@ -85,19 +100,21 @@ const myPermissions = async (req, res) => {
   }
 };
 
-/** Route guard: checkPermission(module, subModuleName, action) — Global/Super Admin always pass */
+/** Route guard: checkPermission(module, subModuleName, action) — Super Admin / Admin always pass */
 const checkPermission = (module, name, action) => {
   return async (req, res, next) => {
     try {
-      // Super Admin always has every action. Their matrix cannot be reduced.
-      if (
-        req.user.role === "Global Admin" ||
-        req.user.role === "Super Admin"
-      ) {
+      const { isLockedRoleName, normalizeRoleName } = require("../config/roles");
+      // Super Admin / Admin always have every action
+      if (isLockedRoleName(req.user.role)) {
         return next();
       }
 
-      const role = await Role.findOne({ name: req.user.role });
+      const role = await Role.findOne({
+        name: {
+          $in: [req.user.role, normalizeRoleName(req.user.role)],
+        },
+      });
       if (!role) {
         return res.status(403).json({ message: "Role not found" });
       }

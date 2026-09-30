@@ -83,7 +83,7 @@ const router = express.Router();
 router.post(
   "/",
   protect,
-  authorize("Global Admin", "Super Admin", "HR Manager"),
+  authorize("Super Admin", "Admin", "HR Manager"),
   checkPermission("Employee", "Employee", "create"),
   (req, _res, next) => {
     req.body.role = "Employee";

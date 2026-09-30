@@ -14,7 +14,7 @@ const {
 const { setAuthCookie, clearAuthCookie } = require("../utils/authCookie");
 const { signToken } = require("../utils/jwt");
 
-const LOCKED_ROLES = new Set(["Super Admin", "Global Admin"]);
+const LOCKED_ROLES = new Set(["Super Admin", "Admin"]);
 
 /** Build a short label like "42 of 120" for the UI */
 const permLabel = (roleDoc) => {
@@ -22,7 +22,7 @@ const permLabel = (roleDoc) => {
   return `${countPermissions(roleDoc.permissions)} of ${totalForRole(roleDoc.name)}`;
 };
 
-/** Keep Super / Global Admin matrix in sync with permissions.js catalog */
+/** Keep Super Admin / Admin matrix in sync with permissions.js catalog */
 async function refreshLockedRole(roleDoc) {
   if (!roleDoc || !LOCKED_ROLES.has(roleDoc.name)) return roleDoc;
   const full = permissionsForRole(roleDoc.name);
@@ -75,7 +75,19 @@ const login = async (req, res) => {
         officialEmail: user.official?.officialEmail || "",
         role: user.role,
         department: user.official?.department || "",
-        company: user.official?.company || "",
+        company:
+          user.role === "Super Admin" || user.role === "Admin"
+            ? "All companies"
+            : user.official?.company || "",
+        companies:
+          user.role === "Super Admin" || user.role === "Admin"
+            ? []
+            : Array.isArray(user.official?.companies) &&
+                user.official.companies.length
+              ? user.official.companies
+              : user.official?.company
+                ? [user.official.company]
+                : [],
         status: user.status,
         lastLogin: user.lastLogin,
         permissionCount: permLabel(roleDoc),

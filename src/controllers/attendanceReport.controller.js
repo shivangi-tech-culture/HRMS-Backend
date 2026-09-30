@@ -13,6 +13,8 @@ const {
 const { hasAllAccess } = require("../middleware/auth");
 const {
   hasGlobalCompanyAccess,
+  getAccessibleCompanies,
+  canAccessCompany,
   DEFAULT_COMPANY,
 } = require("../utils/companyScope");
 const {
@@ -33,9 +35,43 @@ const displayDate = (d) => {
   });
 };
 
+/** Primary company label for report docs (empty = all / platform) */
 const companyForUser = (user) => {
   if (hasGlobalCompanyAccess(user)) return "";
   return user?.official?.company || DEFAULT_COMPANY;
+};
+
+/** Mongo match for report.company scoped to actor */
+const reportCompanyMatch = (user) => {
+  if (hasGlobalCompanyAccess(user)) return {};
+  const accessible = getAccessibleCompanies(user) || [];
+  if (!accessible.length) {
+    const fallback = companyForUser(user);
+    return fallback
+      ? {
+          company: new RegExp(
+            `^${fallback.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
+            "i"
+          ),
+        }
+      : { company: "__none__" };
+  }
+  if (accessible.length === 1) {
+    return {
+      company: new RegExp(
+        `^${accessible[0].replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
+        "i"
+      ),
+    };
+  }
+  return {
+    company: {
+      $in: accessible.map(
+        (c) =>
+          new RegExp(`^${c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i")
+      ),
+    },
+  };
 };
 
 /**
@@ -55,9 +91,7 @@ const listAttendanceReports = async (req, res) => {
       limit = 10,
     } = req.query;
 
-    const company = companyForUser(req.user);
-    const match = {};
-    if (company) match.company = new RegExp(`^${company.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
+    const match = reportCompanyMatch(req.user);
 
     // Latest generated per key
     const latest = await AttendanceReport.aggregate([
@@ -245,9 +279,7 @@ const downloadAttendanceReport = async (req, res) => {
     if (!doc) return res.status(404).json({ message: "Report not found" });
 
     if (!hasGlobalCompanyAccess(req.user)) {
-      const ownRaw = String(req.user?.official?.company || "").trim().toLowerCase();
-      const docCo = String(doc.company || "").trim().toLowerCase();
-      if (ownRaw && docCo && ownRaw !== docCo) {
+      if (doc.company && !canAccessCompany(req.user, doc.company)) {
         return res.status(403).json({ message: "Forbidden" });
       }
     }

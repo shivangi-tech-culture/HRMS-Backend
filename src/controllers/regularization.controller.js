@@ -16,10 +16,9 @@ const Attendance = require("../models/Attendance");
 const User = require("../models/User");
 const { hasAllAccess } = require("../middleware/auth");
 const {
-  companyFilter,
   hasGlobalCompanyAccess,
-  assertSameCompanyEmployee,
 } = require("../utils/companyScope");
+const { listScopeFilter, assertTeamOrCompanyEmployee } = require("../utils/teamScope");
 const {
   getAssignedShift,
   computeDayMetrics,
@@ -160,7 +159,7 @@ const createRegularization = async (req, res) => {
         return res.status(400).json({ message: "Employee is inactive" });
       }
       if (!hasGlobalCompanyAccess(req.user)) {
-        const errMsg = assertSameCompanyEmployee(req.user, emp);
+        const errMsg = assertTeamOrCompanyEmployee(req.user, emp);
         if (errMsg) return res.status(403).json({ message: errMsg });
       }
       targetId = emp._id;
@@ -231,7 +230,7 @@ const listRegularizations = async (req, res) => {
     } else if (employeeId) {
       filter.employee = employeeId;
     } else if (!hasGlobalCompanyAccess(req.user)) {
-      const scope = companyFilter(req.user);
+      const scope = listScopeFilter(req.user);
       if (scope === false) {
         return res.status(403).json({ message: "Your profile has no company" });
       }
@@ -409,7 +408,7 @@ const reviewRegularization = async (req, res) => {
       "_id official.company"
     );
     if (!hasGlobalCompanyAccess(req.user)) {
-      const err = assertSameCompanyEmployee(req.user, employee);
+      const err = assertTeamOrCompanyEmployee(req.user, employee);
       if (err) return res.status(403).json({ message: err });
     }
 

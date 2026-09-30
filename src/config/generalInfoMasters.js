@@ -106,15 +106,15 @@ const ATTENDANCE_DROPDOWNS = {
 };
 
 /**
- * Flatten to seed rows: { type, name, company? }
- * company type has no company field.
+ * Flatten to seed rows: { type, name }
+ * Masters are GLOBAL — no company on rows (except seeding one company name as type=company).
  */
 const buildMasterSeedRows = (company = DEFAULT_COMPANY) => {
   const rows = [{ type: "company", name: company }];
 
   const add = (type, names) => {
     for (const name of names) {
-      rows.push({ type, name, company });
+      rows.push({ type, name });
     }
   };
 
