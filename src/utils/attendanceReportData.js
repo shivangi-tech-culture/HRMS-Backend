@@ -6,11 +6,10 @@ const User = require("../models/User");
 const {
   companyFilter,
   hasGlobalCompanyAccess,
-  getUserCompany,
   DEFAULT_COMPANY,
 } = require("./companyScope");
 const { formatDuration, formatClock } = require("./attendanceView");
-const { todayDate } = require("./shiftTiming");
+const { todayDate, DEFAULT_SHIFT } = require("./shiftTiming");
 
 const resolveRange = ({ month, from, to, date }) => {
   if (date) return { from: date, to: date, month: date.slice(0, 7) };
@@ -40,8 +39,8 @@ const employeeScopeFilter = async (user) => {
 };
 
 const companyLabel = (user) =>
-  getUserCompany(user)
-    ? user.official?.company || DEFAULT_COMPANY
+  Array.isArray(user?.official?.companyIds) && user.official.companyIds.length
+    ? DEFAULT_COMPANY
     : DEFAULT_COMPANY;
 
 /**
@@ -52,7 +51,7 @@ const buildMonthlySummary = async (user, range) => {
   if (scope.error) return { error: scope.error };
 
   const employees = await User.find(scope.filter)
-    .select("name official.employeeCode official.department official.company")
+    .select("name official.employeeCode official.department official.companyIds")
     .sort({ name: 1 })
     .lean();
 
@@ -125,7 +124,6 @@ const buildDailyPunch = async (user, range) => {
       "employee",
       "name official.employeeCode official.department"
     )
-    .populate("shift", "name")
     .sort({ date: 1, punchIn: 1 })
     .lean();
 
@@ -134,7 +132,7 @@ const buildDailyPunch = async (user, range) => {
     employeeName: r.employee?.name || "",
     employeeCode: r.employee?.official?.employeeCode || "",
     department: r.employee?.official?.department || "",
-    shift: r.shift?.name || "",
+    shift: DEFAULT_SHIFT.name,
     punchIn: formatClock(r.punchIn, r.punchInSource) || "—",
     punchOut: formatClock(r.punchOut, r.punchOutSource) || "—",
     workingHours: formatDuration(r.workedMinutes || 0),
@@ -177,7 +175,6 @@ const buildLateEarly = async (user, range) => {
       "employee",
       "name official.employeeCode official.department"
     )
-    .populate("shift", "name")
     .sort({ date: -1 })
     .lean();
 
@@ -186,7 +183,7 @@ const buildLateEarly = async (user, range) => {
     employeeName: r.employee?.name || "",
     employeeCode: r.employee?.official?.employeeCode || "",
     department: r.employee?.official?.department || "",
-    shift: r.shift?.name || "",
+    shift: DEFAULT_SHIFT.name,
     punchIn: formatClock(r.punchIn, r.punchInSource) || "—",
     punchOut: formatClock(r.punchOut, r.punchOutSource) || "—",
     lateBy: formatDuration(r.lateByMinutes || 0),

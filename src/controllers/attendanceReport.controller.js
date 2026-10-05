@@ -13,7 +13,7 @@ const {
 const { hasAllAccess } = require("../middleware/auth");
 const {
   hasGlobalCompanyAccess,
-  getAccessibleCompanies,
+  companyNamesForUser,
   canAccessCompany,
   DEFAULT_COMPANY,
 } = require("../utils/companyScope");
@@ -36,17 +36,18 @@ const displayDate = (d) => {
 };
 
 /** Primary company label for report docs (empty = all / platform) */
-const companyForUser = (user) => {
+const companyForUser = async (user) => {
   if (hasGlobalCompanyAccess(user)) return "";
-  return user?.official?.company || DEFAULT_COMPANY;
+  const names = await companyNamesForUser(user);
+  return names[0] || DEFAULT_COMPANY;
 };
 
 /** Mongo match for report.company scoped to actor */
-const reportCompanyMatch = (user) => {
+const reportCompanyMatch = async (user) => {
   if (hasGlobalCompanyAccess(user)) return {};
-  const accessible = getAccessibleCompanies(user) || [];
+  const accessible = await companyNamesForUser(user);
   if (!accessible.length) {
-    const fallback = companyForUser(user);
+    const fallback = await companyForUser(user);
     return fallback
       ? {
           company: new RegExp(
@@ -91,7 +92,7 @@ const listAttendanceReports = async (req, res) => {
       limit = 10,
     } = req.query;
 
-    const match = reportCompanyMatch(req.user);
+    const match = await reportCompanyMatch(req.user);
 
     // Latest generated per key
     const latest = await AttendanceReport.aggregate([
@@ -197,8 +198,7 @@ const generateAttendanceReport = async (req, res) => {
     if (built.error) return res.status(403).json({ message: built.error });
 
     const company =
-      companyForUser(req.user) ||
-      req.user?.official?.company ||
+      (await companyForUser(req.user)) ||
       DEFAULT_COMPANY;
 
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -279,7 +279,7 @@ const downloadAttendanceReport = async (req, res) => {
     if (!doc) return res.status(404).json({ message: "Report not found" });
 
     if (!hasGlobalCompanyAccess(req.user)) {
-      if (doc.company && !canAccessCompany(req.user, doc.company)) {
+      if (doc.company && !(await canAccessCompany(req.user, doc.company))) {
         return res.status(403).json({ message: "Forbidden" });
       }
     }

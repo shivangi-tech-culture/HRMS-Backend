@@ -30,9 +30,10 @@ const {
   duplicateKeyMessage,
 } = require("../utils/uniqueFields");
 const {
-  assertSameCompany,
-  isSameCompany,
   hasGlobalCompanyAccess,
+  attachCompany,
+  writeCompanyFields,
+  companyNameMap,
 } = require("../utils/companyScope");
 const { assertTeamOrCompanyEmployee } = require("../utils/teamScope");
 const {
@@ -70,8 +71,7 @@ const unsetEmployeeProfileFields = async (userId, roleName) => {
   };
   if (isPlatformRole(roleName)) {
     unset.personal = 1;
-    unset["official.company"] = 1;
-    unset["official.companies"] = 1;
+    unset["official.companyIds"] = 1;
     unset["official.department"] = 1;
   }
   await User.collection.updateOne({ _id: userId }, { $unset: unset });
@@ -287,31 +287,23 @@ const createEmployee = async (req, res) => {
       .toLowerCase()
       .trim();
 
-    // 2. Resolve company (Global/Super → any; HR/Manager → assigned companies)
-    let company = String(officialIn.company || "").trim();
-
-    if (hasGlobalCompanyAccess(req.user)) {
-      if (!company) {
-        return res.status(400).json({ message: "official.company is required" });
-      }
-    } else {
-      if (!company) {
-        return res.status(400).json({ message: "official.company is required" });
-      }
-      const companyErr = assertSameCompany(req.user, company);
-      if (companyErr) {
-        return res.status(403).json({ message: companyErr });
-      }
+    // 2. official.companyIds — Employee must send exactly one id.
+    const assigned = await attachCompany(req.user, "Employee", officialIn);
+    if (!assigned.ok) {
+      return res.status(assigned.status).json({ message: assigned.message });
     }
 
-    const official = normalizeSectionUniques("official", {
-      ...officialIn,
-      officialEmail: email,
-      company,
-      employeeCode: officialIn.employeeCode
-        ? String(officialIn.employeeCode).trim().toUpperCase()
-        : "",
-    });
+    const official = writeCompanyFields(
+      normalizeSectionUniques("official", {
+        ...officialIn,
+        officialEmail: email,
+        employeeCode: officialIn.employeeCode
+          ? String(officialIn.employeeCode).trim().toUpperCase()
+          : "",
+      }),
+      assigned,
+      "Employee"
+    );
 
     const personal = normalizeSectionUniques("personal", personalIn);
 
@@ -378,7 +370,7 @@ const createEmployee = async (req, res) => {
       email,
       password,
       role: "Employee",
-      company: official.company || "",
+      company: assigned.company || "",
       department: String(official.department || "").trim(),
     });
 
@@ -408,7 +400,7 @@ const createEmployee = async (req, res) => {
  */
 const listEmployees = async (req, res) => {
   try {
-    const built = buildListQuery(req, { forceRole: "Employee" });
+    const built = await buildListQuery(req, { forceRole: "Employee" });
     if (built.error) {
       return res.status(built.error.status).json({ message: built.error.message });
     }
@@ -424,7 +416,8 @@ const listEmployees = async (req, res) => {
         .lean(),
     ]);
 
-    const employees = rows.map(mapEmployeeListRow);
+    const nameById = await companyNameMap(rows);
+    const employees = rows.map((row) => mapEmployeeListRow(row, nameById));
 
     return res.json({
       count: employees.length,
@@ -449,7 +442,7 @@ const listEmployees = async (req, res) => {
  */
 const exportEmployees = async (req, res) => {
   try {
-    const built = buildListQuery(req, { forceRole: "Employee" });
+    const built = await buildListQuery(req, { forceRole: "Employee" });
     if (built.error) {
       return res
         .status(built.error.status)
@@ -461,8 +454,9 @@ const exportEmployees = async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
+    const nameById = await companyNameMap(rows);
     const data = rows.map((row) => {
-      const m = mapEmployeeListRow(row);
+      const m = mapEmployeeListRow(row, nameById);
       return {
         name: m.name,
         employeeCode: m.employeeCode,
@@ -591,8 +585,7 @@ const updateEmployee = async (req, res) => {
       }
       if (isPlatformRole(nextRole)) {
         if (!employee.official) employee.official = {};
-        employee.official.company = "";
-        employee.official.companies = undefined;
+        employee.official.companyIds = undefined;
       }
       employee.role = nextRole;
     }
@@ -635,9 +628,10 @@ const updateEmployee = async (req, res) => {
     }
     if (profile.official) {
       const emailAttempt = profile.official.officialEmail;
-      const companyAttempt = profile.official.company;
       delete profile.official.officialEmail;
       delete profile.official.company;
+      delete profile.official.companies;
+      delete profile.official.companyIds;
 
       if (emailAttempt !== undefined) {
         const next = String(emailAttempt || "")
@@ -649,20 +643,6 @@ const updateEmployee = async (req, res) => {
         if (next && next !== cur) {
           return res.status(400).json({
             message: "official.officialEmail cannot be changed",
-          });
-        }
-      }
-      if (companyAttempt !== undefined) {
-        const next = String(companyAttempt || "").trim();
-        const cur = String(employee.official?.company || "").trim();
-        if (next && cur && !isSameCompany(next, cur)) {
-          return res.status(400).json({
-            message: "official.company cannot be changed",
-          });
-        }
-        if (next && !cur) {
-          return res.status(400).json({
-            message: "official.company cannot be changed",
           });
         }
       }

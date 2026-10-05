@@ -171,10 +171,10 @@ const checkEmployeeProfilePermission = (action) => {
 /**
  * Master type → Masters module submodule (admin catalog).
  * GET list/get: no matrix check (web app dropdowns — Employee + Admin).
- * POST/PUT/DELETE: Masters → {Company|Department|…} → action
+ * POST/PUT/DELETE: Masters → {Department|…} → action
+ * Company is /api/companies, not a master type.
  */
 const MASTER_TYPE_PERM = {
-  company: "Company",
   department: "Department",
   designation: "Designation",
   division: "Division",

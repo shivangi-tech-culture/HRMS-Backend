@@ -27,6 +27,7 @@ const holidayRoutes = require("./routes/holiday.routes");
 const weeklyOffRoutes = require("./routes/weeklyOff.routes");
 const mailRoutes = require("./routes/mail.routes");
 const masterRoutes = require("./routes/master.routes");
+const companyRoutes = require("./routes/company.routes");
 const healthRoutes = require("./routes/health.routes");
 
 const app = express();
@@ -167,6 +168,7 @@ app.use("/api/holidays", holidayRoutes); // Holiday Calendar
 app.use("/api/weekly-offs", weeklyOffRoutes); // Weekly Off policies
 app.use("/api/mail", mailRoutes); // Organization → Mail send
 app.use("/api/masters", masterRoutes); // SaaS masters (typed collections)
+app.use("/api/companies", companyRoutes); // Company org (Super Admin + Admin only)
 
 // START SERVER (colored chalk banners)
 

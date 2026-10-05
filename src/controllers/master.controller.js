@@ -1,32 +1,22 @@
 /**
  * Master CRUD — /api/masters
  * All master rows are GLOBAL (shared across companies).
- * type=company is the company list itself; only Super Admin / Admin may write it.
+ * Company is not a master — use /api/companies.
  */
 const mongoose = require("mongoose");
 const {
   TYPES,
   getModel,
-  isCompanyType,
   toMasterDto,
   findMasterById,
   findMasterByIdLean,
   GENERAL_INFO_DROPDOWNS,
 } = require("../models/Master");
-const { hasGlobalCompanyAccess } = require("../utils/companyScope");
 
 const okId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 const escapeRegex = (value) =>
   String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-/** Only Super Admin / Admin may create/update/delete company master */
-const assertCanManageCompanyType = (req) => {
-  if (!hasGlobalCompanyAccess(req.user)) {
-    return "Only Super Admin / Admin can manage company masters";
-  }
-  return null;
-};
 
 /**
  * GET /api/masters/meta
@@ -36,7 +26,8 @@ const listMasterMeta = async (_req, res) => {
     return res.json({
       types: TYPES,
       global: true,
-      note: "Masters are global (all companies). Employee profile still stores company name on official.company.",
+      note: "Masters are global dropdowns. Company is not a master — create and list it at GET/POST /api/companies (Super Admin and Admin). Users store official.companyIds.",
+      companyModule: "/api/companies",
       generalInfoModules: [
         "personal",
         "official",
@@ -129,17 +120,10 @@ const createMaster = async (req, res) => {
     const Model = getModel(type);
     const trimmedName = String(name).trim();
 
-    if (isCompanyType(type)) {
-      const err = assertCanManageCompanyType(req);
-      if (err) return res.status(403).json({ message: err });
-    }
-
     const dup = await findDuplicateName(Model, { name: trimmedName });
     if (dup) {
       return res.status(400).json({
-        message: isCompanyType(type)
-          ? `Company "${trimmedName}" already exists`
-          : `"${trimmedName}" already exists`,
+        message: `"${trimmedName}" already exists`,
       });
     }
 
@@ -172,11 +156,6 @@ const updateMaster = async (req, res) => {
 
     const { type, row, Model } = found;
 
-    if (isCompanyType(type)) {
-      const err = assertCanManageCompanyType(req);
-      if (err) return res.status(403).json({ message: err });
-    }
-
     if (req.body.name !== undefined) {
       const nextName = String(req.body.name).trim();
       if (!nextName) {
@@ -195,9 +174,7 @@ const updateMaster = async (req, res) => {
     });
     if (dup) {
       return res.status(400).json({
-        message: isCompanyType(type)
-          ? `Company "${row.name}" already exists`
-          : `"${row.name}" already exists`,
+        message: `"${row.name}" already exists`,
       });
     }
 
@@ -224,11 +201,6 @@ const deleteMaster = async (req, res) => {
     if (!found) return res.status(404).json({ message: "Not found" });
 
     const { type, row } = found;
-
-    if (isCompanyType(type)) {
-      const err = assertCanManageCompanyType(req);
-      if (err) return res.status(403).json({ message: err });
-    }
 
     await row.deleteOne();
     return res.json({ message: "Deleted", id: req.params.id, type });

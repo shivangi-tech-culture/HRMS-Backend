@@ -17,13 +17,10 @@ const { DEFAULT_COMPANY } = require("../utils/companyScope");
   await clearAllMasterCollections();
   console.log("Cleared all master collections");
 
-  const masters = buildMasterSeedRows(DEFAULT_COMPANY);
+  const masters = buildMasterSeedRows();
   for (const m of masters) {
     const Model = getModel(m.type);
-    const payload =
-      m.type === "company"
-        ? { name: m.name, company: "", status: "Active" }
-        : { name: m.name, company: m.company, status: "Active" };
+    const payload = { name: m.name, company: "", status: "Active" };
     await Model.create(payload);
     console.log(`Master → ${m.type} (${COLLECTION_BY_TYPE[m.type]}): ${m.name}`);
   }

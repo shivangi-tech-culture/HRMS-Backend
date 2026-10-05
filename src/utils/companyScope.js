@@ -2,9 +2,9 @@
  * COMPANY SCOPE — who may see / change which company
  *
  * Super Admin / Admin → all companies
- * HR Manager          → official.company + official.companies[] (Super Admin assigns)
- * Reporting Manager   → single official.company (+ team via teamScope)
- * Employee            → own company
+ * HR Manager          → official.companyIds (one or more)
+ * Reporting Manager   → one id in official.companyIds (+ team via teamScope)
+ * Employee            → one id in official.companyIds
  */
 const {
   GLOBAL_COMPANY_ROLES,
@@ -13,6 +13,7 @@ const {
   canAssignCompanies: hierarchyCanAssignCompanies,
   isMultiCompanyRole: hierarchyIsMultiCompanyRole,
   hasGlobalCompanyRole,
+  isPlatformRole,
 } = require("../config/roles");
 
 /** Default company when create body omits official.company (from .env or fallback) */
@@ -30,15 +31,22 @@ const escapeRegex = (value) =>
 const companyExactRegex = (company) =>
   new RegExp(`^${escapeRegex(String(company).trim())}$`, "i");
 
-/** Read primary company from user.official.company (normalized) */
-const getUserCompany = (user) => normalizeCompany(user?.official?.company);
+/** Company _ids stored on the user (strings). */
+const userCompanyIds = (user) => {
+  const raw = user?.official?.companyIds || user?.companyIds || [];
+  if (!Array.isArray(raw)) return [];
+  return [...new Set(raw.map((id) => String(id || "").trim()).filter(Boolean))];
+};
+
+/** @deprecated Name is not stored on the user. Use companyNamesForUser. */
+const getUserCompany = () => "";
 
 /** True if actor is Super Admin or Admin (all companies) */
 const hasGlobalCompanyAccess = (user) =>
   hasGlobalCompanyRole(user?.role) ||
   GLOBAL_COMPANY_ROLES.includes(normalizeRoleName(user?.role));
 
-/** True when actor may assign official.companies to HR (Super Admin only) */
+/** True when actor may assign more than one company id to HR (Super Admin only) */
 const canAssignCompanies = (user) => hierarchyCanAssignCompanies(user);
 
 /** True when role may hold multiple assigned companies (HR only) */
@@ -68,59 +76,69 @@ const normalizeCompaniesList = (value) => {
 };
 
 /**
- * Accessible company display names for scoped roles.
- * Super/Admin → null (means all). Others → unique list from company + companies[].
- * Reporting Manager ignores companies[] extras (single company only).
+ * Company names for display / holiday rows (not stored on the user).
+ * Super Admin and Admin → every active company. Others → their companyIds.
+ */
+const companyNamesForUser = async (user) =>
+  (await companyListForUser(user)).map((row) => row.companyName);
+
+/** _id → companyName for a page of users. */
+const companyNameMap = async (users = []) => {
+  const ids = [];
+  for (const user of users) {
+    for (const id of userCompanyIds(user)) ids.push(id);
+  }
+  const unique = [...new Set(ids)];
+  if (!unique.length) return new Map();
+  const Company = require("../models/Company");
+  const docs = await Company.find({ _id: { $in: unique } })
+    .select("companyName")
+    .lean();
+  return new Map(docs.map((doc) => [String(doc._id), doc.companyName]));
+};
+
+/**
+ * Sync name list is gone. Names are loaded with companyNamesForUser.
+ * Super/Admin → null (all). Others → [] here; do not use for access checks.
  */
 const getAccessibleCompanies = (user) => {
   if (hasGlobalCompanyAccess(user)) return null;
-
-  const role = normalizeRoleName(user?.role);
-  const primary = String(user?.official?.company || "").trim();
-
-  // Reporting Manager / Employee → primary only
-  if (!MULTI_COMPANY_ROLES.includes(role)) {
-    return primary ? [primary] : [];
-  }
-
-  const list = [];
-  if (primary) list.push(primary);
-  const extra = user?.official?.companies;
-  if (Array.isArray(extra)) {
-    for (const c of extra) {
-      const name = String(c || "").trim();
-      if (name) list.push(name);
-    }
-  }
-  return normalizeCompaniesList(list);
+  return [];
 };
 
-/** True when both values refer to the same company */
+/** True when both values refer to the same company name */
 const isSameCompany = (companyA, companyB) => {
   const a = normalizeCompany(companyA);
   const b = normalizeCompany(companyB);
   return Boolean(a && b && a === b);
 };
 
-/** True if actor may act on targetCompany */
-const canAccessCompany = (actor, targetCompany) => {
+/** True if actor and employee share at least one company id. */
+const sharesCompany = (actor, employee) => {
   if (hasGlobalCompanyAccess(actor)) return true;
-  const accessible = getAccessibleCompanies(actor);
-  if (!accessible || !accessible.length) return false;
-  const target = normalizeCompany(targetCompany);
-  return accessible.some((c) => normalizeCompany(c) === target);
+  const mine = new Set(userCompanyIds(actor));
+  if (!mine.size) return false;
+  return userCompanyIds(employee).some((id) => mine.has(id));
 };
 
-/** Error message if actor cannot act on targetCompany; null if ok */
-const assertSameCompany = (actor, targetCompany) => {
-  if (hasGlobalCompanyAccess(actor)) return null;
+/** True if actor may act on targetCompany name (holiday / weekly off rows). */
+const canAccessCompany = async (actor, targetCompany) => {
+  if (hasGlobalCompanyAccess(actor)) return true;
+  const target = normalizeCompany(targetCompany);
+  if (!target) return false;
+  const names = await companyNamesForUser(actor);
+  return names.some((name) => normalizeCompany(name) === target);
+};
 
-  const accessible = getAccessibleCompanies(actor);
-  if (!accessible || !accessible.length) {
+/** Error message if actor cannot act on a company name; null if ok */
+const assertSameCompany = async (actor, targetCompany) => {
+  if (hasGlobalCompanyAccess(actor)) return null;
+  const names = await companyNamesForUser(actor);
+  if (!names.length) {
     return "Your profile has no company — cannot manage employees";
   }
-  if (!canAccessCompany(actor, targetCompany)) {
-    return accessible.length === 1
+  if (!(await canAccessCompany(actor, targetCompany))) {
+    return names.length === 1
       ? "You can only manage employees for your own company"
       : "You can only manage employees for your assigned companies";
   }
@@ -134,26 +152,26 @@ const assertSameCompanyEmployee = (actor, employee) => {
   }
   if (hasGlobalCompanyAccess(actor)) return null;
   if (String(actor._id) === String(employee._id)) return null;
-  return assertSameCompany(actor, employee?.official?.company);
+  if (!userCompanyIds(actor).length) {
+    return "Your profile has no company — cannot manage employees";
+  }
+  if (!sharesCompany(actor, employee)) {
+    return userCompanyIds(actor).length === 1
+      ? "You can only manage employees for your own company"
+      : "You can only manage employees for your assigned companies";
+  }
+  return null;
 };
 
 /**
- * Mongo filter for list APIs.
- * null = all companies; false = block; object = scoped filter
+ * Mongo filter for user list APIs.
+ * null = all companies; false = block; object = scoped filter on companyIds.
  */
-const companyFilter = (actor, field = "official.company") => {
+const companyFilter = (actor) => {
   if (hasGlobalCompanyAccess(actor)) return null;
-
-  const accessible = getAccessibleCompanies(actor);
-  if (!accessible || !accessible.length) return false;
-
-  if (accessible.length === 1) {
-    return { [field]: companyExactRegex(accessible[0]) };
-  }
-
-  return {
-    [field]: { $in: accessible.map((c) => companyExactRegex(c)) },
-  };
+  const ids = userCompanyIds(actor);
+  if (!ids.length) return false;
+  return { "official.companyIds": { $in: ids } };
 };
 
 /**
@@ -178,6 +196,139 @@ const withDefaultCompany = (company) => {
   return value || DEFAULT_COMPANY;
 };
 
+/**
+ * Dropdown for create-employee / Access & Control.
+ * Super Admin and Admin → every active company.
+ * HR → official.companyIds. Employee → that one id inside companyIds.
+ */
+const companyListForUser = async (user) => {
+  const Company = require("../models/Company");
+
+  if (hasGlobalCompanyAccess(user)) {
+    const rows = await Company.find({ isActive: true })
+      .select("companyName")
+      .sort({ companyName: 1 })
+      .lean();
+    return rows.map((row) => ({
+      companyId: row._id,
+      companyName: row.companyName,
+    }));
+  }
+
+  const ids = Array.isArray(user?.official?.companyIds)
+    ? user.official.companyIds
+    : [];
+
+  if (!ids.length) return [];
+
+  const rows = await Company.find({ _id: { $in: ids }, isActive: true })
+    .select("companyName")
+    .lean();
+  const byId = new Map(rows.map((row) => [String(row._id), row.companyName]));
+  return ids
+    .filter((id) => byId.has(String(id)))
+    .map((id) => ({ companyId: id, companyName: byId.get(String(id)) }));
+};
+
+/**
+ * Save official.companyIds on the user being created.
+ * Employee / Reporting Manager: array length must be 1.
+ * HR: one or more ids.
+ */
+const attachCompany = async (actor, roleName, officialIn = {}) => {
+  const Company = require("../models/Company");
+  const role = normalizeRoleName(roleName);
+
+  if (isPlatformRole(role)) {
+    return { ok: true, company: "", companyIds: [], companies: [] };
+  }
+
+  const multi = isMultiCompanyRole(role);
+  let ids = Array.isArray(officialIn.companyIds) ? officialIn.companyIds : [];
+  if (!ids.length && officialIn.company) {
+    const named = await Company.findOne({
+      companyName: companyExactRegex(officialIn.company),
+      isActive: true,
+    })
+      .select("_id")
+      .lean();
+    if (!named) {
+      return { ok: false, status: 400, message: `Company not found: ${officialIn.company}` };
+    }
+    ids = [named._id];
+  }
+
+  ids = [...new Set(ids.map((id) => String(id || "").trim()).filter(Boolean))];
+
+  if (!ids.length) {
+    return {
+      ok: false,
+      status: 400,
+      message: "official.companyIds is required",
+    };
+  }
+  if (!multi && ids.length > 1) {
+    return {
+      ok: false,
+      status: 400,
+      message: "Employee and Reporting Manager can have only one company",
+    };
+  }
+  if (multi && ids.length > 1 && !canAssignCompanies(actor)) {
+    return {
+      ok: false,
+      status: 403,
+      message: "Only Super Admin can assign more than one company to HR",
+    };
+  }
+
+  const docs = await Company.find({ _id: { $in: ids }, isActive: true })
+    .select("companyName")
+    .lean();
+  if (docs.length !== ids.length) {
+    return { ok: false, status: 400, message: "Company not found or inactive" };
+  }
+  const byId = new Map(docs.map((doc) => [String(doc._id), doc]));
+  const ordered = ids.map((id) => byId.get(id));
+
+  if (!hasGlobalCompanyAccess(actor)) {
+    const allowed = new Set(
+      (await companyListForUser(actor)).map((row) => String(row.companyId))
+    );
+    const blocked = ordered.find((doc) => !allowed.has(String(doc._id)));
+    if (blocked) {
+      return {
+        ok: false,
+        status: 403,
+        message: `Pick a company from your list (${blocked.companyName} is not assigned to you)`,
+      };
+    }
+  }
+
+  return {
+    ok: true,
+    company: ordered[0].companyName,
+    companyIds: ordered.map((doc) => doc._id),
+    companies: ordered.map((doc) => doc.companyName),
+  };
+};
+
+/** Write official.companyIds only. Company name is not copied onto the user. */
+const writeCompanyFields = (official, assigned, roleName) => {
+  const role = normalizeRoleName(roleName);
+  const next = { ...official };
+  delete next.company;
+  delete next.companies;
+
+  if (isPlatformRole(role) || !assigned.companyIds?.length) {
+    next.companyIds = undefined;
+    return next;
+  }
+
+  next.companyIds = assigned.companyIds;
+  return next;
+};
+
 module.exports = {
   DEFAULT_COMPANY,
   GLOBAL_COMPANY_ROLES,
@@ -186,11 +337,15 @@ module.exports = {
   escapeRegex,
   companyExactRegex,
   getUserCompany,
+  userCompanyIds,
   hasGlobalCompanyAccess,
   canAssignCompanies,
   isMultiCompanyRole,
   normalizeCompaniesList,
+  companyNamesForUser,
+  companyNameMap,
   getAccessibleCompanies,
+  sharesCompany,
   isSameCompany,
   canAccessCompany,
   assertSameCompany,
@@ -198,4 +353,7 @@ module.exports = {
   companyFilter,
   mergeAssignedCompanies,
   withDefaultCompany,
+  companyListForUser,
+  attachCompany,
+  writeCompanyFields,
 };

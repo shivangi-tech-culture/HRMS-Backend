@@ -34,6 +34,34 @@ const {
 } = require("./config/roles");
 const { sendWelcomeEmail } = require("./utils/mail");
 const { DEFAULT_COMPANY } = require("./utils/companyScope");
+const Company = require("./models/Company");
+const { WEEK_DAYS } = Company;
+
+/** One week: Mon–Fri 10:00–19:00, Saturday half day, Sunday off. */
+const seedWeek = (weekNumber) => ({
+  weekNumber,
+  days: WEEK_DAYS.map((day) => {
+    if (day === "sunday") {
+      return {
+        day,
+        isOff: true,
+        startTime: "",
+        endTime: "",
+        breakStartTime: "",
+        breakEndTime: "",
+      };
+    }
+    const half = day === "saturday";
+    return {
+      day,
+      isOff: false,
+      startTime: "10:00",
+      endTime: half ? "14:30" : "19:00",
+      breakStartTime: half ? "" : "13:30",
+      breakEndTime: half ? "" : "14:00",
+    };
+  }),
+});
 
 const EMPLOYEE_PROFILE_UNSET = {
   personal: 1,
@@ -46,8 +74,6 @@ const EMPLOYEE_PROFILE_UNSET = {
   visas: 1,
   payroll: 1,
   "official.employeeCode": 1,
-  "official.company": 1,
-  "official.companies": 1,
   "official.department": 1,
   "official.designation": 1,
   "official.reportingHead1": 1,
@@ -68,6 +94,10 @@ const seed = async () => {
   try {
     await mongoose.connection.dropCollection("masters");
     console.log("Dropped legacy collection: masters");
+  } catch (_) {}
+  try {
+    await mongoose.connection.dropCollection("companies");
+    console.log("Dropped legacy master collection: companies");
   } catch (_) {}
   for (const name of ["modules", "headings", "submodules"]) {
     try {
@@ -105,8 +135,37 @@ const seed = async () => {
     );
   }
 
+  await Company.deleteMany({});
+  const companyOrg = await Company.create({
+    companyName: DEFAULT_COMPANY,
+    companyCode: "TCPL",
+    isActive: true,
+    branches: [
+      {
+        branchName: "Noida",
+        branchCode: "NOI",
+        address: "",
+        city: "Noida",
+        state: "Uttar Pradesh",
+        isActive: true,
+        shifts: [
+          {
+            shiftName: "General Shift",
+            shiftCode: "GS-01",
+            isActive: true,
+            monthlySchedule: [1, 2, 3, 4, 5].map(seedWeek),
+          },
+        ],
+      },
+    ],
+  });
+  const companyId = companyOrg._id;
+  console.log(
+    `Company → ${companyOrg.companyName} (${companyOrg.companyCode}) id ${companyId}`
+  );
+
   const { buildMasterSeedRows } = require("./config/generalInfoMasters");
-  const masters = buildMasterSeedRows(DEFAULT_COMPANY);
+  const masters = buildMasterSeedRows();
 
   for (const m of masters) {
     const Model = getModel(m.type);
@@ -150,8 +209,7 @@ const seed = async () => {
       official: {
         employeeCode: "EMP-HR01",
         officialEmail: "hr@gmail.com",
-        company: DEFAULT_COMPANY,
-        companies: [DEFAULT_COMPANY],
+        companyIds: [companyId],
         department: "HR",
         designation: "HR Manager",
       },
@@ -165,7 +223,7 @@ const seed = async () => {
       official: {
         employeeCode: "EMP-MG01",
         officialEmail: "manager@gmail.com",
-        company: DEFAULT_COMPANY,
+        companyIds: [companyId],
         department: "Engineering",
         designation: "Engineering Manager",
       },
@@ -179,7 +237,7 @@ const seed = async () => {
       official: {
         employeeCode: "EMP-1002",
         officialEmail: "employee1@gmail.com",
-        company: DEFAULT_COMPANY,
+        companyIds: [companyId],
         department: "Engineering",
         designation: "Software Engineer",
         reportingHead1: "manager@gmail.com",
@@ -198,7 +256,7 @@ const seed = async () => {
       official: {
         employeeCode: "EMP-1003",
         officialEmail: "employee@gmail.com",
-        company: DEFAULT_COMPANY,
+        companyIds: [companyId],
         department: "Engineering",
         designation: "Software Engineer",
         reportingHead1: "manager@gmail.com",
@@ -232,7 +290,12 @@ const seed = async () => {
       );
     }
 
-    console.log(`User → ${email} / ${u.password} (${u.role})`);
+    const savedIds = (created.official?.companyIds || []).map(String);
+    console.log(
+      `User → ${email} / ${u.password} (${u.role}) companyIds=${
+        savedIds.length ? savedIds.join(", ") : "none"
+      }`
+    );
 
     try {
       await sendWelcomeEmail({
@@ -240,7 +303,7 @@ const seed = async () => {
         email,
         password: u.password,
         role: u.role,
-        company: platform ? "All companies" : u.official.company || DEFAULT_COMPANY,
+        company: platform ? "All companies" : DEFAULT_COMPANY,
         department: u.official.department || "",
       });
       console.log(`  Mail sent → ${email}`);

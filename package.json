@@ -1,7 +1,7 @@
 {
   "name": "hrms-api",
   "version": "1.0.0",
-  "description": "HRMS API - Auth, Employees, Shifts, Punch In/Out (geo), Timesheet, Regularization",
+  "description": "HRMS API - Auth, Employees, Punch In/Out (geo), Timesheet, Regularization",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",

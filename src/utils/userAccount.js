@@ -51,7 +51,7 @@ const visibleRolesForActor = (actor) => visibleRoleFilter(actor.role);
 /**
  * Shared table search + filters + pagination.
  */
-const buildListQuery = (req, { forceRole, roleScope } = {}) => {
+const buildListQuery = async (req, { forceRole, roleScope } = {}) => {
   const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
   const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100);
   const skip = (page - 1) * limit;
@@ -104,7 +104,6 @@ const buildListQuery = (req, { forceRole, roleScope } = {}) => {
           { "official.officialEmail": rx },
           { "official.department": rx },
           { role: rx },
-          { "official.company": rx },
           { "official.employeeCode": rx },
         ],
       });
@@ -142,7 +141,20 @@ const buildListQuery = (req, { forceRole, roleScope } = {}) => {
   if (gender) and.push({ "personal.gender": exact(gender) });
 
   const company = filterValue(req, "company", "branch");
-  if (company) and.push({ "official.company": exact(company) });
+  if (company) {
+    if (/^[a-fA-F0-9]{24}$/.test(company)) {
+      and.push({ "official.companyIds": company });
+    } else {
+      const Company = require("../models/Company");
+      const doc = await Company.findOne({
+        companyName: exact(company),
+        isActive: true,
+      })
+        .select("_id")
+        .lean();
+      and.push(doc ? { "official.companyIds": doc._id } : { _id: null });
+    }
+  }
 
   return {
     page,
@@ -162,7 +174,14 @@ const buildListQuery = (req, { forceRole, roleScope } = {}) => {
 };
 
 /** Access & Control table row */
-const mapListRow = (row) => ({
+const mapListRow = (row, nameById = new Map()) => {
+  const companyIds = Array.isArray(row.official?.companyIds)
+    ? row.official.companyIds
+    : [];
+  const companies = companyIds
+    .map((id) => nameById.get(String(id)))
+    .filter(Boolean);
+  return {
   _id: row._id,
   name: row.name || "",
   email: row.official?.officialEmail || "",
@@ -170,29 +189,33 @@ const mapListRow = (row) => ({
   department: row.official?.department || "",
   lastLogin: row.lastLogin || null,
   status: row.status || "",
-  company: row.official?.company || "",
-  companies: Array.isArray(row.official?.companies)
-    ? row.official.companies
-    : row.official?.company
-      ? [row.official.company]
-      : [],
-});
+  company: companies[0] || "",
+  companies,
+  companyIds,
+};
+};
 
 /** Employee Management table row */
-const mapEmployeeListRow = (row) => ({
+const mapEmployeeListRow = (row, nameById = new Map()) => {
+  const companyIds = Array.isArray(row.official?.companyIds)
+    ? row.official.companyIds
+    : [];
+  return {
   _id: row._id,
   name: row.name || "",
   employeeCode: row.official?.employeeCode || "",
   gender: row.personal?.gender || "",
   designation: row.official?.designation || "",
   department: row.official?.department || "",
-  branch: row.official?.company || "",
+  branch: nameById.get(String(companyIds[0])) || "",
+  companyIds,
   status: row.status || "",
   email: row.official?.officialEmail || "",
-});
+};
+};
 
 const LIST_SELECT =
-  "name role status lastLogin official.officialEmail official.employeeCode official.department official.designation official.company official.companies personal.gender";
+  "name role status lastLogin official.officialEmail official.employeeCode official.department official.designation official.companyIds personal.gender";
 
 module.exports = {
   visibleRolesForActor,

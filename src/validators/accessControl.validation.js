@@ -15,28 +15,25 @@ const phoneOpt = () =>
 
 const only = (keys) => Joi.object(keys).unknown(false);
 
-const companiesField = Joi.alternatives()
-  .try(
-    Joi.array().items(Joi.string().trim().min(2)).max(50),
-    Joi.string().trim().allow("")
-  )
-  .optional();
+const companyObjectId = Joi.string().hex().length(24);
+const companyIdsField = Joi.array().items(companyObjectId).min(1).max(50);
 
 /** Super Admin / Admin — lean platform account */
 const officialPlatform = only({
   officialEmail: Joi.string().trim().email().required(),
   employeeCode: Joi.string().trim().uppercase().allow("").optional(),
-  company: Joi.string().trim().allow("").optional(),
   department: Joi.string().trim().allow("").optional(),
 });
 
-/** HR / Reporting Manager / Employee access users */
+/**
+ * HR / Reporting Manager / Employee.
+ * Everyone sends official.companyIds.
+ * Employee and Reporting Manager: exactly one id. HR: one or more.
+ */
 const officialStaff = only({
   officialEmail: Joi.string().trim().email().required(),
   employeeCode: Joi.string().trim().uppercase().allow("").optional(),
-  company: Joi.string().trim().min(2).required(),
-  /** Multi-company — Super Admin assigns to HR Manager only */
-  companies: companiesField,
+  companyIds: companyIdsField.optional(),
   department: Joi.string().trim().allow("").optional(),
 });
 
@@ -70,7 +67,7 @@ const updateAccessUserSchema = Joi.object({
   official: only({
     employeeCode: Joi.string().trim().uppercase().allow("").optional(),
     department: str(),
-    companies: companiesField,
+    companyIds: companyIdsField.optional(),
   }).optional(),
   personal: personalAccessLean.optional(),
 })

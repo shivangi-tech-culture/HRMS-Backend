@@ -139,7 +139,7 @@ router.post(
  *       - in: query
  *         name: company
  *         schema: { type: string }
- *         description: Matches official.company (branch)
+ *         description: Company _id (24-hex) or company name. Matches official.companyIds.
  *       - in: query
  *         name: page
  *         schema: { type: integer, default: 1, example: 1 }

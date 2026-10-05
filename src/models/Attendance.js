@@ -52,13 +52,9 @@ const attendanceSchema = new mongoose.Schema(
     },
     /** Calendar day YYYY-MM-DD (app timezone) */
     date: { type: String, default: todayDate },
-    /**
-     * Shift Assignment ki Shift id (real DB ref).
-     * null = used default 10–7 timings (no Shift master row)
-     */
+    /** Legacy id from old Shift master (unused; timings always DEFAULT_SHIFT) */
     shift: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Shift",
       default: null,
     },
     punchIn: { type: Date, default: null }, // when came

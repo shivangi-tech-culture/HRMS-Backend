@@ -3,7 +3,7 @@
  *
  * Punch flow (simple):
  * 1. Body: source + latitude + longitude (address NOT from client)
- * 2. getAssignedShift → assignment shift OR default 10:00–19:00 grace 10
+ * 2. Default work window 10:00–19:00 (grace 10)
  * 3. validatePunchAgainstShift → time window OK?
  * 4. Map API → address from lat/long
  * 5. Save Attendance (one row per employee per day)
@@ -13,13 +13,14 @@ const User = require("../models/User"); // employee lookup (manual / scope)
 const { hasAllAccess } = require("../middleware/auth"); // admin/HR/manager roles
 const {
   hasGlobalCompanyAccess, // Super Admin / Admin?
+  companyNamesForUser,
 } = require("../utils/companyScope");
 const { listScopeFilter, assertTeamOrCompanyEmployee } = require("../utils/teamScope");
 const { SELF_SOURCES } = require("../validators/attendance.validation"); // web|mobile|biometric
 const { resolvePunchLocation } = require("../utils/geocode"); // lat/long → address
 const {
   todayDate, // YYYY-MM-DD in app TZ
-  getAssignedShift, // assignment OR default shift
+  getAssignedShift, // default 10:00–19:00
   validatePunchAgainstShift, // punch time gatekeeper
   computeDayMetrics, // Present / Absent / late / early
 } = require("../utils/shiftTiming");
@@ -110,7 +111,7 @@ const punchIn = async (req, res) => {
     const source = req.body.source; // web | mobile | biometric
     const now = new Date(); // punch timestamp
 
-    // 2) Shift: from Shift Assignment, else default 10:00–19:00 grace 10
+    // 2) Default work window (Shift module removed)
     const { shift } = await getAssignedShift(employeeId, date);
 
     // 3) Gatekeeper: punchStart / early rules — fail → no save
@@ -145,7 +146,6 @@ const punchIn = async (req, res) => {
     await record.save();
 
     // 7) Populate for response
-    await record.populate("shift");
     await record.populate(
       "employee",
       "name role official.employeeCode official.department"
@@ -211,7 +211,6 @@ const   punchOut = async (req, res) => {
     applyMetrics(record, shift);
     await record.save();
 
-    await record.populate("shift");
     await record.populate(
       "employee",
       "name role official.employeeCode official.department"
@@ -274,7 +273,7 @@ const markManual = async (req, res) => {
 
     // Target employee must exist + Active
     const employee = await User.findById(employeeId).select(
-      "_id name status official.company"
+      "_id name status official.companyIds"
     );
     if (!employee) {
       return res.status(404).json({ message: "Employee not found" });
@@ -332,10 +331,9 @@ const markManual = async (req, res) => {
 
     await record.populate(
       "employee",
-      "name role official.officialEmail official.employeeCode official.department official.company"
+      "name role official.officialEmail official.employeeCode official.department official.companyIds"
     );
     await record.populate("markedBy", "name role");
-    await record.populate("shift");
 
     return res.status(201).json({
       message: "Manual attendance saved (audit logged)",
@@ -360,7 +358,7 @@ const myToday = async (req, res) => {
     let record = await Attendance.findOne({
       employee: req.user._id,
       date,
-    }).populate("shift");
+    });
 
     // Always resolve live shift (assignment OR default)
     const { shift } = await getAssignedShift(req.user._id, date);
@@ -385,7 +383,6 @@ const myToday = async (req, res) => {
       }
       if (dirty) {
         await record.save();
-        await record.populate("shift");
       }
     }
 
@@ -517,7 +514,7 @@ const applyStatusFilter = (filter, status) => {
  *
  * Filters (query):
  *   date | from+to
- *   search, department, location, shiftId
+ *   search, department, location
  *   mode | source
  *   status: ALL|Present|Absent|Late|Working|HalfDay|OnLeave|WFH|…
  *   employeeId, page, limit
@@ -536,7 +533,6 @@ const listAttendance = async (req, res) => {
       search,
       department,
       location,
-      shiftId,
       mode,
       source,
       status,
@@ -586,7 +582,6 @@ const listAttendance = async (req, res) => {
             search: search || "",
             department: department || "",
             location: location || "",
-            shiftId: shiftId || null,
             mode: mode || source || "",
             status: status || "ALL",
           },
@@ -595,8 +590,6 @@ const listAttendance = async (req, res) => {
       }
       filter.employee = { $in: empIds };
     }
-
-    if (shiftId) filter.shift = shiftId;
 
     // Mode / source (UI: Face, Location, Biometric, Manual, Mobile)
     const punchSource = normalizeMode(mode) || source || null;
@@ -630,7 +623,7 @@ const listAttendance = async (req, res) => {
 
     const skip = (page - 1) * limit;
 
-    // Summary counts: same scope/date/dept/search/shift/mode — ignore status tab
+    // Summary counts: same scope/date/dept/search/mode — ignore status tab
     const summaryFilter = { ...scope };
     if (date) summaryFilter.date = date;
     else if (from || to) {
@@ -639,7 +632,6 @@ const listAttendance = async (req, res) => {
       if (to) summaryFilter.date.$lte = to;
     }
     if (empIds) summaryFilter.employee = { $in: empIds };
-    if (shiftId) summaryFilter.shift = shiftId;
     if (punchSource) {
       summaryFilter.$or = [
         { punchInSource: punchSource },
@@ -679,10 +671,9 @@ const listAttendance = async (req, res) => {
       Attendance.find(filter)
         .populate(
           "employee",
-          "name role official.officialEmail official.employeeCode official.department official.company"
+          "name role official.officialEmail official.employeeCode official.department official.companyIds"
         )
         .populate("markedBy", "name role")
-        .populate("shift", "code name startTime endTime punchStartTime")
         .sort({ date: -1, punchIn: -1 })
         .skip(skip)
         .limit(limit),
@@ -731,7 +722,6 @@ const listAttendance = async (req, res) => {
         search: search || "",
         department: department || "",
         location: location || "",
-        shiftId: shiftId || null,
         mode: mode || source || "",
         status: status || "ALL",
       },
@@ -757,19 +747,17 @@ const getAttendanceDetails = async (req, res) => {
       record = await Attendance.findById(id)
         .populate(
           "employee",
-          "name role personal.presentAddress personal.permanentAddress official.officialEmail official.employeeCode official.department official.company"
+          "name role personal.presentAddress personal.permanentAddress official.officialEmail official.employeeCode official.department official.companyIds"
         )
         .populate("markedBy", "name role")
-        .populate("shift", "code name startTime endTime halfDayEndTime graceMinutes")
         .lean();
     } else if (employeeId && date) {
       record = await Attendance.findOne({ employee: employeeId, date })
         .populate(
           "employee",
-          "name role personal.presentAddress personal.permanentAddress official.officialEmail official.employeeCode official.department official.company"
+          "name role personal.presentAddress personal.permanentAddress official.officialEmail official.employeeCode official.department official.companyIds"
         )
         .populate("markedBy", "name role")
-        .populate("shift", "code name startTime endTime halfDayEndTime graceMinutes")
         .lean();
     } else {
       return res.status(400).json({
@@ -863,7 +851,7 @@ const getAttendanceCalendar = async (req, res) => {
 
     const roster = await User.find(userFilter)
       .select(
-        "name role personal.presentAddress personal.permanentAddress official.officialEmail official.employeeCode official.department official.company"
+        "name role personal.presentAddress personal.permanentAddress official.officialEmail official.employeeCode official.department official.companyIds"
       )
       .sort({ name: 1 })
       .lean();
@@ -878,7 +866,6 @@ const getAttendanceCalendar = async (req, res) => {
             employee: { $in: rosterIds },
             date: { $gte: monthFrom, $lte: monthTo },
           })
-            .populate("shift", "code name startTime endTime halfDayEndTime graceMinutes")
             .lean();
 
     // Index: date → employeeId → record
@@ -1086,7 +1073,7 @@ const getAttendanceCalendar = async (req, res) => {
 
 /**
  * LATE & EARLY — GET /api/attendance/late-early
- * Query: type=late|early|all, date|from+to, search, department, shiftId, page, limit
+ * Query: type=late|early|all, date|from+to, search, department, page, limit
  */
 const listLateEarly = async (req, res) => {
   try {
@@ -1100,7 +1087,6 @@ const listLateEarly = async (req, res) => {
       to,
       search,
       department,
-      shiftId,
       page = 1,
       limit = 10,
     } = req.query;
@@ -1132,7 +1118,6 @@ const listLateEarly = async (req, res) => {
       }
       filter.employee = { $in: empIds };
     }
-    if (shiftId) filter.shift = shiftId;
 
     const t = String(type).toLowerCase();
     if (t === "late") filter.lateByMinutes = { $gt: 0 };
@@ -1150,9 +1135,8 @@ const listLateEarly = async (req, res) => {
       Attendance.find(filter)
         .populate(
           "employee",
-          "name role personal.presentAddress personal.permanentAddress official.officialEmail official.employeeCode official.department official.company"
+          "name role personal.presentAddress personal.permanentAddress official.officialEmail official.employeeCode official.department official.companyIds"
         )
-        .populate("shift", "code name startTime endTime")
         .sort({ date: -1, lateByMinutes: -1 })
         .skip(skip)
         .limit(Number(limit))
@@ -1203,7 +1187,6 @@ const listWebPunches = async (req, res) => {
 
     const records = await Attendance.find(filter)
       .populate("employee", "name official.employeeCode")
-      .populate("shift", "name startTime endTime")
       .sort({ date: -1, punchIn: -1 })
       .lean();
 
@@ -1331,7 +1314,7 @@ const getAttendanceHistory = async (req, res) => {
     }
 
     const emp = await User.findById(employeeId).select(
-      "name role personal.presentAddress personal.permanentAddress official.officialEmail official.employeeCode official.department official.company status"
+      "name role personal.presentAddress personal.permanentAddress official.officialEmail official.employeeCode official.department official.companyIds status"
     );
     if (!emp) return res.status(404).json({ message: "Employee not found" });
 
@@ -1373,7 +1356,6 @@ const getAttendanceHistory = async (req, res) => {
       employee: employeeId,
       date: { $gte: from, $lte: to },
     })
-      .populate("shift", "code name startTime endTime")
       .lean();
     const map = {};
     for (const r of records) map[r.date] = r;
@@ -1439,7 +1421,7 @@ const getAttendanceHistory = async (req, res) => {
         name: emp.name,
         employeeCode: emp.official?.employeeCode || "",
         department: emp.official?.department || "",
-        company: emp.official?.company || "",
+        company: (await companyNamesForUser(emp))[0] || "",
       },
       from,
       to,

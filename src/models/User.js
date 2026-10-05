@@ -104,17 +104,14 @@ const userSchema = new mongoose.Schema(
         trim: true,
       },
       /**
-       * Primary company name (matches Master type=company `name`).
-       * Used by companyScope for tenant isolation + display.
+       * Company _ids.
+       * Employee and Reporting Manager: exactly one.
+       * HR Manager: one or more.
        */
-      company: { type: String, default: "TechCulture.Ai Private Limited" },
-      /**
-       * Extra companies HR Manager / Manager (HOD) may access.
-       * Assigned only by Global Admin / Super Admin.
-       * Always includes primary `company` when set via Access & Control.
-       * Global Admin / Super Admin ignore this (they see all companies).
-       */
-      companies: { type: [String], default: undefined },
+      companyIds: {
+        type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Company" }],
+        default: undefined,
+      },
       /** Department name from masters (string, not ObjectId) */
       department: { type: String, default: "" },
       /** Designation name from masters */

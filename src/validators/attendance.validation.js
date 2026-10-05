@@ -57,8 +57,6 @@ const listAttendanceQuerySchema = Joi.object({
   department: Joi.string().trim().allow("").max(100).optional(),
   /** Match punch address text (office / geo label) */
   location: Joi.string().trim().allow("").max(200).optional(),
-  /** Shift master id */
-  shiftId: Joi.string().hex().length(24).allow("", null).optional(),
   /**
    * Punch mode / verification:
    * web | mobile | biometric | manual
@@ -195,7 +193,6 @@ const lateEarlyQuerySchema = Joi.object({
   to: dateStr.optional(),
   search: Joi.string().trim().allow("").max(100).optional(),
   department: Joi.string().trim().allow("").max(100).optional(),
-  shiftId: Joi.string().hex().length(24).allow("", null).optional(),
   page: Joi.number().integer().min(1).default(1),
   limit: Joi.number().integer().min(1).max(200).default(10),
 }).unknown(true);

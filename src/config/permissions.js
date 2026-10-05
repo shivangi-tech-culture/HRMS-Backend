@@ -1,6 +1,10 @@
 /**
  * PERMISSIONS CATALOG — default role matrices (ADMIN_TREE + ESS_TREE)
  * Seed and Role APIs use permissionsForRole(name).
+ *
+ * Company (org setup) is NOT in ADMIN_TREE.
+ * Only Super Admin and Admin receive it. HR, Reporting Manager,
+ * Employee, and custom roles cannot be granted the Company module.
  */
 const ACTIONS = [
   "view", "create", "edit", "delete", "approve", "reject",
@@ -168,7 +172,6 @@ const ADMIN_TREE = [
     module: "Masters",
     heading: "Masters",
     subModules: [
-      { name: "Company", actions: CRUD },
       { name: "Department", actions: CRUD },
       { name: "Designation", actions: CRUD },
       { name: "Division", actions: CRUD },
@@ -248,6 +251,19 @@ const ADMIN_TREE = [
     ],
   },
 ];
+
+/**
+ * Company org setup (/api/companies).
+ * Platform roles only — kept out of ADMIN_TREE so HR and custom roles never see it.
+ */
+const COMPANY_MODULE = {
+  module: "Company",
+  heading: "Company",
+  subModules: [{ name: "Company", actions: CRUD }],
+};
+
+/** Super Admin / Admin matrix = admin catalog + Company */
+const PLATFORM_TREE = [...ADMIN_TREE, COMPANY_MODULE];
 
 // ESS — Employee only (live UI: hrms-techculture.vercel.app)
 // top nav: Dashboard · Self · Team · Request · Tasks
@@ -346,7 +362,8 @@ function countSlots(tree) {
   return total;
 }
 
-const TOTAL_PERMISSIONS = countSlots(ADMIN_TREE); // Super Admin / HR / Manager
+const TOTAL_PERMISSIONS = countSlots(ADMIN_TREE); // HR / Reporting Manager (no Company)
+const PLATFORM_TOTAL = countSlots(PLATFORM_TREE); // Super Admin / Admin
 const EMPLOYEE_TOTAL = countSlots(ESS_TREE); // Employee
 const COMBINED_TOTAL = countSlots(MODULE_TREE); // custom roles (admin + ESS)
 
@@ -395,19 +412,23 @@ function buildFromTree(tree) {
 /** Get full permissions for a role name */
 function permissionsForRole(role) {
   if (role === "Employee") return buildFromTree(ESS_TREE);
-  return buildFromTree(ADMIN_TREE); // Super Admin, Admin, HR Manager, Reporting Manager
+  // Company module: Super Admin and Admin only
+  if (role === "Super Admin" || role === "Admin" || role === "Global Admin") {
+    return buildFromTree(PLATFORM_TREE);
+  }
+  return buildFromTree(ADMIN_TREE); // HR Manager, Reporting Manager — no Company
 }
 
 /** Max permission count for a role (optional catalog for custom roles) */
 function totalForRole(role, catalog) {
   if (role === "Employee" || catalog === "employee") return EMPLOYEE_TOTAL;
+  if (role === "Super Admin" || role === "Admin" || role === "Global Admin") {
+    return PLATFORM_TOTAL;
+  }
   if (
-    role === "Super Admin" ||
-    role === "Admin" ||
     role === "HR Manager" ||
     role === "Reporting Manager" ||
     role === "Manager" || // legacy
-    role === "Global Admin" || // legacy alias
     catalog === "admin"
   ) {
     return TOTAL_PERMISSIONS;
@@ -561,12 +582,15 @@ function normalizePermissions(incoming, tree = ADMIN_TREE) {
 module.exports = {
   ACTIONS,
   ADMIN_TREE,
+  COMPANY_MODULE,
+  PLATFORM_TREE,
   ESS_TREE,
   MODULE_TREE,
   MODULES,
   ALL_SUBS,
   ALL_ROWS: ALL_SUBS,
   TOTAL_PERMISSIONS,
+  PLATFORM_TOTAL,
   EMPLOYEE_TOTAL,
   COMBINED_TOTAL,
   permissionsForRole,

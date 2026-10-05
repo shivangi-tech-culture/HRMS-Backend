@@ -18,6 +18,7 @@ const PARAM_DOCS = {
   page: "number | optional | page number, default `1`",
   limit: "number | optional | rows per page (usually 1–200)",
   search: "string | optional | name / email / employee code text search",
+  isActive: "boolean | optional | `true` or `false`",
   from: "string (YYYY-MM-DD) | optional | range start date",
   to: "string (YYYY-MM-DD) | optional | range end date",
   date: "string (YYYY-MM-DD) | optional/required by API | single day",
@@ -31,8 +32,7 @@ const PARAM_DOCS = {
   location: "string | optional | match punch address text",
   role: "string | optional | role name e.g. `Super Admin` | `Admin` | `HR Manager` | `Reporting Manager` | `Employee`",
   employeeId: "string (MongoId 24-hex) | optional/required | user `_id`",
-  shiftId: "string (MongoId 24-hex) | optional/required | Shift master `_id`",
-  weeklyOffId: "string (MongoId 24-hex) | required for assign | Weekly Off policy `_id`",
+  weeklyOffId: "string (MongoId 24-hex) | optional | Weekly Off policy `_id`",
   mode: "string | optional | punch mode: `web` | `mobile` | `biometric` | `manual`",
   source: "string | required for punch | `web` | `mobile` | `biometric`",
   format: "string | optional | `PDF` | `Excel` | `ALL`",
@@ -56,7 +56,12 @@ const PARAM_DOCS = {
   // ── official / personal (nested) ───────────────────────────────
   "official.officialEmail": "string (email) | required on create | work login email",
   "official.employeeCode": "string | optional | uppercase code e.g. `EMP-1024`",
-  "official.company": "string | often required | company master name",
+  "official.company":
+    "string | optional | filled from Company.companyName of companyIds[0]",
+  "official.companyIds":
+    "string[] (MongoId) | required | array of Company `_id`s ({{companyOrgId}}). Employee and Reporting Manager: exactly one id. HR: one or more. Only Super Admin may send more than one",
+  companyIds:
+    "string[] (MongoId) | company ids on the user",
   "official.companies":
     "string[] | optional | multi-company list — Super Admin assigns to HR Manager only",
   "official.department": "string | often required | department master name",
@@ -69,7 +74,6 @@ const PARAM_DOCS = {
   "official.dateOfJoining": "string/date (YYYY-MM-DD) | optional | joining date",
   "official.calculateSalaryFrom": "string/date (YYYY-MM-DD) | optional",
   "official.dateOfRetirement": "string/date|null | optional",
-  "official.shift": "string (MongoId) | optional | Shift master id",
   companies:
     "string[] | optional | same as official.companies — HR multi-company access",
   key: "string | required for reports | report catalog key e.g. `daily-attendance`",
@@ -178,23 +182,30 @@ const PARAM_DOCS = {
   reportKey:
     "string | required | `monthly_summary` | `daily_punch` | `late_early` | `absent_missed`",
 
-  // shifts
-  code: "string | required | uppercase short code e.g. `GS` / `5DAY`",
-  punchStartTime: "string (HH:mm) | optional | earliest punch window start",
+  code: "string | required | uppercase short code e.g. `5DAY`",
   startTime: "string (HH:mm) | required | shift start 24h",
   endTime: "string (HH:mm) | required | shift end 24h",
-  shiftDuration: "number | optional | hours e.g. `9`",
-  workDuration: "number | optional | work hours e.g. `9`",
-  breakApplicable: "boolean | optional | default false",
-  nightShift: "boolean | optional | default false",
-  halfDayEndTime: "string (HH:mm) | optional | half-day cutoff",
-  graceMinutes: "number | optional | late grace minutes (0–240)",
-  allowEarlyPunchIn: "boolean | optional | default true",
-  allowLatePunchOut: "boolean | optional | default true",
-  weeklyOffDays: "number[] | optional | 0=Sun … 6=Sat",
-  halfDayDays: "number[] | optional | 0=Sun … 6=Sat",
-  effectiveFrom: "string (YYYY-MM-DD) | required | assignment start",
-  effectiveTo: "string (YYYY-MM-DD)|null | optional | null = open-ended",
+
+  // company org (/api/companies) — Super Admin / Admin only
+  companyName: "string | required on create | company display name (min 2)",
+  companyCode: "string | required on create | unique code, stored uppercase e.g. `ABC`",
+  companyOrgId: "string (MongoId 24-hex) | path | Company org `_id` from Create / List",
+  branches: "array<object> | optional | branches under the company; on update this replaces the full list",
+  branchName: "string | required | branch display name",
+  branchCode: "string | required | unique inside the company, stored uppercase e.g. `NOI`",
+  shifts: "array<object> | optional | shifts on this branch",
+  shiftName: "string | required | shift display name",
+  shiftCode: "string | required | unique inside the branch, stored uppercase e.g. `GS-01`",
+  monthlySchedule: "array<object> | optional | week 1–5 pattern for the shift (not a one-off date)",
+  weekNumber: "number | required | `1`–`5`, unique inside the shift",
+  days: "array<object> | required | all 7 weekdays, each once",
+  day: "string | required | `monday` … `sunday`",
+  isOff: "boolean | optional | `true` = off (times may be omitted). Working day needs startTime + endTime",
+  breakStartTime: "string (HH:mm) | optional | blank if no break; both break times required together",
+  breakEndTime: "string (HH:mm) | optional | must be after breakStartTime and inside shift hours",
+  "branches.address": "string | optional | branch address",
+  "branches.city": "string | optional | branch city",
+  "branches.state": "string | optional | branch state",
 
   // holiday / weekly off
   forAudience: "string | optional | e.g. `All Employees`",
@@ -232,6 +243,17 @@ function contextualDoc(key, ctx) {
     !isMasterApi &&
     !name.includes("reason");
 
+  if (key === "search" && url.includes("/api/companies")) {
+    return "string | optional | match company name or company code";
+  }
+
+  if (key === "isActive" && url.includes("/api/companies")) {
+    if (name.includes("list")) {
+      return "boolean | optional | `true` or `false` — omit to list all";
+    }
+    return "boolean | optional | `true` keeps the company active";
+  }
+
   if (key === "status") {
     if (name.includes("review"))
       return "string | required | `Approved` or `Rejected`";
@@ -246,7 +268,7 @@ function contextualDoc(key, ctx) {
 
   if (key === "type") {
     if (isMasterApi || url.includes("/masters"))
-      return "string | required | master type key e.g. `company`, `department`, `regularizationReason`, `markAttendanceReason`";
+      return "string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)";
     if (name.includes("late") || name.includes("early"))
       return "string | optional | `late` | `early` | `all`";
     if (isOtApi)
@@ -382,7 +404,7 @@ function buildParamsMarkdown(ctx) {
   );
   // Only document id-like path vars that appear after /api/
   const pathIdish = uniquePath.filter((k) =>
-    /Id$|id$|token|masterId|roleId|userId|itemId|shiftId|weeklyOffId|reportId/i.test(k)
+    /Id$|id$|token|masterId|roleId|userId|itemId|weeklyOffId|reportId/i.test(k)
   );
   if (pathIdish.length) {
     lines.push("**Path / URL variables**");

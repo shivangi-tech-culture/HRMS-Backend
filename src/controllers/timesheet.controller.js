@@ -7,6 +7,7 @@ const User = require("../models/User");
 const { hasAllAccess } = require("../middleware/auth");
 const {
   hasGlobalCompanyAccess,
+  companyNamesForUser,
 } = require("../utils/companyScope");
 const { listScopeFilter, assertTeamOrCompanyEmployee } = require("../utils/teamScope");
 const {
@@ -66,7 +67,7 @@ const getTimesheet = async (req, res) => {
         });
       }
       const emp = await User.findById(req.query.employeeId).select(
-        "_id name status official.company official.employeeCode"
+        "_id name status official.companyIds official.employeeCode"
       );
       if (!emp) return res.status(404).json({ message: "Employee not found" });
       if (!hasGlobalCompanyAccess(req.user)) {
@@ -86,71 +87,40 @@ const getTimesheet = async (req, res) => {
     const records = await Attendance.find({
       employee: employeeId,
       date: { $gte: from, $lte: to },
-    })
-      .populate("shift")
-      .lean();
+    }).lean();
 
     for (const r of records) attendanceMap[r.date] = r;
 
-    // Assignments covering range + holidays
-    const ShiftAssignment = require("../models/ShiftAssignment");
     const Holiday = require("../models/Holiday");
     const emp = await User.findById(employeeId)
-      .select("official.company")
-      .lean();
-
-    const assignments = await ShiftAssignment.find({
-      employee: employeeId,
-      effectiveFrom: { $lte: to },
-      $or: [{ effectiveTo: null }, { effectiveTo: { $gte: from } }],
-    })
-      .populate("shift")
-      .populate("weeklyOffPolicy", "name code offDays status")
-      .sort({ effectiveFrom: 1 })
+      .select("official.companyIds")
       .lean();
 
     const holidayFilter = {
       status: "Active",
       date: { $gte: from, $lte: to },
     };
-    const co = String(emp?.official?.company || "").trim();
-    if (co) {
+    const names = await companyNamesForUser(emp);
+    if (names.length === 1) {
       holidayFilter.company = new RegExp(
-        `^${co.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
+        `^${names[0].replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
         "i"
       );
+    } else if (names.length > 1) {
+      holidayFilter.company = {
+        $in: names.map(
+          (name) =>
+            new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i")
+        ),
+      };
     }
     const holidays = await Holiday.find(holidayFilter).lean();
     const holidayMap = {};
     for (const h of holidays) holidayMap[h.date] = h;
 
-    const { effectiveEndTime, dayTypeOf, DEFAULT_SHIFT } = require("../utils/shiftTiming");
+    const { DEFAULT_SHIFT, effectiveEndTime, dayTypeOf } = require("../utils/shiftTiming");
 
-    const shiftForDate = (date) => {
-      let match = null;
-      for (const a of assignments) {
-        if (
-          a.effectiveFrom <= date &&
-          (a.effectiveTo == null || a.effectiveTo >= date)
-        ) {
-          match = a;
-        }
-      }
-      if (match?.shift) {
-        if (match.shift.status && match.shift.status !== "Active") {
-          return { ...DEFAULT_SHIFT };
-        }
-        const weeklyOffDays = match.weeklyOffPolicy?.offDays?.length
-          ? match.weeklyOffPolicy.offDays
-          : match.shift.weeklyOffDays ?? [0];
-        return {
-          ...match.shift,
-          weeklyOffDays,
-        };
-      }
-      // No assignment → default 10:00–19:00 grace 10
-      return { ...DEFAULT_SHIFT };
-    };
+    const shiftForDate = () => ({ ...DEFAULT_SHIFT });
 
     const rows = [];
     let totalPresents = 0;
@@ -371,7 +341,7 @@ const listTeamTimesheet = async (req, res) => {
     const [total, employees] = await Promise.all([
       User.countDocuments(userFilter),
       User.find(userFilter)
-        .select("name official.employeeCode official.department official.company")
+        .select("name official.employeeCode official.department official.companyIds")
         .sort({ name: 1 })
         .skip(skip)
         .limit(limit)

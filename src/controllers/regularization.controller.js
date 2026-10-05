@@ -152,7 +152,7 @@ const createRegularization = async (req, res) => {
         });
       }
       const emp = await User.findById(employeeId).select(
-        "_id name status role official.company official.employeeCode"
+        "_id name status role official.companyIds official.employeeCode"
       );
       if (!emp) return res.status(404).json({ message: "Employee not found" });
       if (emp.status !== "Active") {
@@ -405,7 +405,7 @@ const reviewRegularization = async (req, res) => {
     }
 
     const employee = await User.findById(row.employee).select(
-      "_id official.company"
+      "_id official.companyIds"
     );
     if (!hasGlobalCompanyAccess(req.user)) {
       const err = assertTeamOrCompanyEmployee(req.user, employee);
@@ -431,9 +431,6 @@ const reviewRegularization = async (req, res) => {
       }
 
       const assigned = await getAssignedShift(row.employee, row.sheetDate);
-      if (assigned?.shift && !assigned.shift.isDefault) {
-        attendance.shift = assigned.shift._id;
-      }
 
       if (row.requestedInTime) {
         attendance.punchIn = combineDateTime(row.sheetDate, row.requestedInTime);

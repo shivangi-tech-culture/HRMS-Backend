@@ -113,7 +113,7 @@ const listOvertime = async (req, res) => {
       Overtime.find(filter)
         .populate(
           "employee",
-          "name official.employeeCode official.department official.company"
+          "name official.employeeCode official.department official.companyIds"
         )
         .populate("reviewedBy", "name role")
         .populate("submittedBy", "name role")
@@ -167,7 +167,7 @@ const createOvertime = async (req, res) => {
           .json({ message: "Only admin can submit OT for another employee" });
       }
       const emp = await User.findById(employeeId).select(
-        "_id name status official.company"
+        "_id name status official.companyIds"
       );
       if (!emp) return res.status(404).json({ message: "Employee not found" });
       if (!hasGlobalCompanyAccess(req.user)) {
@@ -270,7 +270,7 @@ const getOvertime = async (req, res) => {
     const row = await Overtime.findById(req.params.id)
       .populate(
         "employee",
-        "name official.employeeCode official.department official.company"
+        "name official.employeeCode official.department official.companyIds"
       )
       .populate("reviewedBy", "name role")
       .populate("submittedBy", "name role");

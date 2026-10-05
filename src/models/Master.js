@@ -1,15 +1,15 @@
 /**
  * Master — dropdown catalogs (global across all companies)
  *
- * type=company → list of companies (tenant names)
- * all other types → shared globally (no company column / filter)
+ * Company is NOT a master. Org companies live in the Company module
+ * (/api/companies, collection companyorgs).
  *
- * Employee forms save `name` string (not _id).
+ * Employee forms save master `name` strings (not _id).
+ * Users store Company _ids in official.companyIds.
  */
 const mongoose = require("mongoose");
 
 const TYPES = [
-  "company",
   "department",
   "designation",
   "division",
@@ -33,7 +33,6 @@ const TYPES = [
 ];
 
 const COLLECTION_BY_TYPE = {
-  company: "companies",
   department: "departments",
   designation: "designations",
   division: "divisions",
@@ -68,7 +67,6 @@ const GENERAL_INFO_DROPDOWNS = {
     "permanentAddress.city": "city",
   },
   official: {
-    company: "company",
     department: "department",
     designation: "designation",
     division: "division",
@@ -101,8 +99,6 @@ const GENERAL_INFO_DROPDOWNS = {
     visaType: "visaType",
   },
 };
-
-const isCompanyType = (type) => type === "company";
 
 /** Mongoose model for this type’s collection (cached) */
 const getModel = (type) => {
@@ -171,7 +167,6 @@ module.exports = {
   TYPES,
   COLLECTION_BY_TYPE,
   GENERAL_INFO_DROPDOWNS,
-  isCompanyType,
   getModel,
   toMasterDto,
   findMasterById,

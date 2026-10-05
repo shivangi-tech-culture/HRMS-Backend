@@ -2,8 +2,7 @@
  * WEEKLY OFF POLICY — Work → Weekly Off
  *
  * UI: Policy Name, Code, Working Days, Week Starts On
- * Assign Shift stores only this doc's _id (weeklyOffPolicy).
- * Punch / timesheet use offDays after populate.
+ * Punch / timesheet use offDays (Sunday weekly off + Saturday half-day by default).
  *
  * offDays: 0=Sunday … 6=Saturday (e.g. [0,6] = Sun+Sat)
  */

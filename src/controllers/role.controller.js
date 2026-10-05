@@ -105,7 +105,7 @@ const getHierarchy = async (_req, res) => {
         rank: 3,
         role: "HR Manager",
         maxUsers: "unlimited",
-        companyAccess: "Assigned companies (Super Admin sets official.companies)",
+        companyAccess: "Assigned companies (Super Admin sets official.companyIds)",
         canCreate: [EMPLOYEE],
         notes: ROLE_DESCRIPTIONS["HR Manager"],
       },

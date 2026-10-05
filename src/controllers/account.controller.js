@@ -5,6 +5,7 @@
  */
 const User = require("../models/User");
 const Role = require("../models/Role");
+const { companyListForUser } = require("../utils/companyScope");
 const {
   countPermissions,
   totalForRole,
@@ -34,18 +35,15 @@ async function refreshLockedRole(roleDoc) {
 }
 
 /** Shape matching My Profile UI cards */
-const toProfilePayload = (user, roleDoc) => {
+const toProfilePayload = async (user, roleDoc) => {
   const official = user.official || {};
   const personal = user.personal || {};
   const isPlatform =
     user.role === "Super Admin" || user.role === "Admin";
+  const companyList = await companyListForUser(user);
   const companies = isPlatform
     ? []
-    : Array.isArray(official.companies) && official.companies.length
-      ? official.companies
-      : official.company
-        ? [official.company]
-        : [];
+    : companyList.map((row) => row.companyName);
   return {
     id: user._id,
     fullName: user.name || "",
@@ -53,8 +51,10 @@ const toProfilePayload = (user, roleDoc) => {
     workEmail: official.officialEmail || "",
     officialEmail: official.officialEmail || "",
     role: user.role || "",
-    company: isPlatform ? "All companies" : official.company || "",
+    company: isPlatform ? "All companies" : companies[0] || "",
     companies,
+    companyList,
+    companyIds: official.companyIds || [],
     department: official.department || "",
     designation: official.designation || "",
     employeeCode: official.employeeCode || "",
@@ -86,7 +86,7 @@ const getMyProfile = async (req, res) => {
 
     return res.json({
       message: "My Profile",
-      data: toProfilePayload(user, roleDoc),
+      data: await toProfilePayload(user, roleDoc),
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -124,7 +124,7 @@ const updateMyProfile = async (req, res) => {
 
     return res.json({
       message: "Profile updated",
-      data: toProfilePayload(lean, roleDoc),
+      data: await toProfilePayload(lean, roleDoc),
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -142,7 +142,7 @@ const getMe = async (req, res) => {
     }
     let roleDoc = await Role.findOne({ name: user.role });
     roleDoc = await refreshLockedRole(roleDoc);
-    const profile = toProfilePayload(user, roleDoc);
+    const profile = await toProfilePayload(user, roleDoc);
 
     return res.json({
       message: "OK",

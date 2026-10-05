@@ -3,7 +3,7 @@
  * Types: regularizationReason | markAttendanceReason
  */
 const { getModel } = require("../models/Master");
-const { getUserCompany, DEFAULT_COMPANY } = require("../utils/companyScope");
+const { companyNamesForUser, DEFAULT_COMPANY } = require("../utils/companyScope");
 const { ATTENDANCE_DROPDOWNS } = require("../config/generalInfoMasters");
 
 const escapeRegex = (value) =>
@@ -16,8 +16,8 @@ const escapeRegex = (value) =>
  */
 const listAttendanceMasterNames = async (type, user) => {
   const Model = getModel(type);
-  const company =
-    (user && getUserCompany(user)) || DEFAULT_COMPANY || "";
+  const names = user ? await companyNamesForUser(user) : [];
+  const company = names[0] || DEFAULT_COMPANY || "";
 
   const filter = { status: "Active" };
   if (company) {

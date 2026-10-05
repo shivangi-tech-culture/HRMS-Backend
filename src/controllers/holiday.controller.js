@@ -9,6 +9,7 @@ const {
   resolveCompany,
   assertOwnCompany,
   hasGlobalCompanyAccess,
+  companyNamesForUser,
 } = require("../utils/workScope");
 
 const okId = (id) => mongoose.Types.ObjectId.isValid(id);
@@ -26,11 +27,14 @@ const listHolidays = async (req, res) => {
     }
 
     if (!hasGlobalCompanyAccess(req.user)) {
-      const own = String(req.user?.official?.company || "").trim();
-      if (!own) {
+      const names = await companyNamesForUser(req.user);
+      if (!names.length) {
         return res.status(403).json({ message: "Your profile has no company" });
       }
-      filter.company = new RegExp(`^${escapeRegex(own)}$`, "i");
+      filter.company =
+        names.length === 1
+          ? new RegExp(`^${escapeRegex(names[0])}$`, "i")
+          : { $in: names.map((name) => new RegExp(`^${escapeRegex(name)}$`, "i")) };
     } else if (company) {
       filter.company = new RegExp(`^${escapeRegex(company)}$`, "i");
     }
@@ -63,7 +67,7 @@ const getHoliday = async (req, res) => {
     }
     const row = await Holiday.findById(req.params.id);
     if (!row) return res.status(404).json({ message: "Holiday not found" });
-    const err = assertOwnCompany(req, row.company);
+    const err = await assertOwnCompany(req, row.company);
     if (err) return res.status(403).json({ message: err });
     return res.json({ data: row });
   } catch (err) {
@@ -73,7 +77,7 @@ const getHoliday = async (req, res) => {
 
 const createHoliday = async (req, res) => {
   try {
-    const company = resolveCompany(req, req.body.company);
+    const company = await resolveCompany(req, req.body.company);
     if (!company) return res.status(400).json({ message: "company is required" });
     const year = Number(String(req.body.date).slice(0, 4));
     const row = await Holiday.create({
@@ -100,7 +104,7 @@ const updateHoliday = async (req, res) => {
     }
     const row = await Holiday.findById(req.params.id);
     if (!row) return res.status(404).json({ message: "Holiday not found" });
-    const err = assertOwnCompany(req, row.company);
+    const err = await assertOwnCompany(req, row.company);
     if (err) return res.status(403).json({ message: err });
     if (!hasGlobalCompanyAccess(req.user)) delete req.body.company;
 
@@ -126,7 +130,7 @@ const deleteHoliday = async (req, res) => {
     }
     const row = await Holiday.findById(req.params.id);
     if (!row) return res.status(404).json({ message: "Holiday not found" });
-    const err = assertOwnCompany(req, row.company);
+    const err = await assertOwnCompany(req, row.company);
     if (err) return res.status(403).json({ message: err });
     await row.deleteOne();
     return res.json({ message: "Holiday deleted" });

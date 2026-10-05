@@ -25,29 +25,35 @@ const {
   managerIdentityTokens,
   teamMemberFilter,
 } = require("../utils/teamScope");
+const { companyNameMap } = require("../utils/companyScope");
 
 const USER_SELECT =
-  "name role status avatar official.officialEmail official.employeeCode official.company official.companies official.department official.designation official.reportingHead1 official.reportingHead2";
+  "name role status avatar official.officialEmail official.employeeCode official.companyIds official.department official.designation official.reportingHead1 official.reportingHead2";
 
-const toCard = (u) => ({
+const toCard = (u, nameById = new Map()) => {
+  const companyIds = Array.isArray(u.official?.companyIds)
+    ? u.official.companyIds
+    : [];
+  const companies = companyIds
+    .map((id) => nameById.get(String(id)))
+    .filter(Boolean);
+  return {
   id: u._id,
   name: u.name || "",
   role: normalizeRoleName(u.role),
   email: u.official?.officialEmail || "",
   employeeCode: u.official?.employeeCode || "",
-  company: u.official?.company || "",
-  companies: Array.isArray(u.official?.companies)
-    ? u.official.companies
-    : u.official?.company
-      ? [u.official.company]
-      : [],
+  company: companies[0] || "",
+  companies,
+  companyIds,
   department: u.official?.department || "",
   designation: u.official?.designation || "",
   status: u.status || "Active",
   avatar: u.avatar || null,
   reportingHead1: u.official?.reportingHead1 || "",
   reportingHead2: u.official?.reportingHead2 || "",
-});
+};
+};
 
 /**
  * GET /api/hierarchy
@@ -61,11 +67,12 @@ const getOverview = async (req, res) => {
         .select(USER_SELECT)
         .sort({ name: 1 })
         .lean();
+      const nameById = await companyNameMap(users);
       levels.push({
         role,
         description: ROLE_DESCRIPTIONS[role] || "",
         count: users.length,
-        users: users.map(toCard),
+        users: users.map((u) => toCard(u, nameById)),
       });
     }
 
@@ -108,6 +115,15 @@ const getTree = async (req, res) => {
       User.find({ role: EMPLOYEE }).select(USER_SELECT).sort({ name: 1 }).lean(),
     ]);
 
+    const nameById = await companyNameMap([
+      ...superAdmins,
+      ...admins,
+      ...hrs,
+      ...managers,
+      ...employees,
+    ]);
+    const card = (u) => toCard(u, nameById);
+
     // Attach team under each Reporting Manager
     const managerNodes = [];
     for (const mgr of managers) {
@@ -123,9 +139,9 @@ const getTree = async (req, res) => {
       });
 
       managerNodes.push({
-        ...toCard(mgr),
+        ...card(mgr),
         teamCount: team.length,
-        children: team.map(toCard),
+        children: team.map(card),
       });
     }
 
@@ -142,19 +158,19 @@ const getTree = async (req, res) => {
       role: SUPER_ADMIN,
       label: "Super Admin",
       count: superAdmins.length,
-      users: superAdmins.map(toCard),
+      users: superAdmins.map(card),
       children: [
         {
           role: ADMIN,
           label: "Admins",
           count: admins.length,
-          users: admins.map(toCard),
+          users: admins.map(card),
           children: [
             {
               role: HR,
               label: "HR Managers",
               count: hrs.length,
-              users: hrs.map(toCard),
+              users: hrs.map(card),
               children: [],
             },
             {
@@ -173,7 +189,7 @@ const getTree = async (req, res) => {
       message: "Organization tree",
       note: "Reporting Manager → employees linked via official.reportingHead1 / reportingHead2",
       tree,
-      unassignedEmployees: unassignedEmployees.map(toCard),
+      unassignedEmployees: unassignedEmployees.map(card),
       totals: {
         superAdmin: superAdmins.length,
         admin: admins.length,
@@ -202,11 +218,12 @@ const listReportingManagers = async (req, res) => {
       .sort({ name: 1 })
       .lean();
 
+    const nameById = await companyNameMap(managers);
     const rows = [];
     for (const mgr of managers) {
       const teamCount = await User.countDocuments(teamMemberFilter(mgr));
       rows.push({
-        ...toCard(mgr),
+        ...toCard(mgr, nameById),
         teamCount,
       });
     }
@@ -257,17 +274,20 @@ const getReportingManagerTeam = async (req, res) => {
       .sort({ name: 1 })
       .lean();
 
+    const nameById = await companyNameMap([mgr, ...team]);
+    const card = (u) => toCard(u, nameById);
+
     return res.json({
       message: "Reporting Manager team",
-      manager: toCard(mgr),
+      manager: card(mgr),
       teamCount: team.length,
-      team: team.map(toCard),
+      team: team.map(card),
       steps: [
-        { step: 1, label: "Select Reporting Manager", selected: toCard(mgr) },
+        { step: 1, label: "Select Reporting Manager", selected: card(mgr) },
         {
           step: 2,
           label: `Team (${team.length})`,
-          members: team.map(toCard),
+          members: team.map(card),
         },
       ],
     });
@@ -292,30 +312,38 @@ const getSuperAdminView = async (req, res) => {
         .lean(),
     ]);
 
+    const nameById = await companyNameMap([
+      ...superAdmins,
+      ...admins,
+      ...hrs,
+      ...managers,
+    ]);
+    const card = (u) => toCard(u, nameById);
+
     return res.json({
       message: "Super Admin hierarchy",
       root: {
         role: SUPER_ADMIN,
-        users: superAdmins.map(toCard),
+        users: superAdmins.map(card),
       },
       branches: [
         {
           role: ADMIN,
           label: "Admins",
           count: admins.length,
-          users: admins.map(toCard),
+          users: admins.map(card),
         },
         {
           role: HR,
           label: "HR Managers (multi-company)",
           count: hrs.length,
-          users: hrs.map(toCard),
+          users: hrs.map(card),
         },
         {
           role: REPORTING_MANAGER,
           label: "Reporting Managers (team)",
           count: managers.length,
-          users: managers.map(toCard),
+          users: managers.map(card),
         },
       ],
     });

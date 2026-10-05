@@ -22,13 +22,12 @@ const description = [
   "| My Profile (account) | `GET/PUT /api/account/profile` — logged-in admin/ESS |",
   "| Employee Management | `/api/employees` list/create/export/delete, approve, official/payroll |",
   "| Masters | `/api/masters` create/update/delete |",
+  "| Company | `/api/companies` CRUD — Super Admin and Admin only (HR has no Company module) |",
   "| Mail | `POST /api/mail/send` |",
   "| Attendance (admin) | Daily list `GET /api/attendance`, details, calendar, late-early, overtime, manual, regularize, close-absent |",
   "| Attendance Reports | `GET/POST /api/reports/attendance` — list · generate · download · regenerate |",
-  "| Work — Shifts | `/api/shifts` CRUD + assignments (`weeklyOffId` from `/api/weekly-offs`) |",
   "| Work — Holiday Calendar | `/api/holidays` CRUD (NATIONAL / DECLARED) |",
   "| Work — Weekly Off | `/api/weekly-offs` |",
-  "| Employee shift | `official.shift` on `/api/employees` only (not Access Control) |",
   "",
   "### 2. Employee Dashboard — ESS (catalog: `employee`)",
   "| Area | APIs |",
@@ -37,7 +36,6 @@ const description = [
   "| My profile | `GET/PUT /api/employees/:id` (own id only) |",
   "| Attendance (self) | punch-in/out (lat/long), web-punches, regularize, today |",
   "| Time Sheet | `GET /api/timesheet` (filters + pagination) |",
-  "| Shift Roster | `GET /api/shifts/roster/me` |",
   "| Masters (dropdowns) | `GET /api/masters?type=…` |",
   "",
   "**Custom roles:** pick `catalog` admin|employee → grant modules → `checkPermission` enforces each action.",
@@ -369,7 +367,7 @@ module.exports = swaggerJsdoc({
           type: "object",
           additionalProperties: false,
           description:
-            "Admin only for most fields. official.shift — Global Admin / Super Admin / HR Manager only (Employee cannot edit).",
+            "Admin only for most fields (employee cannot edit official{}).",
           properties: {
             employeeCode: {
               type: "string",
@@ -409,13 +407,6 @@ module.exports = swaggerJsdoc({
             calculateSalaryFrom: { type: "string", format: "date", nullable: true },
             dateOfRetirement: { type: "string", format: "date", nullable: true },
             grade: { type: "string", example: "G4" },
-            shift: {
-              type: "string",
-              example: "665f1a2b3c4d5e6f7a8b9c0e",
-              nullable: true,
-              description:
-                "Master Shift ObjectId. Set on create/update by Global Admin / Super Admin / HR Manager only — Employee cannot edit.",
-            },
           },
         },
         Other: {
@@ -744,56 +735,6 @@ module.exports = swaggerJsdoc({
               example: "WFH approved",
               description: "Optional note",
             },
-          },
-        },
-        ShiftBody: {
-          type: "object",
-          required: ["name", "startTime", "endTime"],
-          properties: {
-            name: { type: "string", example: "First Shift" },
-            code: { type: "string", example: "FIRST" },
-            company: { type: "string", example: "TechCulture.Ai Private Limited" },
-            punchStartTime: {
-              type: "string",
-              example: "08:00",
-              description: "Earliest punch-in allowed (UI Punch Start Time)",
-            },
-            startTime: {
-              type: "string",
-              example: "09:00",
-              description: "Shift Start — early punch before this (after punchStart) accepted",
-            },
-            endTime: {
-              type: "string",
-              example: "18:00",
-              description: "Shift End — late punch-out after this accepted",
-            },
-            shiftDuration: { type: "number", example: 9 },
-            workDuration: { type: "number", example: 9 },
-            breakApplicable: { type: "boolean", example: false },
-            nightShift: { type: "boolean", example: false },
-            halfDayEndTime: {
-              type: "string",
-              example: "14:30",
-              description: "Saturday half-day end (kept for attendance)",
-            },
-            graceMinutes: { type: "integer", example: 5 },
-            allowEarlyPunchIn: { type: "boolean", example: true },
-            allowLatePunchOut: { type: "boolean", example: true },
-            weeklyOffDays: {
-              type: "array",
-              items: { type: "integer" },
-              example: [0],
-              description: "0=Sun … 6=Sat — default Sunday only",
-            },
-            halfDayDays: {
-              type: "array",
-              items: { type: "integer" },
-              example: [6],
-              description: "Saturday half day ON",
-            },
-            status: { type: "string", enum: ["Active", "Inactive"] },
-            description: { type: "string" },
           },
         },
         ManualAttendanceBody: {

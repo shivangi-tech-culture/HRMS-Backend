@@ -12,6 +12,7 @@ const {
   permissionsForRole,
 } = require("../config/permissions");
 const { setAuthCookie, clearAuthCookie } = require("../utils/authCookie");
+const { companyListForUser } = require("../utils/companyScope");
 const { signToken } = require("../utils/jwt");
 
 const LOCKED_ROLES = new Set(["Super Admin", "Admin"]);
@@ -66,6 +67,12 @@ const login = async (req, res) => {
     const token = signToken(user._id);
     setAuthCookie(res, token);
 
+    const companyList = await companyListForUser(user);
+    const isPlatform = user.role === "Super Admin" || user.role === "Admin";
+    const companyNames = isPlatform
+      ? []
+      : companyList.map((row) => row.companyName);
+
     return res.json({
       message: "Login successful",
       token, // optional: cookie is primary; Bearer still works for Swagger
@@ -75,19 +82,10 @@ const login = async (req, res) => {
         officialEmail: user.official?.officialEmail || "",
         role: user.role,
         department: user.official?.department || "",
-        company:
-          user.role === "Super Admin" || user.role === "Admin"
-            ? "All companies"
-            : user.official?.company || "",
-        companies:
-          user.role === "Super Admin" || user.role === "Admin"
-            ? []
-            : Array.isArray(user.official?.companies) &&
-                user.official.companies.length
-              ? user.official.companies
-              : user.official?.company
-                ? [user.official.company]
-                : [],
+        company: isPlatform ? "All companies" : companyNames[0] || "",
+        companies: companyNames,
+        companyIds: user.official?.companyIds || [],
+        companyList,
         status: user.status,
         lastLogin: user.lastLogin,
         permissionCount: permLabel(roleDoc),

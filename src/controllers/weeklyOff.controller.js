@@ -9,6 +9,7 @@ const {
   resolveCompany,
   assertOwnCompany,
   hasGlobalCompanyAccess,
+  companyNamesForUser,
 } = require("../utils/workScope");
 
 const okId = (id) => mongoose.Types.ObjectId.isValid(id);
@@ -27,11 +28,14 @@ const listWeeklyOffs = async (req, res) => {
     const filter = {};
     if (status) filter.status = status;
     if (!hasGlobalCompanyAccess(req.user)) {
-      const own = String(req.user?.official?.company || "").trim();
-      if (!own) {
+      const names = await companyNamesForUser(req.user);
+      if (!names.length) {
         return res.status(403).json({ message: "Your profile has no company" });
       }
-      filter.company = new RegExp(`^${escapeRegex(own)}$`, "i");
+      filter.company =
+        names.length === 1
+          ? new RegExp(`^${escapeRegex(names[0])}$`, "i")
+          : { $in: names.map((name) => new RegExp(`^${escapeRegex(name)}$`, "i")) };
     } else if (company) {
       filter.company = new RegExp(`^${escapeRegex(company)}$`, "i");
     }
@@ -64,7 +68,7 @@ const getWeeklyOff = async (req, res) => {
     }
     const row = await WeeklyOff.findById(req.params.id);
     if (!row) return res.status(404).json({ message: "Weekly off policy not found" });
-    const err = assertOwnCompany(req, row.company);
+    const err = await assertOwnCompany(req, row.company);
     if (err) return res.status(403).json({ message: err });
     return res.json({ data: row });
   } catch (err) {
@@ -74,7 +78,7 @@ const getWeeklyOff = async (req, res) => {
 
 const createWeeklyOff = async (req, res) => {
   try {
-    const company = resolveCompany(req, req.body.company);
+    const company = await resolveCompany(req, req.body.company);
     if (!company) return res.status(400).json({ message: "company is required" });
     const workingDays = req.body.workingDays ?? 5;
     const offDays = req.body.offDays?.length
@@ -108,7 +112,7 @@ const updateWeeklyOff = async (req, res) => {
     }
     const row = await WeeklyOff.findById(req.params.id);
     if (!row) return res.status(404).json({ message: "Weekly off policy not found" });
-    const err = assertOwnCompany(req, row.company);
+    const err = await assertOwnCompany(req, row.company);
     if (err) return res.status(403).json({ message: err });
     if (!hasGlobalCompanyAccess(req.user)) delete req.body.company;
 
@@ -139,7 +143,7 @@ const deleteWeeklyOff = async (req, res) => {
     }
     const row = await WeeklyOff.findById(req.params.id);
     if (!row) return res.status(404).json({ message: "Weekly off policy not found" });
-    const err = assertOwnCompany(req, row.company);
+    const err = await assertOwnCompany(req, row.company);
     if (err) return res.status(403).json({ message: err });
     await row.deleteOne();
     return res.json({ message: "Weekly off policy deleted" });

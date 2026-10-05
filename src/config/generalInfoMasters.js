@@ -5,8 +5,6 @@
  * Admin can add more later via POST /api/masters.
  * Vaccination module exists in UI but is not seeded / not supported here.
  */
-const { DEFAULT_COMPANY } = require("../utils/companyScope");
-
 /** Exact option lists from frontend chunk (as-is casing/spelling) */
 const UI_DROPDOWNS = {
   courseType: ["Full Time", "Part Time", "Distance", "Online"],
@@ -107,10 +105,10 @@ const ATTENDANCE_DROPDOWNS = {
 
 /**
  * Flatten to seed rows: { type, name }
- * Masters are GLOBAL — no company on rows (except seeding one company name as type=company).
+ * Masters are GLOBAL. Company is not a master — seed creates it via the Company module.
  */
-const buildMasterSeedRows = (company = DEFAULT_COMPANY) => {
-  const rows = [{ type: "company", name: company }];
+const buildMasterSeedRows = () => {
+  const rows = [];
 
   const add = (type, names) => {
     for (const name of names) {

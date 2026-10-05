@@ -8,15 +8,11 @@ const Role = require("../models/Role");
 const {
   SUPER_ADMIN,
   ADMIN,
-  REPORTING_MANAGER,
-  PLATFORM_ROLES,
   maxSuperAdmins,
   canManageRole,
   normalizeRoleName,
   isSuperAdmin,
   isPlatformRole,
-  isMultiCompanyRole,
-  canAssignCompanies,
 } = require("../config/roles");
 const { voidWelcomeEmail, sendEmail } = require("../utils/mail");
 const { applyAnniversary } = require("../utils/anniversary");
@@ -26,9 +22,10 @@ const {
   duplicateKeyMessage,
 } = require("../utils/uniqueFields");
 const {
-  assertSameCompany,
   hasGlobalCompanyAccess,
-  mergeAssignedCompanies,
+  attachCompany,
+  writeCompanyFields,
+  companyNameMap,
 } = require("../utils/companyScope");
 const { assertTeamOrCompanyEmployee } = require("../utils/teamScope");
 const {
@@ -73,83 +70,6 @@ const loadManagedUser = async (req, id) => {
   }
 
   return { user };
-};
-
-const resolveAccessCompany = (req, roleName, officialIn) => {
-  const role = normalizeRoleName(roleName);
-
-  if (PLATFORM_ROLES.includes(role)) {
-    return {
-      ok: true,
-      company: String(officialIn.company || "").trim(),
-    };
-  }
-
-  const company = String(officialIn.company || "").trim();
-  if (!company) {
-    return {
-      ok: false,
-      status: 400,
-      message: "official.company is required",
-    };
-  }
-
-  if (hasGlobalCompanyAccess(req.user)) {
-    return { ok: true, company };
-  }
-
-  const companyErr = assertSameCompany(req.user, company);
-  if (companyErr) {
-    return { ok: false, status: 403, message: companyErr };
-  }
-  return { ok: true, company };
-};
-
-/** HR multi-company — Super Admin only. Reporting Manager = primary only. */
-const resolveAssignedCompanies = (
-  req,
-  roleName,
-  primaryCompany,
-  companiesIn
-) => {
-  const role = normalizeRoleName(roleName);
-
-  if (role === REPORTING_MANAGER) {
-    return {
-      ok: true,
-      companies: primaryCompany ? [primaryCompany] : [],
-    };
-  }
-
-  if (!isMultiCompanyRole(role)) {
-    return { ok: true, companies: [] };
-  }
-
-  if (companiesIn === undefined) {
-    return {
-      ok: true,
-      companies: primaryCompany ? [primaryCompany] : [],
-    };
-  }
-
-  if (!canAssignCompanies(req.user)) {
-    return {
-      ok: false,
-      status: 403,
-      message: "Only Super Admin can assign multiple companies to HR",
-    };
-  }
-
-  const companies = mergeAssignedCompanies(primaryCompany, companiesIn);
-  if (!companies.length) {
-    return {
-      ok: false,
-      status: 400,
-      message: "At least one company is required for HR",
-    };
-  }
-
-  return { ok: true, companies };
 };
 
 /** Enforce Super Admin / Admin create rules */
@@ -211,18 +131,8 @@ const createAccessUserAccount = async (req) => {
     const state = String(addrIn.state || "").trim();
     const country = String(addrIn.country || "").trim();
 
-    const companyRes = resolveAccessCompany(req, roleName, officialIn);
-    if (!companyRes.ok) return companyRes;
-    const company = companyRes.company;
-
-    const companiesRes = resolveAssignedCompanies(
-      req,
-      roleName,
-      company,
-      officialIn.companies
-    );
-    if (!companiesRes.ok) return companiesRes;
-    const companies = companiesRes.companies;
+    const assigned = await attachCompany(req.user, roleName, officialIn);
+    if (!assigned.ok) return assigned;
 
     const uniquePayload = { "official.officialEmail": email };
     if (mobileNo) uniquePayload["personal.mobileNo"] = mobileNo;
@@ -242,19 +152,20 @@ const createAccessUserAccount = async (req) => {
 
     const platform = isPlatformRole(roleName);
 
-    const official = platform
-      ? {
-          officialEmail: email,
-          ...(employeeCode ? { employeeCode } : {}),
-          ...(company ? { company } : {}),
-        }
-      : {
-          officialEmail: email,
-          company,
-          ...(companies.length ? { companies } : {}),
-          ...(department ? { department } : {}),
-          ...(employeeCode ? { employeeCode } : {}),
-        };
+    const official = writeCompanyFields(
+      platform
+        ? {
+            officialEmail: email,
+            ...(employeeCode ? { employeeCode } : {}),
+          }
+        : {
+            officialEmail: email,
+            ...(department ? { department } : {}),
+            ...(employeeCode ? { employeeCode } : {}),
+          },
+      assigned,
+      roleName
+    );
 
     const createDoc = {
       name: String(name).trim(),
@@ -276,9 +187,9 @@ const createAccessUserAccount = async (req) => {
 
     const mailCompany = platform
       ? "All companies"
-      : companies.length > 1
-        ? companies.join(", ")
-        : company;
+      : assigned.companies.length > 1
+        ? assigned.companies.join(", ")
+        : assigned.company;
     const mail = voidWelcomeEmail({
       name: createDoc.name,
       email,
@@ -318,7 +229,7 @@ const createUser = async (req, res) => {
 const listUsers = async (req, res) => {
   try {
     const roleScope = visibleRolesForActor(req.user);
-    const built = buildListQuery(req, { roleScope });
+    const built = await buildListQuery(req, { roleScope });
     if (built.error) {
       return res
         .status(built.error.status)
@@ -336,6 +247,7 @@ const listUsers = async (req, res) => {
         .lean(),
     ]);
 
+    const nameById = await companyNameMap(rows);
     return res.json({
       count: rows.length,
       total,
@@ -345,7 +257,7 @@ const listUsers = async (req, res) => {
       from: total === 0 ? 0 : skip + 1,
       to: skip + rows.length,
       filters: applied,
-      users: rows.map(mapListRow),
+      users: rows.map((row) => mapListRow(row, nameById)),
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -432,7 +344,7 @@ const updateUser = async (req, res) => {
 
       if (!user.official) user.official = {};
       if (isPlatformRole(nextRole)) {
-        user.official.companies = undefined;
+        user.official.companyIds = undefined;
       }
       user.role = nextRole;
     }
@@ -449,36 +361,23 @@ const updateUser = async (req, res) => {
       user.markModified("official");
     }
 
-    if (req.body.official?.companies !== undefined) {
+    if (req.body.official?.companyIds !== undefined) {
       const targetRole = normalizeRoleName(user.role);
-      if (!isMultiCompanyRole(targetRole)) {
-        return res.status(400).json({
-          message: "official.companies can only be set for HR Manager",
-        });
-      }
-      if (!canAssignCompanies(req.user)) {
-        return res.status(403).json({
-          message: "Only Super Admin can assign multiple companies",
-        });
-      }
       if (!user.official) user.official = {};
-      const primary =
-        String(user.official.company || "").trim() ||
-        mergeAssignedCompanies("", req.body.official.companies)[0] ||
-        "";
-      const companiesRes = resolveAssignedCompanies(
-        req,
+      const assigned = await attachCompany(
+        req.user,
         targetRole,
-        primary,
-        req.body.official.companies
+        req.body.official
       );
-      if (!companiesRes.ok) {
-        return res
-          .status(companiesRes.status)
-          .json({ message: companiesRes.message });
+      if (!assigned.ok) {
+        return res.status(assigned.status).json({ message: assigned.message });
       }
-      user.official.company = companiesRes.companies[0] || primary;
-      user.official.companies = companiesRes.companies;
+      const current =
+        typeof user.official.toObject === "function"
+          ? user.official.toObject()
+          : { ...user.official };
+      const next = writeCompanyFields(current, assigned, targetRole);
+      user.official.companyIds = next.companyIds;
       user.markModified("official");
     }
 
@@ -575,7 +474,7 @@ const deleteUser = async (req, res) => {
 const exportUsers = async (req, res) => {
   try {
     const roleScope = visibleRolesForActor(req.user);
-    const built = buildListQuery(req, { roleScope });
+    const built = await buildListQuery(req, { roleScope });
     if (built.error) {
       return res
         .status(built.error.status)
@@ -587,8 +486,9 @@ const exportUsers = async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
+    const nameById = await companyNameMap(rows);
     const data = rows.map((row) => {
-      const mapped = mapListRow(row);
+      const mapped = mapListRow(row, nameById);
       return {
         name: mapped.name,
         email: mapped.email,
@@ -630,7 +530,7 @@ const exportUsers = async (req, res) => {
 const sendUserMail = async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select(
-      "name role official.officialEmail official.company official.reportingHead1 official.reportingHead2"
+      "name role official.officialEmail official.companyIds official.reportingHead1 official.reportingHead2"
     );
     if (!user) {
       return res.status(404).json({ message: "User not found" });

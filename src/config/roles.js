@@ -5,15 +5,17 @@
  * │  Super Admin  (exactly 1)                                   │
  * │  • All companies · full access                              │
  * │  • Creates Admin · assigns multi-company to HR              │
- * │  • Cannot be created by Admin                               │
+ * │  • Company module (create / manage companies)               │
+ * │  • Cannot be created by Admin (seed / ops only)             │
  * ├─────────────────────────────────────────────────────────────┤
  * │  Admin  (many)                                              │
- * │  • All companies · full access                              │
+ * │  • All companies · full access including Company module     │
  * │  • Created only by Super Admin                              │
  * │  • Cannot create / assign Super Admin                       │
  * ├─────────────────────────────────────────────────────────────┤
  * │  HR Manager  (many)                                         │
  * │  • Multi-company access when Super Admin assigns companies[]│
+ * │  • No Company module                                        │
  * │  • Manages employees within assigned companies              │
  * ├─────────────────────────────────────────────────────────────┤
  * │  Reporting Manager  (many)                                  │
@@ -60,7 +62,7 @@ const PLATFORM_ROLES = [SUPER_ADMIN, ADMIN];
 /** All-company tenant access (no company filter) */
 const GLOBAL_COMPANY_ROLES = [SUPER_ADMIN, ADMIN];
 
-/** May receive official.companies[] (multi-company) — Super Admin assigns */
+/** May assign more than one company id to HR — Super Admin only */
 const MULTI_COMPANY_ROLES = [HR];
 
 /** Single-company + team scope */
@@ -170,7 +172,7 @@ const canManageRole = (actorRole, targetRole) => {
 };
 
 /**
- * Who may assign official.companies[] to HR.
+ * Who may assign more than one official.companyIds entry to HR.
  * Only Super Admin (per product rule).
  */
 const canAssignCompanies = (userOrRole) => isSuperAdmin(userOrRole);
@@ -203,11 +205,11 @@ const visibleRoleFilter = (actorRole) => {
 /** Short descriptions for seed / API docs */
 const ROLE_DESCRIPTIONS = {
   [SUPER_ADMIN]:
-    "Single top account. All companies, full access. Creates Admin; assigns multi-company to HR.",
+    "Single top account. All companies and Company module. Creates Admin; assigns multi-company to HR. Not created by Admin.",
   [ADMIN]:
-    "Multiple allowed. All companies, full access. Created by Super Admin. Cannot create Super Admin.",
+    "Multiple allowed. All companies and Company module. Created by Super Admin. Cannot create Super Admin.",
   [HR]:
-    "Multi-company when Super Admin assigns official.companies. Manages employees in those companies.",
+    "Multi-company when Super Admin assigns official.companyIds. Manages employees in those companies. No Company module.",
   [REPORTING_MANAGER]:
     "Single company. Sees / manages only their team (reportingHead).",
   [EMPLOYEE]: "Own ESS access only (Self / Team / Request / Tasks).",

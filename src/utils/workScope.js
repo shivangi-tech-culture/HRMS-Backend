@@ -1,11 +1,9 @@
 /**
- * Shared helpers for Work module (Shift / Assignment / Holiday / Timings / Weekly Off)
+ * Shared helpers for Work module (Holiday / Weekly Off)
  */
 const {
   hasGlobalCompanyAccess,
-  getUserCompany,
-  getAccessibleCompanies,
-  canAccessCompany,
+  companyNamesForUser,
   withDefaultCompany,
   normalizeCompany,
 } = require("./companyScope");
@@ -13,31 +11,31 @@ const {
 const escapeRegex = (value) =>
   String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-const resolveCompany = (req, bodyCompany) => {
+const resolveCompany = async (req, bodyCompany) => {
   if (hasGlobalCompanyAccess(req.user)) {
-    return withDefaultCompany(bodyCompany || getUserCompany(req.user));
+    return withDefaultCompany(bodyCompany || "");
   }
 
+  const names = await companyNamesForUser(req.user);
   const sent = String(bodyCompany || "").trim();
-  if (sent) {
-    if (!canAccessCompany(req.user, sent)) {
-      return String(req.user?.official?.company || "").trim() || withDefaultCompany("");
-    }
+  if (
+    sent &&
+    names.some((name) => normalizeCompany(name) === normalizeCompany(sent))
+  ) {
     return sent;
   }
-
-  const own = String(req.user?.official?.company || "").trim();
-  return own || withDefaultCompany("");
+  return names[0] || "";
 };
 
-const assertOwnCompany = (req, companyName) => {
+const assertOwnCompany = async (req, companyName) => {
   if (hasGlobalCompanyAccess(req.user)) return null;
-  if (canAccessCompany(req.user, companyName)) return null;
-
-  const accessible = getAccessibleCompanies(req.user) || [];
-  return accessible.length > 1
-    ? "Access denied for this company"
-    : "Access denied for this company";
+  const names = await companyNamesForUser(req.user);
+  if (
+    names.some((name) => normalizeCompany(name) === normalizeCompany(companyName))
+  ) {
+    return null;
+  }
+  return "Access denied for this company";
 };
 
 /** "Sat, Sun" | "Sun" | "Sat-Sun" → [0,6] */
@@ -80,8 +78,6 @@ module.exports = {
   parseWeeklyOffLabel,
   formatWeeklyOffLabel,
   hasGlobalCompanyAccess,
-  getUserCompany,
-  getAccessibleCompanies,
-  canAccessCompany,
+  companyNamesForUser,
   normalizeCompany,
 };
