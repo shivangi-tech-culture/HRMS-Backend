@@ -2,9 +2,9 @@
  * PERMISSIONS CATALOG — default role matrices (ADMIN_TREE + ESS_TREE)
  * Seed and Role APIs use permissionsForRole(name).
  *
- * Company (org setup) is NOT in ADMIN_TREE.
+ * Company org CRUD is a submodule of Administration, not its own module.
  * Only Super Admin and Admin receive it. HR, Reporting Manager,
- * Employee, and custom roles cannot be granted the Company module.
+ * Employee, and custom roles cannot be granted Company.
  */
 const ACTIONS = [
   "view", "create", "edit", "delete", "approve", "reject",
@@ -184,6 +184,8 @@ const ADMIN_TREE = [
       { name: "Country", actions: CRUD },
       { name: "State", actions: CRUD },
       { name: "City", actions: CRUD },
+      { name: "Branch", actions: CRUD },
+      { name: "Shift", actions: CRUD },
       { name: "Course Type", actions: CRUD },
       { name: "Course Level", actions: CRUD },
       { name: "Bank Name", actions: CRUD },
@@ -237,6 +239,7 @@ const ADMIN_TREE = [
   },
 
   // Administration
+  // Company CRUD is not listed here. Super Admin / Admin get it via PLATFORM_TREE.
   {
     module: "Administration",
     heading: "Administration",
@@ -248,22 +251,39 @@ const ADMIN_TREE = [
         actions: ["view", "create", "edit", "delete", "export"],
       },
       { name: "System Configuration", actions: VEd },
+      // Org tree + manual reporting-manager assignment (/api/hierarchy)
+      // Super Admin / Admin / HR → full org; Reporting Manager → own team only (view)
+      { name: "Hierarchy", actions: ["view", "assign"] },
     ],
   },
 ];
 
 /**
- * Company org setup (/api/companies).
- * Platform roles only — kept out of ADMIN_TREE so HR and custom roles never see it.
+ * Default grants narrower than the catalog for a system role.
+ * Key "Module/SubModule" → allowed actions. Admins can still widen via Roles & Permissions.
  */
-const COMPANY_MODULE = {
-  module: "Company",
-  heading: "Company",
-  subModules: [{ name: "Company", actions: CRUD }],
+const ROLE_DEFAULT_LIMITS = {
+  "Reporting Manager": { "Administration/Hierarchy": ["view"] },
 };
 
-/** Super Admin / Admin matrix = admin catalog + Company */
-const PLATFORM_TREE = [...ADMIN_TREE, COMPANY_MODULE];
+/**
+ * Company org CRUD (/api/companies).
+ * Nested under Administration for Super Admin and Admin only.
+ * Kept out of ADMIN_TREE so HR and custom roles never see it.
+ */
+const COMPANY_SUBMODULE = { name: "Company", actions: CRUD };
+
+const withCompanyCrud = (tree) =>
+  tree.map((block) => {
+    if (block.module !== "Administration") return block;
+    return {
+      ...block,
+      subModules: [...block.subModules, COMPANY_SUBMODULE],
+    };
+  });
+
+/** Super Admin / Admin matrix = admin catalog + Administration → Company */
+const PLATFORM_TREE = withCompanyCrud(ADMIN_TREE);
 
 // ESS — Employee only (live UI: hrms-techculture.vercel.app)
 // top nav: Dashboard · Self · Team · Request · Tasks
@@ -362,7 +382,7 @@ function countSlots(tree) {
   return total;
 }
 
-const TOTAL_PERMISSIONS = countSlots(ADMIN_TREE); // HR / Reporting Manager (no Company)
+const TOTAL_PERMISSIONS = countSlots(ADMIN_TREE); // HR / Reporting Manager (no Company CRUD)
 const PLATFORM_TOTAL = countSlots(PLATFORM_TREE); // Super Admin / Admin
 const EMPLOYEE_TOTAL = countSlots(ESS_TREE); // Employee
 const COMBINED_TOTAL = countSlots(MODULE_TREE); // custom roles (admin + ESS)
@@ -394,29 +414,34 @@ function toFlags(allowed) {
 /**
  * Convert catalog tree into the shape saved on role.permissions.
  */
-function buildFromTree(tree) {
+function buildFromTree(tree, limits = {}) {
   const result = [];
   for (const block of tree) {
     result.push({
       module: block.module,
       heading: block.heading,
-      subModules: block.subModules.map((sub) => ({
-        name: sub.name,
-        ...toFlags(sub.actions),
-      })),
+      subModules: block.subModules.map((sub) => {
+        const limit = limits[`${block.module}/${sub.name}`];
+        const allowed = limit
+          ? sub.actions.filter((a) => limit.includes(a))
+          : sub.actions;
+        return { name: sub.name, ...toFlags(allowed) };
+      }),
     });
   }
   return result;
 }
 
-/** Get full permissions for a role name */
+/** Get default permissions for a role name */
 function permissionsForRole(role) {
   if (role === "Employee") return buildFromTree(ESS_TREE);
-  // Company module: Super Admin and Admin only
+  // Administration → Company: Super Admin and Admin only
   if (role === "Super Admin" || role === "Admin" || role === "Global Admin") {
     return buildFromTree(PLATFORM_TREE);
   }
-  return buildFromTree(ADMIN_TREE); // HR Manager, Reporting Manager — no Company
+  // HR Manager, Reporting Manager — no Company CRUD
+  const name = role === "Manager" ? "Reporting Manager" : role;
+  return buildFromTree(ADMIN_TREE, ROLE_DEFAULT_LIMITS[name]);
 }
 
 /** Max permission count for a role (optional catalog for custom roles) */
@@ -582,7 +607,6 @@ function normalizePermissions(incoming, tree = ADMIN_TREE) {
 module.exports = {
   ACTIONS,
   ADMIN_TREE,
-  COMPANY_MODULE,
   PLATFORM_TREE,
   ESS_TREE,
   MODULE_TREE,

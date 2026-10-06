@@ -8,6 +8,7 @@ const { hasAllAccess } = require("../middleware/auth");
 const {
   hasGlobalCompanyAccess,
   companyNamesForUser,
+  COMPANY_POPULATE,
 } = require("../utils/companyScope");
 const { listScopeFilter, assertTeamOrCompanyEmployee } = require("../utils/teamScope");
 const {
@@ -342,6 +343,7 @@ const listTeamTimesheet = async (req, res) => {
       User.countDocuments(userFilter),
       User.find(userFilter)
         .select("name official.employeeCode official.department official.companyIds")
+        .populate(COMPANY_POPULATE)
         .sort({ name: 1 })
         .skip(skip)
         .limit(limit)

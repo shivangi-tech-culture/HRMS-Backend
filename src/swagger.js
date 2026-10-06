@@ -22,7 +22,7 @@ const description = [
   "| My Profile (account) | `GET/PUT /api/account/profile` — logged-in admin/ESS |",
   "| Employee Management | `/api/employees` list/create/export/delete, approve, official/payroll |",
   "| Masters | `/api/masters` create/update/delete |",
-  "| Company | `/api/companies` CRUD — Super Admin and Admin only (HR has no Company module) |",
+  "| Company | `/api/companies` nested branches+shifts; GET `/:id/branches` for user dropdown |",
   "| Mail | `POST /api/mail/send` |",
   "| Attendance (admin) | Daily list `GET /api/attendance`, details, calendar, late-early, overtime, manual, regularize, close-absent |",
   "| Attendance Reports | `GET/POST /api/reports/attendance` — list · generate · download · regenerate |",
@@ -379,11 +379,24 @@ module.exports = swaggerJsdoc({
               example: "shivi.gupta@techculture.ai",
               description: "Login ID — unique",
             },
-            company: {
-              type: "string",
-              example: "TechCulture.Ai Private Limited",
+            companyIds: {
+              type: "array",
+              items: { type: "string" },
+              example: ["6ac4ca7070e8935d51b17035"],
+              description:
+                "Company _ids. Workplace is branchId + shiftId. Catalog: GET /api/companies/{id}/branches.",
             },
             department: { type: "string", example: "Finance" },
+            branchId: {
+              type: "string",
+              example: "6ac4e6585473cbef581c18cf",
+              description: "Assigned branch _id from GET /api/companies/{id}/branches",
+            },
+            shiftId: {
+              type: "string",
+              example: "6ac4e6585473cbef581c18d0",
+              description: "Assigned shift _id of that branch. Days stay on Company.",
+            },
             designation: { type: "string", example: "Finance Executive" },
             division: {
               type: "string",
@@ -395,8 +408,18 @@ module.exports = swaggerJsdoc({
               example: "Permanent",
               description: "Master name string (not ObjectId)",
             },
-            reportingHead1: { type: "string", example: "Shivangi Gupta" },
-            reportingHead2: { type: "string" },
+            reportingHead1: {
+              type: "string",
+              nullable: true,
+              example: "6ac4b3e4d269e78d0eae7f64",
+              description:
+                "Reporting Manager User _id. Responses return { _id, name, email, employeeCode }. Bulk: POST /api/hierarchy/assign",
+            },
+            reportingHead2: {
+              type: "string",
+              nullable: true,
+              description: "Second Reporting Manager User _id",
+            },
             jobRole: { type: "string", example: "Executive" },
             dateOfJoining: {
               type: "string",

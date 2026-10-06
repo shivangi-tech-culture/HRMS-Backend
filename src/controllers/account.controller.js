@@ -5,7 +5,10 @@
  */
 const User = require("../models/User");
 const Role = require("../models/Role");
-const { companyListForUser } = require("../utils/companyScope");
+const {
+  companyListForUser,
+  hasGlobalCompanyAccess,
+} = require("../utils/companyScope");
 const {
   countPermissions,
   totalForRole,
@@ -38,12 +41,10 @@ async function refreshLockedRole(roleDoc) {
 const toProfilePayload = async (user, roleDoc) => {
   const official = user.official || {};
   const personal = user.personal || {};
-  const isPlatform =
-    user.role === "Super Admin" || user.role === "Admin";
-  const companyList = await companyListForUser(user);
-  const companies = isPlatform
-    ? []
-    : companyList.map((row) => row.companyName);
+  const companies = (await companyListForUser(user)).map((row) => ({
+    _id: row.companyId,
+    companyName: row.companyName,
+  }));
   return {
     id: user._id,
     fullName: user.name || "",
@@ -51,10 +52,8 @@ const toProfilePayload = async (user, roleDoc) => {
     workEmail: official.officialEmail || "",
     officialEmail: official.officialEmail || "",
     role: user.role || "",
-    company: isPlatform ? "All companies" : companies[0] || "",
+    allCompanies: hasGlobalCompanyAccess(user),
     companies,
-    companyList,
-    companyIds: official.companyIds || [],
     department: official.department || "",
     designation: official.designation || "",
     employeeCode: official.employeeCode || "",

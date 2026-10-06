@@ -154,7 +154,7 @@ const updateMaster = async (req, res) => {
     const found = await findMasterById(req.params.id);
     if (!found) return res.status(404).json({ message: "Not found" });
 
-    const { type, row, Model } = found;
+    const { row, Model } = found;
 
     if (req.body.name !== undefined) {
       const nextName = String(req.body.name).trim();
@@ -164,8 +164,6 @@ const updateMaster = async (req, res) => {
       row.name = nextName;
     }
     if (req.body.status !== undefined) row.status = req.body.status;
-
-    // Ignore company — masters are global
     row.company = "";
 
     const dup = await findDuplicateName(Model, {
@@ -181,7 +179,7 @@ const updateMaster = async (req, res) => {
     await row.save();
     return res.json({
       message: "Updated",
-      master: toMasterDto(type, row),
+      master: toMasterDto(found.type, row),
     });
   } catch (err) {
     if (err.code === 11000) {
@@ -201,7 +199,6 @@ const deleteMaster = async (req, res) => {
     if (!found) return res.status(404).json({ message: "Not found" });
 
     const { type, row } = found;
-
     await row.deleteOne();
     return res.json({ message: "Deleted", id: req.params.id, type });
   } catch (err) {

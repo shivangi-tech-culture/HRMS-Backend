@@ -1,6 +1,7 @@
 /**
  * DATABASE SEED — wipe + recreate demo roles, masters, users
  * Password for all sample users: 123456. Run: npm run seed
+ * Order: roles + permissions → default users → all masters.
  *
  * Hierarchy: src/config/roles.js
  */
@@ -37,31 +38,27 @@ const { DEFAULT_COMPANY } = require("./utils/companyScope");
 const Company = require("./models/Company");
 const { WEEK_DAYS } = Company;
 
-/** One week: Mon–Fri 10:00–19:00, Saturday half day, Sunday off. */
-const seedWeek = (weekNumber) => ({
-  weekNumber,
-  days: WEEK_DAYS.map((day) => {
-    if (day === "sunday") {
-      return {
-        day,
-        isOff: true,
-        startTime: "",
-        endTime: "",
-        breakStartTime: "",
-        breakEndTime: "",
-      };
+const weekDays = (start, end, satEnd = "13:30") =>
+  WEEK_DAYS.map((day) => {
+    if (day === "sunday") return { day, isOff: true };
+    if (day === "saturday") {
+      return { day, isOff: false, startTime: start, endTime: satEnd };
     }
-    const half = day === "saturday";
     return {
       day,
       isOff: false,
-      startTime: "10:00",
-      endTime: half ? "14:30" : "19:00",
-      breakStartTime: half ? "" : "13:30",
-      breakEndTime: half ? "" : "14:00",
+      startTime: start,
+      endTime: end,
+      breakStartTime: "13:00",
+      breakEndTime: "14:00",
     };
-  }),
-});
+  });
+
+const fourWeeks = (start, end, satEnd) =>
+  [1, 2, 3, 4].map((weekNumber) => ({
+    weekNumber,
+    days: weekDays(start, end, satEnd),
+  }));
 
 const EMPLOYEE_PROFILE_UNSET = {
   personal: 1,
@@ -91,6 +88,13 @@ const seed = async () => {
   await User.deleteMany({});
   await Role.deleteMany({});
   await clearAllMasterCollections();
+  await Company.deleteMany({});
+  for (const name of ["branches", "shifts", "shiftassignments"]) {
+    try {
+      await mongoose.connection.dropCollection(name);
+      console.log(`Dropped collection: ${name}`);
+    } catch (_) {}
+  }
   try {
     await mongoose.connection.dropCollection("masters");
     console.log("Dropped legacy collection: masters");
@@ -135,35 +139,6 @@ const seed = async () => {
     );
   }
 
-  await Company.deleteMany({});
-  const companyOrg = await Company.create({
-    companyName: DEFAULT_COMPANY,
-    companyCode: "TCPL",
-    isActive: true,
-    branches: [
-      {
-        branchName: "Noida",
-        branchCode: "NOI",
-        address: "",
-        city: "Noida",
-        state: "Uttar Pradesh",
-        isActive: true,
-        shifts: [
-          {
-            shiftName: "General Shift",
-            shiftCode: "GS-01",
-            isActive: true,
-            monthlySchedule: [1, 2, 3, 4, 5].map(seedWeek),
-          },
-        ],
-      },
-    ],
-  });
-  const companyId = companyOrg._id;
-  console.log(
-    `Company → ${companyOrg.companyName} (${companyOrg.companyCode}) id ${companyId}`
-  );
-
   const { buildMasterSeedRows } = require("./config/generalInfoMasters");
   const masters = buildMasterSeedRows();
 
@@ -174,10 +149,66 @@ const seed = async () => {
       company: "",
       status: "Active",
     });
-    console.log(
-      `Master → ${m.type} (${COLLECTION_BY_TYPE[m.type]}): ${m.name}`
-    );
+    console.log(`Master → ${m.type} (${COLLECTION_BY_TYPE[m.type]}): ${m.name}`);
   }
+
+  const companyOrg = await Company.create({
+    companyName: DEFAULT_COMPANY,
+    companyCode: "TCPL",
+    isActive: true,
+    branches: [
+      {
+        branchName: "Noida",
+        branchCode: "NOIDA",
+        city: "Noida",
+        state: "Uttar Pradesh",
+        isActive: true,
+        shifts: [
+          {
+            shiftName: "General Shift",
+            shiftCode: "GS-01",
+            isActive: true,
+            monthlySchedule: fourWeeks("10:00", "19:00"),
+          },
+          {
+            shiftName: "Evening Shift",
+            shiftCode: "ES-01",
+            isActive: true,
+            monthlySchedule: fourWeeks("14:00", "23:00", "18:00"),
+          },
+        ],
+      },
+      {
+        branchName: "Delhi",
+        branchCode: "DEL",
+        city: "Delhi",
+        state: "Delhi",
+        isActive: true,
+        shifts: [
+          {
+            shiftName: "General Shift",
+            shiftCode: "GS-01",
+            isActive: true,
+            monthlySchedule: fourWeeks("10:00", "19:00"),
+          },
+          {
+            shiftName: "Evening Shift",
+            shiftCode: "ES-01",
+            isActive: true,
+            monthlySchedule: fourWeeks("14:00", "23:00", "18:00"),
+          },
+        ],
+      },
+    ],
+  });
+  const companyId = companyOrg._id;
+  const noida = companyOrg.branches.find((b) => b.branchName === "Noida");
+  const delhi = companyOrg.branches.find((b) => b.branchName === "Delhi");
+  const noidaGeneral = noida.shifts.find((s) => s.shiftName === "General Shift");
+  const delhiEvening = delhi.shifts.find((s) => s.shiftName === "Evening Shift");
+  console.log(
+    `Company → ${companyOrg.companyName} (${companyOrg.companyCode}) id ${companyId}`
+  );
 
   const users = [
     {
@@ -212,6 +243,8 @@ const seed = async () => {
         companyIds: [companyId],
         department: "HR",
         designation: "HR Manager",
+        branchId: noida._id,
+        shiftId: noidaGeneral._id,
       },
     },
     {
@@ -226,6 +259,8 @@ const seed = async () => {
         companyIds: [companyId],
         department: "Engineering",
         designation: "Engineering Manager",
+        branchId: noida._id,
+        shiftId: noidaGeneral._id,
       },
     },
     {
@@ -240,8 +275,10 @@ const seed = async () => {
         companyIds: [companyId],
         department: "Engineering",
         designation: "Software Engineer",
-        reportingHead1: "manager@gmail.com",
+        branchId: noida._id,
+        shiftId: noidaGeneral._id,
       },
+      reportsTo: "manager@gmail.com",
     },
     {
       name: "Employee Two",
@@ -259,11 +296,14 @@ const seed = async () => {
         companyIds: [companyId],
         department: "Engineering",
         designation: "Software Engineer",
-        reportingHead1: "manager@gmail.com",
+        branchId: delhi._id,
+        shiftId: delhiEvening._id,
       },
+      reportsTo: "manager@gmail.com",
     },
   ];
 
+  const idByEmail = new Map();
   for (const u of users) {
     const hashed = await bcrypt.hash(u.password, 10);
     const email = String(u.official.officialEmail).toLowerCase().trim();
@@ -276,12 +316,16 @@ const seed = async () => {
       status: u.status,
       official: { ...u.official, officialEmail: email },
     };
+    if (u.reportsTo) {
+      doc.official.reportingHead1 = idByEmail.get(u.reportsTo) || null;
+    }
 
     if (!platform) {
       doc.personal = u.personal || {};
     }
 
     const created = await User.create(doc);
+    idByEmail.set(email, created._id);
 
     if (platform) {
       await User.collection.updateOne(
@@ -318,7 +362,7 @@ const seed = async () => {
   console.log("  HR Manager         → hr@gmail.com");
   console.log("  Reporting Manager  → manager@gmail.com");
   console.log("  Employee           → employee@gmail.com / employee1@gmail.com");
-  console.log("  Next               → npm run sync:admin-perms (refresh role matrices)");
+  console.log(`  Masters            → ${masters.length} rows`);
   process.exit(0);
 };
 

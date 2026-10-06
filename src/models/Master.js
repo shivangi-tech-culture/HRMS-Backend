@@ -1,8 +1,8 @@
 /**
  * Master — dropdown catalogs (global across all companies)
  *
- * Company is NOT a master. Org companies live in the Company module
- * (/api/companies, collection companyorgs).
+ * Company is NOT a master. Org companies live at /api/companies
+ * (Administration → Company, collection companyorgs).
  *
  * Employee forms save master `name` strings (not _id).
  * Users store Company _ids in official.companyIds.
@@ -22,6 +22,8 @@ const TYPES = [
   "country",
   "state",
   "city",
+  "branch",
+  "shift",
   "courseType",
   "courseLevel",
   "bankName",
@@ -45,6 +47,8 @@ const COLLECTION_BY_TYPE = {
   country: "countries",
   state: "states",
   city: "cities",
+  branch: "branches",
+  shift: "shifts",
   courseType: "coursetypes",
   courseLevel: "courselevels",
   bankName: "banknames",
@@ -73,6 +77,8 @@ const GENERAL_INFO_DROPDOWNS = {
     employeeGroup: "employeeGroup",
     grade: "grade",
     jobRole: "jobRole",
+    branch: "branch",
+    shift: "shift",
   },
   other: {
     bloodGroup: "bloodGroup",

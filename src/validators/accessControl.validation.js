@@ -35,6 +35,8 @@ const officialStaff = only({
   employeeCode: Joi.string().trim().uppercase().allow("").optional(),
   companyIds: companyIdsField.optional(),
   department: Joi.string().trim().allow("").optional(),
+  branchId: Joi.string().hex().length(24).allow("", null).optional(),
+  shiftId: Joi.string().hex().length(24).allow("", null).optional(),
 });
 
 const personalAccessLean = only({
@@ -68,6 +70,8 @@ const updateAccessUserSchema = Joi.object({
     employeeCode: Joi.string().trim().uppercase().allow("").optional(),
     department: str(),
     companyIds: companyIdsField.optional(),
+    branchId: Joi.string().hex().length(24).allow("", null).optional(),
+    shiftId: Joi.string().hex().length(24).allow("", null).optional(),
   }).optional(),
   personal: personalAccessLean.optional(),
 })

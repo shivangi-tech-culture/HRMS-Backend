@@ -167,7 +167,7 @@ app.use("/api/reports/attendance", require("./routes/attendanceReport.routes"));
 app.use("/api/holidays", holidayRoutes); // Holiday Calendar
 app.use("/api/weekly-offs", weeklyOffRoutes); // Weekly Off policies
 app.use("/api/mail", mailRoutes); // Organization → Mail send
-app.use("/api/masters", masterRoutes); // SaaS masters (typed collections)
+app.use("/api/masters", masterRoutes); // SaaS masters (typed collections, including Branch + Shift)
 app.use("/api/companies", companyRoutes); // Company org (Super Admin + Admin only)
 
 // START SERVER (colored chalk banners)

@@ -1,8 +1,6 @@
 /**
- * SHIFT TIMING HELPERS — default work window for punch / timesheet metrics
- *
- * Shift master CRUD removed from Work module.
- * Always uses DEFAULT_SHIFT (10:00–19:00, Sunday WO, Saturday half-day).
+ * SHIFT TIMING HELPERS — punch / timesheet window
+ * Uses the user's assigned company shift (branchId + shiftId).
  */
 const TZ = () => process.env.TZ || "Asia/Kolkata";
 
@@ -48,11 +46,56 @@ const DEFAULT_SHIFT = {
   isDefault: true,
 };
 
-/** Always default — Shift module removed */
-const getAssignedShift = async () => ({
-  assignment: null,
-  shift: { ...DEFAULT_SHIFT },
-});
+const getAssignedShift = async (employeeId, dateStr) => {
+  try {
+    const User = require("../models/User");
+    const { getUserDaySchedule } = require("./companyShift");
+    const user = await User.findById(employeeId).select("official").lean();
+    const resolved = user
+      ? await getUserDaySchedule(user, dateStr || todayDate())
+      : null;
+    const day = resolved?.day;
+    if (!day) {
+      return { assignment: null, shift: { ...DEFAULT_SHIFT } };
+    }
+
+    const weekday = weekdayOf(dateStr || todayDate());
+    const shiftName = resolved.shift?.shiftName || DEFAULT_SHIFT.name;
+    const shiftCode = resolved.shift?.shiftCode || DEFAULT_SHIFT.code;
+    if (day.isOff) {
+      return {
+        assignment: { source: "company" },
+        shift: {
+          ...DEFAULT_SHIFT,
+          name: shiftName,
+          code: shiftCode,
+          weeklyOffDays: [weekday],
+          halfDayDays: [],
+        },
+      };
+    }
+
+    const start = parseHm(day.startTime);
+    const end = parseHm(day.endTime);
+    const half = start != null && end != null && end - start <= 5 * 60;
+    return {
+      assignment: { source: "company" },
+      shift: {
+        ...DEFAULT_SHIFT,
+        name: shiftName,
+        code: shiftCode,
+        startTime: day.startTime || DEFAULT_SHIFT.startTime,
+        endTime: day.endTime || DEFAULT_SHIFT.endTime,
+        halfDayEndTime: day.endTime || DEFAULT_SHIFT.halfDayEndTime,
+        weeklyOffDays: [],
+        halfDayDays: half ? [weekday] : [],
+        isDefault: false,
+      },
+    };
+  } catch (_err) {
+    return { assignment: null, shift: { ...DEFAULT_SHIFT } };
+  }
+};
 
 const dayTypeOf = (shift, dateStr, holidayMap = {}) => {
   if (holidayMap && holidayMap[dateStr]) return "holiday";

@@ -13,7 +13,8 @@ const User = require("../models/User"); // employee lookup (manual / scope)
 const { hasAllAccess } = require("../middleware/auth"); // admin/HR/manager roles
 const {
   hasGlobalCompanyAccess, // Super Admin / Admin?
-  companyNamesForUser,
+  COMPANY_POPULATE,
+  companyRefs,
 } = require("../utils/companyScope");
 const { listScopeFilter, assertTeamOrCompanyEmployee } = require("../utils/teamScope");
 const { SELF_SOURCES } = require("../validators/attendance.validation"); // web|mobile|biometric
@@ -35,6 +36,10 @@ const {
 const { ATTENDANCE_DROPDOWNS } = require("../config/generalInfoMasters");
 
 const today = todayDate; // alias used in this file
+
+const EMPLOYEE_FIELDS =
+  "name role official.officialEmail official.employeeCode official.department official.companyIds";
+const EMPLOYEE_FIELDS_WITH_ADDRESS = `${EMPLOYEE_FIELDS} personal.presentAddress personal.permanentAddress`;
 
 /**
  * Manual mark helper: "2026-09-29" + "09:30" → Date
@@ -329,10 +334,11 @@ const markManual = async (req, res) => {
     applyMetrics(record, shift); // status / late / early
     await record.save();
 
-    await record.populate(
-      "employee",
-      "name role official.officialEmail official.employeeCode official.department official.companyIds"
-    );
+    await record.populate({
+      path: "employee",
+      select: EMPLOYEE_FIELDS,
+      populate: COMPANY_POPULATE,
+    });
     await record.populate("markedBy", "name role");
 
     return res.status(201).json({
@@ -669,10 +675,11 @@ const listAttendance = async (req, res) => {
     ] = await Promise.all([
       Attendance.countDocuments(filter),
       Attendance.find(filter)
-        .populate(
-          "employee",
-          "name role official.officialEmail official.employeeCode official.department official.companyIds"
-        )
+        .populate({
+          path: "employee",
+          select: EMPLOYEE_FIELDS,
+          populate: COMPANY_POPULATE,
+        })
         .populate("markedBy", "name role")
         .sort({ date: -1, punchIn: -1 })
         .skip(skip)
@@ -745,18 +752,20 @@ const getAttendanceDetails = async (req, res) => {
     let record = null;
     if (id) {
       record = await Attendance.findById(id)
-        .populate(
-          "employee",
-          "name role personal.presentAddress personal.permanentAddress official.officialEmail official.employeeCode official.department official.companyIds"
-        )
+        .populate({
+          path: "employee",
+          select: EMPLOYEE_FIELDS_WITH_ADDRESS,
+          populate: COMPANY_POPULATE,
+        })
         .populate("markedBy", "name role")
         .lean();
     } else if (employeeId && date) {
       record = await Attendance.findOne({ employee: employeeId, date })
-        .populate(
-          "employee",
-          "name role personal.presentAddress personal.permanentAddress official.officialEmail official.employeeCode official.department official.companyIds"
-        )
+        .populate({
+          path: "employee",
+          select: EMPLOYEE_FIELDS_WITH_ADDRESS,
+          populate: COMPANY_POPULATE,
+        })
         .populate("markedBy", "name role")
         .lean();
     } else {
@@ -850,9 +859,8 @@ const getAttendanceCalendar = async (req, res) => {
     }
 
     const roster = await User.find(userFilter)
-      .select(
-        "name role personal.presentAddress personal.permanentAddress official.officialEmail official.employeeCode official.department official.companyIds"
-      )
+      .select(EMPLOYEE_FIELDS_WITH_ADDRESS)
+      .populate(COMPANY_POPULATE)
       .sort({ name: 1 })
       .lean();
 
@@ -1133,10 +1141,11 @@ const listLateEarly = async (req, res) => {
     const [total, records] = await Promise.all([
       Attendance.countDocuments(filter),
       Attendance.find(filter)
-        .populate(
-          "employee",
-          "name role personal.presentAddress personal.permanentAddress official.officialEmail official.employeeCode official.department official.companyIds"
-        )
+        .populate({
+          path: "employee",
+          select: EMPLOYEE_FIELDS_WITH_ADDRESS,
+          populate: COMPANY_POPULATE,
+        })
         .sort({ date: -1, lateByMinutes: -1 })
         .skip(skip)
         .limit(Number(limit))
@@ -1313,9 +1322,9 @@ const getAttendanceHistory = async (req, res) => {
       return res.status(403).json({ message: "Forbidden" });
     }
 
-    const emp = await User.findById(employeeId).select(
-      "name role personal.presentAddress personal.permanentAddress official.officialEmail official.employeeCode official.department official.companyIds status"
-    );
+    const emp = await User.findById(employeeId)
+      .select(`${EMPLOYEE_FIELDS_WITH_ADDRESS} status`)
+      .populate(COMPANY_POPULATE);
     if (!emp) return res.status(404).json({ message: "Employee not found" });
 
     if (hasAllAccess(req.user) && !hasGlobalCompanyAccess(req.user)) {
@@ -1421,7 +1430,7 @@ const getAttendanceHistory = async (req, res) => {
         name: emp.name,
         employeeCode: emp.official?.employeeCode || "",
         department: emp.official?.department || "",
-        company: (await companyNamesForUser(emp))[0] || "",
+        companies: companyRefs(emp),
       },
       from,
       to,

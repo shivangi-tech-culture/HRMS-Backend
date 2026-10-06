@@ -23,7 +23,6 @@ const statusField = Joi.string().valid("Active", "Inactive").messages({
   "any.only": "status must be Active or Inactive",
 });
 
-/** POST /api/masters — company not needed */
 const createMasterSchema = Joi.object({
   type: Joi.string()
     .valid(...TYPES)
@@ -34,11 +33,9 @@ const createMasterSchema = Joi.object({
     }),
   name: masterName.required(),
   status: statusField.default("Active"),
-  /** Accepted but ignored (masters are global) */
   company: Joi.string().trim().max(150).allow("").optional(),
 }).unknown(false);
 
-/** PUT /api/masters/:id */
 const updateMasterSchema = Joi.object({
   name: masterName.optional(),
   status: statusField.optional(),
@@ -50,7 +47,6 @@ const updateMasterSchema = Joi.object({
     "object.min": "Provide at least one of: name, status",
   });
 
-/** GET /api/masters query — company filter ignored */
 const listMasterQuerySchema = Joi.object({
   type: Joi.string()
     .valid(...TYPES)

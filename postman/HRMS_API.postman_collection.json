@@ -34,10 +34,6 @@
       "value": ""
     },
     {
-      "key": "globalAdminEmail",
-      "value": "superadmin@gmail.com"
-    },
-    {
       "key": "adminEmail",
       "value": "superadmin@gmail.com"
     },
@@ -95,7 +91,7 @@
     },
     {
       "key": "reportingHead1",
-      "value": "manager@gmail.com"
+      "value": "6ac4b3e4d269e78d0eae7f64"
     },
     {
       "key": "reportingHead2",
@@ -226,10 +222,6 @@
       "value": ""
     },
     {
-      "key": "eduDocumentName",
-      "value": ""
-    },
-    {
       "key": "bankName",
       "value": "HDFC Bank"
     },
@@ -350,10 +342,6 @@
       "value": "admin"
     },
     {
-      "key": "roleUpdateDescription",
-      "value": "Updated description"
-    },
-    {
       "key": "userRole",
       "value": "Employee"
     },
@@ -388,14 +376,6 @@
     {
       "key": "familyOccupation",
       "value": "Business"
-    },
-    {
-      "key": "educationId",
-      "value": ""
-    },
-    {
-      "key": "nomineeName",
-      "value": "Neha Iyer"
     },
     {
       "key": "latitude",
@@ -438,10 +418,6 @@
       "value": "Forgot to punch out"
     },
     {
-      "key": "reviewStatus",
-      "value": "Approved"
-    },
-    {
       "key": "reviewRemarks",
       "value": "OK"
     },
@@ -482,16 +458,7 @@
       "value": ""
     },
     {
-      "key": "effectiveFrom",
-      "value": "2026-09-01"
-    },
-    {
       "key": "punchRemarksSelf",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "effectiveTo",
       "value": "",
       "type": "string"
     },
@@ -543,6 +510,42 @@
     {
       "key": "platformAdminEmail",
       "value": "admin@gmail.com"
+    },
+    {
+      "key": "managerId",
+      "value": ""
+    },
+    {
+      "key": "managerId2",
+      "value": ""
+    },
+    {
+      "key": "employeeId1",
+      "value": ""
+    },
+    {
+      "key": "employeeId2",
+      "value": ""
+    },
+    {
+      "key": "branchId",
+      "value": ""
+    },
+    {
+      "key": "shiftId",
+      "value": ""
+    },
+    {
+      "key": "attendanceId",
+      "value": ""
+    },
+    {
+      "key": "overtimeId",
+      "value": ""
+    },
+    {
+      "key": "attendanceReportId",
+      "value": ""
     }
   ],
   "item": [
@@ -708,7 +711,8 @@
                 "exec": [
                   "var j = pm.response.json();",
                   "if (j.token) pm.collectionVariables.set('token', j.token);",
-                  "if (j.user && j.user.id) pm.collectionVariables.set('userId', j.user.id);"
+                  "if (j.user && j.user.id) pm.collectionVariables.set('userId', j.user.id);",
+                  "if (j.user && j.user.id) pm.collectionVariables.set('managerId', j.user.id);"
                 ],
                 "type": "text/javascript"
               }
@@ -857,7 +861,7 @@
                   }
                 ],
                 "url": "{{baseUrl}}/api/permissions/modules",
-                "description": "Returns both catalogs for Create Role UI:\n- side: admin → Super Admin / HR / Manager modules\n- side: employee → ESS modules\n\nPick ONE side, toggle modules/actions, then POST /api/roles with that catalog + permissions array.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                "description": "Returns both catalogs for Create Role UI:\n- side: admin → Super Admin / HR / Manager modules\n- side: employee → ESS modules\n\nCompany CRUD is Administration → Company. It is only on Super Admin and Admin, so it does not appear in this Create Role catalog.\n\nPick ONE side, toggle modules/actions, then POST /api/roles with that catalog + permissions array.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
               }
             },
             {
@@ -1026,11 +1030,40 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"name\": \"{{newUserName}}\",\n  \"password\": \"{{password}}\",\n  \"role\": \"Employee\",\n  \"status\": \"Active\",\n  \"official\": {\n    \"officialEmail\": \"{{newUserEmail}}\",\n    \"companyIds\": [\"{{companyOrgId}}\"],\n    \"employeeCode\": \"{{employeeCode}}\",\n    \"department\": \"{{department}}\"\n  },\n  \"personal\": {\n    \"mobileNo\": \"{{mobileNo}}\",\n    \"presentAddress\": {\n      \"city\": \"{{city}}\",\n      \"state\": \"{{state}}\",\n      \"country\": \"{{country}}\"\n    }\n  }\n}"
+                  "raw": "{\n  \"name\": \"{{newUserName}}\",\n  \"password\": \"{{password}}\",\n  \"role\": \"Employee\",\n  \"status\": \"Active\",\n  \"official\": {\n    \"officialEmail\": \"{{newUserEmail}}\",\n    \"companyIds\": [\"{{companyOrgId}}\"],\n    \"branchId\": \"{{branchId}}\",\n    \"shiftId\": \"{{shiftId}}\",\n    \"employeeCode\": \"{{employeeCode}}\",\n    \"department\": \"{{department}}\"\n  },\n  \"personal\": {\n    \"mobileNo\": \"{{mobileNo}}\",\n    \"presentAddress\": {\n      \"city\": \"{{city}}\",\n      \"state\": \"{{state}}\",\n      \"country\": \"{{country}}\"\n    }\n  }\n}"
                 },
                 "url": "{{baseUrl}}/api/users",
-                "description": "POST /api/users — create lean user (any role). Sets {{userId}}.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `name` — string | required/optional | display / full name (min 2)\n- `password` — string | required (min 6) | plain password; blank on update = keep\n- `role` — string | required on create | `Global Admin` | `Super Admin` | `HR Manager` | `Manager` | `Employee` | custom role name\n- `status` — string | optional | `Active` or `Inactive`\n- `official.officialEmail` — string (email) | required on create | work login email\n- `official.employeeCode` — string | optional | uppercase code e.g. `EMP-1024`\n- `official.company` — string | optional | filled from Company.companyName of companyIds[0]\n- `official.department` — string | often required | department master name\n- `personal.mobileNo` — string | optional | 10-digit mobile digits only\n- `personal.presentAddress.city` — string | optional | City master\n- `personal.presentAddress.state` — string | optional | State master\n- `personal.presentAddress.country` — string | optional | Country master\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
-              }
+                "description": "POST /api/users — create lean user (any role). Sets {{userId}}.\n\n**Branch / shift (optional):** send ids only — `official.branchId` + `official.shiftId`.\nGet them from **1.11 → Get Company Branches** then **Get Branch Shifts** (both auto-set {{branchId}} / {{shiftId}}).\nThe shift must be on that branch, else **400**. Days / timings stay on the company shift.\nResponse returns them populated: `branchId: { _id, branchName, branchCode }`, `shiftId: { _id, shiftName, shiftCode }`.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `name` — string | required/optional | display / full name (min 2)\n- `password` — string | required (min 6) | plain password; blank on update = keep\n- `role` — string | required on create | `Global Admin` | `Super Admin` | `HR Manager` | `Manager` | `Employee` | custom role name\n- `status` — string | optional | `Active` or `Inactive`\n- `official.officialEmail` — string (email) | required on create | work login email\n- `official.companyIds` — string[] (MongoId) | required | array of Company `_id`s ({{companyOrgId}}). Employee and Reporting Manager: exactly one id. HR: one or more. Only Super Admin may send more than one\n- `official.branchId` — string (MongoId) | optional | one branch `_id` of the selected company (GET /api/companies/{id}/branches). Response returns `{ _id, branchName, branchCode }`\n- `official.shiftId` — string (MongoId) | optional | one shift `_id` on that branch (GET /api/companies/{id}/branches/{branchId}). Response returns `{ _id, shiftName, shiftCode }`\n- `official.employeeCode` — string | optional | uppercase code e.g. `EMP-1024`\n- `official.department` — string | often required | department master name\n- `personal.mobileNo` — string | optional | 10-digit mobile digits only\n- `personal.presentAddress.city` — string | optional | City master\n- `personal.presentAddress.state` — string | optional | State master\n- `personal.presentAddress.country` — string | optional | Country master\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+              },
+              "response": [
+                {
+                  "name": "201 — branch / shift populated",
+                  "originalRequest": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/users"
+                  },
+                  "status": "Created",
+                  "code": 201,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json; charset=utf-8"
+                    }
+                  ],
+                  "body": "{\n  \"message\": \"User created. Welcome email queued for newuser@gmail.com.\",\n  \"user\": {\n    \"_id\": \"6ac4eeb01e0cfdb02b36b6eb\",\n    \"name\": \"New User\",\n    \"role\": \"Employee\",\n    \"status\": \"Active\",\n    \"official\": {\n      \"officialEmail\": \"newuser@gmail.com\",\n      \"employeeCode\": \"EMP-1024\",\n      \"department\": \"Engineering\",\n      \"companyIds\": [\n        {\n          \"_id\": \"6ac4eeaf1e0cfdb02b36b6ce\",\n          \"companyName\": \"ABC Technologies\"\n        }\n      ],\n      \"branchId\": {\n        \"_id\": \"6ac4eeaf1e0cfdb02b36b6cf\",\n        \"branchName\": \"Noida\",\n        \"branchCode\": \"NOIDA\"\n      },\n      \"shiftId\": {\n        \"_id\": \"6ac4eeaf1e0cfdb02b36b6d0\",\n        \"shiftName\": \"General Shift\",\n        \"shiftCode\": \"GS-01\"\n      }\n    }\n  }\n}"
+                }
+              ]
             },
             {
               "name": "Create Super Admin",
@@ -1094,10 +1127,10 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"name\": \"Priya Mehta\",\n  \"password\": \"{{password}}\",\n  \"role\": \"HR Manager\",\n  \"status\": \"Active\",\n  \"official\": {\n    \"officialEmail\": \"priya.access@techculture.ai\",\n    \"department\": \"HR\",\n    \"companyIds\": [\n      \"{{companyOrgId}}\"\n    ]\n  },\n  \"personal\": {\n    \"mobileNo\": \"9876543210\",\n    \"presentAddress\": {\n      \"city\": \"Noida\",\n      \"state\": \"DELHI\",\n      \"country\": \"India\"\n    }\n  }\n}"
+                  "raw": "{\n  \"name\": \"Priya Mehta\",\n  \"password\": \"{{password}}\",\n  \"role\": \"HR Manager\",\n  \"status\": \"Active\",\n  \"official\": {\n    \"officialEmail\": \"priya.access@techculture.ai\",\n    \"department\": \"HR\",\n    \"companyIds\": [\n      \"{{companyOrgId}}\"\n    ],\n    \"branchId\": \"{{branchId}}\",\n    \"shiftId\": \"{{shiftId}}\"\n  },\n  \"personal\": {\n    \"mobileNo\": \"9876543210\",\n    \"presentAddress\": {\n      \"city\": \"Noida\",\n      \"state\": \"DELHI\",\n      \"country\": \"India\"\n    }\n  }\n}"
                 },
                 "url": "{{baseUrl}}/api/users",
-                "description": "Create HR Manager. official.companyIds is an array of Company _ids ({{companyOrgId}}). One id is enough. Only Super Admin may send more than one.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `name` — string | required/optional | display / full name (min 2)\n- `password` — string | required (min 6) | plain password; blank on update = keep\n- `role` — string | required on create | `Global Admin` | `Super Admin` | `HR Manager` | `Manager` | `Employee` | custom role name\n- `status` — string | optional | `Active` or `Inactive`\n- `official.officialEmail` — string (email) | required on create | work login email\n- `official.company` — string | optional | filled from Company.companyName of companyIds[0]\n- `official.department` — string | often required | department master name\n- `official.companyIds` — string[] (MongoId) | required | array of Company `_id`s ({{companyOrgId}}). Employee and Reporting Manager: exactly one id. HR: one or more. Only Super Admin may send more than one\n- `personal.mobileNo` — string | optional | 10-digit mobile digits only\n- `personal.presentAddress.city` — string | optional | City master\n- `personal.presentAddress.state` — string | optional | State master\n- `personal.presentAddress.country` — string | optional | Country master\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                "description": "Create HR Manager. official.companyIds is an array of Company _ids ({{companyOrgId}}). One id is enough. Only Super Admin may send more than one.\n\n**Branch / shift (optional):** send ids only — `official.branchId` + `official.shiftId`.\nGet them from **1.11 → Get Company Branches** then **Get Branch Shifts** (both auto-set {{branchId}} / {{shiftId}}).\nThe shift must be on that branch, else **400**. Days / timings stay on the company shift.\nResponse returns them populated: `branchId: { _id, branchName, branchCode }`, `shiftId: { _id, shiftName, shiftCode }`.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `name` — string | required/optional | display / full name (min 2)\n- `password` — string | required (min 6) | plain password; blank on update = keep\n- `role` — string | required on create | `Global Admin` | `Super Admin` | `HR Manager` | `Manager` | `Employee` | custom role name\n- `status` — string | optional | `Active` or `Inactive`\n- `official.officialEmail` — string (email) | required on create | work login email\n- `official.department` — string | often required | department master name\n- `official.companyIds` — string[] (MongoId) | required | array of Company `_id`s ({{companyOrgId}}). Employee and Reporting Manager: exactly one id. HR: one or more. Only Super Admin may send more than one\n- `official.branchId` — string (MongoId) | optional | one branch `_id` of the selected company (GET /api/companies/{id}/branches). Response returns `{ _id, branchName, branchCode }`\n- `official.shiftId` — string (MongoId) | optional | one shift `_id` on that branch (GET /api/companies/{id}/branches/{branchId}). Response returns `{ _id, shiftName, shiftCode }`\n- `personal.mobileNo` — string | optional | 10-digit mobile digits only\n- `personal.presentAddress.city` — string | optional | City master\n- `personal.presentAddress.state` — string | optional | State master\n- `personal.presentAddress.country` — string | optional | Country master\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
               }
             },
             {
@@ -1133,7 +1166,7 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{baseUrl}}/api/users?search=&role=&status=&department=&company=&page=1&limit=10",
+                  "raw": "{{baseUrl}}/api/users?search=&role=&status=&department=&company=&branch=&shift=&page=1&limit=10",
                   "host": [
                     "{{baseUrl}}"
                   ],
@@ -1168,6 +1201,16 @@
                       "description": "string | optional | company name (exact master name)"
                     },
                     {
+                      "key": "branch",
+                      "value": "",
+                      "description": "string | optional | current branch filter — Branch `_id`, branch name or branch code (e.g. `NOI`)"
+                    },
+                    {
+                      "key": "shift",
+                      "value": "",
+                      "description": "string | optional | current shift filter — Shift `_id`, shift name or shift code (e.g. `GS-01`)"
+                    },
+                    {
                       "key": "page",
                       "value": "1",
                       "description": "number | optional | page number, default `1`"
@@ -1179,7 +1222,7 @@
                     }
                   ]
                 },
-                "description": "GET /api/users — filters + pagination. Hierarchy by actor role.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `search` — string | optional | name / email / employee code text search\n- `role` — string | optional filter | role name e.g. `Employee` / `HR Manager`\n- `status` — string | optional | `Active` or `Inactive`\n- `department` — string | optional | department name\n- `company` — string | optional | company name (exact master name)\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                "description": "GET /api/users — filters + pagination. Hierarchy by actor role.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `search` — string | optional | name / email / employee code text search\n- `role` — string | optional filter | role name e.g. `Employee` / `HR Manager`\n- `status` — string | optional | `Active` or `Inactive`\n- `department` — string | optional | department name\n- `company` — string | optional | company name (exact master name)\n- `branch` — string | optional | current branch filter — Branch `_id`, branch name or branch code (e.g. `NOI`)\n- `shift` — string | optional | current shift filter — Shift `_id`, shift name or shift code (e.g. `GS-01`)\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
               }
             },
             {
@@ -1193,7 +1236,7 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{baseUrl}}/api/users/export?search=&role=&status=&department=&company=",
+                  "raw": "{{baseUrl}}/api/users/export?search=&role=&status=&department=&company=&branch=&shift=",
                   "host": [
                     "{{baseUrl}}"
                   ],
@@ -1227,10 +1270,20 @@
                       "key": "company",
                       "value": "",
                       "description": "string | optional | company name (exact master name)"
+                    },
+                    {
+                      "key": "branch",
+                      "value": "",
+                      "description": "string | optional | current branch filter — Branch `_id`, branch name or branch code (e.g. `NOI`)"
+                    },
+                    {
+                      "key": "shift",
+                      "value": "",
+                      "description": "string | optional | current shift filter — Shift `_id`, shift name or shift code (e.g. `GS-01`)"
                     }
                   ]
                 },
-                "description": "GET /api/users/export — .xlsx (Access & Control → export). Same filters as list.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `search` — string | optional | name / email / employee code text search\n- `role` — string | optional filter | role name e.g. `Employee` / `HR Manager`\n- `status` — string | optional | `Active` or `Inactive`\n- `department` — string | optional | department name\n- `company` — string | optional | company name (exact master name)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                "description": "GET /api/users/export — .xlsx (Access & Control → export). Same filters as list.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `search` — string | optional | name / email / employee code text search\n- `role` — string | optional filter | role name e.g. `Employee` / `HR Manager`\n- `status` — string | optional | `Active` or `Inactive`\n- `department` — string | optional | department name\n- `company` — string | optional | company name (exact master name)\n- `branch` — string | optional | current branch filter — Branch `_id`, branch name or branch code (e.g. `NOI`)\n- `shift` — string | optional | current shift filter — Shift `_id`, shift name or shift code (e.g. `GS-01`)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
               }
             },
             {
@@ -1339,10 +1392,10 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"name\": \"{{newUserName}}\",\n  \"password\": \"{{password}}\",\n  \"role\": \"{{userRole}}\",\n  \"status\": \"{{userStatus}}\",\n  \"personal\": {\n    \"dateOfBirth\": \"{{dateOfBirth}}\",\n    \"aadhaarNo\": \"{{aadhaarNo}}\",\n    \"panNo\": \"{{panNo}}\",\n    \"gender\": \"{{gender}}\",\n    \"fatherOrHusbandName\": \"{{fatherOrHusbandName}}\",\n    \"maritalStatus\": \"{{maritalStatus}}\",\n    \"spouseName\": \"\",\n    \"anniversaryDate\": null,\n    \"personalEmail\": \"{{personalEmail}}\",\n    \"languageKnown\": \"{{languageKnown}}\",\n    \"emergencyContact1\": \"{{emergencyContact1}}\",\n    \"emergencyContact2\": \"{{emergencyContact2}}\",\n    \"drivingLicenseNo\": \"{{drivingLicenseNo}}\",\n    \"licenseValidUpto\": null,\n    \"passportNo\": \"{{passportNo}}\",\n    \"remarks\": \"\",\n    \"mobileNo\": \"{{mobileNo}}\",\n    \"workPhone\": \"{{workPhone}}\",\n    \"workExt\": \"{{workExt}}\",\n    \"presentAddress\": {\n      \"address\": \"{{address}}\",\n      \"country\": \"{{country}}\",\n      \"state\": \"{{state}}\",\n      \"city\": \"{{city}}\",\n      \"pincode\": \"{{pincode}}\"\n    },\n    \"permanentAddress\": {\n      \"address\": \"{{address}}\",\n      \"country\": \"{{country}}\",\n      \"state\": \"{{state}}\",\n      \"city\": \"{{city}}\",\n      \"pincode\": \"{{pincode}}\"\n    }\n  },\n  \"official\": {\n    \"officialEmail\": \"{{newUserEmail}}\",\n    \"companyIds\": [\"{{companyOrgId}}\"],\n    \"department\": \"{{department}}\",\n    \"employeeCode\": \"{{employeeCode}}\",\n    \"designation\": \"{{designation}}\",\n    \"reportingHead1\": \"{{reportingHead1}}\",\n    \"reportingHead2\": \"{{reportingHead2}}\",\n    \"jobRole\": \"{{jobRole}}\",\n    \"dateOfJoining\": \"{{dateOfJoining}}\",\n    \"calculateSalaryFrom\": \"{{dateOfJoining}}\",\n    \"dateOfRetirement\": null,\n    \"grade\": \"{{grade}}\",\n  },\n  \"other\": {\n    \"bloodGroup\": \"{{bloodGroup}}\",\n    \"passportExpiry\": \"{{passportExpiry}}\"\n  },\n  \"education\": [\n    {\n      \"courseType\": \"{{eduCourseType}}\",\n      \"courseLevel\": \"{{eduCourseLevel}}\",\n      \"courseName\": \"{{eduCourseName}}\",\n      \"instituteName\": \"{{eduInstitute}}\",\n      \"location\": \"{{city}}\",\n      \"fromYear\": \"{{eduFromYear}}\",\n      \"passingYear\": \"{{eduPassingYear}}\",\n      \"major\": \"\",\n      \"minor\": \"\",\n      \"percentageOrGrade\": \"{{eduGrade}}\",\n      \"document\": \"{{eduDocument}}\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"accounts\": [\n    {\n      \"bankName\": \"{{bankName}}\",\n      \"accountNo\": \"{{bankAccountNo}}\",\n      \"accountHolderName\": \"{{accountHolderName}}\",\n      \"ifscCode\": \"{{ifscCode}}\",\n      \"location\": \"{{city}}\",\n      \"remarks\": \"\",\n      \"attachment\": \"\",\n      \"active\": true,\n      \"salaryAccount\": true\n    }\n  ],\n  \"family\": [\n    {\n      \"name\": \"{{familyName}}\",\n      \"relation\": \"{{familyRelation}}\",\n      \"dob\": null,\n      \"occupation\": \"{{familyOccupation}}\",\n      \"education\": \"\",\n      \"aadhaarNo\": \"\",\n      \"mobileNo\": \"{{familyMobile}}\",\n      \"mediclaim\": false\n    }\n  ],\n  \"nominees\": [\n    {\n      \"nominateFor\": \"{{nominateFor}}\",\n      \"relation\": \"{{nomineeRelation}}\",\n      \"dob\": null,\n      \"amountPercent\": {{nomineePercent}},\n      \"address\": \"{{address}}\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"experience\": [\n    {\n      \"organization\": \"{{expOrganization}}\",\n      \"designation\": \"{{expDesignation}}\",\n      \"location\": \"{{city}}\",\n      \"fromDate\": \"{{expFromDate}}\",\n      \"toDate\": \"{{expToDate}}\",\n      \"lastSalaryDrawn\": \"{{expLastSalary}}\",\n      \"description\": \"\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"visas\": [\n    {\n      \"countryName\": \"{{visaCountry}}\",\n      \"visaType\": \"{{visaType}}\",\n      \"visaNumber\": \"{{visaNumber}}\",\n      \"fromDate\": \"{{visaFromDate}}\",\n      \"toDate\": \"{{visaToDate}}\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"payroll\": {\n    \"salaryGroup\": \"\",\n    \"salaryDate\": \"\",\n    \"appraisalDuration\": \"\",\n    \"basic\": {{payrollBasic}},\n    \"annualCtc\": {{payrollCtc}},\n    \"grossSalary\": 0,\n    \"totalEarning\": 0,\n    \"totalDeduction\": 0,\n    \"appraisalDate\": null,\n    \"paymentMode\": \"{{payrollPaymentMode}}\",\n    \"ot1Rate\": 0,\n    \"ot2Rate\": 0,\n    \"remarks\": \"\",\n    \"uanNo\": \"{{payrollUan}}\",\n    \"pfApply\": false,\n    \"pfEmployerShare\": false,\n    \"pfNo\": \"\",\n    \"pfType\": \"\",\n    \"pf\": \"\",\n    \"pfApplyFrom\": null,\n    \"pfApplyTo\": null,\n    \"esiApply\": false,\n    \"esiNo\": \"\",\n    \"esiEmployerShare\": false,\n    \"esiApplyFrom\": null,\n    \"esiApplyTo\": null,\n    \"ptApply\": false,\n    \"tdsApply\": false,\n    \"taxRegime\": \"New\",\n    \"bankName\": \"{{bankName}}\",\n    \"bankAccount\": \"{{bankAccountNo}}\",\n    \"ifsc\": \"{{ifscCode}}\"\n  }\n}"
+                  "raw": "{\n  \"name\": \"{{newUserName}}\",\n  \"password\": \"{{password}}\",\n  \"role\": \"{{userRole}}\",\n  \"status\": \"{{userStatus}}\",\n  \"personal\": {\n    \"dateOfBirth\": \"{{dateOfBirth}}\",\n    \"aadhaarNo\": \"{{aadhaarNo}}\",\n    \"panNo\": \"{{panNo}}\",\n    \"gender\": \"{{gender}}\",\n    \"fatherOrHusbandName\": \"{{fatherOrHusbandName}}\",\n    \"maritalStatus\": \"{{maritalStatus}}\",\n    \"spouseName\": \"\",\n    \"anniversaryDate\": null,\n    \"personalEmail\": \"{{personalEmail}}\",\n    \"languageKnown\": \"{{languageKnown}}\",\n    \"emergencyContact1\": \"{{emergencyContact1}}\",\n    \"emergencyContact2\": \"{{emergencyContact2}}\",\n    \"drivingLicenseNo\": \"{{drivingLicenseNo}}\",\n    \"licenseValidUpto\": null,\n    \"passportNo\": \"{{passportNo}}\",\n    \"remarks\": \"\",\n    \"mobileNo\": \"{{mobileNo}}\",\n    \"workPhone\": \"{{workPhone}}\",\n    \"workExt\": \"{{workExt}}\",\n    \"presentAddress\": {\n      \"address\": \"{{address}}\",\n      \"country\": \"{{country}}\",\n      \"state\": \"{{state}}\",\n      \"city\": \"{{city}}\",\n      \"pincode\": \"{{pincode}}\"\n    },\n    \"permanentAddress\": {\n      \"address\": \"{{address}}\",\n      \"country\": \"{{country}}\",\n      \"state\": \"{{state}}\",\n      \"city\": \"{{city}}\",\n      \"pincode\": \"{{pincode}}\"\n    }\n  },\n  \"official\": {\n    \"officialEmail\": \"{{newUserEmail}}\",\n    \"companyIds\": [\"{{companyOrgId}}\"],\n    \"branchId\": \"{{branchId}}\",\n    \"shiftId\": \"{{shiftId}}\",\n    \"department\": \"{{department}}\",\n    \"employeeCode\": \"{{employeeCode}}\",\n    \"designation\": \"{{designation}}\",\n    \"reportingHead1\": \"{{reportingHead1}}\",\n    \"reportingHead2\": \"{{reportingHead2}}\",\n    \"jobRole\": \"{{jobRole}}\",\n    \"dateOfJoining\": \"{{dateOfJoining}}\",\n    \"calculateSalaryFrom\": \"{{dateOfJoining}}\",\n    \"dateOfRetirement\": null,\n    \"grade\": \"{{grade}}\"\n  },\n  \"other\": {\n    \"bloodGroup\": \"{{bloodGroup}}\",\n    \"passportExpiry\": \"{{passportExpiry}}\"\n  },\n  \"education\": [\n    {\n      \"courseType\": \"{{eduCourseType}}\",\n      \"courseLevel\": \"{{eduCourseLevel}}\",\n      \"courseName\": \"{{eduCourseName}}\",\n      \"instituteName\": \"{{eduInstitute}}\",\n      \"location\": \"{{city}}\",\n      \"fromYear\": \"{{eduFromYear}}\",\n      \"passingYear\": \"{{eduPassingYear}}\",\n      \"major\": \"\",\n      \"minor\": \"\",\n      \"percentageOrGrade\": \"{{eduGrade}}\",\n      \"document\": \"{{eduDocument}}\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"accounts\": [\n    {\n      \"bankName\": \"{{bankName}}\",\n      \"accountNo\": \"{{bankAccountNo}}\",\n      \"accountHolderName\": \"{{accountHolderName}}\",\n      \"ifscCode\": \"{{ifscCode}}\",\n      \"location\": \"{{city}}\",\n      \"remarks\": \"\",\n      \"attachment\": \"\",\n      \"active\": true,\n      \"salaryAccount\": true\n    }\n  ],\n  \"family\": [\n    {\n      \"name\": \"{{familyName}}\",\n      \"relation\": \"{{familyRelation}}\",\n      \"dob\": null,\n      \"occupation\": \"{{familyOccupation}}\",\n      \"education\": \"\",\n      \"aadhaarNo\": \"\",\n      \"mobileNo\": \"{{familyMobile}}\",\n      \"mediclaim\": false\n    }\n  ],\n  \"nominees\": [\n    {\n      \"nominateFor\": \"{{nominateFor}}\",\n      \"relation\": \"{{nomineeRelation}}\",\n      \"dob\": null,\n      \"amountPercent\": {{nomineePercent}},\n      \"address\": \"{{address}}\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"experience\": [\n    {\n      \"organization\": \"{{expOrganization}}\",\n      \"designation\": \"{{expDesignation}}\",\n      \"location\": \"{{city}}\",\n      \"fromDate\": \"{{expFromDate}}\",\n      \"toDate\": \"{{expToDate}}\",\n      \"lastSalaryDrawn\": \"{{expLastSalary}}\",\n      \"description\": \"\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"visas\": [\n    {\n      \"countryName\": \"{{visaCountry}}\",\n      \"visaType\": \"{{visaType}}\",\n      \"visaNumber\": \"{{visaNumber}}\",\n      \"fromDate\": \"{{visaFromDate}}\",\n      \"toDate\": \"{{visaToDate}}\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"payroll\": {\n    \"salaryGroup\": \"\",\n    \"salaryDate\": \"\",\n    \"appraisalDuration\": \"\",\n    \"basic\": {{payrollBasic}},\n    \"annualCtc\": {{payrollCtc}},\n    \"grossSalary\": 0,\n    \"totalEarning\": 0,\n    \"totalDeduction\": 0,\n    \"appraisalDate\": null,\n    \"paymentMode\": \"{{payrollPaymentMode}}\",\n    \"ot1Rate\": 0,\n    \"ot2Rate\": 0,\n    \"remarks\": \"\",\n    \"uanNo\": \"{{payrollUan}}\",\n    \"pfApply\": false,\n    \"pfEmployerShare\": false,\n    \"pfNo\": \"\",\n    \"pfType\": \"\",\n    \"pf\": \"\",\n    \"pfApplyFrom\": null,\n    \"pfApplyTo\": null,\n    \"esiApply\": false,\n    \"esiNo\": \"\",\n    \"esiEmployerShare\": false,\n    \"esiApplyFrom\": null,\n    \"esiApplyTo\": null,\n    \"ptApply\": false,\n    \"tdsApply\": false,\n    \"taxRegime\": \"New\",\n    \"bankName\": \"{{bankName}}\",\n    \"bankAccount\": \"{{bankAccountNo}}\",\n    \"ifsc\": \"{{ifscCode}}\"\n  }\n}"
                 },
                 "url": "{{baseUrl}}/api/employees",
-                "description": "Full nested profile for Employee / HR / Manager.\nLogin as Global Admin / Super Admin / HR Manager.\n\nofficial.companyIds must contain exactly one Company _id ({{companyOrgId}}).\nChange {{newUserEmail}} and {{employeeCode}} before each create.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `name` — string | required/optional | display / full name (min 2)\n- `password` — string | required (min 6) | plain password; blank on update = keep\n- `role` — string | required on create | `Global Admin` | `Super Admin` | `HR Manager` | `Manager` | `Employee` | custom role name\n- `status` — string | optional | `Active` or `Inactive`\n- `personal.dateOfBirth` — string/date (YYYY-MM-DD) | optional\n- `personal.aadhaarNo` — string | optional | 12 digits\n- `personal.panNo` — string | optional | PAN e.g. `ABCDE1234F`\n- `personal.gender` — string | optional | Gender master name\n- `personal.fatherOrHusbandName` — string | optional\n- `personal.maritalStatus` — string | optional | Marital Status master name\n- `personal.spouseName` — string | optional\n- `personal.anniversaryDate` — date|null | optional | ignored by API (auto)\n- `personal.personalEmail` — string (email) | optional\n- `personal.languageKnown` — string | optional\n- `personal.emergencyContact1` — string | optional\n- `personal.emergencyContact2` — string | optional\n- `personal.drivingLicenseNo` — string | optional\n- `personal.licenseValidUpto` — date|null | optional\n- `personal.passportNo` — string | optional\n- `personal.remarks` — string | optional\n- `personal.mobileNo` — string | optional | 10-digit mobile digits only\n- `personal.workPhone` — string | optional | office phone\n- `personal.workExt` — string | optional | extension\n- `personal.presentAddress.address` — string | optional\n- `personal.presentAddress.country` — string | optional | Country master\n- `personal.presentAddress.state` — string | optional | State master\n- `personal.presentAddress.city` — string | optional | City master\n- `personal.presentAddress.pincode` — string | optional\n- `personal.permanentAddress.address` — string | optional\n- `personal.permanentAddress.country` — string | optional\n- `personal.permanentAddress.state` — string | optional\n- `personal.permanentAddress.city` — string | optional\n- `personal.permanentAddress.pincode` — string | optional\n- `official.officialEmail` — string (email) | required on create | work login email\n- `official.companyIds` — string[] (MongoId) | required | array of Company `_id`s ({{companyOrgId}}). Employee and Reporting Manager: exactly one id. HR: one or more. Only Super Admin may send more than one\n- `official.company` — string | optional | filled from Company.companyName of companyIds[0]\n- `official.department` — string | often required | department master name\n- `official.employeeCode` — string | optional | uppercase code e.g. `EMP-1024`\n- `official.designation` — string | optional | designation master name\n- `official.reportingHead1` — string | optional | manager email/code/name (links employee to Reporting Manager team)\n- `official.reportingHead2` — string | optional | 2nd reporting head\n- `official.jobRole` — string | optional | job role master name\n- `official.dateOfJoining` — string/date (YYYY-MM-DD) | optional | joining date\n- `official.calculateSalaryFrom` — string/date (YYYY-MM-DD) | optional\n- `official.dateOfRetirement` — string/date|null | optional\n- `official.grade` — string | optional | grade master name\n- `other.bloodGroup` — string | optional | Blood Group master\n- `other.passportExpiry` — string/date | optional\n- `education` — array<object> | optional | education rows (courseType, courseLevel, …)\n- `accounts` — array<object> | optional | bank account rows\n- `family` — array<object> | optional | family rows\n- `nominees` — array<object> | optional | nominee rows\n- `experience` — array<object> | optional | experience rows\n- `visas` — array<object> | optional | visa rows\n- `payroll.salaryGroup` — string | optional\n- `payroll.salaryDate` — string | optional\n- `payroll.appraisalDuration` — string | optional\n- `payroll.basic` — number/string | optional | basic salary\n- `payroll.annualCtc` — number/string | optional\n- `payroll.grossSalary` — number | optional\n- `payroll.totalEarning` — number | optional\n- `payroll.totalDeduction` — number | optional\n- `payroll.appraisalDate` — date|null | optional\n- `payroll.paymentMode` — string | optional\n- `payroll.ot1Rate` — number | optional\n- `payroll.ot2Rate` — number | optional\n- `payroll.remarks` — string | optional\n- `payroll.uanNo` — string | optional\n- `payroll.pfApply` — boolean | optional\n- `payroll.pfEmployerShare` — boolean | optional\n- `payroll.pfNo` — string | optional\n- `payroll.pfType` — string | optional\n- `payroll.pf` — string/number | optional\n- `payroll.pfApplyFrom` — date|null | optional\n- `payroll.pfApplyTo` — date|null | optional\n- `payroll.esiApply` — boolean | optional\n- `payroll.esiNo` — string | optional\n- `payroll.esiEmployerShare` — boolean | optional\n- `payroll.esiApplyFrom` — date|null | optional\n- `payroll.esiApplyTo` — date|null | optional\n- `payroll.ptApply` — boolean | optional\n- `payroll.tdsApply` — boolean | optional\n- `payroll.taxRegime` — string | optional | e.g. `New` / `Old`\n- `payroll.bankName` — string | optional\n- `payroll.bankAccount` — string | optional\n- `payroll.ifsc` — string | optional | IFSC\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                "description": "Full nested profile for Employee / HR / Manager.\nLogin as Global Admin / Super Admin / HR Manager.\n\nofficial.companyIds must contain exactly one Company _id ({{companyOrgId}}).\nChange {{newUserEmail}} and {{employeeCode}} before each create.\n\n**Branch / shift (optional):** send ids only — `official.branchId` + `official.shiftId`.\nGet them from **1.11 → Get Company Branches** then **Get Branch Shifts** (both auto-set {{branchId}} / {{shiftId}}).\nThe shift must be on that branch, else **400**. Days / timings stay on the company shift.\nResponse returns them populated: `branchId: { _id, branchName, branchCode }`, `shiftId: { _id, shiftName, shiftCode }`.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `name` — string | required/optional | display / full name (min 2)\n- `password` — string | required (min 6) | plain password; blank on update = keep\n- `role` — string | required on create | `Global Admin` | `Super Admin` | `HR Manager` | `Manager` | `Employee` | custom role name\n- `status` — string | optional | `Active` or `Inactive`\n- `personal.dateOfBirth` — string/date (YYYY-MM-DD) | optional\n- `personal.aadhaarNo` — string | optional | 12 digits\n- `personal.panNo` — string | optional | PAN e.g. `ABCDE1234F`\n- `personal.gender` — string | optional | Gender master name\n- `personal.fatherOrHusbandName` — string | optional\n- `personal.maritalStatus` — string | optional | Marital Status master name\n- `personal.spouseName` — string | optional\n- `personal.anniversaryDate` — date|null | optional | ignored by API (auto)\n- `personal.personalEmail` — string (email) | optional\n- `personal.languageKnown` — string | optional\n- `personal.emergencyContact1` — string | optional\n- `personal.emergencyContact2` — string | optional\n- `personal.drivingLicenseNo` — string | optional\n- `personal.licenseValidUpto` — date|null | optional\n- `personal.passportNo` — string | optional\n- `personal.remarks` — string | optional\n- `personal.mobileNo` — string | optional | 10-digit mobile digits only\n- `personal.workPhone` — string | optional | office phone\n- `personal.workExt` — string | optional | extension\n- `personal.presentAddress.address` — string | optional\n- `personal.presentAddress.country` — string | optional | Country master\n- `personal.presentAddress.state` — string | optional | State master\n- `personal.presentAddress.city` — string | optional | City master\n- `personal.presentAddress.pincode` — string | optional\n- `personal.permanentAddress.address` — string | optional\n- `personal.permanentAddress.country` — string | optional\n- `personal.permanentAddress.state` — string | optional\n- `personal.permanentAddress.city` — string | optional\n- `personal.permanentAddress.pincode` — string | optional\n- `official.officialEmail` — string (email) | required on create | work login email\n- `official.companyIds` — string[] (MongoId) | required | array of Company `_id`s ({{companyOrgId}}). Employee and Reporting Manager: exactly one id. HR: one or more. Only Super Admin may send more than one\n- `official.branchId` — string (MongoId) | optional | one branch `_id` of the selected company (GET /api/companies/{id}/branches). Response returns `{ _id, branchName, branchCode }`\n- `official.shiftId` — string (MongoId) | optional | one shift `_id` on that branch (GET /api/companies/{id}/branches/{branchId}). Response returns `{ _id, shiftName, shiftCode }`\n- `official.department` — string | often required | department master name\n- `official.employeeCode` — string | optional | uppercase code e.g. `EMP-1024`\n- `official.designation` — string | optional | designation master name\n- `official.reportingHead1` — string (MongoId) | optional | Reporting Manager User _id (\"\" or null clears). Bulk: POST /api/hierarchy/assign\n- `official.reportingHead2` — string (MongoId) | optional | 2nd Reporting Manager User _id\n- `official.jobRole` — string | optional | job role master name\n- `official.dateOfJoining` — string/date (YYYY-MM-DD) | optional | joining date\n- `official.calculateSalaryFrom` — string/date (YYYY-MM-DD) | optional\n- `official.dateOfRetirement` — string/date|null | optional\n- `official.grade` — string | optional | grade master name\n- `other.bloodGroup` — string | optional | Blood Group master\n- `other.passportExpiry` — string/date | optional\n- `education` — array<object> | optional | education rows (courseType, courseLevel, …)\n- `accounts` — array<object> | optional | bank account rows\n- `family` — array<object> | optional | family rows\n- `nominees` — array<object> | optional | nominee rows\n- `experience` — array<object> | optional | experience rows\n- `visas` — array<object> | optional | visa rows\n- `payroll.salaryGroup` — string | optional\n- `payroll.salaryDate` — string | optional\n- `payroll.appraisalDuration` — string | optional\n- `payroll.basic` — number/string | optional | basic salary\n- `payroll.annualCtc` — number/string | optional\n- `payroll.grossSalary` — number | optional\n- `payroll.totalEarning` — number | optional\n- `payroll.totalDeduction` — number | optional\n- `payroll.appraisalDate` — date|null | optional\n- `payroll.paymentMode` — string | optional\n- `payroll.ot1Rate` — number | optional\n- `payroll.ot2Rate` — number | optional\n- `payroll.remarks` — string | optional\n- `payroll.uanNo` — string | optional\n- `payroll.pfApply` — boolean | optional\n- `payroll.pfEmployerShare` — boolean | optional\n- `payroll.pfNo` — string | optional\n- `payroll.pfType` — string | optional\n- `payroll.pf` — string/number | optional\n- `payroll.pfApplyFrom` — date|null | optional\n- `payroll.pfApplyTo` — date|null | optional\n- `payroll.esiApply` — boolean | optional\n- `payroll.esiNo` — string | optional\n- `payroll.esiEmployerShare` — boolean | optional\n- `payroll.esiApplyFrom` — date|null | optional\n- `payroll.esiApplyTo` — date|null | optional\n- `payroll.ptApply` — boolean | optional\n- `payroll.tdsApply` — boolean | optional\n- `payroll.taxRegime` — string | optional | e.g. `New` / `Old`\n- `payroll.bankName` — string | optional\n- `payroll.bankAccount` — string | optional\n- `payroll.ifsc` — string | optional | IFSC\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
               }
             },
             {
@@ -1356,7 +1409,7 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{baseUrl}}/api/employees?search=&status=&department=&designation=&gender=&branch=&page=1&limit=10",
+                  "raw": "{{baseUrl}}/api/employees?search=&status=&department=&designation=&gender=&branch=&company=&shift=&page=1&limit=10",
                   "host": [
                     "{{baseUrl}}"
                   ],
@@ -1393,7 +1446,17 @@
                     {
                       "key": "branch",
                       "value": "",
-                      "description": "string | optional | branch / location filter"
+                      "description": "string | optional | current branch filter — Branch `_id`, branch name or branch code (e.g. `NOI`)"
+                    },
+                    {
+                      "key": "company",
+                      "value": "",
+                      "description": "string | optional | company name (exact master name)"
+                    },
+                    {
+                      "key": "shift",
+                      "value": "",
+                      "description": "string | optional | current shift filter — Shift `_id`, shift name or shift code (e.g. `GS-01`)"
                     },
                     {
                       "key": "page",
@@ -1407,7 +1470,7 @@
                     }
                   ]
                 },
-                "description": "Employee Management — **only role = Employee**.\n\nFor Access & Control (all roles) use **List Users** → GET /api/users.\n\nColumns: _id, name, email, role, department, lastLogin, status, employeeCode, gender, designation, branch.\nGlobal Admin → all companies. Super Admin / HR / Manager → own company.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `search` — string | optional | name / email / employee code text search\n- `status` — string | optional | `Active` or `Inactive`\n- `department` — string | optional | department name\n- `designation` — string | optional | designation name\n- `gender` — string | optional | Gender master name e.g. `Male` / `Female`\n- `branch` — string | optional | branch / location filter\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                "description": "Employee Management — **only role = Employee**.\n\nFor Access & Control (all roles) use **List Users** → GET /api/users.\n\nColumns: _id, name, email, role, department, lastLogin, status, employeeCode, gender, designation, branch.\nGlobal Admin → all companies. Super Admin / HR / Manager → own company.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `search` — string | optional | name / email / employee code text search\n- `status` — string | optional | `Active` or `Inactive`\n- `department` — string | optional | department name\n- `designation` — string | optional | designation name\n- `gender` — string | optional | Gender master name e.g. `Male` / `Female`\n- `branch` — string | optional | current branch filter — Branch `_id`, branch name or branch code (e.g. `NOI`)\n- `company` — string | optional | company name (exact master name)\n- `shift` — string | optional | current shift filter — Shift `_id`, shift name or shift code (e.g. `GS-01`)\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
               }
             },
             {
@@ -1421,7 +1484,7 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{baseUrl}}/api/employees/export?search=&status=&department=&designation=&gender=&company=",
+                  "raw": "{{baseUrl}}/api/employees/export?search=&status=&department=&designation=&gender=&company=&branch=&shift=",
                   "host": [
                     "{{baseUrl}}"
                   ],
@@ -1460,10 +1523,20 @@
                       "key": "company",
                       "value": "",
                       "description": "string | optional | company name (exact master name)"
+                    },
+                    {
+                      "key": "branch",
+                      "value": "",
+                      "description": "string | optional | current branch filter — Branch `_id`, branch name or branch code (e.g. `NOI`)"
+                    },
+                    {
+                      "key": "shift",
+                      "value": "",
+                      "description": "string | optional | current shift filter — Shift `_id`, shift name or shift code (e.g. `GS-01`)"
                     }
                   ]
                 },
-                "description": "GET /api/employees/export — admin only (not Employee role).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `search` — string | optional | name / email / employee code text search\n- `status` — string | optional | `Active` or `Inactive`\n- `department` — string | optional | department name\n- `designation` — string | optional | designation name\n- `gender` — string | optional | Gender master name e.g. `Male` / `Female`\n- `company` — string | optional | company name (exact master name)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                "description": "GET /api/employees/export — admin only (not Employee role).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `search` — string | optional | name / email / employee code text search\n- `status` — string | optional | `Active` or `Inactive`\n- `department` — string | optional | department name\n- `designation` — string | optional | designation name\n- `gender` — string | optional | Gender master name e.g. `Male` / `Female`\n- `company` — string | optional | company name (exact master name)\n- `branch` — string | optional | current branch filter — Branch `_id`, branch name or branch code (e.g. `NOI`)\n- `shift` — string | optional | current shift filter — Shift `_id`, shift name or shift code (e.g. `GS-01`)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
               }
             },
             {
@@ -1485,7 +1558,7 @@
                   "raw": "{\n  \"name\": \"{{newUserName}}\",\n  \"personal\": {\n    \"dateOfBirth\": \"{{dateOfBirth}}\",\n    \"gender\": \"{{gender}}\",\n    \"maritalStatus\": \"{{maritalStatus}}\",\n    \"fatherOrHusbandName\": \"{{fatherOrHusbandName}}\",\n    \"panNo\": \"{{panNo}}\",\n    \"aadhaarNo\": \"{{aadhaarNo}}\",\n    \"personalEmail\": \"{{personalEmail}}\",\n    \"mobileNo\": \"{{mobileNo}}\",\n    \"workPhone\": \"{{workPhone}}\",\n    \"workExt\": \"{{workExt}}\",\n    \"drivingLicenseNo\": \"{{drivingLicenseNo}}\",\n    \"passportNo\": \"{{passportNo}}\",\n    \"languageKnown\": \"{{languageKnown}}\",\n    \"emergencyContact1\": \"{{emergencyContact1}}\",\n    \"emergencyContact2\": \"{{emergencyContact2}}\",\n    \"presentAddress\": {\n      \"address\": \"{{address}}\",\n      \"city\": \"{{city}}\",\n      \"state\": \"{{state}}\",\n      \"country\": \"{{country}}\",\n      \"pincode\": \"{{pincode}}\"\n    },\n    \"permanentAddress\": {\n      \"address\": \"{{address}}\",\n      \"city\": \"{{city}}\",\n      \"state\": \"{{state}}\",\n      \"country\": \"{{country}}\",\n      \"pincode\": \"{{pincode}}\"\n    }\n  },\n  \"official\": {\n    \"employeeCode\": \"{{employeeCode}}\",\n    \"officialEmail\": \"{{newUserEmail}}\",\n    \"department\": \"{{department}}\",\n    \"designation\": \"{{designation}}\",\n    \"grade\": \"{{grade}}\",\n    \"jobRole\": \"{{jobRole}}\",\n    \"reportingHead1\": \"{{reportingHead1}}\",\n    \"reportingHead2\": \"{{reportingHead2}}\",\n    \"dateOfJoining\": \"{{dateOfJoining}}\"\n  },\n  \"other\": {\n    \"bloodGroup\": \"{{bloodGroup}}\",\n    \"passportExpiry\": \"{{passportExpiry}}\"\n  },\n  \"education\": [\n    {\n      \"courseType\": \"{{eduCourseType}}\",\n      \"courseLevel\": \"{{eduCourseLevel}}\",\n      \"courseName\": \"{{eduCourseName}}\",\n      \"instituteName\": \"{{eduInstitute}}\",\n      \"location\": \"{{city}}\",\n      \"fromYear\": \"{{eduFromYear}}\",\n      \"passingYear\": \"{{eduPassingYear}}\",\n      \"percentageOrGrade\": \"{{eduGrade}}\",\n      \"document\": \"{{eduDocument}}\"\n    }\n  ],\n  \"accounts\": [\n    {\n      \"bankName\": \"{{bankName}}\",\n      \"accountNo\": \"{{bankAccountNo}}\",\n      \"accountHolderName\": \"{{accountHolderName}}\",\n      \"ifscCode\": \"{{ifscCode}}\",\n      \"location\": \"{{city}}\",\n      \"active\": true,\n      \"salaryAccount\": true,\n      \"attachment\": \"\"\n    }\n  ],\n  \"family\": [\n    {\n      \"name\": \"{{familyName}}\",\n      \"relation\": \"{{familyRelation}}\",\n      \"mobileNo\": \"{{familyMobile}}\",\n      \"occupation\": \"{{familyOccupation}}\"\n    }\n  ],\n  \"nominees\": [\n    {\n      \"nominateFor\": \"{{nominateFor}}\",\n      \"relation\": \"{{nomineeRelation}}\",\n      \"amountPercent\": {{nomineePercent}},\n      \"address\": \"{{address}}\"\n    }\n  ],\n  \"experience\": [\n    {\n      \"organization\": \"{{expOrganization}}\",\n      \"designation\": \"{{expDesignation}}\",\n      \"location\": \"{{city}}\",\n      \"fromDate\": \"{{expFromDate}}\",\n      \"toDate\": \"{{expToDate}}\",\n      \"lastSalaryDrawn\": \"{{expLastSalary}}\"\n    }\n  ],\n  \"visas\": [\n    {\n      \"countryName\": \"{{visaCountry}}\",\n      \"visaType\": \"{{visaType}}\",\n      \"visaNumber\": \"{{visaNumber}}\",\n      \"fromDate\": \"{{visaFromDate}}\",\n      \"toDate\": \"{{visaToDate}}\"\n    }\n  ],\n  \"payroll\": {\n    \"basic\": {{payrollBasic}},\n    \"annualCtc\": {{payrollCtc}},\n    \"paymentMode\": \"{{payrollPaymentMode}}\",\n    \"uanNo\": \"{{payrollUan}}\",\n    \"bankName\": \"{{bankName}}\",\n    \"bankAccount\": \"{{bankAccountNo}}\",\n    \"ifsc\": \"{{ifscCode}}\"\n  },\n  \"\": \"{{}}\"\n}"
                 },
                 "url": "{{baseUrl}}/api/employees/{{userId}}",
-                "description": "PUT /api/employees/{{userId}} — ALL objects (admin).\n\npersonal | official | other | education | accounts | family | nominees | experience | visas | payroll\n\nEdit values in Collection → Variables. Login Super Admin first.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `userId` → {{userId}} — string (MongoId / id) | set collection variable after create/list\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `name` — string | required/optional | display / full name (min 2)\n- `personal.dateOfBirth` — string/date (YYYY-MM-DD) | optional\n- `personal.gender` — string | optional | Gender master name\n- `personal.maritalStatus` — string | optional | Marital Status master name\n- `personal.fatherOrHusbandName` — string | optional\n- `personal.panNo` — string | optional | PAN e.g. `ABCDE1234F`\n- `personal.aadhaarNo` — string | optional | 12 digits\n- `personal.personalEmail` — string (email) | optional\n- `personal.mobileNo` — string | optional | 10-digit mobile digits only\n- `personal.workPhone` — string | optional | office phone\n- `personal.workExt` — string | optional | extension\n- `personal.drivingLicenseNo` — string | optional\n- `personal.passportNo` — string | optional\n- `personal.languageKnown` — string | optional\n- `personal.emergencyContact1` — string | optional\n- `personal.emergencyContact2` — string | optional\n- `personal.presentAddress.address` — string | optional\n- `personal.presentAddress.city` — string | optional | City master\n- `personal.presentAddress.state` — string | optional | State master\n- `personal.presentAddress.country` — string | optional | Country master\n- `personal.presentAddress.pincode` — string | optional\n- `personal.permanentAddress.address` — string | optional\n- `personal.permanentAddress.city` — string | optional\n- `personal.permanentAddress.state` — string | optional\n- `personal.permanentAddress.country` — string | optional\n- `personal.permanentAddress.pincode` — string | optional\n- `official.employeeCode` — string | optional | uppercase code e.g. `EMP-1024`\n- `official.officialEmail` — string (email) | required on create | work login email\n- `official.company` — string | optional | filled from Company.companyName of companyIds[0]\n- `official.department` — string | often required | department master name\n- `official.designation` — string | optional | designation master name\n- `official.grade` — string | optional | grade master name\n- `official.jobRole` — string | optional | job role master name\n- `official.reportingHead1` — string | optional | manager email/code/name (links employee to Reporting Manager team)\n- `official.reportingHead2` — string | optional | 2nd reporting head\n- `official.dateOfJoining` — string/date (YYYY-MM-DD) | optional | joining date\n- `other.bloodGroup` — string | optional | Blood Group master\n- `other.passportExpiry` — string/date | optional\n- `education` — array<object> | optional | education rows (courseType, courseLevel, …)\n- `accounts` — array<object> | optional | bank account rows\n- `family` — array<object> | optional | family rows\n- `nominees` — array<object> | optional | nominee rows\n- `experience` — array<object> | optional | experience rows\n- `visas` — array<object> | optional | visa rows\n- `payroll.basic` — number/string | optional | basic salary\n- `payroll.annualCtc` — number/string | optional\n- `payroll.paymentMode` — string | optional\n- `payroll.uanNo` — string | optional\n- `payroll.bankName` — string | optional\n- `payroll.bankAccount` — string | optional\n- `payroll.ifsc` — string | optional | IFSC\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                "description": "PUT /api/employees/{{userId}} — ALL objects (admin).\n\npersonal | official | other | education | accounts | family | nominees | experience | visas | payroll\n\nEdit values in Collection → Variables. Login Super Admin first.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `userId` → {{userId}} — string (MongoId / id) | set collection variable after create/list\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `name` — string | required/optional | display / full name (min 2)\n- `personal.dateOfBirth` — string/date (YYYY-MM-DD) | optional\n- `personal.gender` — string | optional | Gender master name\n- `personal.maritalStatus` — string | optional | Marital Status master name\n- `personal.fatherOrHusbandName` — string | optional\n- `personal.panNo` — string | optional | PAN e.g. `ABCDE1234F`\n- `personal.aadhaarNo` — string | optional | 12 digits\n- `personal.personalEmail` — string (email) | optional\n- `personal.mobileNo` — string | optional | 10-digit mobile digits only\n- `personal.workPhone` — string | optional | office phone\n- `personal.workExt` — string | optional | extension\n- `personal.drivingLicenseNo` — string | optional\n- `personal.passportNo` — string | optional\n- `personal.languageKnown` — string | optional\n- `personal.emergencyContact1` — string | optional\n- `personal.emergencyContact2` — string | optional\n- `personal.presentAddress.address` — string | optional\n- `personal.presentAddress.city` — string | optional | City master\n- `personal.presentAddress.state` — string | optional | State master\n- `personal.presentAddress.country` — string | optional | Country master\n- `personal.presentAddress.pincode` — string | optional\n- `personal.permanentAddress.address` — string | optional\n- `personal.permanentAddress.city` — string | optional\n- `personal.permanentAddress.state` — string | optional\n- `personal.permanentAddress.country` — string | optional\n- `personal.permanentAddress.pincode` — string | optional\n- `official.employeeCode` — string | optional | uppercase code e.g. `EMP-1024`\n- `official.officialEmail` — string (email) | required on create | work login email\n- `official.department` — string | often required | department master name\n- `official.designation` — string | optional | designation master name\n- `official.grade` — string | optional | grade master name\n- `official.jobRole` — string | optional | job role master name\n- `official.reportingHead1` — string (MongoId) | optional | Reporting Manager User _id (\"\" or null clears). Bulk: POST /api/hierarchy/assign\n- `official.reportingHead2` — string (MongoId) | optional | 2nd Reporting Manager User _id\n- `official.dateOfJoining` — string/date (YYYY-MM-DD) | optional | joining date\n- `other.bloodGroup` — string | optional | Blood Group master\n- `other.passportExpiry` — string/date | optional\n- `education` — array<object> | optional | education rows (courseType, courseLevel, …)\n- `accounts` — array<object> | optional | bank account rows\n- `family` — array<object> | optional | family rows\n- `nominees` — array<object> | optional | nominee rows\n- `experience` — array<object> | optional | experience rows\n- `visas` — array<object> | optional | visa rows\n- `payroll.basic` — number/string | optional | basic salary\n- `payroll.annualCtc` — number/string | optional\n- `payroll.paymentMode` — string | optional\n- `payroll.uanNo` — string | optional\n- `payroll.bankName` — string | optional\n- `payroll.bankAccount` — string | optional\n- `payroll.ifsc` — string | optional | IFSC\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
               }
             },
             {
@@ -4692,7 +4765,7 @@
                   }
                 ],
                 "url": "{{baseUrl}}/api/weekly-offs",
-                "description": "offDays: 0=Sun … 6=Sat. Weekly off days live on this policy. Shift hours live on the Company module.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `company` — string | optional | company name (exact master name)\n- `workingDays` — number | optional | 1–7, default 5\n- `weekStartsOn` — string | optional | weekday name e.g. `Monday`\n- `offDays` — number[] | optional | 0=Sun … 6=Sat e.g. `[0,6]`\n- `status` — string | optional | `Active` or `Inactive`\n- `description` — string | optional | free text notes\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                "description": "offDays: 0=Sun … 6=Sat. Weekly off days live on this policy. Shift hours live on Administration → Company (`/api/companies`).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `company` — string | optional | company name (exact master name)\n- `workingDays` — number | optional | 1–7, default 5\n- `weekStartsOn` — string | optional | weekday name e.g. `Monday`\n- `offDays` — number[] | optional | 0=Sun … 6=Sat e.g. `[0,6]`\n- `status` — string | optional | `Active` or `Inactive`\n- `description` — string | optional | free text notes\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"name\": \"5 Day Week\",\n  \"code\": \"5DAY\",\n  \"company\": \"{{company}}\",\n  \"workingDays\": 5,\n  \"weekStartsOn\": \"Monday\",\n  \"offDays\": [0, 6],\n  \"status\": \"Active\",\n  \"description\": \"\"\n}",
@@ -4765,8 +4838,8 @@
           ]
         },
         {
-          "name": "1.11 Company Org",
-          "description": "Company setup: company → branches → shifts → monthly week schedule.\nPOST/GET/PUT/DELETE /api/companies\n\n**Super Admin and Admin only.** Login as Super Admin or Admin first. HR, Reporting Manager, and Employee get 403 — Company is not in their permission catalog.\n\nCompany is its own module. It is not under Masters (`type=company` is removed).\n\nCreate saves `{{companyOrgId}}`. Each week needs all 7 days. Sunday `isOff: true` can omit times. Sending `branches` on update replaces the full schedule.",
+          "name": "1.11 Company (Administration)",
+          "description": "Company setup: company → branches → shifts → monthly week schedule.\nPOST/GET/PUT/DELETE /api/companies\n\nPermission: **Administration → Company** (view / create / edit / delete). This is not a separate Company module and not a Master (`type=company` does not exist).\n\n**Super Admin and Admin only.** Login as Super Admin or Admin first. HR, Reporting Manager, Employee, and custom roles get 403.\n\nCreate saves `{{companyOrgId}}`. Each week needs all 7 days. Sunday `isOff: true` can omit times. Sending `branches` on update replaces the full schedule.",
           "item": [
             {
               "name": "List Companies",
@@ -4827,7 +4900,7 @@
                     }
                   ]
                 },
-                "description": "List company org records. Login as Super Admin or Admin.\nOptional `isActive` is disabled in Params — enable it and set `true` or `false` to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `search` — string | optional | match company name or company code\n- `isActive` — boolean | optional | `true` or `false` — omit to list all\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                "description": "List company org records. Permission: Administration → Company → view. Login as Super Admin or Admin.\nOptional `isActive` is disabled in Params — enable it and set `true` or `false` to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `search` — string | optional | match company name or company code\n- `isActive` — boolean | optional | `true` or `false` — omit to list all\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
               }
             },
             {
@@ -4839,7 +4912,12 @@
                     "type": "text/javascript",
                     "exec": [
                       "const j = pm.response.json();",
-                      "if (j.data && j.data._id) pm.collectionVariables.set('companyOrgId', j.data._id);"
+                      "const d = j.data || {};",
+                      "if (d._id) pm.collectionVariables.set('companyOrgId', d._id);",
+                      "const b = (d.branches || [])[0];",
+                      "if (b) pm.collectionVariables.set('branchId', b._id);",
+                      "const s = b && (b.shifts || [])[0];",
+                      "if (s) pm.collectionVariables.set('shiftId', s._id);"
                     ]
                   }
                 }
@@ -4857,10 +4935,10 @@
                   }
                 ],
                 "url": "{{baseUrl}}/api/companies",
-                "description": "Create company with one branch, one shift, week 1 (till 18:00) and week 2 (till 16:00). Saturday half day, Sunday off.\nDuplicate company name or code → 409. HR cannot call this.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `companyName` — string | required on create | company display name (min 2)\n- `companyCode` — string | required on create | unique code, stored uppercase e.g. `ABC`\n- `isActive` — boolean | optional | `true` keeps the company active\n- `branches` — array<object> | optional | branches under the company; on update this replaces the full list\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                "description": "Create company with nested branches → shifts → monthlySchedule (days / times). Sets {{companyOrgId}}, {{branchId}}, {{shiftId}}.\nEach week needs all 7 days; an off day (`isOff: true`) can omit times. `branchCode` is unique per company, `shiftCode` per branch.\nCompany = catalog (all branches + shifts + days). User = assignment (`companyIds` + one `branchId` + one `shiftId`).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `companyName` — string | required on create | company display name (min 2)\n- `companyCode` — string | required on create | unique code, stored uppercase e.g. `ABC`\n- `isActive` — boolean | optional | `true` keeps the company active\n- `branches` — array<object> | nested on company create/update — branchName, branchCode, shifts[].monthlySchedule\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"companyName\": \"ABC Technologies\",\n  \"companyCode\": \"ABC\",\n  \"isActive\": true,\n  \"branches\": [\n    {\n      \"branchName\": \"Noida Branch\",\n      \"branchCode\": \"NOI\",\n      \"address\": \"\",\n      \"city\": \"Noida\",\n      \"state\": \"Uttar Pradesh\",\n      \"isActive\": true,\n      \"shifts\": [\n        {\n          \"shiftName\": \"General Shift\",\n          \"shiftCode\": \"GS-01\",\n          \"isActive\": true,\n          \"monthlySchedule\": [\n            {\n              \"weekNumber\": 1,\n              \"days\": [\n                {\n                  \"day\": \"monday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:00\",\n                  \"endTime\": \"18:00\"\n                },\n                {\n                  \"day\": \"tuesday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:00\",\n                  \"endTime\": \"18:00\"\n                },\n                {\n                  \"day\": \"wednesday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:00\",\n                  \"endTime\": \"18:00\"\n                },\n                {\n                  \"day\": \"thursday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:00\",\n                  \"endTime\": \"18:00\"\n                },\n                {\n                  \"day\": \"friday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:00\",\n                  \"endTime\": \"18:00\"\n                },\n                {\n                  \"day\": \"saturday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:00\",\n                  \"endTime\": \"13:30\"\n                },\n                {\n                  \"day\": \"sunday\",\n                  \"isOff\": true\n                }\n              ]\n            },\n            {\n              \"weekNumber\": 2,\n              \"days\": [\n                {\n                  \"day\": \"monday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:00\",\n                  \"endTime\": \"16:00\"\n                },\n                {\n                  \"day\": \"tuesday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:00\",\n                  \"endTime\": \"16:00\"\n                },\n                {\n                  \"day\": \"wednesday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:00\",\n                  \"endTime\": \"16:00\"\n                },\n                {\n                  \"day\": \"thursday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:00\",\n                  \"endTime\": \"16:00\"\n                },\n                {\n                  \"day\": \"friday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:00\",\n                  \"endTime\": \"16:00\"\n                },\n                {\n                  \"day\": \"saturday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:00\",\n                  \"endTime\": \"13:30\"\n                },\n                {\n                  \"day\": \"sunday\",\n                  \"isOff\": true\n                }\n              ]\n            }\n          ]\n        }\n      ]\n    }\n  ]\n}",
+                  "raw": "{\n  \"companyName\": \"ABC Technologies\",\n  \"companyCode\": \"ABC\",\n  \"isActive\": true,\n  \"branches\": [\n    {\n      \"branchName\": \"Noida\",\n      \"branchCode\": \"NOIDA\",\n      \"city\": \"Noida\",\n      \"state\": \"Uttar Pradesh\",\n      \"isActive\": true,\n      \"shifts\": [\n        {\n          \"shiftName\": \"General Shift\",\n          \"shiftCode\": \"GS-01\",\n          \"isActive\": true,\n          \"monthlySchedule\": [\n            {\n              \"weekNumber\": 1,\n              \"days\": [\n                { \"day\": \"monday\", \"isOff\": false, \"startTime\": \"10:00\", \"endTime\": \"19:00\", \"breakStartTime\": \"13:00\", \"breakEndTime\": \"14:00\" },\n                { \"day\": \"tuesday\", \"isOff\": false, \"startTime\": \"10:00\", \"endTime\": \"19:00\", \"breakStartTime\": \"13:00\", \"breakEndTime\": \"14:00\" },\n                { \"day\": \"wednesday\", \"isOff\": false, \"startTime\": \"10:00\", \"endTime\": \"19:00\", \"breakStartTime\": \"13:00\", \"breakEndTime\": \"14:00\" },\n                { \"day\": \"thursday\", \"isOff\": false, \"startTime\": \"10:00\", \"endTime\": \"19:00\", \"breakStartTime\": \"13:00\", \"breakEndTime\": \"14:00\" },\n                { \"day\": \"friday\", \"isOff\": false, \"startTime\": \"10:00\", \"endTime\": \"19:00\", \"breakStartTime\": \"13:00\", \"breakEndTime\": \"14:00\" },\n                { \"day\": \"saturday\", \"isOff\": false, \"startTime\": \"10:00\", \"endTime\": \"14:30\" },\n                { \"day\": \"sunday\", \"isOff\": true }\n              ]\n            }\n          ]\n        }\n      ]\n    }\n  ]\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -4884,8 +4962,128 @@
                   }
                 ],
                 "url": "{{baseUrl}}/api/companies/{{companyOrgId}}",
-                "description": "One company org by id. Set {{companyOrgId}} from Create or List.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `companyOrgId` → {{companyOrgId}} — string (MongoId / id) | set collection variable after create/list\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                "description": "One company org by id (includes nested branches and shift days). Permission: Administration → Company → view.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `companyOrgId` → {{companyOrgId}} — string (MongoId / id) | set collection variable after create/list\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
               }
+            },
+            {
+              "name": "Get Company Branches (user dropdown)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/companies/{{companyOrgId}}/branches",
+                "description": "Create-user form, step 2: after picking a company, list its active branches (with shift names). Sets {{branchId}} to the first branch.\nNext: **Get Branch Shifts**. HR / Reporting Manager can call this only for their own companies.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `companyOrgId` → {{companyOrgId}} — string (MongoId / id) | set collection variable after create/list\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const d = pm.response.json().data || {};",
+                      "const b = (d.branches || [])[0];",
+                      "if (b) pm.collectionVariables.set('branchId', b._id);"
+                    ]
+                  }
+                }
+              ],
+              "response": [
+                {
+                  "name": "200 — branches of a company",
+                  "originalRequest": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/companies/{{companyOrgId}}/branches"
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json; charset=utf-8"
+                    }
+                  ],
+                  "body": "{\n  \"data\": {\n    \"companyId\": \"6ac4eeaf1e0cfdb02b36b6ce\",\n    \"companyName\": \"ABC Technologies\",\n    \"companyCode\": \"ABC\",\n    \"branches\": [\n      {\n        \"_id\": \"6ac4eeaf1e0cfdb02b36b6cf\",\n        \"branchName\": \"Noida\",\n        \"branchCode\": \"NOIDA\",\n        \"city\": \"Noida\",\n        \"state\": \"Uttar Pradesh\",\n        \"shifts\": [\n          {\n            \"_id\": \"6ac4eeaf1e0cfdb02b36b6d0\",\n            \"shiftName\": \"General Shift\",\n            \"shiftCode\": \"GS-01\"\n          },\n          {\n            \"_id\": \"6ac4eeaf1e0cfdb02b36b6d1\",\n            \"shiftName\": \"Evening Shift\",\n            \"shiftCode\": \"ES-01\"\n          }\n        ]\n      }\n    ]\n  }\n}"
+                }
+              ]
+            },
+            {
+              "name": "Get Branch Shifts (user dropdown)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/companies/{{companyOrgId}}/branches/{{branchId}}",
+                "description": "Create-user form, step 3: shifts of the selected branch only. Sets {{shiftId}} to the first shift.\nSave the picked ids on the user as `official.branchId` + `official.shiftId`.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `companyOrgId` → {{companyOrgId}} — string (MongoId / id) | set collection variable after create/list\n- `branchId` → {{branchId}} — string (MongoId / id) | set collection variable after create/list\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const d = pm.response.json().data || {};",
+                      "const s = (d.shifts || [])[0];",
+                      "if (s) pm.collectionVariables.set('shiftId', s._id);"
+                    ]
+                  }
+                }
+              ],
+              "response": [
+                {
+                  "name": "200 — shifts of one branch",
+                  "originalRequest": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "url": "{{baseUrl}}/api/companies/{{companyOrgId}}/branches/{{branchId}}"
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json; charset=utf-8"
+                    }
+                  ],
+                  "body": "{\n  \"data\": {\n    \"companyId\": \"6ac4eeaf1e0cfdb02b36b6ce\",\n    \"companyName\": \"ABC Technologies\",\n    \"branch\": {\n      \"_id\": \"6ac4eeaf1e0cfdb02b36b6cf\",\n      \"branchName\": \"Noida\",\n      \"branchCode\": \"NOIDA\"\n    },\n    \"shifts\": [\n      {\n        \"_id\": \"6ac4eeaf1e0cfdb02b36b6d0\",\n        \"shiftName\": \"General Shift\",\n        \"shiftCode\": \"GS-01\"\n      },\n      {\n        \"_id\": \"6ac4eeaf1e0cfdb02b36b6d1\",\n        \"shiftName\": \"Evening Shift\",\n        \"shiftCode\": \"ES-01\"\n      }\n    ]\n  }\n}"
+                }
+              ]
             },
             {
               "name": "Update Company",
@@ -4902,15 +5100,10 @@
                   }
                 ],
                 "url": "{{baseUrl}}/api/companies/{{companyOrgId}}",
-                "description": "Partial update. This sample only renames / toggles active.\nTo change branches or the weekly schedule, send the full `branches` array (same shape as Create). Omitted `branches` leaves the saved schedule as-is.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `companyOrgId` → {{companyOrgId}} — string (MongoId / id) | set collection variable after create/list\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `companyName` — string | required on create | company display name (min 2)\n- `isActive` — boolean | optional | `true` keeps the company active\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                "description": "Update company. Sending `branches` replaces the full nested tree.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `companyOrgId` → {{companyOrgId}} — string (MongoId / id) | set collection variable after create/list\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `companyName` — string | required on create | company display name (min 2)\n- `isActive` — boolean | optional | `true` keeps the company active\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"companyName\": \"ABC Technologies\",\n  \"isActive\": true\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
+                  "raw": "{\n  \"companyName\": \"ABC Technologies Pvt Ltd\",\n  \"isActive\": true\n}"
                 }
               }
             },
@@ -4929,14 +5122,14 @@
                   }
                 ],
                 "url": "{{baseUrl}}/api/companies/{{companyOrgId}}",
-                "description": "Hard delete. Super Admin or Admin only.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `companyOrgId` → {{companyOrgId}} — string (MongoId / id) | set collection variable after create/list\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                "description": "Delete company with its branches and shifts. **409** while any user has this company — set `isActive: false` instead.\nPermission: Administration → Company → delete.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `companyOrgId` → {{companyOrgId}} — string (MongoId / id) | set collection variable after create/list\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
               }
             }
           ]
         },
         {
-          "name": "1.7 Hierarchy (Org Tree)",
-          "description": "Organization hierarchy — Super Admin → Admin → HR / Reporting Manager → Employee team.\nLike Manager Hierarchy UI.",
+          "name": "1.7 Hierarchy (Administration)",
+          "description": "Administration → Hierarchy — /api/hierarchy\n\nSuper Admin → Admin → HR / Reporting Manager → Employee team.\nTeam = employees whose `official.reportingHead1` / `reportingHead2` is the manager `_id` (assigned manually, never by company).\n\n**Who sees what**\n- Super Admin / Admin / HR Manager → full organization + assign / unassign\n- Reporting Manager → own hierarchy only (self + team), view only\n- Employee → no access (403)\n\n**Run order:** Login (Super Admin / Admin / HR) → Reporting Managers list (sets {{managerId}}) → Organization Tree (sets {{employeeId1}}, {{employeeId2}}) → Assign / Unassign.\nLogin as Reporting Manager → Organization Tree returns `scope: \"team\"` and a tree rooted at that manager.",
           "item": [
             {
               "name": "Overview (ladder + users)",
@@ -4950,11 +5143,35 @@
                   }
                 ],
                 "url": "{{baseUrl}}/api/hierarchy",
-                "description": "Role ladder overview with users at each level.\nLogin as Super Admin first.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                "description": "Role ladder with users at each level. Response has `scope`: `organization` or `team`.\nReporting Manager → only self + own team appear.\n\n**Access (Administration → Hierarchy)**\n- Super Admin / Admin / HR Manager → full organization\n- Reporting Manager → own hierarchy only (self + team)\n- Employee → 403\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
               }
             },
             {
-              "name": "Full Tree",
+              "name": "Organization Tree",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "var j = pm.response.json();",
+                      "var emps = [];",
+                      "function walk(n) {",
+                      "  (n.users || []).forEach(function (u) {",
+                      "    if (u.role === 'Employee') emps.push(u.id);",
+                      "    (u.children || []).forEach(function (c) { if (c.role === 'Employee') emps.push(c.id); });",
+                      "  });",
+                      "  (n.children || []).forEach(walk);",
+                      "}",
+                      "if (j.tree) walk(j.tree);",
+                      "(j.unassignedEmployees || []).forEach(function (u) { emps.push(u.id); });",
+                      "emps = emps.filter(function (v, i, a) { return a.indexOf(v) === i; });",
+                      "if (emps[0]) pm.collectionVariables.set('employeeId1', emps[0]);",
+                      "if (emps[1]) pm.collectionVariables.set('employeeId2', emps[1]);"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "GET",
                 "header": [
@@ -4965,11 +5182,11 @@
                   }
                 ],
                 "url": "{{baseUrl}}/api/hierarchy/tree",
-                "description": "Full org tree. Reporting Managers include team children (reportingHead).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                "description": "Tree View. Super Admin / Admin / HR → full tree from Super Admin down, plus `unassignedEmployees`.\nReporting Manager → `label: \"My Team\"` rooted at themselves with team as children.\n\nTests: sets {{employeeId1}} / {{employeeId2}} from employees in the tree.\n\n**Access (Administration → Hierarchy)**\n- Super Admin / Admin / HR Manager → full organization\n- Reporting Manager → own hierarchy only (self + team)\n- Employee → 403\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
               }
             },
             {
-              "name": "Super Admin view",
+              "name": "Super Admin view (branches)",
               "request": {
                 "method": "GET",
                 "header": [
@@ -4980,11 +5197,24 @@
                   }
                 ],
                 "url": "{{baseUrl}}/api/hierarchy/super-admin",
-                "description": "Super Admin / Admin only — branches: Admins, HR, Reporting Managers.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                "description": "Branches under Super Admin: Admins, HR Managers, Reporting Managers.\n\n**Access:** Super Admin / Admin / HR Manager. Reporting Manager / Employee → 403.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
               }
             },
             {
               "name": "Reporting Managers list",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "var j = pm.response.json();",
+                      "if (j.managers && j.managers[0]) pm.collectionVariables.set('managerId', j.managers[0].id);",
+                      "if (j.managers && j.managers[1]) pm.collectionVariables.set('managerId2', j.managers[1].id);"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "GET",
                 "header": [
@@ -4995,7 +5225,7 @@
                   }
                 ],
                 "url": "{{baseUrl}}/api/hierarchy/reporting-managers",
-                "description": "Managers strip with teamCount (like ezwealth Manager Hierarchy top row).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                "description": "Active Reporting Managers with `teamCount`. Reporting Manager → only themselves.\n\nTests: sets {{managerId}} (first) and {{managerId2}} (second, if any).\n\n**Access (Administration → Hierarchy)**\n- Super Admin / Admin / HR Manager → full organization\n- Reporting Manager → own hierarchy only (self + team)\n- Employee → 403\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
               }
             },
             {
@@ -5009,8 +5239,341 @@
                     "type": "text"
                   }
                 ],
-                "url": "{{baseUrl}}/api/hierarchy/reporting-managers/{{userId}}",
-                "description": "Step 1 manager + Step 2 team. Set {{userId}} = Reporting Manager `_id`.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `userId` → {{userId}} — string (MongoId / id) | set collection variable after create/list\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                "url": "{{baseUrl}}/api/hierarchy/reporting-managers/{{managerId}}",
+                "description": "One manager → team list (Step 1 / Step 2 UI). Reporting Manager can open only their own id (else 403).\n\n**Access (Administration → Hierarchy)**\n- Super Admin / Admin / HR Manager → full organization\n- Reporting Manager → own hierarchy only (self + team)\n- Employee → 403\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `managerId` → {{managerId}} — string (MongoId / id) | set collection variable after create/list\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+              }
+            },
+            {
+              "name": "Assign employees to manager (bulk, reportingHead1)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('200 OK', function () { pm.response.to.have.status(200); });",
+                      "var j = pm.response.json();",
+                      "if (j.errors) console.log(JSON.stringify(j.errors, null, 2));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"managerId\": \"{{managerId}}\",\n  \"employeeIds\": [\n    \"{{employeeId1}}\",\n    \"{{employeeId2}}\"\n  ],\n  \"level\": 1\n}"
+                },
+                "url": "{{baseUrl}}/api/hierarchy/assign",
+                "description": "Sets `official.reportingHead1 = managerId` for every employee in `employeeIds` (1–500).\nAll-or-nothing: if any employee is invalid, nothing changes and `errors[]` lists each one.\n\nRules: manager must be an Active Reporting Manager; only Employee role can be assigned; same manager cannot be both heads.\nResponse: employees with populated `reportingHead1` / `reportingHead2` `{ _id, name, email, employeeCode }`.\n\n**Access:** Administration → Hierarchy → `assign` — Super Admin / Admin / HR Manager. Reporting Manager and Employee → 403.\nHR Manager can assign only employees of their own companies. Manager can be from any company.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `managerId` — string (MongoId 24-hex) | required on assign, optional on unassign | Reporting Manager user `_id`\n- `employeeIds` — array<string> (MongoId 24-hex) | required | 1–500 Employee user `_id`s (bulk)\n- `level` — number | optional | `1` = reportingHead1 (default on assign), `2` = reportingHead2\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+              }
+            },
+            {
+              "name": "Assign as second reporting head (reportingHead2)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('200 OK', function () { pm.response.to.have.status(200); });",
+                      "var j = pm.response.json();",
+                      "if (j.errors) console.log(JSON.stringify(j.errors, null, 2));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"managerId\": \"{{managerId2}}\",\n  \"employeeIds\": [\n    \"{{employeeId1}}\"\n  ],\n  \"level\": 2\n}"
+                },
+                "url": "{{baseUrl}}/api/hierarchy/assign",
+                "description": "Same as assign but sets `official.reportingHead2`. Use a different manager than reportingHead1 ({{managerId2}}) — the same manager in both heads returns 400.\n\n**Access:** Administration → Hierarchy → `assign` — Super Admin / Admin / HR Manager. Reporting Manager and Employee → 403.\nHR Manager can assign only employees of their own companies. Manager can be from any company.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `managerId` — string (MongoId 24-hex) | required on assign, optional on unassign | Reporting Manager user `_id`\n- `employeeIds` — array<string> (MongoId 24-hex) | required | 1–500 Employee user `_id`s (bulk)\n- `level` — number | optional | `1` = reportingHead1 (default on assign), `2` = reportingHead2\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+              }
+            },
+            {
+              "name": "Remove employees from manager's team",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('200 OK', function () { pm.response.to.have.status(200); });",
+                      "var j = pm.response.json();",
+                      "if (j.errors) console.log(JSON.stringify(j.errors, null, 2));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"employeeIds\": [\n    \"{{employeeId1}}\",\n    \"{{employeeId2}}\"\n  ],\n  \"managerId\": \"{{managerId}}\"\n}"
+                },
+                "url": "{{baseUrl}}/api/hierarchy/unassign",
+                "description": "Clears only the heads that point to `managerId` (reportingHead1 and/or reportingHead2). Other heads stay.\n\n**Access:** Administration → Hierarchy → `assign` — Super Admin / Admin / HR Manager. Reporting Manager and Employee → 403.\nHR Manager can assign only employees of their own companies. Manager can be from any company.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `employeeIds` — array<string> (MongoId 24-hex) | required | 1–500 Employee user `_id`s (bulk)\n- `managerId` — string (MongoId 24-hex) | required on assign, optional on unassign | Reporting Manager user `_id`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+              }
+            },
+            {
+              "name": "Clear reportingHead2 only",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('200 OK', function () { pm.response.to.have.status(200); });",
+                      "var j = pm.response.json();",
+                      "if (j.errors) console.log(JSON.stringify(j.errors, null, 2));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"employeeIds\": [\n    \"{{employeeId1}}\"\n  ],\n  \"level\": 2\n}"
+                },
+                "url": "{{baseUrl}}/api/hierarchy/unassign",
+                "description": "Clears `official.reportingHead2` for the employees, whoever it points to.\n\n**Access:** Administration → Hierarchy → `assign` — Super Admin / Admin / HR Manager. Reporting Manager and Employee → 403.\nHR Manager can assign only employees of their own companies. Manager can be from any company.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `employeeIds` — array<string> (MongoId 24-hex) | required | 1–500 Employee user `_id`s (bulk)\n- `level` — number | optional | `1` = reportingHead1 (default on assign), `2` = reportingHead2\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+              }
+            },
+            {
+              "name": "Clear both reporting heads",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('200 OK', function () { pm.response.to.have.status(200); });",
+                      "var j = pm.response.json();",
+                      "if (j.errors) console.log(JSON.stringify(j.errors, null, 2));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"employeeIds\": [\n    \"{{employeeId1}}\"\n  ]\n}"
+                },
+                "url": "{{baseUrl}}/api/hierarchy/unassign",
+                "description": "No `managerId` / `level` → clears reportingHead1 and reportingHead2. Employee shows in `unassignedEmployees` of the tree.\n\n**Access:** Administration → Hierarchy → `assign` — Super Admin / Admin / HR Manager. Reporting Manager and Employee → 403.\nHR Manager can assign only employees of their own companies. Manager can be from any company.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `employeeIds` — array<string> (MongoId 24-hex) | required | 1–500 Employee user `_id`s (bulk)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.12 Branch & Shift Masters",
+          "description": "Masters hold names only (Noida, General Shift). Timings live on Company.branches[].shifts[].monthlySchedule.\nUser stores only official.companyIds. Load branches/shifts from GET /api/companies/{id}/branches.",
+          "item": [
+            {
+              "name": "List Branches",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/masters?type=branch&status=Active&page=1&limit=50",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "masters"
+                  ],
+                  "query": [
+                    {
+                      "key": "type",
+                      "value": "branch",
+                      "description": "string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
+                    },
+                    {
+                      "key": "status",
+                      "value": "Active",
+                      "description": "string | optional | `Active` or `Inactive`"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1",
+                      "description": "number | optional | page number, default `1`"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50",
+                      "description": "number | optional | rows per page (usually 1–200)"
+                    }
+                  ]
+                },
+                "description": "Branch names (Noida, Delhi, …) for the company form's `branchName` dropdown.\nUsers never store this name — they store `official.branchId` from the company.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+              }
+            },
+            {
+              "name": "Create Branch",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/masters",
+                "description": "Add a branch name. Same API as Department.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"type\": \"branch\",\n  \"name\": \"Gurugram\",\n  \"status\": \"Active\"\n}"
+                }
+              }
+            },
+            {
+              "name": "List Shifts",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/masters?type=shift&status=Active&page=1&limit=50",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "masters"
+                  ],
+                  "query": [
+                    {
+                      "key": "type",
+                      "value": "shift",
+                      "description": "string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
+                    },
+                    {
+                      "key": "status",
+                      "value": "Active",
+                      "description": "string | optional | `Active` or `Inactive`"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1",
+                      "description": "number | optional | page number, default `1`"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50",
+                      "description": "number | optional | rows per page (usually 1–200)"
+                    }
+                  ]
+                },
+                "description": "Shift names (General Shift, Evening Shift, …) for the company form's `shiftName` dropdown.\nUsers never store this name — they store `official.shiftId` from the company.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+              }
+            },
+            {
+              "name": "Create Shift",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/masters",
+                "description": "Add a shift name. Same API as Department.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"type\": \"shift\",\n  \"name\": \"Morning Shift\",\n  \"status\": \"Active\"\n}"
+                }
               }
             }
           ]

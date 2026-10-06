@@ -104,8 +104,11 @@ const officialItem = only({
   designation: str(),
   division: str(),
   employeeGroup: str(),
-  reportingHead1: str(),
-  reportingHead2: str(),
+  branchId: Joi.string().hex().length(24).allow("", null).optional(),
+  shiftId: Joi.string().hex().length(24).allow("", null).optional(),
+  /** Reporting Manager User _id ("" or null clears) */
+  reportingHead1: Joi.string().hex().length(24).allow("", null).optional(),
+  reportingHead2: Joi.string().hex().length(24).allow("", null).optional(),
   jobRole: str(),
   dateOfJoining: date(),
   calculateSalaryFrom: date(),

@@ -21,7 +21,6 @@ const { hasAllAccess } = require("../middleware/auth");
 const { queueWelcomeEmail } = require("../utils/mail");
 const { logEmployeeActivity } = require("../utils/activityLog");
 const ActivityLog = require("../models/ActivityLog");
-const { applyAnniversary } = require("../utils/anniversary");
 const { sendExcel } = require("../utils/excel");
 const { uploadToCloudinary, UPLOAD_TYPES } = require("../middleware/upload");
 const {
@@ -33,13 +32,25 @@ const {
   hasGlobalCompanyAccess,
   attachCompany,
   writeCompanyFields,
-  companyNameMap,
+  COMPANY_POPULATE,
+  companyRefs,
 } = require("../utils/companyScope");
-const { assertTeamOrCompanyEmployee } = require("../utils/teamScope");
+const {
+  assertTeamOrCompanyEmployee,
+  validateReportingHeads,
+  headId,
+} = require("../utils/teamScope");
+const {
+  assertUserPlacement,
+  attachPlacementMany,
+  parseOidOrNull,
+} = require("../utils/companyShift");
 const {
   buildListQuery,
   mapEmployeeListRow,
   LIST_SELECT,
+  LIST_POPULATE,
+  safeUser,
 } = require("../utils/userAccount");
 
 /** True for Super Admin / Admin (lean login accounts) */
@@ -75,16 +86,6 @@ const unsetEmployeeProfileFields = async (userId, roleName) => {
     unset["official.department"] = 1;
   }
   await User.collection.updateOne({ _id: userId }, { $unset: unset });
-};
-
-/** Strip password before sending a user in the API response */
-const safeUser = (doc) => {
-  if (!doc) return null;
-  applyAnniversary(doc);
-  const obj = doc.toObject ? doc.toObject() : { ...doc };
-  delete obj.password;
-  delete obj.contact;
-  return obj;
 };
 
 /** Nested profile keys accepted on update */
@@ -292,6 +293,8 @@ const createEmployee = async (req, res) => {
     if (!assigned.ok) {
       return res.status(assigned.status).json({ message: assigned.message });
     }
+    const headErr = await validateReportingHeads(officialIn);
+    if (headErr) return res.status(400).json({ message: headErr });
 
     const official = writeCompanyFields(
       normalizeSectionUniques("official", {
@@ -300,10 +303,21 @@ const createEmployee = async (req, res) => {
         employeeCode: officialIn.employeeCode
           ? String(officialIn.employeeCode).trim().toUpperCase()
           : "",
+        branchId: parseOidOrNull(officialIn.branchId),
+        shiftId: parseOidOrNull(officialIn.shiftId),
       }),
       assigned,
       "Employee"
     );
+
+    const placed = await assertUserPlacement({
+      companyIds: official.companyIds,
+      branchId: official.branchId,
+      shiftId: official.shiftId,
+    });
+    if (!placed.ok) {
+      return res.status(placed.status).json({ message: placed.message });
+    }
 
     const personal = normalizeSectionUniques("personal", personalIn);
 
@@ -382,7 +396,7 @@ const createEmployee = async (req, res) => {
       message: `Employee created. Welcome email queued for ${mail.emailTo}.`,
       emailQueued: true,
       emailTo: mail.emailTo || email,
-      employee: safeUser(fresh),
+      employee: await safeUser(fresh),
     });
   } catch (err) {
     const dup = duplicateKeyMessage(err);
@@ -395,7 +409,7 @@ const createEmployee = async (req, res) => {
  * LIST EMPLOYEES — GET /api/employees
  *
  * Admin table only. Employee role uses GET /:id for own profile (not list).
- * Query: search|q, status, department, designation, gender, company|branch, page, limit
+ * Query: search|q, status, department, designation, gender, company, branch, shift, page, limit
  * Always filters role = Employee.
  */
 const listEmployees = async (req, res) => {
@@ -413,11 +427,12 @@ const listEmployees = async (req, res) => {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
+        .populate(LIST_POPULATE)
         .lean(),
     ]);
 
-    const nameById = await companyNameMap(rows);
-    const employees = rows.map((row) => mapEmployeeListRow(row, nameById));
+    await attachPlacementMany(rows);
+    const employees = rows.map(mapEmployeeListRow);
 
     return res.json({
       count: employees.length,
@@ -452,18 +467,22 @@ const exportEmployees = async (req, res) => {
     const rows = await User.find(built.filter)
       .select(LIST_SELECT)
       .sort({ createdAt: -1 })
+      .populate(LIST_POPULATE)
       .lean();
 
-    const nameById = await companyNameMap(rows);
+    await attachPlacementMany(rows);
+
     const data = rows.map((row) => {
-      const m = mapEmployeeListRow(row, nameById);
+      const m = mapEmployeeListRow(row);
       return {
         name: m.name,
         employeeCode: m.employeeCode,
         gender: m.gender,
         designation: m.designation,
         department: m.department,
-        branch: m.branch,
+        company: m.companies.map((c) => c.companyName).join(", "),
+        branch: m.branch || "",
+        shift: m.shift || "",
         status: m.status,
         email: m.email,
       };
@@ -478,7 +497,9 @@ const exportEmployees = async (req, res) => {
         { header: "Gender", key: "gender", width: 10 },
         { header: "Designation", key: "designation", width: 22 },
         { header: "Department", key: "department", width: 16 },
-        { header: "Branch", key: "branch", width: 32 },
+        { header: "Company", key: "company", width: 32 },
+        { header: "Branch", key: "branch", width: 22 },
+        { header: "Shift", key: "shift", width: 20 },
         { header: "Status", key: "status", width: 12 },
         { header: "Email", key: "email", width: 28 },
       ],
@@ -520,7 +541,7 @@ const getEmployee = async (req, res) => {
       }
     }
 
-    return res.json({ employee: safeUser(employee) });
+    return res.json({ employee: await safeUser(employee) });
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
@@ -633,6 +654,7 @@ const updateEmployee = async (req, res) => {
       delete profile.official.companies;
       delete profile.official.companyIds;
 
+
       if (emailAttempt !== undefined) {
         const next = String(emailAttempt || "")
           .trim()
@@ -648,6 +670,21 @@ const updateEmployee = async (req, res) => {
       }
 
       profile.official = normalizeSectionUniques("official", profile.official);
+
+      const headErr = await validateReportingHeads(profile.official);
+      if (headErr) return res.status(400).json({ message: headErr });
+      const nextHead = (key) =>
+        profile.official[key] !== undefined
+          ? profile.official[key]
+          : employee.official?.[key];
+      if (
+        nextHead("reportingHead1") &&
+        headId(nextHead("reportingHead1")) === headId(nextHead("reportingHead2"))
+      ) {
+        return res.status(400).json({
+          message: "reportingHead1 and reportingHead2 cannot be the same manager",
+        });
+      }
     }
 
     // --- unique conflict checks (only fields that actually changed) ---
@@ -724,6 +761,26 @@ const updateEmployee = async (req, res) => {
       employee.markModified("payroll");
     }
 
+    if (employee.official) {
+      if (employee.official.branchId !== undefined) {
+        employee.official.branchId = parseOidOrNull(employee.official.branchId);
+      }
+      if (employee.official.shiftId !== undefined) {
+        employee.official.shiftId = parseOidOrNull(employee.official.shiftId);
+      }
+    }
+
+    if (!isPlatformRole(employee.role)) {
+      const placed = await assertUserPlacement({
+        companyIds: employee.official?.companyIds,
+        branchId: employee.official?.branchId,
+        shiftId: employee.official?.shiftId,
+      });
+      if (!placed.ok) {
+        return res.status(placed.status).json({ message: placed.message });
+      }
+    }
+
     // --- save + response ---
     await employee.save();
 
@@ -749,7 +806,7 @@ const updateEmployee = async (req, res) => {
         ;
       return res.json({
         message: "Employee updated",
-        employee: safeUser(fresh),
+        employee: await safeUser(fresh),
       });
     }
 
@@ -758,7 +815,7 @@ const updateEmployee = async (req, res) => {
       ;
     return res.json({
       message: "Employee updated",
-      employee: safeUser(fresh),
+      employee: await safeUser(fresh),
     });
   } catch (err) {
     const dup = duplicateKeyMessage(err);
@@ -856,7 +913,7 @@ const deleteArrayItem = async (req, res) => {
 
     return res.json({
       message: idSet.size === 1 ? `${section} item deleted` : `${section} items deleted`,
-      employee: safeUser(loaded.employee),
+      employee: await safeUser(loaded.employee),
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -963,7 +1020,7 @@ const deleteObjectSection = async (req, res) => {
 
     return res.json({
       message: "payroll cleared",
-      employee: safeUser(loaded.employee),
+      employee: await safeUser(loaded.employee),
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -1081,9 +1138,9 @@ const listEmployeeActivity = async (req, res) => {
       return res.status(403).json({ message: "You can only view your own activity" });
     }
 
-    const employee = await User.findById(req.params.id).select(
-      "name role official"
-    );
+    const employee = await User.findById(req.params.id)
+      .select("name role official")
+      .populate(COMPANY_POPULATE);
     if (!employee) {
       return res.status(404).json({ message: "Employee not found" });
     }
@@ -1117,7 +1174,7 @@ const listEmployeeActivity = async (req, res) => {
         name: employee.name,
         officialEmail: employee.official?.officialEmail || "",
         employeeCode: employee.official?.employeeCode || "",
-        company: employee.official?.company || "",
+        companies: companyRefs(employee),
         department: employee.official?.department || "",
       },
       count: logs.length,

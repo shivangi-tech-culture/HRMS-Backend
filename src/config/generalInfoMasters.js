@@ -78,6 +78,8 @@ const OFFICIAL_DROPDOWNS = {
   employeeGroup: ["Permanent", "Contract"],
   grade: ["G1", "G2", "G3", "G4", "G5"],
   jobRole: ["Executive", "Manager", "Intern", "Consultant"],
+  branch: ["Noida", "Delhi"],
+  shift: ["General Shift", "Evening Shift"],
 };
 
 /**
@@ -105,7 +107,7 @@ const ATTENDANCE_DROPDOWNS = {
 
 /**
  * Flatten to seed rows: { type, name }
- * Masters are GLOBAL. Company is not a master — seed creates it via the Company module.
+ * Masters are GLOBAL. Company is not a master — org companies are /api/companies.
  */
 const buildMasterSeedRows = () => {
   const rows = [];

@@ -2,7 +2,7 @@
  * Make all existing masters GLOBAL (clear company field + drop old indexes).
  * Does NOT wipe master names. Safe to re-run.
  *
- * Run: npm run migrate:masters-global
+ * Prefer: npm run seed:masters
  */
 require("dotenv").config();
 const mongoose = require("mongoose");

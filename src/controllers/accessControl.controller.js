@@ -14,8 +14,7 @@ const {
   isSuperAdmin,
   isPlatformRole,
 } = require("../config/roles");
-const { voidWelcomeEmail, sendEmail } = require("../utils/mail");
-const { applyAnniversary } = require("../utils/anniversary");
+const { queueWelcomeEmail, sendEmail } = require("../utils/mail");
 const { sendExcel } = require("../utils/excel");
 const {
   findUniqueConflict,
@@ -25,24 +24,21 @@ const {
   hasGlobalCompanyAccess,
   attachCompany,
   writeCompanyFields,
-  companyNameMap,
 } = require("../utils/companyScope");
 const { assertTeamOrCompanyEmployee } = require("../utils/teamScope");
+const {
+  assertUserPlacement,
+  attachPlacementMany,
+  parseOidOrNull,
+} = require("../utils/companyShift");
 const {
   visibleRolesForActor,
   buildListQuery,
   mapListRow,
   LIST_SELECT,
+  LIST_POPULATE,
+  safeUser,
 } = require("../utils/userAccount");
-
-const safeUser = (doc) => {
-  if (!doc) return null;
-  applyAnniversary(doc);
-  const obj = doc.toObject ? doc.toObject() : { ...doc };
-  delete obj.password;
-  delete obj.contact;
-  return obj;
-};
 
 const loadManagedUser = async (req, id) => {
   if (String(req.user._id) === String(id)) {
@@ -152,6 +148,9 @@ const createAccessUserAccount = async (req) => {
 
     const platform = isPlatformRole(roleName);
 
+    const branchId = parseOidOrNull(officialIn.branchId);
+    const shiftId = parseOidOrNull(officialIn.shiftId);
+
     const official = writeCompanyFields(
       platform
         ? {
@@ -162,10 +161,21 @@ const createAccessUserAccount = async (req) => {
             officialEmail: email,
             ...(department ? { department } : {}),
             ...(employeeCode ? { employeeCode } : {}),
+            ...(branchId ? { branchId } : {}),
+            ...(shiftId ? { shiftId } : {}),
           },
       assigned,
       roleName
     );
+
+    if (!platform) {
+      const placed = await assertUserPlacement({
+        companyIds: official.companyIds,
+        branchId: official.branchId,
+        shiftId: official.shiftId,
+      });
+      if (!placed.ok) return placed;
+    }
 
     const createDoc = {
       name: String(name).trim(),
@@ -190,7 +200,7 @@ const createAccessUserAccount = async (req) => {
       : assigned.companies.length > 1
         ? assigned.companies.join(", ")
         : assigned.company;
-    const mail = voidWelcomeEmail({
+    const mail = queueWelcomeEmail({
       name: createDoc.name,
       email,
       password,
@@ -202,7 +212,7 @@ const createAccessUserAccount = async (req) => {
     const fresh = await User.findById(user._id).select("-password");
     return {
       ok: true,
-      user: safeUser(fresh),
+      user: await safeUser(fresh),
       emailQueued: true,
       emailTo: mail.emailTo,
     };
@@ -244,10 +254,12 @@ const listUsers = async (req, res) => {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
+        .populate(LIST_POPULATE)
         .lean(),
     ]);
 
-    const nameById = await companyNameMap(rows);
+    await attachPlacementMany(rows);
+
     return res.json({
       count: rows.length,
       total,
@@ -257,7 +269,7 @@ const listUsers = async (req, res) => {
       from: total === 0 ? 0 : skip + 1,
       to: skip + rows.length,
       filters: applied,
-      users: rows.map((row) => mapListRow(row, nameById)),
+      users: rows.map(mapListRow),
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -282,7 +294,7 @@ const getUser = async (req, res) => {
       }
     }
 
-    return res.json({ user: safeUser(user) });
+    return res.json({ user: await safeUser(user) });
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
@@ -361,6 +373,18 @@ const updateUser = async (req, res) => {
       user.markModified("official");
     }
 
+    if (req.body.official?.branchId !== undefined) {
+      if (!user.official) user.official = {};
+      user.official.branchId = parseOidOrNull(req.body.official.branchId);
+      user.markModified("official");
+    }
+
+    if (req.body.official?.shiftId !== undefined) {
+      if (!user.official) user.official = {};
+      user.official.shiftId = parseOidOrNull(req.body.official.shiftId);
+      user.markModified("official");
+    }
+
     if (req.body.official?.companyIds !== undefined) {
       const targetRole = normalizeRoleName(user.role);
       if (!user.official) user.official = {};
@@ -397,6 +421,17 @@ const updateUser = async (req, res) => {
       }
       user.official.employeeCode = code;
       user.markModified("official");
+    }
+
+    if (!isPlatformRole(user.role)) {
+      const placed = await assertUserPlacement({
+        companyIds: user.official?.companyIds,
+        branchId: user.official?.branchId,
+        shiftId: user.official?.shiftId,
+      });
+      if (!placed.ok) {
+        return res.status(placed.status).json({ message: placed.message });
+      }
     }
 
     if (req.body.personal) {
@@ -437,7 +472,7 @@ const updateUser = async (req, res) => {
     const fresh = await User.findById(user._id).select("-password");
     return res.json({
       message: "User updated",
-      user: safeUser(fresh),
+      user: await safeUser(fresh),
     });
   } catch (err) {
     const dup = duplicateKeyMessage(err);
@@ -484,20 +519,21 @@ const exportUsers = async (req, res) => {
     const rows = await User.find(built.filter)
       .select(LIST_SELECT)
       .sort({ createdAt: -1 })
+      .populate(LIST_POPULATE)
       .lean();
 
-    const nameById = await companyNameMap(rows);
+    await attachPlacementMany(rows);
+
     const data = rows.map((row) => {
-      const mapped = mapListRow(row, nameById);
+      const mapped = mapListRow(row);
       return {
         name: mapped.name,
         email: mapped.email,
         role: mapped.role,
         department: mapped.department,
-        company: mapped.company,
-        companies: Array.isArray(mapped.companies)
-          ? mapped.companies.join(", ")
-          : mapped.company,
+        companies: mapped.companies.map((c) => c.companyName).join(", "),
+        branch: mapped.branch || "",
+        shift: mapped.shift || "",
         status: mapped.status,
         lastLogin: mapped.lastLogin
           ? new Date(mapped.lastLogin).toISOString()
@@ -513,8 +549,9 @@ const exportUsers = async (req, res) => {
         { header: "Email", key: "email", width: 28 },
         { header: "Role", key: "role", width: 16 },
         { header: "Department", key: "department", width: 18 },
-        { header: "Company", key: "company", width: 32 },
         { header: "Companies", key: "companies", width: 40 },
+        { header: "Branch", key: "branch", width: 22 },
+        { header: "Shift", key: "shift", width: 20 },
         { header: "Status", key: "status", width: 12 },
         { header: "Last login", key: "lastLogin", width: 24 },
       ],

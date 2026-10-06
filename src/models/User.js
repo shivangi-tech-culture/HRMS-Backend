@@ -104,14 +104,18 @@ const userSchema = new mongoose.Schema(
         trim: true,
       },
       /**
-       * Company _ids.
-       * Employee and Reporting Manager: exactly one.
-       * HR Manager: one or more.
+       * Company _ids (Employee / RM: one. HR: one or more).
+       * Catalog of branches/shifts is on Company — GET /api/companies/:id/branches.
+       * This user's workplace is official.branchId + official.shiftId (not the whole tree).
        */
       companyIds: {
         type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Company" }],
         default: undefined,
       },
+      /** Selected Company.branches[]._id — one current branch */
+      branchId: { type: mongoose.Schema.Types.ObjectId, default: null },
+      /** Selected shift on that branch. Days stay on Company. */
+      shiftId: { type: mongoose.Schema.Types.ObjectId, default: null },
       /** Department name from masters (string, not ObjectId) */
       department: { type: String, default: "" },
       /** Designation name from masters */
@@ -120,10 +124,18 @@ const userSchema = new mongoose.Schema(
       division: { type: String, default: "" },
       /** Employee group name from masters */
       employeeGroup: { type: String, default: "" },
-      /** Primary reporting manager (display / email / name as stored by UI) */
-      reportingHead1: { type: String, default: "" },
-      /** Secondary reporting manager */
-      reportingHead2: { type: String, default: "" },
+      /** Primary reporting manager (User _id, role Reporting Manager). Assigned manually. */
+      reportingHead1: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        default: null,
+      },
+      /** Secondary reporting manager (User _id) */
+      reportingHead2: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        default: null,
+      },
       jobRole: { type: String, default: "" },
       /** Joining date — also drives personal.anniversaryDate */
       dateOfJoining: { type: Date, default: null },
@@ -302,6 +314,10 @@ userSchema.index(...uniquePartial("personal.panNo"));
 userSchema.index(...uniquePartial("personal.aadhaarNo"));
 userSchema.index(...uniquePartial("personal.drivingLicenseNo"));
 userSchema.index(...uniquePartial("personal.passportNo"));
+userSchema.index({ "official.branchId": 1 });
+userSchema.index({ "official.shiftId": 1 });
+userSchema.index({ "official.reportingHead1": 1 });
+userSchema.index({ "official.reportingHead2": 1 });
 
 /** Mongoose model: User — used by auth, employees, attendance, seed, etc. */
 module.exports = mongoose.model("User", userSchema);

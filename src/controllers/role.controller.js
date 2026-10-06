@@ -113,7 +113,7 @@ const getHierarchy = async (_req, res) => {
         rank: 4,
         role: "Reporting Manager",
         maxUsers: "unlimited",
-        companyAccess: "Single company — team (reportingHead) only",
+        companyAccess: "Own team only — employees assigned via reportingHead1 / reportingHead2 (any company)",
         canCreate: [],
         notes: ROLE_DESCRIPTIONS["Reporting Manager"],
       },

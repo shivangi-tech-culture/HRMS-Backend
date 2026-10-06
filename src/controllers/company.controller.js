@@ -1,11 +1,15 @@
 /**
  * COMPANY CONTROLLER — /api/companies
- * Org setup: company → branches → shifts → monthly week schedule.
- * Super Admin and Admin only. HR and other roles have no Company module.
+ * Super Admin and Admin only. Company CRUD is under Administration.
  */
 const mongoose = require("mongoose");
 const Company = require("../models/Company");
-const { escapeRegex } = require("../utils/companyScope");
+const User = require("../models/User");
+const {
+  escapeRegex,
+  hasGlobalCompanyAccess,
+  userCompanyIds,
+} = require("../utils/companyScope");
 
 const okId = (id) => mongoose.Types.ObjectId.isValid(id);
 
@@ -27,9 +31,7 @@ const codeTaken = async (companyCode, excludeId) => {
 
 const duplicateMessage = (err) => {
   if (err?.code !== 11000) return null;
-  const key = Object.keys(err.keyPattern || err.keyValue || {})[0] || "";
-  if (key.includes("companyCode")) return "Company code already exists";
-  return "Company already exists";
+  return "Company code already exists";
 };
 
 const listCompanies = async (req, res) => {
@@ -90,8 +92,8 @@ const createCompany = async (req, res) => {
     const row = await Company.create({
       companyName,
       companyCode,
-      branches: req.body.branches || [],
       isActive: req.body.isActive !== false,
+      branches: req.body.branches || [],
     });
 
     return res.status(201).json({ message: "Company created", data: row });
@@ -126,14 +128,8 @@ const updateCompany = async (req, res) => {
       row.companyCode = companyCode;
     }
 
-    if (req.body.branches !== undefined) {
-      row.branches = req.body.branches;
-      row.markModified("branches");
-    }
-
-    if (req.body.isActive !== undefined) {
-      row.isActive = req.body.isActive;
-    }
+    if (req.body.isActive !== undefined) row.isActive = req.body.isActive;
+    if (req.body.branches !== undefined) row.branches = req.body.branches;
 
     await row.save();
     return res.json({ message: "Company updated", data: row });
@@ -151,8 +147,110 @@ const deleteCompany = async (req, res) => {
     }
     const row = await Company.findById(req.params.id);
     if (!row) return res.status(404).json({ message: "Company not found" });
+
+    const users = await User.countDocuments({ "official.companyIds": row._id });
+    if (users) {
+      return res.status(409).json({
+        message: `Company has ${users} user(s). Move them or set isActive: false instead.`,
+      });
+    }
+
     await row.deleteOne();
     return res.json({ message: "Company deleted" });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+const listCompanyBranches = async (req, res) => {
+  try {
+    if (!okId(req.params.id)) {
+      return res.status(400).json({ message: "Invalid company id" });
+    }
+    const row = await Company.findById(req.params.id)
+      .select("companyName companyCode isActive branches")
+      .lean();
+    if (!row) return res.status(404).json({ message: "Company not found" });
+
+    if (!hasGlobalCompanyAccess(req.user)) {
+      const mine = userCompanyIds(req.user);
+      if (!mine.includes(String(row._id))) {
+        return res.status(403).json({ message: "You cannot view this company" });
+      }
+    }
+
+    const branches = (row.branches || [])
+      .filter((b) => b.isActive !== false)
+      .map((b) => ({
+        _id: b._id,
+        branchName: b.branchName,
+        branchCode: b.branchCode,
+        city: b.city || "",
+        state: b.state || "",
+        shifts: (b.shifts || [])
+          .filter((s) => s.isActive !== false)
+          .map((s) => ({
+            _id: s._id,
+            shiftName: s.shiftName,
+            shiftCode: s.shiftCode,
+          })),
+      }));
+
+    return res.json({
+      data: {
+        companyId: row._id,
+        companyName: row.companyName,
+        companyCode: row.companyCode,
+        branches,
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+const listCompanyBranchShifts = async (req, res) => {
+  try {
+    if (!okId(req.params.id) || !okId(req.params.branchId)) {
+      return res.status(400).json({ message: "Invalid company or branch id" });
+    }
+    const row = await Company.findById(req.params.id)
+      .select("companyName companyCode branches")
+      .lean();
+    if (!row) return res.status(404).json({ message: "Company not found" });
+
+    if (!hasGlobalCompanyAccess(req.user)) {
+      const mine = userCompanyIds(req.user);
+      if (!mine.includes(String(row._id))) {
+        return res.status(403).json({ message: "You cannot view this company" });
+      }
+    }
+
+    const branch = (row.branches || []).find(
+      (b) => String(b._id) === String(req.params.branchId) && b.isActive !== false
+    );
+    if (!branch) return res.status(404).json({ message: "Branch not found" });
+
+    const shifts = (branch.shifts || [])
+      .filter((s) => s.isActive !== false)
+      .map((s) => ({
+        _id: s._id,
+        shiftName: s.shiftName,
+        shiftCode: s.shiftCode,
+      }));
+
+    return res.json({
+      data: {
+        companyId: row._id,
+        companyName: row.companyName,
+        branch: {
+          _id: branch._id,
+          branchName: branch.branchName,
+          branchCode: branch.branchCode,
+        },
+        shifts,
+      },
+    });
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
@@ -161,6 +259,8 @@ const deleteCompany = async (req, res) => {
 module.exports = {
   listCompanies,
   getCompany,
+  listCompanyBranches,
+  listCompanyBranchShifts,
   createCompany,
   updateCompany,
   deleteCompany,

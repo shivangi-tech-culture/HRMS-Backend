@@ -7,7 +7,7 @@
  *
  * Also ensures Role docs exist for Admin + Reporting Manager.
  *
- * Run: npm run migrate:roles
+ * Run: node src/scripts/migrateRoles.js
  */
 require("dotenv").config();
 const connectDB = require("../config/db");

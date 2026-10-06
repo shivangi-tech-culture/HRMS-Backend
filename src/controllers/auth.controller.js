@@ -12,7 +12,10 @@ const {
   permissionsForRole,
 } = require("../config/permissions");
 const { setAuthCookie, clearAuthCookie } = require("../utils/authCookie");
-const { companyListForUser } = require("../utils/companyScope");
+const {
+  companyListForUser,
+  hasGlobalCompanyAccess,
+} = require("../utils/companyScope");
 const { signToken } = require("../utils/jwt");
 
 const LOCKED_ROLES = new Set(["Super Admin", "Admin"]);
@@ -67,11 +70,10 @@ const login = async (req, res) => {
     const token = signToken(user._id);
     setAuthCookie(res, token);
 
-    const companyList = await companyListForUser(user);
-    const isPlatform = user.role === "Super Admin" || user.role === "Admin";
-    const companyNames = isPlatform
-      ? []
-      : companyList.map((row) => row.companyName);
+    const companies = (await companyListForUser(user)).map((row) => ({
+      _id: row.companyId,
+      companyName: row.companyName,
+    }));
 
     return res.json({
       message: "Login successful",
@@ -82,10 +84,8 @@ const login = async (req, res) => {
         officialEmail: user.official?.officialEmail || "",
         role: user.role,
         department: user.official?.department || "",
-        company: isPlatform ? "All companies" : companyNames[0] || "",
-        companies: companyNames,
-        companyIds: user.official?.companyIds || [],
-        companyList,
+        allCompanies: hasGlobalCompanyAccess(user),
+        companies,
         status: user.status,
         lastLogin: user.lastLogin,
         permissionCount: permLabel(roleDoc),

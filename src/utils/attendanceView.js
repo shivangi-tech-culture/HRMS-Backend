@@ -10,6 +10,7 @@ const {
   minutesOfDay,
   TZ,
 } = require("./shiftTiming");
+const { companyRefs } = require("./companyScope");
 
 /** Format Date → "09:24 AM" in app TZ (manual punches store clock as UTC hours) */
 const formatClock = (date, source) => {
@@ -228,7 +229,7 @@ const enrichAttendanceRow = async (record, opts = {}) => {
       name: emp.name || "",
       employeeCode: emp.official?.employeeCode || "",
       department: emp.official?.department || "",
-      company: emp.official?.company || "",
+      companies: companyRefs(emp),
       email: emp.official?.officialEmail || "",
       role: emp.role || "Employee",
     },

@@ -31,12 +31,25 @@ const escapeRegex = (value) =>
 const companyExactRegex = (company) =>
   new RegExp(`^${escapeRegex(String(company).trim())}$`, "i");
 
-/** Company _ids stored on the user (strings). */
+/** Company _ids stored on the user (strings). Works with raw or populated companyIds. */
 const userCompanyIds = (user) => {
   const raw = user?.official?.companyIds || user?.companyIds || [];
   if (!Array.isArray(raw)) return [];
-  return [...new Set(raw.map((id) => String(id || "").trim()).filter(Boolean))];
+  return [
+    ...new Set(
+      raw.map((id) => String(id?._id || id || "").trim()).filter(Boolean)
+    ),
+  ];
 };
+
+/** Mongoose populate option for User.official.companyIds → { _id, companyName } */
+const COMPANY_POPULATE = { path: "official.companyIds", select: "companyName" };
+
+/** [{ _id, companyName }] from a user whose official.companyIds is populated. */
+const companyRefs = (user) =>
+  (Array.isArray(user?.official?.companyIds) ? user.official.companyIds : [])
+    .filter((c) => c && c.companyName !== undefined)
+    .map((c) => ({ _id: c._id, companyName: c.companyName || "" }));
 
 /** @deprecated Name is not stored on the user. Use companyNamesForUser. */
 const getUserCompany = () => "";
@@ -81,21 +94,6 @@ const normalizeCompaniesList = (value) => {
  */
 const companyNamesForUser = async (user) =>
   (await companyListForUser(user)).map((row) => row.companyName);
-
-/** _id → companyName for a page of users. */
-const companyNameMap = async (users = []) => {
-  const ids = [];
-  for (const user of users) {
-    for (const id of userCompanyIds(user)) ids.push(id);
-  }
-  const unique = [...new Set(ids)];
-  if (!unique.length) return new Map();
-  const Company = require("../models/Company");
-  const docs = await Company.find({ _id: { $in: unique } })
-    .select("companyName")
-    .lean();
-  return new Map(docs.map((doc) => [String(doc._id), doc.companyName]));
-};
 
 /**
  * Sync name list is gone. Names are loaded with companyNamesForUser.
@@ -215,9 +213,7 @@ const companyListForUser = async (user) => {
     }));
   }
 
-  const ids = Array.isArray(user?.official?.companyIds)
-    ? user.official.companyIds
-    : [];
+  const ids = userCompanyIds(user);
 
   if (!ids.length) return [];
 
@@ -319,9 +315,13 @@ const writeCompanyFields = (official, assigned, roleName) => {
   const next = { ...official };
   delete next.company;
   delete next.companies;
+  delete next.branch;
+  delete next.shift;
 
   if (isPlatformRole(role) || !assigned.companyIds?.length) {
     next.companyIds = undefined;
+    next.branchId = undefined;
+    next.shiftId = undefined;
     return next;
   }
 
@@ -338,12 +338,13 @@ module.exports = {
   companyExactRegex,
   getUserCompany,
   userCompanyIds,
+  COMPANY_POPULATE,
+  companyRefs,
   hasGlobalCompanyAccess,
   canAssignCompanies,
   isMultiCompanyRole,
   normalizeCompaniesList,
   companyNamesForUser,
-  companyNameMap,
   getAccessibleCompanies,
   sharesCompany,
   isSameCompany,

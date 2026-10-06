@@ -5,17 +5,17 @@
  * │  Super Admin  (exactly 1)                                   │
  * │  • All companies · full access                              │
  * │  • Creates Admin · assigns multi-company to HR              │
- * │  • Company module (create / manage companies)               │
+ * │  • Company CRUD under Administration                        │
  * │  • Cannot be created by Admin (seed / ops only)             │
  * ├─────────────────────────────────────────────────────────────┤
  * │  Admin  (many)                                              │
- * │  • All companies · full access including Company module     │
+ * │  • All companies · Company CRUD under Administration        │
  * │  • Created only by Super Admin                              │
  * │  • Cannot create / assign Super Admin                       │
  * ├─────────────────────────────────────────────────────────────┤
  * │  HR Manager  (many)                                         │
  * │  • Multi-company access when Super Admin assigns companies[]│
- * │  • No Company module                                        │
+ * │  • No Company CRUD                                          │
  * │  • Manages employees within assigned companies              │
  * ├─────────────────────────────────────────────────────────────┤
  * │  Reporting Manager  (many)                                  │
@@ -68,7 +68,7 @@ const MULTI_COMPANY_ROLES = [HR];
 /** Single-company + team scope */
 const TEAM_SCOPED_ROLES = [REPORTING_MANAGER];
 
-/** Locked permission matrix (always full ADMIN_TREE) */
+/** Locked permission matrix (full admin catalog + Company CRUD) */
 const LOCKED_ROLES = [SUPER_ADMIN, ADMIN];
 
 /** Soft cap: only one Super Admin account */
@@ -205,13 +205,13 @@ const visibleRoleFilter = (actorRole) => {
 /** Short descriptions for seed / API docs */
 const ROLE_DESCRIPTIONS = {
   [SUPER_ADMIN]:
-    "Single top account. All companies and Company module. Creates Admin; assigns multi-company to HR. Not created by Admin.",
+    "Single top account. All companies. Company CRUD is under Administration. Creates Admin; assigns multi-company to HR. Not created by Admin.",
   [ADMIN]:
-    "Multiple allowed. All companies and Company module. Created by Super Admin. Cannot create Super Admin.",
+    "Multiple allowed. All companies and Company CRUD under Administration. Created by Super Admin. Cannot create Super Admin.",
   [HR]:
-    "Multi-company when Super Admin assigns official.companyIds. Manages employees in those companies. No Company module.",
+    "Multi-company when Super Admin assigns official.companyIds. Manages employees in those companies. No Company CRUD.",
   [REPORTING_MANAGER]:
-    "Single company. Sees / manages only their team (reportingHead).",
+    "Sees / manages only their team — employees assigned to them as reportingHead1 / reportingHead2 (Administration → Hierarchy).",
   [EMPLOYEE]: "Own ESS access only (Self / Team / Request / Tasks).",
 };
 

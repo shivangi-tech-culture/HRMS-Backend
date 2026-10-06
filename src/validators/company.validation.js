@@ -1,12 +1,10 @@
 /**
- * COMPANY VALIDATION — nested branches, shifts, monthly schedule
- * Access: Super Admin and Admin only (see company.routes.js).
+ * COMPANY VALIDATION — nested branches → shifts → monthly schedule
  */
 const Joi = require("joi");
 const { WEEK_DAYS } = require("../models/Company");
 
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
-
 const toMinutes = (value) => {
   const [h, m] = String(value).split(":").map(Number);
   return h * 60 + m;
@@ -15,22 +13,16 @@ const toMinutes = (value) => {
 const uniqueBy = (field, label) => (items, helpers) => {
   const seen = new Set();
   for (const item of items || []) {
-    const key = String(item?.[field] ?? "")
-      .trim()
-      .toUpperCase();
+    const key = String(item?.[field] ?? "").trim().toUpperCase();
     if (!key) continue;
-    if (seen.has(key)) {
-      return helpers.message(`Duplicate ${label}: ${item[field]}`);
-    }
+    if (seen.has(key)) return helpers.message(`Duplicate ${label}: ${item[field]}`);
     seen.add(key);
   }
   return items;
 };
 
 const dayScheduleSchema = Joi.object({
-  day: Joi.string()
-    .valid(...WEEK_DAYS)
-    .required(),
+  day: Joi.string().valid(...WEEK_DAYS).required(),
   isOff: Joi.boolean().default(false),
   startTime: Joi.string().trim().allow("").default(""),
   endTime: Joi.string().trim().allow("").default(""),
@@ -40,9 +32,7 @@ const dayScheduleSchema = Joi.object({
   const pairError = (start, end, label) => {
     const hasStart = Boolean(start);
     const hasEnd = Boolean(end);
-    if (hasStart !== hasEnd) {
-      return `${day.day}: ${label} needs both start and end`;
-    }
+    if (hasStart !== hasEnd) return `${day.day}: ${label} needs both start and end`;
     if (hasStart && (!TIME_RE.test(start) || !TIME_RE.test(end))) {
       return `${day.day}: ${label} must be HH:mm`;
     }
@@ -54,9 +44,7 @@ const dayScheduleSchema = Joi.object({
 
   if (!day.isOff) {
     if (!TIME_RE.test(day.startTime) || !TIME_RE.test(day.endTime)) {
-      return helpers.message(
-        `${day.day}: startTime and endTime are required (HH:mm)`
-      );
+      return helpers.message(`${day.day}: startTime and endTime are required (HH:mm)`);
     }
     if (toMinutes(day.endTime) <= toMinutes(day.startTime)) {
       return helpers.message(`${day.day}: endTime must be after startTime`);
@@ -78,7 +66,6 @@ const dayScheduleSchema = Joi.object({
   ) {
     return helpers.message(`${day.day}: break must fall inside shift hours`);
   }
-
   return day;
 });
 
@@ -94,9 +81,7 @@ const weekScheduleSchema = Joi.object({
       }
       const missing = WEEK_DAYS.filter((d) => !names.includes(d));
       if (missing.length) {
-        return helpers.message(
-          `Week must include all 7 days. Missing: ${missing.join(", ")}`
-        );
+        return helpers.message(`Week must include all 7 days. Missing: ${missing.join(", ")}`);
       }
       return days;
     })

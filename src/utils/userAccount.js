@@ -10,8 +10,42 @@ const {
   REPORTING_MANAGER,
   EMPLOYEE,
 } = require("../config/roles");
-const { listScopeFilter } = require("./teamScope");
-const { companyFilter } = require("./companyScope");
+const {
+  listScopeFilter,
+  REPORTING_HEAD_POPULATE,
+  headRef,
+} = require("./teamScope");
+const {
+  companyFilter,
+  companyRefs,
+  COMPANY_POPULATE,
+} = require("./companyScope");
+const { applyAnniversary } = require("./anniversary");
+const { attachPlacement } = require("./companyShift");
+
+/** Populate for list / export queries */
+const LIST_POPULATE = [COMPANY_POPULATE];
+
+/**
+ * User document → API JSON: no password/contact; companies and reporting heads populated.
+ * reportingHead1/2 become { _id, name, email, employeeCode } or null.
+ */
+const safeUser = async (doc) => {
+  if (!doc) return null;
+  if (doc.populate) {
+    await doc.populate([...LIST_POPULATE, ...REPORTING_HEAD_POPULATE]);
+  }
+  applyAnniversary(doc);
+  const obj = doc.toObject ? doc.toObject() : { ...doc };
+  delete obj.password;
+  delete obj.contact;
+  if (obj.official) {
+    obj.official.reportingHead1 = headRef(obj.official.reportingHead1);
+    obj.official.reportingHead2 = headRef(obj.official.reportingHead2);
+  }
+  await attachPlacement(obj);
+  return obj;
+};
 
 const escapeRegex = (value) =>
   String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -140,7 +174,7 @@ const buildListQuery = async (req, { forceRole, roleScope } = {}) => {
   const gender = filterValue(req, "gender");
   if (gender) and.push({ "personal.gender": exact(gender) });
 
-  const company = filterValue(req, "company", "branch");
+  const company = filterValue(req, "company", "companyId");
   if (company) {
     if (/^[a-fA-F0-9]{24}$/.test(company)) {
       and.push({ "official.companyIds": company });
@@ -153,6 +187,48 @@ const buildListQuery = async (req, { forceRole, roleScope } = {}) => {
         .select("_id")
         .lean();
       and.push(doc ? { "official.companyIds": doc._id } : { _id: null });
+    }
+  }
+
+  const branch = filterValue(req, "branch", "branchId");
+  if (branch) {
+    if (/^[a-fA-F0-9]{24}$/.test(branch)) {
+      and.push({ "official.branchId": branch });
+    } else {
+      const Company = require("../models/Company");
+      const docs = await Company.find({ "branches.branchName": exact(branch) })
+        .select("branches")
+        .lean();
+      const ids = [];
+      for (const company of docs) {
+        for (const b of company.branches || []) {
+          if (exact(branch).test(b.branchName)) ids.push(b._id);
+        }
+      }
+      and.push({ "official.branchId": { $in: ids.length ? ids : [null] } });
+    }
+  }
+
+  const shift = filterValue(req, "shift", "shiftId");
+  if (shift) {
+    if (/^[a-fA-F0-9]{24}$/.test(shift)) {
+      and.push({ "official.shiftId": shift });
+    } else {
+      const Company = require("../models/Company");
+      const docs = await Company.find({
+        "branches.shifts.shiftName": exact(shift),
+      })
+        .select("branches")
+        .lean();
+      const ids = [];
+      for (const company of docs) {
+        for (const b of company.branches || []) {
+          for (const s of b.shifts || []) {
+            if (exact(shift).test(s.shiftName)) ids.push(s._id);
+          }
+        }
+      }
+      and.push({ "official.shiftId": { $in: ids.length ? ids : [null] } });
     }
   }
 
@@ -169,19 +245,14 @@ const buildListQuery = async (req, { forceRole, roleScope } = {}) => {
       designation: designation || "",
       gender: gender || "",
       company: company || "",
+      branch: branch || "",
+      shift: shift || "",
     },
   };
 };
 
-/** Access & Control table row */
-const mapListRow = (row, nameById = new Map()) => {
-  const companyIds = Array.isArray(row.official?.companyIds)
-    ? row.official.companyIds
-    : [];
-  const companies = companyIds
-    .map((id) => nameById.get(String(id)))
-    .filter(Boolean);
-  return {
+/** Access & Control table row — query must populate LIST_POPULATE */
+const mapListRow = (row) => ({
   _id: row._id,
   name: row.name || "",
   email: row.official?.officialEmail || "",
@@ -189,35 +260,32 @@ const mapListRow = (row, nameById = new Map()) => {
   department: row.official?.department || "",
   lastLogin: row.lastLogin || null,
   status: row.status || "",
-  company: companies[0] || "",
-  companies,
-  companyIds,
-};
-};
+  companies: companyRefs(row),
+  branch: row.official?.branchId?.branchName || "",
+  shift: row.official?.shiftId?.shiftName || "",
+});
 
-/** Employee Management table row */
-const mapEmployeeListRow = (row, nameById = new Map()) => {
-  const companyIds = Array.isArray(row.official?.companyIds)
-    ? row.official.companyIds
-    : [];
-  return {
+/** Employee Management table row — query must populate LIST_POPULATE */
+const mapEmployeeListRow = (row) => ({
   _id: row._id,
   name: row.name || "",
   employeeCode: row.official?.employeeCode || "",
   gender: row.personal?.gender || "",
   designation: row.official?.designation || "",
   department: row.official?.department || "",
-  branch: nameById.get(String(companyIds[0])) || "",
-  companyIds,
+  companies: companyRefs(row),
+  branch: row.official?.branchId?.branchName || "",
+  shift: row.official?.shiftId?.shiftName || "",
   status: row.status || "",
   email: row.official?.officialEmail || "",
-};
-};
+});
 
 const LIST_SELECT =
-  "name role status lastLogin official.officialEmail official.employeeCode official.department official.designation official.companyIds personal.gender";
+  "name role status lastLogin official.officialEmail official.employeeCode official.department official.designation official.companyIds official.branchId official.shiftId personal.gender";
 
 module.exports = {
+  safeUser,
+  LIST_POPULATE,
   visibleRolesForActor,
   buildListQuery,
   mapListRow,

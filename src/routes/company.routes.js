@@ -1,19 +1,18 @@
 /**
  * COMPANY ROUTES → /api/companies
  * Super Admin and Admin only.
- * HR, Reporting Manager, Employee, and custom roles are denied
- * (Company is not in their permission catalog).
- * Super Admin is not created by Admin — see Access & Control.
  */
 const express = require("express");
 const {
   listCompanies,
   getCompany,
+  listCompanyBranches,
+  listCompanyBranchShifts,
   createCompany,
   updateCompany,
   deleteCompany,
 } = require("../controllers/company.controller");
-const { protect, authorize } = require("../middleware/auth");
+const { protect, authorize, ALL_ACCESS } = require("../middleware/auth");
 const { checkPermission } = require("../controllers/permission.controller");
 const { SUPER_ADMIN, ADMIN } = require("../config/roles");
 const { validate, validateQuery } = require("../middleware/validate");
@@ -31,9 +30,11 @@ const companyRoles = [SUPER_ADMIN, ADMIN];
  * tags:
  *   - name: Admin / Company
  *     description: |
- *       Company org setup (branches → shifts → monthly schedule).
- *       **Super Admin and Admin only.** HR and other roles have no Company module.
- *       Super Admin is not created by Admin.
+ *       Company org with nested branches → shifts → monthlySchedule (days/times).
+ *       Masters `/api/masters?type=branch|shift` are **name catalogs only**.
+ *       Users save official.companyIds + one branchId + one shiftId (workplace).
+ *       Catalog: GET /api/companies/{id}/branches then GET .../branches/{branchId}.
+ *       **CRUD: Super Admin and Admin only.** HR can GET branches of assigned companies.
  */
 
 /**
@@ -48,7 +49,6 @@ const companyRoles = [SUPER_ADMIN, ADMIN];
  *       - in: query
  *         name: search
  *         schema: { type: string }
- *         description: Match company name or code
  *       - in: query
  *         name: isActive
  *         schema: { type: boolean }
@@ -60,11 +60,9 @@ const companyRoles = [SUPER_ADMIN, ADMIN];
  *         schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
  *     responses:
  *       200: { description: Paginated companies }
- *       403: { description: HR and other roles cannot access Company }
  *   post:
  *     tags: [Admin / Company]
- *     summary: Create company with branches, shifts, and weekly schedule
- *     description: Super Admin and Admin. HR has no create access.
+ *     summary: Create company
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -82,54 +80,32 @@ const companyRoles = [SUPER_ADMIN, ADMIN];
  *                 type: array
  *                 items:
  *                   type: object
- *                   required: [branchName, branchCode]
  *                   properties:
- *                     branchName: { type: string, example: Noida Branch }
- *                     branchCode: { type: string, example: NOI }
- *                     address: { type: string }
- *                     city: { type: string }
- *                     state: { type: string }
- *                     isActive: { type: boolean }
+ *                     branchName: { type: string, example: Noida }
+ *                     branchCode: { type: string, example: Noida }
+ *                     city: { type: string, example: Noida }
+ *                     state: { type: string, example: Uttar Pradesh }
+ *                     isActive: { type: boolean, example: true }
  *                     shifts:
  *                       type: array
  *                       items:
  *                         type: object
- *                         required: [shiftName, shiftCode]
  *                         properties:
  *                           shiftName: { type: string, example: General Shift }
  *                           shiftCode: { type: string, example: GS-01 }
- *                           isActive: { type: boolean }
+ *                           isActive: { type: boolean, example: true }
  *                           monthlySchedule:
  *                             type: array
- *                             items:
- *                               type: object
- *                               required: [weekNumber, days]
- *                               properties:
- *                                 weekNumber: { type: integer, minimum: 1, maximum: 5 }
- *                                 days:
- *                                   type: array
- *                                   description: All 7 weekdays. isOff true may omit times.
- *                                   items:
- *                                     type: object
- *                                     properties:
- *                                       day:
- *                                         type: string
- *                                         enum: [monday, tuesday, wednesday, thursday, friday, saturday, sunday]
- *                                       isOff: { type: boolean }
- *                                       startTime: { type: string, example: "09:00" }
- *                                       endTime: { type: string, example: "18:00" }
- *                                       breakStartTime: { type: string, example: "13:00" }
- *                                       breakEndTime: { type: string, example: "13:30" }
+ *                             description: weekNumber 1-5; each week must include all 7 days
  *     responses:
  *       201: { description: Company created }
- *       403: { description: Not Super Admin or Admin }
  *       409: { description: Duplicate company name or code }
  */
 router.get(
   "/",
   protect,
   authorize(...companyRoles),
-  checkPermission("Company", "Company", "view"),
+  checkPermission("Administration", "Company", "view"),
   validateQuery(listCompanyQuerySchema),
   listCompanies
 );
@@ -138,9 +114,48 @@ router.post(
   "/",
   protect,
   authorize(...companyRoles),
-  checkPermission("Company", "Company", "create"),
+  checkPermission("Administration", "Company", "create"),
   validate(createCompanySchema),
   createCompany
+);
+
+/**
+ * @swagger
+ * /api/companies/{id}/branches/{branchId}:
+ *   get:
+ *     tags: [Admin / Company]
+ *     summary: Shifts of one branch (create-user cascade)
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get(
+  "/:id/branches/:branchId",
+  protect,
+  authorize(...ALL_ACCESS),
+  listCompanyBranchShifts
+);
+
+/**
+ * @swagger
+ * /api/companies/{id}/branches:
+ *   get:
+ *     tags: [Admin / Company]
+ *     summary: Company branches + shift names (create-user dropdown)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200: { description: Active branches and their shifts }
+ */
+router.get(
+  "/:id/branches",
+  protect,
+  authorize(...ALL_ACCESS),
+  listCompanyBranches
 );
 
 /**
@@ -161,7 +176,7 @@ router.post(
  *       404: { description: Not found }
  *   put:
  *     tags: [Admin / Company]
- *     summary: Update company (send full branches array to replace schedule)
+ *     summary: Update company
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -171,10 +186,10 @@ router.post(
  *         schema: { type: string }
  *     responses:
  *       200: { description: Updated }
- *       403: { description: Not Super Admin or Admin }
  *   delete:
  *     tags: [Admin / Company]
  *     summary: Delete company
+ *     description: Blocked (409) while users still reference it.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -184,13 +199,13 @@ router.post(
  *         schema: { type: string }
  *     responses:
  *       200: { description: Deleted }
- *       403: { description: Not Super Admin or Admin }
+ *       409: { description: Company still in use }
  */
 router.get(
   "/:id",
   protect,
   authorize(...companyRoles),
-  checkPermission("Company", "Company", "view"),
+  checkPermission("Administration", "Company", "view"),
   getCompany
 );
 
@@ -198,7 +213,7 @@ router.put(
   "/:id",
   protect,
   authorize(...companyRoles),
-  checkPermission("Company", "Company", "edit"),
+  checkPermission("Administration", "Company", "edit"),
   validate(updateCompanySchema),
   updateCompany
 );
@@ -207,7 +222,7 @@ router.delete(
   "/:id",
   protect,
   authorize(...companyRoles),
-  checkPermission("Company", "Company", "delete"),
+  checkPermission("Administration", "Company", "delete"),
   deleteCompany
 );
 

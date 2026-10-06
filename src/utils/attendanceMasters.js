@@ -31,26 +31,6 @@ const listAttendanceMasterNames = async (type, user) => {
   return ATTENDANCE_DROPDOWNS[type] ? [...ATTENDANCE_DROPDOWNS[type]] : [];
 };
 
-/** Upsert attendance reason masters for a company (idempotent) */
-const ensureAttendanceReasonMasters = async (company = DEFAULT_COMPANY) => {
-  let created = 0;
-  for (const [type, names] of Object.entries(ATTENDANCE_DROPDOWNS)) {
-    const Model = getModel(type);
-    for (const name of names) {
-      const existing = await Model.findOne({
-        company,
-        name: new RegExp(`^${escapeRegex(name)}$`, "i"),
-      });
-      if (!existing) {
-        await Model.create({ name, company, status: "Active" });
-        created += 1;
-      }
-    }
-  }
-  return created;
-};
-
 module.exports = {
   listAttendanceMasterNames,
-  ensureAttendanceReasonMasters,
 };

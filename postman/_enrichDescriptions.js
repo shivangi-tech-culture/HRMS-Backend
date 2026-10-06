@@ -28,10 +28,15 @@ const PARAM_DOCS = {
   department: "string | optional | department name",
   designation: "string | optional | designation name",
   gender: "string | optional | Gender master name e.g. `Male` / `Female`",
-  branch: "string | optional | branch / location filter",
+  branch: "string | optional | current branch filter — Branch `_id`, branch name or branch code (e.g. `NOI`)",
+  shift: "string | optional | current shift filter — Shift `_id`, shift name or shift code (e.g. `GS-01`)",
+  branchId: "string (MongoId 24-hex) | path | Company branch `_id` (from GET /api/companies/{id}/branches)",
   location: "string | optional | match punch address text",
   role: "string | optional | role name e.g. `Super Admin` | `Admin` | `HR Manager` | `Reporting Manager` | `Employee`",
   employeeId: "string (MongoId 24-hex) | optional/required | user `_id`",
+  managerId: "string (MongoId 24-hex) | required on assign, optional on unassign | Reporting Manager user `_id`",
+  employeeIds: "array<string> (MongoId 24-hex) | required | 1–500 Employee user `_id`s (bulk)",
+  level: "number | optional | `1` = reportingHead1 (default on assign), `2` = reportingHead2",
   weeklyOffId: "string (MongoId 24-hex) | optional | Weekly Off policy `_id`",
   mode: "string | optional | punch mode: `web` | `mobile` | `biometric` | `manual`",
   source: "string | required for punch | `web` | `mobile` | `biometric`",
@@ -69,15 +74,18 @@ const PARAM_DOCS = {
   "official.jobRole": "string | optional | job role master name",
   "official.grade": "string | optional | grade master name",
   "official.reportingHead1":
-    "string | optional | manager email/code/name (links employee to Reporting Manager team)",
-  "official.reportingHead2": "string | optional | 2nd reporting head",
+    "string (MongoId) | optional | Reporting Manager User _id (\"\" or null clears). Bulk: POST /api/hierarchy/assign",
+  "official.reportingHead2": "string (MongoId) | optional | 2nd Reporting Manager User _id",
+  "official.branchId":
+    "string (MongoId) | optional | one branch `_id` of the selected company (GET /api/companies/{id}/branches). Response returns `{ _id, branchName, branchCode }`",
+  "official.shiftId":
+    "string (MongoId) | optional | one shift `_id` on that branch (GET /api/companies/{id}/branches/{branchId}). Response returns `{ _id, shiftName, shiftCode }`",
   "official.dateOfJoining": "string/date (YYYY-MM-DD) | optional | joining date",
   "official.calculateSalaryFrom": "string/date (YYYY-MM-DD) | optional",
   "official.dateOfRetirement": "string/date|null | optional",
   companies:
     "string[] | optional | same as official.companies — HR multi-company access",
   key: "string | required for reports | report catalog key e.g. `daily-attendance`",
-  reportKey: "string | optional alias for `key`",
   id: "string (MongoId) | path | resource `_id`",
   q: "string | optional | alias for search",
   query: "string | optional | alias for search",
@@ -190,7 +198,7 @@ const PARAM_DOCS = {
   companyName: "string | required on create | company display name (min 2)",
   companyCode: "string | required on create | unique code, stored uppercase e.g. `ABC`",
   companyOrgId: "string (MongoId 24-hex) | path | Company org `_id` from Create / List",
-  branches: "array<object> | optional | branches under the company; on update this replaces the full list",
+  branches: "array<object> | nested on company create/update — branchName, branchCode, shifts[].monthlySchedule",
   branchName: "string | required | branch display name",
   branchCode: "string | required | unique inside the company, stored uppercase e.g. `NOI`",
   shifts: "array<object> | optional | shifts on this branch",
@@ -243,10 +251,13 @@ function contextualDoc(key, ctx) {
     !isMasterApi &&
     !name.includes("reason");
 
+  if (key === "code" && (url.includes("type=branch") || url.includes("type=shift") || name.includes("branch master") || name.includes("shift master"))) {
+    return "string | required | unique uppercase code e.g. `NOI` / `GS-01`";
+  }
+
   if (key === "search" && url.includes("/api/companies")) {
     return "string | optional | match company name or company code";
   }
-
   if (key === "isActive" && url.includes("/api/companies")) {
     if (name.includes("list")) {
       return "boolean | optional | `true` or `false` — omit to list all";
