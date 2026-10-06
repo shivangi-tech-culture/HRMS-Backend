@@ -102,8 +102,9 @@ router.get(
  *             properties:
  *               type:
  *                 type: string
- *                 enum: [department, designation, division, employeeGroup, grade, jobRole, gender, maritalStatus, bloodGroup, country, state, city, courseType, courseLevel, bankName, relation, nominateFor, visaType]
- *               name: { type: string }
+ *                 enum: [department, designation, division, employeeGroup, grade, jobRole, gender, maritalStatus, bloodGroup, country, state, city, branch, shift, courseType, courseLevel, bankName, relation, nominateFor, visaType, regularizationReason, markAttendanceReason]
+ *               name: { type: string, example: Noida }
+ *               code: { type: string, description: Optional short code, unique inside the type, example: NOIDA }
  *               status: { type: string, enum: [Active, Inactive] }
  *               company: { type: string }
  *     responses:
@@ -159,6 +160,7 @@ router.post(
  *             type: object
  *             properties:
  *               name: { type: string }
+ *               code: { type: string, description: Optional short code ("" clears) }
  *               status: { type: string, enum: [Active, Inactive] }
  *               company: { type: string }
  *     responses:

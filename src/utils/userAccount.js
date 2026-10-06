@@ -22,6 +22,7 @@ const {
 } = require("./companyScope");
 const { applyAnniversary } = require("./anniversary");
 const { attachPlacement } = require("./companyShift");
+const { getModel } = require("../models/Master");
 
 /** Populate for list / export queries */
 const LIST_POPULATE = [COMPANY_POPULATE];
@@ -74,6 +75,15 @@ const filterValue = (req, ...keys) => {
     return String(req.query[key]).trim();
   }
   return null;
+};
+
+/** Branch / shift filter value (master _id, name or code) → Mongo condition on the master id */
+const masterIdFilter = async (type, value) => {
+  if (/^[a-fA-F0-9]{24}$/.test(value)) return value;
+  const ids = await getModel(type)
+    .find({ $or: [{ name: exact(value) }, { code: String(value).trim().toUpperCase() }] })
+    .distinct("_id");
+  return { $in: ids.length ? ids : [null] };
 };
 
 /**
@@ -191,46 +201,10 @@ const buildListQuery = async (req, { forceRole, roleScope } = {}) => {
   }
 
   const branch = filterValue(req, "branch", "branchId");
-  if (branch) {
-    if (/^[a-fA-F0-9]{24}$/.test(branch)) {
-      and.push({ "official.branchId": branch });
-    } else {
-      const Company = require("../models/Company");
-      const docs = await Company.find({ "branches.branchName": exact(branch) })
-        .select("branches")
-        .lean();
-      const ids = [];
-      for (const company of docs) {
-        for (const b of company.branches || []) {
-          if (exact(branch).test(b.branchName)) ids.push(b._id);
-        }
-      }
-      and.push({ "official.branchId": { $in: ids.length ? ids : [null] } });
-    }
-  }
+  if (branch) and.push({ "official.branchId": await masterIdFilter("branch", branch) });
 
   const shift = filterValue(req, "shift", "shiftId");
-  if (shift) {
-    if (/^[a-fA-F0-9]{24}$/.test(shift)) {
-      and.push({ "official.shiftId": shift });
-    } else {
-      const Company = require("../models/Company");
-      const docs = await Company.find({
-        "branches.shifts.shiftName": exact(shift),
-      })
-        .select("branches")
-        .lean();
-      const ids = [];
-      for (const company of docs) {
-        for (const b of company.branches || []) {
-          for (const s of b.shifts || []) {
-            if (exact(shift).test(s.shiftName)) ids.push(s._id);
-          }
-        }
-      }
-      and.push({ "official.shiftId": { $in: ids.length ? ids : [null] } });
-    }
-  }
+  if (shift) and.push({ "official.shiftId": await masterIdFilter("shift", shift) });
 
   return {
     page,
@@ -261,8 +235,8 @@ const mapListRow = (row) => ({
   lastLogin: row.lastLogin || null,
   status: row.status || "",
   companies: companyRefs(row),
-  branch: row.official?.branchId?.branchName || "",
-  shift: row.official?.shiftId?.shiftName || "",
+  branch: row.official?.branchId?.name || "",
+  shift: row.official?.shiftId?.name || "",
 });
 
 /** Employee Management table row — query must populate LIST_POPULATE */
@@ -274,8 +248,8 @@ const mapEmployeeListRow = (row) => ({
   designation: row.official?.designation || "",
   department: row.official?.department || "",
   companies: companyRefs(row),
-  branch: row.official?.branchId?.branchName || "",
-  shift: row.official?.shiftId?.shiftName || "",
+  branch: row.official?.branchId?.name || "",
+  shift: row.official?.shiftId?.name || "",
   status: row.status || "",
   email: row.official?.officialEmail || "",
 });

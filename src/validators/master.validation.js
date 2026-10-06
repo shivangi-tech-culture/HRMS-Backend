@@ -23,6 +23,17 @@ const statusField = Joi.string().valid("Active", "Inactive").messages({
   "any.only": "status must be Active or Inactive",
 });
 
+const codeField = Joi.string()
+  .trim()
+  .uppercase()
+  .max(30)
+  .pattern(/^[A-Z0-9][A-Z0-9_-]*$/)
+  .allow("")
+  .messages({
+    "string.max": "code must be at most 30 characters",
+    "string.pattern.base": "code may only contain letters, numbers, _ and -",
+  });
+
 const createMasterSchema = Joi.object({
   type: Joi.string()
     .valid(...TYPES)
@@ -32,19 +43,21 @@ const createMasterSchema = Joi.object({
       "any.required": "type is required",
     }),
   name: masterName.required(),
+  code: codeField.default(""),
   status: statusField.default("Active"),
   company: Joi.string().trim().max(150).allow("").optional(),
 }).unknown(false);
 
 const updateMasterSchema = Joi.object({
   name: masterName.optional(),
+  code: codeField.optional(),
   status: statusField.optional(),
   company: Joi.string().trim().max(150).allow("").optional(),
 })
   .min(1)
   .unknown(false)
   .messages({
-    "object.min": "Provide at least one of: name, status",
+    "object.min": "Provide at least one of: name, code, status",
   });
 
 const listMasterQuerySchema = Joi.object({

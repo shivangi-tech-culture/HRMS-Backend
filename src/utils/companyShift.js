@@ -1,8 +1,10 @@
 /**
- * Catalog = Company tree. Assignment = User.official.branchId + shiftId.
- * Days stay on Company.branches[].shifts[].monthlySchedule.
+ * Catalog = Company tree (branches[].branchId → shifts[].shiftId, master ids).
+ * Assignment = User.official.branchId + shiftId (same master ids).
+ * Names / codes come from the branch / shift masters; days stay on the company shift.
  */
 const Company = require("../models/Company");
+const { getModel } = require("../models/Master");
 const { userCompanyIds } = require("./companyScope");
 
 const oid = (value) => {
@@ -16,80 +18,46 @@ const parseOidOrNull = (value) => {
   return /^[a-fA-F0-9]{24}$/.test(id) ? id : null;
 };
 
-const findBranchById = (company, branchId) => {
-  const id = oid(branchId);
-  if (!id) return null;
-  return (company?.branches || []).find(
-    (b) => oid(b._id) === id && b.isActive !== false
+const findBranch = (company, branchId) =>
+  (company?.branches || []).find(
+    (b) => oid(b.branchId) === branchId && b.isActive !== false
   );
-};
 
-const findShiftById = (branch, shiftId) => {
-  const id = oid(shiftId);
-  if (!id) return null;
-  return (branch?.shifts || []).find(
-    (s) => oid(s._id) === id && s.isActive !== false
+const findShift = (branch, shiftId) =>
+  (branch?.shifts || []).find(
+    (s) => oid(s.shiftId) === shiftId && s.isActive !== false
   );
-};
-
-const publicBranch = (branch) =>
-  branch
-    ? {
-        _id: branch._id,
-        branchName: branch.branchName,
-        branchCode: branch.branchCode,
-      }
-    : null;
-
-const publicShift = (shift) =>
-  shift
-    ? {
-        _id: shift._id,
-        shiftName: shift.shiftName,
-        shiftCode: shift.shiftCode,
-      }
-    : null;
 
 const resolvePlacement = (companies, { branchId, shiftId }) => {
   const bId = oid(branchId);
   const sId = oid(shiftId);
-  if (!bId && !sId) {
-    return { ok: true, company: null, branch: null, shift: null };
-  }
+  if (!bId && !sId) return { ok: true, company: null, branch: null, shift: null };
   if (!bId) {
-    return {
-      ok: false,
-      status: 400,
-      message: "official.branchId is required when shiftId is set",
-    };
+    return { ok: false, status: 400, message: "official.branchId is required when shiftId is set" };
   }
   if (!companies.length) {
-    return {
-      ok: false,
-      status: 400,
-      message: "Company is required before branch / shift",
-    };
+    return { ok: false, status: 400, message: "Company is required before branch / shift" };
   }
 
   for (const company of companies) {
-    const branch = findBranchById(company, bId);
+    const branch = findBranch(company, bId);
     if (!branch) continue;
-    if (sId) {
-      const shift = findShiftById(branch, sId);
-      if (!shift) {
-        return {
-          ok: false,
-          status: 400,
-          message: `Shift is not on branch ${branch.branchName} of ${company.companyName}`,
-        };
-      }
-      return { ok: true, company, branch, shift };
+    if (!sId) return { ok: true, company, branch, shift: null };
+    const shift = findShift(branch, sId);
+    if (!shift) {
+      return {
+        ok: false,
+        status: 400,
+        message: `Shift is not on this branch of ${company.companyName}`,
+      };
     }
-    return { ok: true, company, branch, shift: null };
+    return { ok: true, company, branch, shift };
   }
-
   return { ok: false, status: 400, message: "Branch is not on the user's company" };
 };
+
+const loadCompanies = (ids) =>
+  Company.find({ _id: { $in: ids } }).select("companyName branches").lean();
 
 const assertUserPlacement = async ({ companyIds, branchId, shiftId }) => {
   const bId = oid(branchId);
@@ -98,30 +66,45 @@ const assertUserPlacement = async ({ companyIds, branchId, shiftId }) => {
 
   const ids = (companyIds || []).map((id) => oid(id)).filter(Boolean);
   if (!ids.length) {
-    return {
-      ok: false,
-      status: 400,
-      message: "Company is required before branch / shift",
-    };
+    return { ok: false, status: 400, message: "Company is required before branch / shift" };
   }
-
-  const companies = await Company.find({ _id: { $in: ids } })
-    .select("companyName branches")
-    .lean();
-  if (!companies.length) {
-    return { ok: false, status: 400, message: "Company not found" };
-  }
+  const companies = await loadCompanies(ids);
+  if (!companies.length) return { ok: false, status: 400, message: "Company not found" };
   return resolvePlacement(companies, { branchId: bId, shiftId: sId });
 };
 
+/** Map of master _id → { _id, name, code } for the given branch / shift ids */
+const loadMasterNames = async (branchIds, shiftIds) => {
+  const pick = (type, ids) =>
+    ids.length
+      ? getModel(type).find({ _id: { $in: ids } }).select("name code").lean()
+      : [];
+  const [branches, shifts] = await Promise.all([
+    pick("branch", [...new Set(branchIds)]),
+    pick("shift", [...new Set(shiftIds)]),
+  ]);
+  const byId = new Map();
+  for (const m of [...branches, ...shifts]) {
+    byId.set(oid(m._id), { _id: m._id, name: m.name, code: m.code || "" });
+  }
+  return byId;
+};
+
 /** Response only: branchId / shiftId become { _id, name, code } like populated companyIds. */
-const applyPublicPlacement = (official, placed) => {
+const applyPublicPlacement = (official, placed, names) => {
   if (!official) return;
-  official.branchId = placed?.ok ? publicBranch(placed.branch) : null;
-  official.shiftId = placed?.ok ? publicShift(placed.shift) : null;
+  const bId = placed?.ok && placed.branch ? oid(placed.branch.branchId) : "";
+  const sId = placed?.ok && placed.shift ? oid(placed.shift.shiftId) : "";
+  official.branchId = (bId && names.get(bId)) || null;
+  official.shiftId = (sId && names.get(sId)) || null;
   delete official.branch;
   delete official.shift;
 };
+
+const placedIds = (placed) => ({
+  b: placed?.ok && placed.branch ? [oid(placed.branch.branchId)] : [],
+  s: placed?.ok && placed.shift ? [oid(placed.shift.shiftId)] : [],
+});
 
 const attachPlacement = async (user) => {
   if (!user?.official) return user;
@@ -130,37 +113,33 @@ const attachPlacement = async (user) => {
     branchId: user.official.branchId,
     shiftId: user.official.shiftId,
   });
-  applyPublicPlacement(user.official, placed);
+  const { b, s } = placedIds(placed);
+  applyPublicPlacement(user.official, placed, await loadMasterNames(b, s));
   return user;
 };
 
 const attachPlacementMany = async (rows) => {
-  const list = Array.isArray(rows) ? rows : [];
+  const list = (Array.isArray(rows) ? rows : []).filter((row) => row?.official);
   const ids = [...new Set(list.flatMap((row) => userCompanyIds(row)))];
-  if (!ids.length) {
-    for (const row of list) applyPublicPlacement(row?.official, null);
-    return list;
-  }
-  const companies = await Company.find({ _id: { $in: ids } })
-    .select("companyName branches")
-    .lean();
+  const companies = ids.length ? await loadCompanies(ids) : [];
   const byId = new Map(companies.map((c) => [oid(c._id), c]));
-  for (const row of list) {
-    if (!row?.official) continue;
-    const owned = userCompanyIds(row)
-      .map((id) => byId.get(id))
-      .filter(Boolean);
-    applyPublicPlacement(
-      row.official,
-      resolvePlacement(owned, {
-        branchId: row.official.branchId,
-        shiftId: row.official.shiftId,
-      })
-    );
-  }
-  return list;
+
+  const placements = list.map((row) =>
+    resolvePlacement(
+      userCompanyIds(row).map((id) => byId.get(id)).filter(Boolean),
+      { branchId: row.official.branchId, shiftId: row.official.shiftId }
+    )
+  );
+  const all = placements.map(placedIds);
+  const names = await loadMasterNames(
+    all.flatMap((x) => x.b),
+    all.flatMap((x) => x.s)
+  );
+  list.forEach((row, i) => applyPublicPlacement(row.official, placements[i], names));
+  return rows;
 };
 
+/** { day, shift: { _id, name, code } } for the user's company shift on dateStr, or null */
 const getUserDaySchedule = async (user, dateStr) => {
   const placed = await assertUserPlacement({
     companyIds: userCompanyIds(user),
@@ -186,7 +165,11 @@ const getUserDaySchedule = async (user, dateStr) => {
     weeks.find((w) => w.weekNumber === 4) ||
     weeks[0];
   const day = (week?.days || []).find((d) => d.day === weekday);
-  return day ? { day, shift: placed.shift, branch: placed.branch } : null;
+  if (!day) return null;
+
+  const sId = oid(placed.shift.shiftId);
+  const names = await loadMasterNames([], [sId]);
+  return { day, shift: names.get(sId) || null };
 };
 
 module.exports = {

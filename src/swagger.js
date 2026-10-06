@@ -22,7 +22,7 @@ const description = [
   "| My Profile (account) | `GET/PUT /api/account/profile` — logged-in admin/ESS |",
   "| Employee Management | `/api/employees` list/create/export/delete, approve, official/payroll |",
   "| Masters | `/api/masters` create/update/delete |",
-  "| Company | `/api/companies` nested branches+shifts; GET `/:id/branches` for user dropdown |",
+  "| Company | `/api/companies` links branch / shift masters + days; GET `/:id/branches` for user dropdown |",
   "| Mail | `POST /api/mail/send` |",
   "| Attendance (admin) | Daily list `GET /api/attendance`, details, calendar, late-early, overtime, manual, regularize, close-absent |",
   "| Attendance Reports | `GET/POST /api/reports/attendance` — list · generate · download · regenerate |",
@@ -390,12 +390,14 @@ module.exports = swaggerJsdoc({
             branchId: {
               type: "string",
               example: "6ac4e6585473cbef581c18cf",
-              description: "Assigned branch _id from GET /api/companies/{id}/branches",
+              description:
+                "Branch master _id (one of the company's branches — GET /api/companies/{id}/branches). Response: { _id, name, code }",
             },
             shiftId: {
               type: "string",
               example: "6ac4e6585473cbef581c18d0",
-              description: "Assigned shift _id of that branch. Days stay on Company.",
+              description:
+                "Shift master _id on that branch (GET /api/companies/{id}/branches/{branchId}). Response: { _id, name, code }",
             },
             designation: { type: "string", example: "Finance Executive" },
             division: {

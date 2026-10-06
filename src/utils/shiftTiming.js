@@ -60,8 +60,8 @@ const getAssignedShift = async (employeeId, dateStr) => {
     }
 
     const weekday = weekdayOf(dateStr || todayDate());
-    const shiftName = resolved.shift?.shiftName || DEFAULT_SHIFT.name;
-    const shiftCode = resolved.shift?.shiftCode || DEFAULT_SHIFT.code;
+    const shiftName = resolved.shift?.name || DEFAULT_SHIFT.name;
+    const shiftCode = resolved.shift?.code || DEFAULT_SHIFT.code;
     if (day.isOff) {
       return {
         assignment: { source: "company" },

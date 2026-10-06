@@ -142,70 +142,38 @@ const seed = async () => {
   const { buildMasterSeedRows } = require("./config/generalInfoMasters");
   const masters = buildMasterSeedRows();
 
+  const masterId = {};
   for (const m of masters) {
     const Model = getModel(m.type);
-    await Model.create({
+    const created = await Model.create({
       name: m.name,
+      code: m.code,
       company: "",
       status: "Active",
     });
+    masterId[`${m.type}:${m.name}`] = created._id;
     console.log(`Master → ${m.type} (${COLLECTION_BY_TYPE[m.type]}): ${m.name}`);
   }
+
+  const noida = masterId["branch:Noida"];
+  const delhi = masterId["branch:Delhi"];
+  const general = masterId["shift:General Shift"];
+  const evening = masterId["shift:Evening Shift"];
+  const standardShifts = () => [
+    { shiftId: general, isActive: true, monthlySchedule: fourWeeks("10:00", "19:00") },
+    { shiftId: evening, isActive: true, monthlySchedule: fourWeeks("14:00", "23:00", "18:00") },
+  ];
 
   const companyOrg = await Company.create({
     companyName: DEFAULT_COMPANY,
     companyCode: "TCPL",
     isActive: true,
     branches: [
-      {
-        branchName: "Noida",
-        branchCode: "NOIDA",
-        city: "Noida",
-        state: "Uttar Pradesh",
-        isActive: true,
-        shifts: [
-          {
-            shiftName: "General Shift",
-            shiftCode: "GS-01",
-            isActive: true,
-            monthlySchedule: fourWeeks("10:00", "19:00"),
-          },
-          {
-            shiftName: "Evening Shift",
-            shiftCode: "ES-01",
-            isActive: true,
-            monthlySchedule: fourWeeks("14:00", "23:00", "18:00"),
-          },
-        ],
-      },
-      {
-        branchName: "Delhi",
-        branchCode: "DEL",
-        city: "Delhi",
-        state: "Delhi",
-        isActive: true,
-        shifts: [
-          {
-            shiftName: "General Shift",
-            shiftCode: "GS-01",
-            isActive: true,
-            monthlySchedule: fourWeeks("10:00", "19:00"),
-          },
-          {
-            shiftName: "Evening Shift",
-            shiftCode: "ES-01",
-            isActive: true,
-            monthlySchedule: fourWeeks("14:00", "23:00", "18:00"),
-          },
-        ],
-      },
+      { branchId: noida, city: "Noida", state: "Uttar Pradesh", isActive: true, shifts: standardShifts() },
+      { branchId: delhi, city: "Delhi", state: "Delhi", isActive: true, shifts: standardShifts() },
     ],
   });
   const companyId = companyOrg._id;
-  const noida = companyOrg.branches.find((b) => b.branchName === "Noida");
-  const delhi = companyOrg.branches.find((b) => b.branchName === "Delhi");
-  const noidaGeneral = noida.shifts.find((s) => s.shiftName === "General Shift");
-  const delhiEvening = delhi.shifts.find((s) => s.shiftName === "Evening Shift");
   console.log(
     `Company → ${companyOrg.companyName} (${companyOrg.companyCode}) id ${companyId}`
   );
@@ -243,8 +211,8 @@ const seed = async () => {
         companyIds: [companyId],
         department: "HR",
         designation: "HR Manager",
-        branchId: noida._id,
-        shiftId: noidaGeneral._id,
+        branchId: noida,
+        shiftId: general,
       },
     },
     {
@@ -259,8 +227,8 @@ const seed = async () => {
         companyIds: [companyId],
         department: "Engineering",
         designation: "Engineering Manager",
-        branchId: noida._id,
-        shiftId: noidaGeneral._id,
+        branchId: noida,
+        shiftId: general,
       },
     },
     {
@@ -275,8 +243,8 @@ const seed = async () => {
         companyIds: [companyId],
         department: "Engineering",
         designation: "Software Engineer",
-        branchId: noida._id,
-        shiftId: noidaGeneral._id,
+        branchId: noida,
+        shiftId: general,
       },
       reportsTo: "manager@gmail.com",
     },
@@ -296,8 +264,8 @@ const seed = async () => {
         companyIds: [companyId],
         department: "Engineering",
         designation: "Software Engineer",
-        branchId: delhi._id,
-        shiftId: delhiEvening._id,
+        branchId: delhi,
+        shiftId: evening,
       },
       reportsTo: "manager@gmail.com",
     },

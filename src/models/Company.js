@@ -1,15 +1,19 @@
 /**
  * COMPANY MODULE — org setup. Collection `companyorgs`.
  *
- * Masters hold only names (Noida, Morning Shift).
- * This document holds the real tree: branches → shifts → weekly days/times.
- * User assignment: official.companyIds + branchId + shiftId (one workplace).
- * Catalog (all branches/shifts/days) stays on this document.
+ * Branch / shift names + codes live in masters (type=branch|shift), shared by all companies.
+ * This document links them: branches[].branchId → shifts[].shiftId → weekly days/times.
+ * Address and timings are per company; a branch / shift master appears once per company / branch.
+ * User assignment: official.companyIds + branchId + shiftId (same master ids).
  * Attendance reads times from here, not from the user.
  *
  * Access: Super Admin and Admin only.
  */
 const mongoose = require("mongoose");
+const { getModel, modelNameOf } = require("./Master");
+
+getModel("branch");
+getModel("shift");
 
 const WEEK_DAYS = [
   "monday",
@@ -41,22 +45,34 @@ const weekScheduleSchema = new mongoose.Schema(
   { _id: false }
 );
 
-const shiftSchema = new mongoose.Schema({
-  shiftName: { type: String, required: true, trim: true },
-  shiftCode: { type: String, required: true, trim: true, uppercase: true },
-  monthlySchedule: { type: [weekScheduleSchema], default: [] },
-  isActive: { type: Boolean, default: true },
-});
+const shiftSchema = new mongoose.Schema(
+  {
+    shiftId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: modelNameOf("shift"),
+      required: true,
+    },
+    monthlySchedule: { type: [weekScheduleSchema], default: [] },
+    isActive: { type: Boolean, default: true },
+  },
+  { _id: false }
+);
 
-const branchSchema = new mongoose.Schema({
-  branchName: { type: String, required: true, trim: true },
-  branchCode: { type: String, required: true, trim: true, uppercase: true },
-  address: { type: String, default: "" },
-  city: { type: String, default: "" },
-  state: { type: String, default: "" },
-  isActive: { type: Boolean, default: true },
-  shifts: { type: [shiftSchema], default: [] },
-});
+const branchSchema = new mongoose.Schema(
+  {
+    branchId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: modelNameOf("branch"),
+      required: true,
+    },
+    address: { type: String, default: "" },
+    city: { type: String, default: "" },
+    state: { type: String, default: "" },
+    isActive: { type: Boolean, default: true },
+    shifts: { type: [shiftSchema], default: [] },
+  },
+  { _id: false }
+);
 
 const companySchema = new mongoose.Schema(
   {
@@ -76,6 +92,15 @@ const companySchema = new mongoose.Schema(
 
 companySchema.index({ companyName: 1 });
 companySchema.index({ isActive: 1 });
+companySchema.index({ "branches.branchId": 1 });
+companySchema.index({ "branches.shifts.shiftId": 1 });
+
+/** Populate paths that turn branchId / shiftId into { _id, name, code } */
+const MASTER_POPULATE = [
+  { path: "branches.branchId", select: "name code" },
+  { path: "branches.shifts.shiftId", select: "name code" },
+];
 
 module.exports = mongoose.model("Company", companySchema);
 module.exports.WEEK_DAYS = WEEK_DAYS;
+module.exports.MASTER_POPULATE = MASTER_POPULATE;

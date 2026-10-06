@@ -30,7 +30,7 @@ const PARAM_DOCS = {
   gender: "string | optional | Gender master name e.g. `Male` / `Female`",
   branch: "string | optional | current branch filter — Branch `_id`, branch name or branch code (e.g. `NOI`)",
   shift: "string | optional | current shift filter — Shift `_id`, shift name or shift code (e.g. `GS-01`)",
-  branchId: "string (MongoId 24-hex) | path | Company branch `_id` (from GET /api/companies/{id}/branches)",
+  branchId: "string (MongoId 24-hex) | path | Branch master `_id` that is on this company (from GET /api/companies/{id}/branches)",
   location: "string | optional | match punch address text",
   role: "string | optional | role name e.g. `Super Admin` | `Admin` | `HR Manager` | `Reporting Manager` | `Employee`",
   employeeId: "string (MongoId 24-hex) | optional/required | user `_id`",
@@ -77,9 +77,9 @@ const PARAM_DOCS = {
     "string (MongoId) | optional | Reporting Manager User _id (\"\" or null clears). Bulk: POST /api/hierarchy/assign",
   "official.reportingHead2": "string (MongoId) | optional | 2nd Reporting Manager User _id",
   "official.branchId":
-    "string (MongoId) | optional | one branch `_id` of the selected company (GET /api/companies/{id}/branches). Response returns `{ _id, branchName, branchCode }`",
+    "string (MongoId) | optional | Branch master `_id` that is on the selected company (GET /api/companies/{id}/branches). Response returns `{ _id, name, code }`",
   "official.shiftId":
-    "string (MongoId) | optional | one shift `_id` on that branch (GET /api/companies/{id}/branches/{branchId}). Response returns `{ _id, shiftName, shiftCode }`",
+    "string (MongoId) | optional | Shift master `_id` that is on that branch (GET /api/companies/{id}/branches/{branchId}). Response returns `{ _id, name, code }`",
   "official.dateOfJoining": "string/date (YYYY-MM-DD) | optional | joining date",
   "official.calculateSalaryFrom": "string/date (YYYY-MM-DD) | optional",
   "official.dateOfRetirement": "string/date|null | optional",
@@ -198,12 +198,11 @@ const PARAM_DOCS = {
   companyName: "string | required on create | company display name (min 2)",
   companyCode: "string | required on create | unique code, stored uppercase e.g. `ABC`",
   companyOrgId: "string (MongoId 24-hex) | path | Company org `_id` from Create / List",
-  branches: "array<object> | nested on company create/update — branchName, branchCode, shifts[].monthlySchedule",
-  branchName: "string | required | branch display name",
-  branchCode: "string | required | unique inside the company, stored uppercase e.g. `NOI`",
-  shifts: "array<object> | optional | shifts on this branch",
-  shiftName: "string | required | shift display name",
-  shiftCode: "string | required | unique inside the branch, stored uppercase e.g. `GS-01`",
+  branches: "array<object> | optional | company branches — branchId (master), address, shifts[].shiftId + monthlySchedule. Update replaces the whole list",
+  "branches.branchId": "string (MongoId) | required | Branch master `_id` (GET /api/masters?type=branch); once per company",
+  "branches.shifts": "array<object> | optional | shifts on this branch",
+  "branches.shifts.shiftId": "string (MongoId) | required | Shift master `_id` (GET /api/masters?type=shift); once per branch",
+  "branches.shifts.isActive": "boolean | optional | `false` hides this shift from dropdowns",
   monthlySchedule: "array<object> | optional | week 1–5 pattern for the shift (not a one-off date)",
   weekNumber: "number | required | `1`–`5`, unique inside the shift",
   days: "array<object> | required | all 7 weekdays, each once",
@@ -252,7 +251,7 @@ function contextualDoc(key, ctx) {
     !name.includes("reason");
 
   if (key === "code" && (url.includes("type=branch") || url.includes("type=shift") || name.includes("branch master") || name.includes("shift master"))) {
-    return "string | required | unique uppercase code e.g. `NOI` / `GS-01`";
+    return "string | optional | short code, unique inside the type, stored uppercase e.g. `NOIDA` / `GS-01`";
   }
 
   if (key === "search" && url.includes("/api/companies")) {

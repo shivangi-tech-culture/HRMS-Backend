@@ -5,7 +5,8 @@
  * (Administration → Company, collection companyorgs).
  *
  * Employee forms save master `name` strings (not _id).
- * Users store Company _ids in official.companyIds.
+ * Exception: branch / shift — Company and User store their master `_id`
+ * (one Noida / General Shift shared by every company).
  */
 const mongoose = require("mongoose");
 
@@ -77,8 +78,8 @@ const GENERAL_INFO_DROPDOWNS = {
     employeeGroup: "employeeGroup",
     grade: "grade",
     jobRole: "jobRole",
-    branch: "branch",
-    shift: "shift",
+    branchId: "branch",
+    shiftId: "shift",
   },
   other: {
     bloodGroup: "bloodGroup",
@@ -106,6 +107,8 @@ const GENERAL_INFO_DROPDOWNS = {
   },
 };
 
+const modelNameOf = (type) => `Master_${COLLECTION_BY_TYPE[type]}`;
+
 /** Mongoose model for this type’s collection (cached) */
 const getModel = (type) => {
   if (!TYPES.includes(type)) {
@@ -113,12 +116,14 @@ const getModel = (type) => {
   }
 
   const collection = COLLECTION_BY_TYPE[type];
-  const modelName = `Master_${collection}`;
+  const modelName = modelNameOf(type);
   if (mongoose.models[modelName]) return mongoose.models[modelName];
 
   const schema = new mongoose.Schema(
     {
       name: { type: String, default: "" },
+      /** Optional short code e.g. NOIDA, GS-01 — unique inside the type when set */
+      code: { type: String, default: "", trim: true, uppercase: true },
       /** Legacy field — always "" now (masters are global) */
       company: { type: String, default: "" },
       status: { type: String, default: "Active" },
@@ -130,6 +135,10 @@ const getModel = (type) => {
   schema.index(
     { name: 1 },
     { unique: true, collation: { locale: "en", strength: 2 } }
+  );
+  schema.index(
+    { code: 1 },
+    { unique: true, partialFilterExpression: { code: { $gt: "" } } }
   );
   schema.index({ status: 1 });
 
@@ -173,6 +182,7 @@ module.exports = {
   TYPES,
   COLLECTION_BY_TYPE,
   GENERAL_INFO_DROPDOWNS,
+  modelNameOf,
   getModel,
   toMasterDto,
   findMasterById,

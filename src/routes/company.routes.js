@@ -30,10 +30,10 @@ const companyRoles = [SUPER_ADMIN, ADMIN];
  * tags:
  *   - name: Admin / Company
  *     description: |
- *       Company org with nested branches → shifts → monthlySchedule (days/times).
- *       Masters `/api/masters?type=branch|shift` are **name catalogs only**.
- *       Users save official.companyIds + one branchId + one shiftId (workplace).
- *       Catalog: GET /api/companies/{id}/branches then GET .../branches/{branchId}.
+ *       Branch / shift names + codes are masters (`/api/masters?type=branch|shift`), shared by all companies.
+ *       A company links them: branches[].branchId → shifts[].shiftId → monthlySchedule (days/times).
+ *       Users save official.companyIds + one branchId + one shiftId (same master ids).
+ *       Dropdown: GET /api/companies/{id}/branches then GET .../branches/{branchId}.
  *       **CRUD: Super Admin and Admin only.** HR can GET branches of assigned companies.
  */
 
@@ -80,9 +80,10 @@ const companyRoles = [SUPER_ADMIN, ADMIN];
  *                 type: array
  *                 items:
  *                   type: object
+ *                   required: [branchId]
  *                   properties:
- *                     branchName: { type: string, example: Noida }
- *                     branchCode: { type: string, example: Noida }
+ *                     branchId: { type: string, description: Branch master _id, example: 6ac4e6585473cbef581c18cf }
+ *                     address: { type: string, example: Sector 62 }
  *                     city: { type: string, example: Noida }
  *                     state: { type: string, example: Uttar Pradesh }
  *                     isActive: { type: boolean, example: true }
@@ -90,15 +91,16 @@ const companyRoles = [SUPER_ADMIN, ADMIN];
  *                       type: array
  *                       items:
  *                         type: object
+ *                         required: [shiftId]
  *                         properties:
- *                           shiftName: { type: string, example: General Shift }
- *                           shiftCode: { type: string, example: GS-01 }
+ *                           shiftId: { type: string, description: Shift master _id, example: 6ac4e6585473cbef581c18d0 }
  *                           isActive: { type: boolean, example: true }
  *                           monthlySchedule:
  *                             type: array
  *                             description: weekNumber 1-5; each week must include all 7 days
  *     responses:
- *       201: { description: Company created }
+ *       201: { description: Company created (branchId / shiftId populated to { _id, name, code }) }
+ *       400: { description: Unknown branch / shift master id or invalid schedule }
  *       409: { description: Duplicate company name or code }
  */
 router.get(

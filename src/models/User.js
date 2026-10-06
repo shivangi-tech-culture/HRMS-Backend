@@ -112,9 +112,9 @@ const userSchema = new mongoose.Schema(
         type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Company" }],
         default: undefined,
       },
-      /** Selected Company.branches[]._id — one current branch */
+      /** Branch master _id — must be one of the company's branches */
       branchId: { type: mongoose.Schema.Types.ObjectId, default: null },
-      /** Selected shift on that branch. Days stay on Company. */
+      /** Shift master _id — must be on that branch. Days stay on Company. */
       shiftId: { type: mongoose.Schema.Types.ObjectId, default: null },
       /** Department name from masters (string, not ObjectId) */
       department: { type: String, default: "" },

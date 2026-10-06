@@ -63,7 +63,8 @@ const listMasters = async (req, res) => {
 
     if (status) and.push({ status });
     if (search) {
-      and.push({ name: new RegExp(escapeRegex(search), "i") });
+      const rx = new RegExp(escapeRegex(search), "i");
+      and.push({ $or: [{ name: rx }, { code: rx }] });
     }
 
     const filter = and.length ? { $and: and } : {};
@@ -113,10 +114,37 @@ const findDuplicateName = async (Model, { name, excludeId }) => {
   return Model.findOne(filter).lean();
 };
 
+const codeTaken = async (Model, { code, excludeId }) => {
+  if (!code) return null;
+  const filter = { code };
+  if (excludeId) filter._id = { $ne: excludeId };
+  return Model.findOne(filter).select("_id").lean();
+};
+
+/** Branch / shift master ids are stored on companies and users */
+const masterInUse = async (type, id) => {
+  const Company = require("../models/Company");
+  const User = require("../models/User");
+  if (type === "branch") {
+    return (
+      (await Company.exists({ "branches.branchId": id })) ||
+      (await User.exists({ "official.branchId": id }))
+    );
+  }
+  if (type === "shift") {
+    return (
+      (await Company.exists({ "branches.shifts.shiftId": id })) ||
+      (await User.exists({ "official.shiftId": id }))
+    );
+  }
+  return false;
+};
+
 /** POST /api/masters */
 const createMaster = async (req, res) => {
   try {
     const { type, name, status } = req.body;
+    const code = req.body.code || "";
     const Model = getModel(type);
     const trimmedName = String(name).trim();
 
@@ -126,9 +154,13 @@ const createMaster = async (req, res) => {
         message: `"${trimmedName}" already exists`,
       });
     }
+    if (await codeTaken(Model, { code })) {
+      return res.status(400).json({ message: `Code "${code}" already exists` });
+    }
 
     const created = await Model.create({
       name: trimmedName,
+      code,
       status: status || "Active",
       company: "",
     });
@@ -163,6 +195,7 @@ const updateMaster = async (req, res) => {
       }
       row.name = nextName;
     }
+    if (req.body.code !== undefined) row.code = req.body.code;
     if (req.body.status !== undefined) row.status = req.body.status;
     row.company = "";
 
@@ -174,6 +207,9 @@ const updateMaster = async (req, res) => {
       return res.status(400).json({
         message: `"${row.name}" already exists`,
       });
+    }
+    if (await codeTaken(Model, { code: row.code, excludeId: row._id })) {
+      return res.status(400).json({ message: `Code "${row.code}" already exists` });
     }
 
     await row.save();
@@ -199,6 +235,11 @@ const deleteMaster = async (req, res) => {
     if (!found) return res.status(404).json({ message: "Not found" });
 
     const { type, row } = found;
+    if (await masterInUse(type, row._id)) {
+      return res.status(409).json({
+        message: `This ${type} is used by a company or user. Set status Inactive instead.`,
+      });
+    }
     await row.deleteOne();
     return res.json({ message: "Deleted", id: req.params.id, type });
   } catch (err) {

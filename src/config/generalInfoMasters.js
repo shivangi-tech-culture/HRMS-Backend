@@ -78,8 +78,14 @@ const OFFICIAL_DROPDOWNS = {
   employeeGroup: ["Permanent", "Contract"],
   grade: ["G1", "G2", "G3", "G4", "G5"],
   jobRole: ["Executive", "Manager", "Intern", "Consultant"],
-  branch: ["Noida", "Delhi"],
-  shift: ["General Shift", "Evening Shift"],
+  branch: [
+    { name: "Noida", code: "NOIDA" },
+    { name: "Delhi", code: "DEL" },
+  ],
+  shift: [
+    { name: "General Shift", code: "GS-01" },
+    { name: "Evening Shift", code: "ES-01" },
+  ],
 };
 
 /**
@@ -106,15 +112,17 @@ const ATTENDANCE_DROPDOWNS = {
 };
 
 /**
- * Flatten to seed rows: { type, name }
+ * Flatten to seed rows: { type, name, code }
+ * Entries are a name string or { name, code }.
  * Masters are GLOBAL. Company is not a master — org companies are /api/companies.
  */
 const buildMasterSeedRows = () => {
   const rows = [];
 
-  const add = (type, names) => {
-    for (const name of names) {
-      rows.push({ type, name });
+  const add = (type, entries) => {
+    for (const entry of entries) {
+      const { name, code = "" } = typeof entry === "string" ? { name: entry } : entry;
+      rows.push({ type, name, code });
     }
   };
 

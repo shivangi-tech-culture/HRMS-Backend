@@ -88,10 +88,15 @@ const weekScheduleSchema = Joi.object({
     .required(),
 });
 
+const masterId = (label) =>
+  Joi.string().hex().length(24).required().messages({
+    "string.hex": `${label} must be a master _id`,
+    "string.length": `${label} must be a master _id`,
+    "any.required": `${label} is required`,
+  });
+
 const shiftSchema = Joi.object({
-  _id: Joi.string().hex().length(24).optional(),
-  shiftName: Joi.string().trim().min(2).max(120).required(),
-  shiftCode: Joi.string().trim().uppercase().min(1).max(30).required(),
+  shiftId: masterId("shiftId"),
   monthlySchedule: Joi.array()
     .items(weekScheduleSchema)
     .custom(uniqueBy("weekNumber", "weekNumber"))
@@ -100,36 +105,32 @@ const shiftSchema = Joi.object({
 });
 
 const branchSchema = Joi.object({
-  _id: Joi.string().hex().length(24).optional(),
-  branchName: Joi.string().trim().min(2).max(120).required(),
-  branchCode: Joi.string().trim().uppercase().min(1).max(30).required(),
+  branchId: masterId("branchId"),
   address: Joi.string().trim().allow("").max(300).default(""),
   city: Joi.string().trim().allow("").max(80).default(""),
   state: Joi.string().trim().allow("").max(80).default(""),
   shifts: Joi.array()
     .items(shiftSchema)
-    .custom(uniqueBy("shiftCode", "shiftCode"))
+    .custom(uniqueBy("shiftId", "shiftId in a branch"))
     .default([]),
   isActive: Joi.boolean().default(true),
 });
 
+const branchesField = Joi.array()
+  .items(branchSchema)
+  .custom(uniqueBy("branchId", "branchId in a company"));
+
 const createCompanySchema = Joi.object({
   companyName: Joi.string().trim().min(2).max(160).required(),
   companyCode: Joi.string().trim().uppercase().min(1).max(20).required(),
-  branches: Joi.array()
-    .items(branchSchema)
-    .custom(uniqueBy("branchCode", "branchCode"))
-    .default([]),
+  branches: branchesField.default([]),
   isActive: Joi.boolean().default(true),
 }).unknown(false);
 
 const updateCompanySchema = Joi.object({
   companyName: Joi.string().trim().min(2).max(160).optional(),
   companyCode: Joi.string().trim().uppercase().min(1).max(20).optional(),
-  branches: Joi.array()
-    .items(branchSchema)
-    .custom(uniqueBy("branchCode", "branchCode"))
-    .optional(),
+  branches: branchesField.optional(),
   isActive: Joi.boolean().optional(),
 })
   .min(1)

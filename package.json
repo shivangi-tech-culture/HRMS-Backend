@@ -7,9 +7,7 @@
     "start": "node src/server.js",
     "dev": "nodemon --watch src src/server.js",
     "seed": "node src/seed.js",
-    "seed:masters": "node src/scripts/seedMasters.js",
-    "migrate:reporting-heads": "node src/scripts/migrateReportingHeads.js",
-    "sync:permissions": "node src/scripts/syncRolePermissions.js"
+    "seed:masters": "node src/scripts/seedMasters.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
