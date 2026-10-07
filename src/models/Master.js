@@ -1,51 +1,38 @@
 /**
- * Master — dropdown catalogs (one file, many Mongo collections by `type`)
+ * Master — dropdown catalogs (global across all companies)
  *
- * Official (org): company, department, designation, division, employeeGroup, grade, jobRole
- * General Info: gender, maritalStatus, bloodGroup, country, state, city,
- *   courseType, courseLevel, bankName, relation, nominateFor, visaType
+ * Company is NOT a master. Org companies live at /api/companies
+ * (Administration → Company, collection companyorgs).
  *
- * Schema = data shape only. Request rules → validators/master.validation.js
- * Employee forms save `name` string (not _id).
- *
- * ESS General Info (9 modules — no Vaccination):
- *   Personal | Official | Other | Education | Account | Family | Nominee | Experience | Visa
+ * Employee forms save master `name` strings (not _id).
+ * Exception: branch / shift — Company and User store their master `_id`
+ * (one Noida / General Shift shared by every company).
  */
 const mongoose = require("mongoose");
 
 const TYPES = [
-  // Official / org structure
-  "company",
   "department",
   "designation",
   "division",
   "employeeGroup",
   "grade",
   "jobRole",
-  // Personal / Other
   "gender",
   "maritalStatus",
   "bloodGroup",
-  "country",
-  "state",
-  "city",
-  // Education
+  "branch",
+  "shift",
   "courseType",
   "courseLevel",
-  // Accounts
   "bankName",
-  // Family + Nominee
   "relation",
   "nominateFor",
-  // Visa
   "visaType",
-  // Attendance dropdowns (Admin Attendance screens)
   "regularizationReason",
   "markAttendanceReason",
 ];
 
 const COLLECTION_BY_TYPE = {
-  company: "companies",
   department: "departments",
   designation: "designations",
   division: "divisions",
@@ -55,9 +42,8 @@ const COLLECTION_BY_TYPE = {
   gender: "genders",
   maritalStatus: "maritalstatuses",
   bloodGroup: "bloodgroups",
-  country: "countries",
-  state: "states",
-  city: "cities",
+  branch: "branches",
+  shift: "shifts",
   courseType: "coursetypes",
   courseLevel: "courselevels",
   bankName: "banknames",
@@ -68,29 +54,20 @@ const COLLECTION_BY_TYPE = {
   markAttendanceReason: "markattendancereasons",
 };
 
-/**
- * Field → master `type` for ESS General Info dropdowns.
- * Frontend: GET /api/masters?type=<type>&status=Active
- */
 const GENERAL_INFO_DROPDOWNS = {
   personal: {
     gender: "gender",
     maritalStatus: "maritalStatus",
-    "presentAddress.country": "country",
-    "presentAddress.state": "state",
-    "presentAddress.city": "city",
-    "permanentAddress.country": "country",
-    "permanentAddress.state": "state",
-    "permanentAddress.city": "city",
   },
   official: {
-    company: "company",
     department: "department",
     designation: "designation",
     division: "division",
     employeeGroup: "employeeGroup",
     grade: "grade",
     jobRole: "jobRole",
+    branchId: "branch",
+    shiftId: "shift",
   },
   other: {
     bloodGroup: "bloodGroup",
@@ -108,18 +85,16 @@ const GENERAL_INFO_DROPDOWNS = {
   nominees: {
     nominateFor: "nominateFor",
     relation: "relation",
-    // nomineeName = free text input (not a master dropdown)
   },
   experience: {
     designation: "designation",
   },
   visas: {
-    countryName: "country",
     visaType: "visaType",
   },
 };
 
-const isCompanyType = (type) => type === "company";
+const modelNameOf = (type) => `Master_${COLLECTION_BY_TYPE[type]}`;
 
 /** Mongoose model for this type’s collection (cached) */
 const getModel = (type) => {
@@ -128,46 +103,46 @@ const getModel = (type) => {
   }
 
   const collection = COLLECTION_BY_TYPE[type];
-  const modelName = `Master_${collection}`;
+  const modelName = modelNameOf(type);
   if (mongoose.models[modelName]) return mongoose.models[modelName];
 
   const schema = new mongoose.Schema(
     {
-      name: { type: String, default: "" }, // dropdown label
-      company: { type: String, default: "" }, // parent company; "" for type=company
-      status: { type: String, default: "Active" }, // Active | Inactive (Joi)
+      name: { type: String, default: "" },
+      /** Optional short code e.g. NOIDA, GS-01 — unique inside the type when set */
+      code: { type: String, default: "", trim: true, uppercase: true },
+      /** Legacy field — always "" now (masters are global) */
+      company: { type: String, default: "" },
+      status: { type: String, default: "Active" },
     },
     { timestamps: true, collection }
   );
 
-  if (isCompanyType(type)) {
-    schema.index(
-      { name: 1 },
-      { unique: true, collation: { locale: "en", strength: 2 } }
-    );
-  } else {
-    schema.index(
-      { company: 1, name: 1 },
-      { unique: true, collation: { locale: "en", strength: 2 } }
-    );
-    schema.index({ company: 1, status: 1 });
-  }
+  // Global uniqueness by name (not per-company)
+  schema.index(
+    { name: 1 },
+    { unique: true, collation: { locale: "en", strength: 2 } }
+  );
+  schema.index(
+    { code: 1 },
+    { unique: true, partialFilterExpression: { code: { $gt: "" } } }
+  );
+  schema.index({ status: 1 });
 
   return mongoose.model(modelName, schema, collection);
 };
 
-/** Add `type` on API response */
+/** API DTO — omit company for UI (masters are global) */
 const toMasterDto = (type, doc) => {
   if (!doc) return null;
   const row = typeof doc.toObject === "function" ? doc.toObject() : { ...doc };
+  const { company, ...rest } = row;
   return {
-    ...row,
+    ...rest,
     type,
-    company: isCompanyType(type) ? "" : row.company || "",
   };
 };
 
-/** Find row by _id across all master collections */
 const findMasterById = async (id) => {
   for (const type of TYPES) {
     const Model = getModel(type);
@@ -186,7 +161,6 @@ const findMasterByIdLean = async (id) => {
   return null;
 };
 
-/** Clear all master collections (seed) */
 const clearAllMasterCollections = async () => {
   await Promise.all(TYPES.map((type) => getModel(type).deleteMany({})));
 };
@@ -195,7 +169,7 @@ module.exports = {
   TYPES,
   COLLECTION_BY_TYPE,
   GENERAL_INFO_DROPDOWNS,
-  isCompanyType,
+  modelNameOf,
   getModel,
   toMasterDto,
   findMasterById,

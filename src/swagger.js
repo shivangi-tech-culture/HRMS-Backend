@@ -22,22 +22,15 @@ const description = [
   "| My Profile (account) | `GET/PUT /api/account/profile` — logged-in admin/ESS |",
   "| Employee Management | `/api/employees` list/create/export/delete, approve, official/payroll |",
   "| Masters | `/api/masters` create/update/delete |",
+  "| Company | `/api/companies` links branch / shift masters + days; GET `/:id` = full details for user dropdowns |",
   "| Mail | `POST /api/mail/send` |",
-  "| Attendance (admin) | Daily list `GET /api/attendance`, details, calendar, late-early, overtime, manual, regularize, close-absent |",
-  "| Attendance Reports | `GET/POST /api/reports/attendance` — list · generate · download · regenerate |",
-  "| Work — Shifts | `/api/shifts` CRUD + assignments (`weeklyOffId` from `/api/weekly-offs`) |",
-  "| Work — Holiday Calendar | `/api/holidays` CRUD (NATIONAL / DECLARED) |",
-  "| Work — Weekly Off | `/api/weekly-offs` |",
-  "| Employee shift | `official.shift` on `/api/employees` only (not Access Control) |",
   "",
   "### 2. Employee Dashboard — ESS (catalog: `employee`)",
   "| Area | APIs |",
   "| --- | --- |",
   "| My permissions | `GET /api/permissions/my` |",
   "| My profile | `GET/PUT /api/employees/:id` (own id only) |",
-  "| Attendance (self) | punch-in/out (lat/long), web-punches, regularize, today |",
-  "| Time Sheet | `GET /api/timesheet` (filters + pagination) |",
-  "| Shift Roster | `GET /api/shifts/roster/me` |",
+  "| Attendance (self) | `/api/attendance` punch-in/out (lat/long), today, web-punches |",
   "| Masters (dropdowns) | `GET /api/masters?type=…` |",
   "",
   "**Custom roles:** pick `catalog` admin|employee → grant modules → `checkPermission` enforces each action.",
@@ -99,13 +92,9 @@ module.exports = swaggerJsdoc({
         description: "Admin Dashboard — Organization → Mail",
       },
       {
-        name: "Admin / Attendance",
-        description: "Admin Dashboard — manual mark + attendance list",
-      },
-      {
         name: "Employee / ESS",
         description:
-          "Employee Dashboard — my permissions, own profile, punch in/out, my today",
+          "Employee Dashboard — my permissions, own profile, punch in/out, my today, my punches",
       },
     ],
     components: {
@@ -369,7 +358,7 @@ module.exports = swaggerJsdoc({
           type: "object",
           additionalProperties: false,
           description:
-            "Admin only for most fields. official.shift — Global Admin / Super Admin / HR Manager only (Employee cannot edit).",
+            "Admin only for most fields (employee cannot edit official{}).",
           properties: {
             employeeCode: {
               type: "string",
@@ -381,11 +370,26 @@ module.exports = swaggerJsdoc({
               example: "shivi.gupta@techculture.ai",
               description: "Login ID — unique",
             },
-            company: {
-              type: "string",
-              example: "TechCulture.Ai Private Limited",
+            companyIds: {
+              type: "array",
+              items: { type: "string" },
+              example: ["6ac4ca7070e8935d51b17035"],
+              description:
+                "Company _ids. Workplace is branchId + shiftId. Catalog: GET /api/companies/{id}.",
             },
             department: { type: "string", example: "Finance" },
+            branchId: {
+              type: "string",
+              example: "6ac4e6585473cbef581c18cf",
+              description:
+                "Branch master _id (one of the company's branches — GET /api/companies/{id}). Response: { _id, name, code, address, city, state }",
+            },
+            shiftId: {
+              type: "string",
+              example: "6ac4e6585473cbef581c18d0",
+              description:
+                "Shift master _id on that branch (GET /api/companies/{id}). Response: { _id, name, code, monthlySchedule: [{ weekNumber, days: [{ day, isOff, startTime, endTime, breakStartTime, breakEndTime }] }] }",
+            },
             designation: { type: "string", example: "Finance Executive" },
             division: {
               type: "string",
@@ -397,8 +401,18 @@ module.exports = swaggerJsdoc({
               example: "Permanent",
               description: "Master name string (not ObjectId)",
             },
-            reportingHead1: { type: "string", example: "Shivangi Gupta" },
-            reportingHead2: { type: "string" },
+            reportingHead1: {
+              type: "string",
+              nullable: true,
+              example: "6ac4b3e4d269e78d0eae7f64",
+              description:
+                "Reporting Manager User _id. Responses return { _id, name, email, employeeCode }. Bulk: POST /api/employees/assign-manager",
+            },
+            reportingHead2: {
+              type: "string",
+              nullable: true,
+              description: "Second Reporting Manager User _id",
+            },
             jobRole: { type: "string", example: "Executive" },
             dateOfJoining: {
               type: "string",
@@ -409,13 +423,6 @@ module.exports = swaggerJsdoc({
             calculateSalaryFrom: { type: "string", format: "date", nullable: true },
             dateOfRetirement: { type: "string", format: "date", nullable: true },
             grade: { type: "string", example: "G4" },
-            shift: {
-              type: "string",
-              example: "665f1a2b3c4d5e6f7a8b9c0e",
-              nullable: true,
-              description:
-                "Master Shift ObjectId. Set on create/update by Global Admin / Super Admin / HR Manager only — Employee cannot edit.",
-            },
           },
         },
         Other: {
@@ -715,7 +722,7 @@ module.exports = swaggerJsdoc({
         },
         PunchBody: {
           type: "object",
-          required: ["source"],
+          required: ["source", "latitude", "longitude"],
           properties: {
             source: {
               type: "string",
@@ -733,87 +740,11 @@ module.exports = swaggerJsdoc({
               example: 77.2242,
               description: "GPS longitude (pair with latitude)",
             },
-            address: {
-              type: "string",
-              example: "Connaught Place, New Delhi",
-              description:
-                "Optional — if empty, filled via Google Maps or OpenStreetMap reverse geocode",
-            },
             remarks: {
               type: "string",
               example: "WFH approved",
               description: "Optional note",
             },
-          },
-        },
-        ShiftBody: {
-          type: "object",
-          required: ["name", "startTime", "endTime"],
-          properties: {
-            name: { type: "string", example: "First Shift" },
-            code: { type: "string", example: "FIRST" },
-            company: { type: "string", example: "TechCulture.Ai Private Limited" },
-            punchStartTime: {
-              type: "string",
-              example: "08:00",
-              description: "Earliest punch-in allowed (UI Punch Start Time)",
-            },
-            startTime: {
-              type: "string",
-              example: "09:00",
-              description: "Shift Start — early punch before this (after punchStart) accepted",
-            },
-            endTime: {
-              type: "string",
-              example: "18:00",
-              description: "Shift End — late punch-out after this accepted",
-            },
-            shiftDuration: { type: "number", example: 9 },
-            workDuration: { type: "number", example: 9 },
-            breakApplicable: { type: "boolean", example: false },
-            nightShift: { type: "boolean", example: false },
-            halfDayEndTime: {
-              type: "string",
-              example: "14:30",
-              description: "Saturday half-day end (kept for attendance)",
-            },
-            graceMinutes: { type: "integer", example: 5 },
-            allowEarlyPunchIn: { type: "boolean", example: true },
-            allowLatePunchOut: { type: "boolean", example: true },
-            weeklyOffDays: {
-              type: "array",
-              items: { type: "integer" },
-              example: [0],
-              description: "0=Sun … 6=Sat — default Sunday only",
-            },
-            halfDayDays: {
-              type: "array",
-              items: { type: "integer" },
-              example: [6],
-              description: "Saturday half day ON",
-            },
-            status: { type: "string", enum: ["Active", "Inactive"] },
-            description: { type: "string" },
-          },
-        },
-        ManualAttendanceBody: {
-          type: "object",
-          required: ["employeeId", "punchType", "time", "reason"],
-          properties: {
-            employeeId: {
-              type: "string",
-              example: "665f1a2b3c4d5e6f7a8b9c0d",
-              description: "Target employee MongoDB ObjectId (24 hex)",
-            },
-            punchType: { type: "string", enum: ["in", "out"], example: "in" },
-            time: {
-              type: "string",
-              example: "09:30",
-              description: "HH:mm 24h",
-              pattern: "^([01]\\d|2[0-3]):([0-5]\\d)$",
-            },
-            reason: { type: "string", example: "Forgot to punch" },
-            remarks: { type: "string", example: "Approved by HR" },
           },
         },
         MongoId: {
@@ -875,24 +806,6 @@ module.exports = swaggerJsdoc({
           required: true,
           schema: { $ref: "#/components/schemas/MongoId" },
           description: "Role id (from create / list roles)",
-        },
-        AttendanceDate: {
-          in: "query",
-          name: "date",
-          required: false,
-          schema: { type: "string", format: "date", example: "2026-09-23" },
-          description: "Filter by date YYYY-MM-DD",
-        },
-        AttendanceSource: {
-          in: "query",
-          name: "source",
-          required: false,
-          schema: {
-            type: "string",
-            enum: ["web", "mobile", "biometric", "manual"],
-            example: "web",
-          },
-          description: "Matches punchInSource or punchOutSource",
         },
       },
     },

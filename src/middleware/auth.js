@@ -8,17 +8,13 @@ const User = require("../models/User");
 const Role = require("../models/Role");
 const { readToken } = require("../utils/authCookie");
 const { verifyToken } = require("../utils/jwt");
-
-/** System roles that manage other users, official{}, payroll, approvals */
-const ALL_ACCESS = [
-  "Global Admin",
-  "Super Admin",
-  "HR Manager",
-  "Manager",
-];
-
-/** Gates that include these may also admit custom admin-side roles */
-const DELEGATABLE_ADMIN = ["HR Manager", "Manager"];
+const {
+  ALL_ACCESS,
+  DELEGATABLE_ADMIN,
+  EMPLOYEE,
+  normalizeRoleName,
+  SYSTEM_ROLES,
+} = require("../config/roles");
 
 /** Admin-catalog modules (not ESS Self/Team/Request/Tasks) */
 const ADMIN_ONLY_MODULES = new Set([
@@ -65,17 +61,16 @@ const blockHasGrant = (block) =>
 /**
  * Classify role from name + catalog + stored permissions.
  * catalog (admin|employee) from create wins for custom roles.
- * Module allow/deny is separate — only granted actions pass checkPermission.
  */
 const classifyRoleAccess = (roleName, permissions = [], catalog) => {
-  if (ALL_ACCESS.includes(roleName)) {
+  const role = normalizeRoleName(roleName);
+  if (ALL_ACCESS.includes(role)) {
     return { adminAccess: true, essAccess: false };
   }
-  if (roleName === "Employee") {
+  if (role === EMPLOYEE) {
     return { adminAccess: false, essAccess: true };
   }
 
-  // Custom role: trust catalog chosen at create / last save
   if (catalog === "admin") {
     return { adminAccess: true, essAccess: false };
   }
@@ -83,7 +78,6 @@ const classifyRoleAccess = (roleName, permissions = [], catalog) => {
     return { adminAccess: false, essAccess: true };
   }
 
-  // Legacy roles without catalog — infer from granted modules
   const hasAdmin = (permissions || []).some(
     (p) => ADMIN_ONLY_MODULES.has(p.module) && blockHasGrant(p)
   );
@@ -96,8 +90,10 @@ const classifyRoleAccess = (roleName, permissions = [], catalog) => {
   return { adminAccess: false, essAccess: false };
 };
 
-const isSystemRoleName = (roleName) =>
-  ALL_ACCESS.includes(roleName) || roleName === "Employee";
+const isSystemRoleName = (roleName) => {
+  const role = normalizeRoleName(roleName);
+  return SYSTEM_ROLES.includes(role) || ALL_ACCESS.includes(role);
+};
 
 /** Require login — JWT from cookie or Bearer → req.user */
 const protect = async (req, res, next) => {
@@ -114,14 +110,21 @@ const protect = async (req, res, next) => {
       return res.status(401).json({ message: "User not found or inactive" });
     }
 
-    const roleDoc = await Role.findOne({ name: user.role }).lean();
+    // Normalize legacy role names in-memory for this request
+    const normalized = normalizeRoleName(user.role);
+    if (normalized !== user.role) {
+      user.role = normalized;
+    }
+
+    const roleDoc = await Role.findOne({
+      name: { $in: [user.role, normalized] },
+    }).lean();
     const { adminAccess, essAccess } = classifyRoleAccess(
       user.role,
       roleDoc?.permissions,
       roleDoc?.catalog
     );
 
-    // In-memory flags for authorize / hasAllAccess / profile permission routing
     user.adminAccess = adminAccess;
     user.essAccess = essAccess;
     req.roleDoc = roleDoc || null;
@@ -134,10 +137,6 @@ const protect = async (req, res, next) => {
 
 /**
  * Allow listed system roles, or custom roles on the same side.
- * - Global/Super-only gates stay strict (no custom bypass).
- * - Gates that include HR Manager / Manager also admit custom adminAccess.
- * - Gates that include Employee also admit custom essAccess.
- * Action-level grants still come from checkPermission where used.
  */
 const authorize = (...allowedRoles) => {
   return (req, res, next) => {
@@ -145,25 +144,27 @@ const authorize = (...allowedRoles) => {
       return res.status(401).json({ message: "Please login first" });
     }
 
-    if (allowedRoles.includes(req.user.role)) {
+    const userRole = normalizeRoleName(req.user.role);
+    const allowed = allowedRoles.map(normalizeRoleName);
+
+    if (allowed.includes(userRole)) {
       return next();
     }
 
-    // System roles: exact name only (keeps Manager≠HR create, Super-only deletes, etc.)
-    if (isSystemRoleName(req.user.role)) {
+    if (isSystemRoleName(userRole)) {
       return res.status(403).json({
         message: `Access denied. Allowed roles: ${allowedRoles.join(", ")}`,
       });
     }
 
-    const allowsDelegatedAdmin = allowedRoles.some((r) =>
+    const allowsDelegatedAdmin = allowed.some((r) =>
       DELEGATABLE_ADMIN.includes(r)
     );
     if (allowsDelegatedAdmin && hasAllAccess(req.user)) {
       return next();
     }
 
-    if (allowedRoles.includes("Employee") && req.user.essAccess === true) {
+    if (allowed.includes(EMPLOYEE) && req.user.essAccess === true) {
       return next();
     }
 
@@ -173,14 +174,10 @@ const authorize = (...allowedRoles) => {
   };
 };
 
-/**
- * True for system ALL_ACCESS roles, or custom roles with admin-catalog grants.
- * Uses flag set in protect when present.
- */
 const hasAllAccess = (user) => {
   if (!user) return false;
   if (typeof user.adminAccess === "boolean") return user.adminAccess;
-  return ALL_ACCESS.includes(user.role);
+  return ALL_ACCESS.includes(normalizeRoleName(user.role));
 };
 
 module.exports = {

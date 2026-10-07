@@ -6,13 +6,18 @@
 const User = require("../models/User");
 const Role = require("../models/Role");
 const {
+  companyListForUser,
+  hasGlobalCompanyAccess,
+} = require("../utils/companyScope");
+const {
   countPermissions,
   totalForRole,
   compactPermissions,
   permissionsForRole,
 } = require("../config/permissions");
+const { logEmployeeActivity } = require("../utils/activityLog");
 
-const LOCKED_ROLES = new Set(["Super Admin", "Global Admin"]);
+const LOCKED_ROLES = new Set(["Super Admin", "Admin"]);
 
 const permLabel = (roleDoc) => {
   if (!roleDoc) return "0 of 0";
@@ -34,9 +39,13 @@ async function refreshLockedRole(roleDoc) {
 }
 
 /** Shape matching My Profile UI cards */
-const toProfilePayload = (user, roleDoc) => {
+const toProfilePayload = async (user, roleDoc) => {
   const official = user.official || {};
   const personal = user.personal || {};
+  const companies = (await companyListForUser(user)).map((row) => ({
+    _id: row.companyId,
+    companyName: row.companyName,
+  }));
   return {
     id: user._id,
     fullName: user.name || "",
@@ -44,7 +53,8 @@ const toProfilePayload = (user, roleDoc) => {
     workEmail: official.officialEmail || "",
     officialEmail: official.officialEmail || "",
     role: user.role || "",
-    company: official.company || "",
+    allCompanies: hasGlobalCompanyAccess(user),
+    companies,
     department: official.department || "",
     designation: official.designation || "",
     employeeCode: official.employeeCode || "",
@@ -76,7 +86,7 @@ const getMyProfile = async (req, res) => {
 
     return res.json({
       message: "My Profile",
-      data: toProfilePayload(user, roleDoc),
+      data: await toProfilePayload(user, roleDoc),
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -93,6 +103,7 @@ const updateMyProfile = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
+    const before = user.toObject(); // snapshot for activity log diff
 
     if (req.body.name !== undefined) {
       const name = String(req.body.name || "").trim();
@@ -107,6 +118,7 @@ const updateMyProfile = async (req, res) => {
     }
 
     await user.save();
+    await logEmployeeActivity({ actor: req.user, employee: user, action: "update", before });
 
     const roleDoc = await Role.findOne({ name: user.role }).lean();
     const lean = user.toObject();
@@ -114,7 +126,7 @@ const updateMyProfile = async (req, res) => {
 
     return res.json({
       message: "Profile updated",
-      data: toProfilePayload(lean, roleDoc),
+      data: await toProfilePayload(lean, roleDoc),
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -132,7 +144,7 @@ const getMe = async (req, res) => {
     }
     let roleDoc = await Role.findOne({ name: user.role });
     roleDoc = await refreshLockedRole(roleDoc);
-    const profile = toProfilePayload(user, roleDoc);
+    const profile = await toProfilePayload(user, roleDoc);
 
     return res.json({
       message: "OK",

@@ -16,19 +16,20 @@ const chalk = require("chalk");
 const swaggerUi = require("swagger-ui-express");
 const connectDB = require("./config/db");
 const swaggerSpec = require("./swagger");
+const { PORT, API_BASE_URL, NODE_ENV } = require("./config/env");
 
+const healthRoutes = require("./routes/health.routes");
 const authRoutes = require("./routes/auth.routes");
+const accountRoutes = require("./routes/account.routes");
 const roleRoutes = require("./routes/role.routes");
+const hierarchyRoutes = require("./routes/hierarchy.routes");
+const permissionRoutes = require("./routes/permission.routes");
 const employeeRoutes = require("./routes/employee.routes");
 const accessControlRoutes = require("./routes/accessControl.routes");
 const attendanceRoutes = require("./routes/attendance.routes");
-const shiftRoutes = require("./routes/shift.routes");
-const timesheetRoutes = require("./routes/timesheet.routes");
-const holidayRoutes = require("./routes/holiday.routes");
-const weeklyOffRoutes = require("./routes/weeklyOff.routes");
 const mailRoutes = require("./routes/mail.routes");
 const masterRoutes = require("./routes/master.routes");
-const healthRoutes = require("./routes/health.routes");
+const companyRoutes = require("./routes/company.routes");
 
 const app = express();
 
@@ -99,15 +100,15 @@ const maxRequests = Number(process.env.RATE_LIMIT_MAX) || 200; // all APIs
 const loginMax = Number(process.env.RATE_LIMIT_LOGIN_MAX) || 20; // login only
 
 /** Global limiter — almost every request (health, employees, …) */
-const globalLimiter = rateLimit({
-  windowMs, // time window (ms)
-  max: maxRequests, // max hits per IP in that window
-  standardHeaders: true, // RateLimit-* headers (remaining count)
-  legacyHeaders: false, // disable legacy X-RateLimit-* headers
-  message: {
-    message: "Too many requests from this IP. Please try again later.",
-  },
-});
+// const globalLimiter = rateLimit({
+//   windowMs, // time window (ms)
+//   max: maxRequests, // max hits per IP in that window
+//   standardHeaders: true, // RateLimit-* headers (remaining count)
+//   legacyHeaders: false, // disable legacy X-RateLimit-* headers
+//   message: {
+//     message: "Too many requests from this IP. Please try again later.",
+//   },
+// });
 
 /** Stricter limiter for POST /api/auth/login */
 const loginLimiter = rateLimit({
@@ -121,7 +122,7 @@ const loginLimiter = rateLimit({
 });
 
 // Apply global limit first (every route after this counts toward the max)
-app.use(globalLimiter);
+// app.use(globalLimiter);
 
 // DOCS / HOME / API ROUTE MOUNTS
 
@@ -155,23 +156,18 @@ app.get("/", (req, res) => {
 app.use("/api/health", healthRoutes); // public health check (API + MongoDB)
 app.use("/api/auth/login", loginLimiter); // count login attempts (max 20 / window)
 app.use("/api/auth", authRoutes); // login / logout
-app.use("/api/account", require("./routes/account.routes")); // My Profile (admin + ESS)
+app.use("/api/account", accountRoutes); // My Profile (admin + ESS)
 app.use("/api/roles", roleRoutes); // role CRUD + permission matrix
-app.use("/api/permissions", require("./routes/permission.routes")); // catalogs + my permissions
+app.use("/api/hierarchy", hierarchyRoutes); // org hierarchy tree
+app.use("/api/permissions", permissionRoutes); // catalogs + my permissions
 app.use("/api/employees", employeeRoutes); // employees only (role = Employee)
 app.use("/api/users", accessControlRoutes); // Access & Control (any role)
-app.use("/api/attendance", attendanceRoutes); // punch in/out + geo + regularize
-app.use("/api/shifts", shiftRoutes); // shift master + assignments
-app.use("/api/timesheet", timesheetRoutes); // employee time sheet
-app.use("/api/reports/attendance", require("./routes/attendanceReport.routes")); // Attendance Reports
-app.use("/api/holidays", holidayRoutes); // Holiday Calendar
-app.use("/api/weekly-offs", weeklyOffRoutes); // Weekly Off policies
+app.use("/api/attendance", attendanceRoutes); // self punch in/out + today + my punches
 app.use("/api/mail", mailRoutes); // Organization → Mail send
-app.use("/api/masters", masterRoutes); // SaaS masters (typed collections)
+app.use("/api/masters", masterRoutes); // SaaS masters (typed collections, including Branch + Shift)
+app.use("/api/companies", companyRoutes); // Company CRUD
 
 // START SERVER (colored chalk banners)
-
-const { PORT, API_BASE_URL, NODE_ENV } = require("./config/env");
 
 connectDB().then(() => {
   app.listen(PORT, () => {

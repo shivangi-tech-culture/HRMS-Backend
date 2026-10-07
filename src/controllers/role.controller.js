@@ -1,6 +1,6 @@
 /**
  * ROLE CONTROLLER — /api/roles
- * Role CRUD + permission matrix. Super Admin / Global Admin stay full access.
+ * Role CRUD + permission matrix. Hierarchy: src/config/roles.js
  */
 const Role = require("../models/Role");
 const User = require("../models/User");
@@ -14,9 +14,19 @@ const {
   normalizePermissions,
   compactPermissions,
 } = require("../config/permissions");
-
-const SUPER_ADMIN = "Super Admin";
-const GLOBAL_ADMIN = "Global Admin";
+const {
+  SUPER_ADMIN,
+  ADMIN,
+  EMPLOYEE,
+  SYSTEM_ROLES,
+  LOCKED_ROLES,
+  ROLE_DESCRIPTIONS,
+  maxSuperAdmins,
+  normalizeRoleName,
+  isSuperAdmin,
+  isLockedRoleName,
+  canManageRole,
+} = require("../config/roles");
 
 /** Pick catalog tree for normalize — admin OR employee only */
 const treeForCatalog = (catalog) => {
@@ -24,28 +34,15 @@ const treeForCatalog = (catalog) => {
   return ADMIN_TREE;
 };
 
-/**
- * Normalize against catalog, then keep only modules/actions that are true.
- * DB stores what the role can do — UI/routes see only those grants.
- */
 const grantedPermissions = (incoming, tree) =>
   compactPermissions(normalizePermissions(incoming, tree));
 
-/** True if this is the Global Admin system role (string name or role doc) */
-const isGlobalAdminRole = (role) =>
-  (typeof role === "string" ? role : role?.name) === GLOBAL_ADMIN;
-
-/** Super Admin and Global Admin cannot be edited or deleted */
 const isLockedRole = (role) =>
-  role.name === SUPER_ADMIN || role.name === GLOBAL_ADMIN;
+  isLockedRoleName(typeof role === "string" ? role : role?.name);
 
-/** Soft cap for Global Admin user accounts (env MAX_GLOBAL_ADMINS, default 5) */
-const maxGlobalAdmins = () => {
-  const n = Number(process.env.MAX_GLOBAL_ADMINS);
-  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 5;
-};
+/** @deprecated use maxSuperAdmins — kept for any old imports */
+const maxGlobalAdmins = () => maxSuperAdmins();
 
-/** Locked roles always keep the full admin permission matrix (from permissions.js) */
 async function forceFullAdminAccess(role) {
   const full = permissionsForRole(role.name);
   const stale =
@@ -58,12 +55,8 @@ async function forceFullAdminAccess(role) {
   return role;
 }
 
-/**
- * Catalog added Access & Control → create; older matrices had create:false.
- * If the role can already manage users (view+edit+delete), grant create once.
- */
 async function grantAccessControlCreate(role) {
-  if (!role || role.name === "Employee") return role;
+  if (!role || role.name === EMPLOYEE) return role;
   let changed = false;
   for (const block of role.permissions || []) {
     if (block.module !== "Administration") continue;
@@ -82,27 +75,88 @@ async function grantAccessControlCreate(role) {
   return role;
 }
 
-/** Short label like "42 of 120" (granted true actions / catalog max) */
 const permLabel = (role) =>
   `${countPermissions(role.permissions)} of ${totalForRole(role.name, role.catalog)}`;
 
 /**
- * CREATE — POST /api/roles
- *
- * Body: { name, catalog, permissions, description?, status? }
- * catalog: admin | employee (required — one side only)
- * permissions: required — decide matrix at create; only granted flags are stored.
- * Cannot create a role named "Global Admin" (system role only).
+ * Hierarchy overview — GET /api/roles/hierarchy
+ * Easy-to-read role ladder for UI / docs.
  */
+const getHierarchy = async (_req, res) => {
+  try {
+    const ladder = [
+      {
+        rank: 1,
+        role: SUPER_ADMIN,
+        maxUsers: maxSuperAdmins(),
+        companyAccess: "All companies",
+        canCreate: [ADMIN, "HR Manager", "Reporting Manager", EMPLOYEE],
+        notes: ROLE_DESCRIPTIONS[SUPER_ADMIN],
+      },
+      {
+        rank: 2,
+        role: ADMIN,
+        maxUsers: "unlimited",
+        companyAccess: "All companies",
+        canCreate: ["HR Manager", "Reporting Manager", EMPLOYEE],
+        notes: ROLE_DESCRIPTIONS[ADMIN],
+      },
+      {
+        rank: 3,
+        role: "HR Manager",
+        maxUsers: "unlimited",
+        companyAccess: "Assigned companies (Super Admin sets official.companyIds)",
+        canCreate: [EMPLOYEE],
+        notes: ROLE_DESCRIPTIONS["HR Manager"],
+      },
+      {
+        rank: 4,
+        role: "Reporting Manager",
+        maxUsers: "unlimited",
+        companyAccess: "Own team only — employees assigned via reportingHead1 / reportingHead2 (any company)",
+        canCreate: [],
+        notes: ROLE_DESCRIPTIONS["Reporting Manager"],
+      },
+      {
+        rank: 5,
+        role: EMPLOYEE,
+        maxUsers: "unlimited",
+        companyAccess: "Own company — self ESS only",
+        canCreate: [],
+        notes: ROLE_DESCRIPTIONS[EMPLOYEE],
+      },
+    ];
+
+    const counts = {};
+    for (const name of SYSTEM_ROLES) {
+      counts[name] = await User.countDocuments({ role: name });
+    }
+
+    return res.json({
+      message: "Role hierarchy",
+      removed: ["Global Admin"],
+      legacyAliases: {
+        "Global Admin": SUPER_ADMIN,
+        Manager: "Reporting Manager",
+        HR: "HR Manager",
+      },
+      hierarchy: ladder,
+      userCounts: counts,
+    });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
 const createRole = async (req, res) => {
   try {
-    const { name, description, status, catalog, permissions } = req.body;
+    const { name, description, status, permissions } = req.body;
     const roleName = name.trim();
+    const normalized = normalizeRoleName(roleName);
 
-    if (roleName === GLOBAL_ADMIN) {
+    if (SYSTEM_ROLES.includes(normalized) || roleName === "Global Admin") {
       return res.status(403).json({
-        message:
-          "Global Admin is a system role. Create Global Admin users via POST /api/users (Global Admin only).",
+        message: `"${roleName}" is a system role. Create users via Access & Control (POST /api/users).`,
       });
     }
 
@@ -111,14 +165,15 @@ const createRole = async (req, res) => {
       return res.status(400).json({ message: "Role name already exists" });
     }
 
-    const cat = roleName === "Employee" ? "employee" : catalog;
-    const tree = treeForCatalog(cat);
+    // Create Role UI always uses ADMIN permission tree (hide/show modules)
+    const cat = "admin";
+    const tree = ADMIN_TREE;
     const perms = grantedPermissions(permissions, tree);
 
     if (!perms.length) {
       return res.status(400).json({
         message:
-          "permissions must grant at least one action (all false / empty is not allowed)",
+          "permissions must grant at least one action (hide unused modules; keep at least one true)",
       });
     }
 
@@ -131,7 +186,7 @@ const createRole = async (req, res) => {
     });
 
     return res.status(201).json({
-      message: "Role created",
+      message: "Role created (admin permissions)",
       role: {
         id: role._id,
         name: role.name,
@@ -147,20 +202,12 @@ const createRole = async (req, res) => {
   }
 };
 
-/**
- * LIST — GET /api/roles
- *
- * Auth: logged in + Roles & Permissions → view
- *
- * Global Admin actor → sees Global Admin in the list (can assign more owners).
- * Everyone else → Global Admin role is hidden (cannot escalate).
- */
 const listRoles = async (req, res) => {
   try {
-    const filter =
-      req.user?.role === GLOBAL_ADMIN
-        ? {}
-        : { name: { $ne: GLOBAL_ADMIN } };
+    // Hide Super Admin role from Admin actors (cannot escalate)
+    const filter = isSuperAdmin(req.user)
+      ? {}
+      : { name: { $nin: [SUPER_ADMIN, "Global Admin"] } };
 
     const roles = await Role.find(filter).sort({ createdAt: 1 });
 
@@ -174,9 +221,10 @@ const listRoles = async (req, res) => {
         status: role.status,
         catalog:
           role.catalog ||
-          (role.name === "Employee" ? "employee" : "admin"),
+          (role.name === EMPLOYEE ? "employee" : "admin"),
         users,
         permissions: permLabel(role),
+        locked: isLockedRole(role),
       });
     }
 
@@ -186,19 +234,16 @@ const listRoles = async (req, res) => {
   }
 };
 
-/**
- * GET ONE — GET /api/roles/:id
- *
- * Auth: logged in + Roles & Permissions → view
- * Non–Global Admin callers get 404 for the Global Admin role (hidden).
- */
 const getRole = async (req, res) => {
   try {
     const role = await Role.findById(req.params.id);
     if (!role) {
       return res.status(404).json({ message: "Role not found" });
     }
-    if (isGlobalAdminRole(role) && req.user?.role !== GLOBAL_ADMIN) {
+    if (
+      normalizeRoleName(role.name) === SUPER_ADMIN &&
+      !isSuperAdmin(req.user)
+    ) {
       return res.status(404).json({ message: "Role not found" });
     }
 
@@ -211,10 +256,11 @@ const getRole = async (req, res) => {
         status: role.status,
         catalog:
           role.catalog ||
-          (role.name === "Employee" ? "employee" : "admin"),
+          (role.name === EMPLOYEE ? "employee" : "admin"),
         users,
         permissions: role.permissions,
         permissionCount: permLabel(role),
+        locked: isLockedRole(role),
       },
     });
   } catch (err) {
@@ -222,14 +268,6 @@ const getRole = async (req, res) => {
   }
 };
 
-/**
- * UPDATE — PUT /api/roles/:id
- *
- * Body: { description?, status? } — name never changes
- * Auth: typically admin (exported helper; check role.routes.js if mounted)
- *
- * Super Admin / Global Admin roles are blocked from editing.
- */
 const updateRole = async (req, res) => {
   try {
     const role = await Role.findById(req.params.id);
@@ -253,14 +291,6 @@ const updateRole = async (req, res) => {
   }
 };
 
-/**
- * DELETE — DELETE /api/roles/:id
- *
- * Auth: Global Admin or Super Admin + Roles & Permissions → delete
- *
- * Locked roles (Super Admin / Global Admin) cannot be deleted.
- * Other roles delete only when no user still has that role.
- */
 const deleteRole = async (req, res) => {
   try {
     const role = await Role.findById(req.params.id);
@@ -276,7 +306,9 @@ const deleteRole = async (req, res) => {
 
     const users = await User.countDocuments({ role: role.name });
     if (users > 0) {
-      return res.status(400).json({ message: "Cannot delete. Users are using this role." });
+      return res
+        .status(400)
+        .json({ message: "Cannot delete. Users are using this role." });
     }
 
     await role.deleteOne();
@@ -300,7 +332,10 @@ const getPermissions = async (req, res) => {
     if (!role) {
       return res.status(404).json({ message: "Role not found" });
     }
-    if (isGlobalAdminRole(role) && req.user?.role !== GLOBAL_ADMIN) {
+    if (
+      normalizeRoleName(role.name) === SUPER_ADMIN &&
+      !isSuperAdmin(req.user)
+    ) {
       return res.status(404).json({ message: "Role not found" });
     }
 
@@ -317,7 +352,7 @@ const getPermissions = async (req, res) => {
       roleName: role.name,
       catalog:
         role.catalog ||
-        (role.name === "Employee" ? "employee" : "admin"),
+        (role.name === EMPLOYEE ? "employee" : "admin"),
       title: `${role.name} permissions`,
       structure: "module + heading + subModules[]",
       totalNodes: ALL_SUBS.length,
@@ -332,11 +367,8 @@ const getPermissions = async (req, res) => {
 
 /**
  * SAVE PERMISSIONS — PUT /api/roles/:id/permissions
- *
- * Body: { permissions, catalog? }
- * Employee → ESS. Super Admin / Global Admin locked.
- * Custom / HR / Manager → admin catalog (or body.catalog).
- * Only granted (true) modules/actions are stored — hide = omit / all false.
+ * Custom roles + HR / Reporting Manager → always admin catalog (hide/show).
+ * System Employee → ESS only. Super Admin / Admin locked.
  */
 const savePermissions = async (req, res) => {
   try {
@@ -344,7 +376,10 @@ const savePermissions = async (req, res) => {
     if (!role) {
       return res.status(404).json({ message: "Role not found" });
     }
-    if (isGlobalAdminRole(role) && req.user?.role !== GLOBAL_ADMIN) {
+    if (
+      normalizeRoleName(role.name) === SUPER_ADMIN &&
+      !isSuperAdmin(req.user)
+    ) {
       return res.status(404).json({ message: "Role not found" });
     }
 
@@ -356,17 +391,12 @@ const savePermissions = async (req, res) => {
     }
 
     let tree;
-    let catalog = role.catalog;
-    if (role.name === "Employee") {
+    let catalog;
+    if (role.name === EMPLOYEE) {
       tree = ESS_TREE;
       catalog = "employee";
-    } else if (req.body.catalog) {
-      tree = treeForCatalog(req.body.catalog);
-      catalog = req.body.catalog;
-    } else if (role.catalog) {
-      tree = treeForCatalog(role.catalog);
     } else {
-      // HR Manager, Manager, legacy custom — default admin catalog
+      // Always admin matrix for create/edit role hide-show
       tree = ADMIN_TREE;
       catalog = "admin";
     }
@@ -375,7 +405,7 @@ const savePermissions = async (req, res) => {
     if (!perms.length) {
       return res.status(400).json({
         message:
-          "permissions must grant at least one action (all false / empty is not allowed)",
+          "permissions must grant at least one action (hide unused; keep at least one true)",
       });
     }
 
@@ -403,5 +433,8 @@ module.exports = {
   deleteRole,
   getPermissions,
   savePermissions,
+  getHierarchy,
   maxGlobalAdmins,
+  maxSuperAdmins,
+  canManageRole,
 };

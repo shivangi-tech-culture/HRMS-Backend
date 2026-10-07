@@ -12,9 +12,13 @@ const {
   permissionsForRole,
 } = require("../config/permissions");
 const { setAuthCookie, clearAuthCookie } = require("../utils/authCookie");
+const {
+  companyListForUser,
+  hasGlobalCompanyAccess,
+} = require("../utils/companyScope");
 const { signToken } = require("../utils/jwt");
 
-const LOCKED_ROLES = new Set(["Super Admin", "Global Admin"]);
+const LOCKED_ROLES = new Set(["Super Admin", "Admin"]);
 
 /** Build a short label like "42 of 120" for the UI */
 const permLabel = (roleDoc) => {
@@ -22,7 +26,7 @@ const permLabel = (roleDoc) => {
   return `${countPermissions(roleDoc.permissions)} of ${totalForRole(roleDoc.name)}`;
 };
 
-/** Keep Super / Global Admin matrix in sync with permissions.js catalog */
+/** Keep Super Admin / Admin matrix in sync with permissions.js catalog */
 async function refreshLockedRole(roleDoc) {
   if (!roleDoc || !LOCKED_ROLES.has(roleDoc.name)) return roleDoc;
   const full = permissionsForRole(roleDoc.name);
@@ -66,6 +70,11 @@ const login = async (req, res) => {
     const token = signToken(user._id);
     setAuthCookie(res, token);
 
+    const companies = (await companyListForUser(user)).map((row) => ({
+      _id: row.companyId,
+      companyName: row.companyName,
+    }));
+
     return res.json({
       message: "Login successful",
       token, // optional: cookie is primary; Bearer still works for Swagger
@@ -75,7 +84,8 @@ const login = async (req, res) => {
         officialEmail: user.official?.officialEmail || "",
         role: user.role,
         department: user.official?.department || "",
-        company: user.official?.company || "",
+        allCompanies: hasGlobalCompanyAccess(user),
+        companies,
         status: user.status,
         lastLogin: user.lastLogin,
         permissionCount: permLabel(roleDoc),

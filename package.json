@@ -1,15 +1,14 @@
 {
   "name": "hrms-api",
   "version": "1.0.0",
-  "description": "HRMS API - Auth, Employees, Shifts, Punch In/Out (geo), Timesheet, Regularization",
+  "description": "HRMS API - Auth, Employees, Punch In/Out (geo), Timesheet, Regularization",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon --watch src src/server.js",
     "seed": "node src/seed.js",
-    "seed:shifts": "node src/scripts/seedShifts.js",
-    "seed:attendance-reasons": "node src/scripts/seedAttendanceReasonMasters.js",
-    "sync:admin-perms": "node src/scripts/syncAdminRolePermissions.js"
+    "seed:masters": "node src/scripts/seedMasters.js",
+    "backfill:activity": "node src/scripts/backfillActivityCompanies.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

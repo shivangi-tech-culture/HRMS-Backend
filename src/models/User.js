@@ -33,7 +33,8 @@ const userSchema = new mongoose.Schema(
     password: { type: String, default: "" },
     /**
      * Access role string (must match Role.name / authorize lists).
-     * Typical: Global Admin | Super Admin | HR Manager | Manager | Employee
+     * Hierarchy: Super Admin | Admin | HR Manager | Reporting Manager | Employee
+     * (see src/config/roles.js)
      */
     role: {
       type: String,
@@ -103,10 +104,18 @@ const userSchema = new mongoose.Schema(
         trim: true,
       },
       /**
-       * Company name string (matches Master type=company `name`).
-       * Used by companyScope for tenant isolation.
+       * Company _ids (Employee / RM: one. HR: one or more).
+       * Catalog of branches/shifts is on Company — GET /api/companies/:id.
+       * This user's workplace is official.branchId + official.shiftId (not the whole tree).
        */
-      company: { type: String, default: "TechCulture.Ai Private Limited" },
+      companyIds: {
+        type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Company" }],
+        default: undefined,
+      },
+      /** Branch master _id — must be one of the company's branches */
+      branchId: { type: mongoose.Schema.Types.ObjectId, default: null },
+      /** Shift master _id — must be on that branch. Days stay on Company. */
+      shiftId: { type: mongoose.Schema.Types.ObjectId, default: null },
       /** Department name from masters (string, not ObjectId) */
       department: { type: String, default: "" },
       /** Designation name from masters */
@@ -115,10 +124,18 @@ const userSchema = new mongoose.Schema(
       division: { type: String, default: "" },
       /** Employee group name from masters */
       employeeGroup: { type: String, default: "" },
-      /** Primary reporting manager (display / email / name as stored by UI) */
-      reportingHead1: { type: String, default: "" },
-      /** Secondary reporting manager */
-      reportingHead2: { type: String, default: "" },
+      /** Primary reporting manager (User _id, role Reporting Manager). Assigned manually. */
+      reportingHead1: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        default: null,
+      },
+      /** Secondary reporting manager (User _id) */
+      reportingHead2: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        default: null,
+      },
       jobRole: { type: String, default: "" },
       /** Joining date — also drives personal.anniversaryDate */
       dateOfJoining: { type: Date, default: null },
@@ -126,16 +143,6 @@ const userSchema = new mongoose.Schema(
       calculateSalaryFrom: { type: Date, default: null },
       dateOfRetirement: { type: Date, default: null },
       grade: { type: String, default: "" },
-      /**
-       * Assigned work shift (Master Shift).
-       * Set on employee create/update by Global Admin / Super Admin / HR Manager only.
-       * Employees cannot edit this field.
-       */
-      shift: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Shift",
-        default: null,
-      },
     },
     // 3. OTHER — extra personal details
 
@@ -307,6 +314,10 @@ userSchema.index(...uniquePartial("personal.panNo"));
 userSchema.index(...uniquePartial("personal.aadhaarNo"));
 userSchema.index(...uniquePartial("personal.drivingLicenseNo"));
 userSchema.index(...uniquePartial("personal.passportNo"));
+userSchema.index({ "official.branchId": 1 });
+userSchema.index({ "official.shiftId": 1 });
+userSchema.index({ "official.reportingHead1": 1 });
+userSchema.index({ "official.reportingHead2": 1 });
 
 /** Mongoose model: User — used by auth, employees, attendance, seed, etc. */
 module.exports = mongoose.model("User", userSchema);

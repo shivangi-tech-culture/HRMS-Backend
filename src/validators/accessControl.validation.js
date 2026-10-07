@@ -1,6 +1,6 @@
 /**
  * ACCESS & CONTROL VALIDATION (Joi) — /api/users
- * Lean create / update — UI drawer fields only.
+ * Hierarchy: Super Admin → Admin → HR Manager / Reporting Manager → Employee
  */
 const Joi = require("joi");
 
@@ -15,25 +15,28 @@ const phoneOpt = () =>
 
 const only = (keys) => Joi.object(keys).unknown(false);
 
-const officialGlobalAdmin = only({
+const companyObjectId = Joi.string().hex().length(24);
+const companyIdsField = Joi.array().items(companyObjectId).min(1).max(50);
+
+/** Super Admin / Admin — lean platform account */
+const officialPlatform = only({
   officialEmail: Joi.string().trim().email().required(),
   employeeCode: Joi.string().trim().uppercase().allow("").optional(),
-  company: Joi.string().trim().allow("").optional(),
   department: Joi.string().trim().allow("").optional(),
 });
 
-const officialSuperAdmin = only({
+/**
+ * HR / Reporting Manager / Employee.
+ * Everyone sends official.companyIds.
+ * Employee and Reporting Manager: exactly one id. HR: one or more.
+ */
+const officialStaff = only({
   officialEmail: Joi.string().trim().email().required(),
   employeeCode: Joi.string().trim().uppercase().allow("").optional(),
-  company: Joi.string().trim().min(2).allow("").optional(),
+  companyIds: companyIdsField.optional(),
   department: Joi.string().trim().allow("").optional(),
-});
-
-const officialAccessStaff = only({
-  officialEmail: Joi.string().trim().email().required(),
-  employeeCode: Joi.string().trim().uppercase().allow("").optional(),
-  company: Joi.string().trim().min(2).required(),
-  department: Joi.string().trim().allow("").optional(),
+  branchId: Joi.string().hex().length(24).allow("", null).optional(),
+  shiftId: Joi.string().hex().length(24).allow("", null).optional(),
 });
 
 const personalAccessLean = only({
@@ -45,28 +48,19 @@ const personalAccessLean = only({
   }).optional(),
 });
 
-/** CREATE — POST /api/users */
 const createAccessUserSchema = Joi.object({
   name: Joi.string().trim().min(2).max(100).required(),
   password: Joi.string().min(6).max(50).required(),
   role: Joi.string().trim().required(),
   status: Joi.string().valid("Active", "Inactive").default("Active"),
   official: Joi.when("role", {
-    is: "Global Admin",
-    then: officialGlobalAdmin.required(),
-    otherwise: Joi.when("role", {
-      is: "Super Admin",
-      then: officialSuperAdmin.required(),
-      otherwise: officialAccessStaff.required(),
-    }),
+    is: Joi.valid("Super Admin", "Admin"),
+    then: officialPlatform.required(),
+    otherwise: officialStaff.required(),
   }),
   personal: personalAccessLean.optional(),
 }).unknown(false);
 
-/**
- * UPDATE — PUT /api/users/:id
- * Email + company immutable (not in schema).
- */
 const updateAccessUserSchema = Joi.object({
   name: Joi.string().trim().min(2).max(100).optional(),
   password: Joi.string().min(6).max(50).allow("").optional(),
@@ -75,13 +69,15 @@ const updateAccessUserSchema = Joi.object({
   official: only({
     employeeCode: Joi.string().trim().uppercase().allow("").optional(),
     department: str(),
+    companyIds: companyIdsField.optional(),
+    branchId: Joi.string().hex().length(24).allow("", null).optional(),
+    shiftId: Joi.string().hex().length(24).allow("", null).optional(),
   }).optional(),
   personal: personalAccessLean.optional(),
 })
   .min(1)
   .unknown(false);
 
-/** SEND MAIL — POST /api/users/:id/mail (row mail icon) */
 const accessSendMailSchema = Joi.object({
   subject: Joi.string().trim().min(1).max(200).required(),
   body: Joi.string().trim().min(1).max(20000).required(),

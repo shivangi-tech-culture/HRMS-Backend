@@ -45,16 +45,17 @@ const permissionBlockSchema = Joi.object({
 });
 
 /**
- * CREATE ROLE body — permissions decided at create (required).
- * Pick one catalog: admin OR employee (not both).
+ * CREATE ROLE body — always admin catalog.
+ * UI: load admin modules → hide/show (omit or all-false) → POST.
+ * `catalog` optional (forced to admin server-side).
  */
 const createRoleSchema = Joi.object({
   name: Joi.string().trim().min(2).max(100).required(),
   description: Joi.string().trim().allow("").default(""),
   status: Joi.string().valid("Active", "Inactive").default("Active"),
-  /** Which master tree to validate against — one side only */
-  catalog: Joi.string().valid("admin", "employee").required(),
-  /** Required: modules/actions for this role (hide unused = omit or all false) */
+  /** Ignored if sent — Create Role always uses admin tree */
+  catalog: Joi.string().valid("admin").optional().default("admin"),
+  /** Required: admin modules/actions (hide = omit or all false) */
   permissions: Joi.array().items(permissionBlockSchema).min(1).required(),
 });
 
@@ -70,11 +71,12 @@ const updateRoleSchema = Joi.object({
 }).min(1);
 
 /**
- * SAVE PERMISSIONS body — hide/show modules within the chosen catalog
+ * SAVE PERMISSIONS body — hide/show within admin catalog (custom roles).
+ * System Employee role keeps ESS; catalog forced admin for all others.
  */
 const savePermissionsSchema = Joi.object({
   permissions: Joi.array().items(permissionBlockSchema).min(1).required(),
-  /** admin | employee — required for custom roles when re-saving matrix */
+  /** Optional — ignored for custom roles (always admin). Employee system role uses employee. */
   catalog: Joi.string().valid("admin", "employee").optional(),
 });
 

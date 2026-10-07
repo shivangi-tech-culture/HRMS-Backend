@@ -93,23 +93,27 @@ const personalItem = only({
  * official{} — work email, company, department, reporting heads, etc.
  * Login email is official.officialEmail
  */
+const companyObjectId = Joi.string().hex().length(24);
+
 const officialItem = only({
   employeeCode: Joi.string().trim().uppercase().allow("").optional(),
   officialEmail: emailOpt(),
-  company: str(),
+  /** One id for Employee / Reporting Manager. One or more for HR. */
+  companyIds: Joi.array().items(companyObjectId).min(1).max(50).optional(),
   department: str(),
   designation: str(),
   division: str(),
   employeeGroup: str(),
-  reportingHead1: str(),
-  reportingHead2: str(),
+  branchId: Joi.string().hex().length(24).allow("", null).optional(),
+  shiftId: Joi.string().hex().length(24).allow("", null).optional(),
+  /** Reporting Manager User _id ("" or null clears) */
+  reportingHead1: Joi.string().hex().length(24).allow("", null).optional(),
+  reportingHead2: Joi.string().hex().length(24).allow("", null).optional(),
   jobRole: str(),
   dateOfJoining: date(),
   calculateSalaryFrom: date(),
   dateOfRetirement: date(),
   grade: str(),
-  /** Master Shift _id — HR / Super Admin / Global Admin only */
-  shift: Joi.string().hex().length(24).allow(null, "").optional(),
 });
 
 /** other{} — blood group and passport expiry */
@@ -256,7 +260,7 @@ const createEmployeeSchema = Joi.object({
     .keys({
       officialEmail: Joi.string().trim().email().required(),
       employeeCode: Joi.string().trim().uppercase().min(2).required(),
-      company: Joi.string().trim().min(2).required(),
+      companyIds: Joi.array().items(companyObjectId).length(1).required(),
       department: Joi.string().trim().allow("").optional(),
     })
     .required(),
@@ -281,10 +285,10 @@ const listOrOne = (item) =>
 
 /**
  * UPDATE EMPLOYEE / profile — PUT /api/employees/:id
- * official.officialEmail and official.company are immutable (forbidden here).
+ * official.officialEmail and official.companyIds are immutable (forbidden here).
  */
 const officialUpdateItem = officialItem.fork(
-  ["officialEmail", "company"],
+  ["officialEmail", "companyIds"],
   (schema) => schema.forbidden()
 );
 

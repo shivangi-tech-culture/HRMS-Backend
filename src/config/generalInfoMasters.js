@@ -5,8 +5,6 @@
  * Admin can add more later via POST /api/masters.
  * Vaccination module exists in UI but is not seeded / not supported here.
  */
-const { DEFAULT_COMPANY } = require("../utils/companyScope");
-
 /** Exact option lists from frontend chunk (as-is casing/spelling) */
 const UI_DROPDOWNS = {
   courseType: ["Full Time", "Part Time", "Distance", "Online"],
@@ -38,18 +36,6 @@ const UI_DROPDOWNS = {
     "Other",
   ],
   nominateFor: ["PF", "FNF", "Gratuity", "GTLI", "GPA", "GHI"],
-  country: [
-    "India",
-    "United States",
-    "United Kingdom",
-    "United Arab Emirates",
-    "Singapore",
-    "Germany",
-    "Canada",
-    "Australia",
-    "Japan",
-    "Saudi Arabia",
-  ],
   visaType: [
     "Employment Visa",
     "Business Visa",
@@ -80,12 +66,18 @@ const OFFICIAL_DROPDOWNS = {
   employeeGroup: ["Permanent", "Contract"],
   grade: ["G1", "G2", "G3", "G4", "G5"],
   jobRole: ["Executive", "Manager", "Intern", "Consultant"],
+  branch: [
+    { name: "Noida", code: "NOIDA" },
+    { name: "Delhi", code: "DEL" },
+  ],
+  shift: [
+    { name: "General Shift", code: "GS-01" },
+    { name: "Evening Shift", code: "ES-01" },
+  ],
 };
 
 /**
- * Attendance UI reason dropdowns (separate masters)
- * Regularization: /attendance/regularization
- * Mark Attendance: Daily Attendance → Mark Attendance modal
+ * Attendance reason dropdowns (separate masters, seeded only)
  */
 const ATTENDANCE_DROPDOWNS = {
   regularizationReason: [
@@ -106,15 +98,17 @@ const ATTENDANCE_DROPDOWNS = {
 };
 
 /**
- * Flatten to seed rows: { type, name, company? }
- * company type has no company field.
+ * Flatten to seed rows: { type, name, code }
+ * Entries are a name string or { name, code }.
+ * Masters are GLOBAL. Company is not a master — org companies are /api/companies.
  */
-const buildMasterSeedRows = (company = DEFAULT_COMPANY) => {
-  const rows = [{ type: "company", name: company }];
+const buildMasterSeedRows = () => {
+  const rows = [];
 
-  const add = (type, names) => {
-    for (const name of names) {
-      rows.push({ type, name, company });
+  const add = (type, entries) => {
+    for (const entry of entries) {
+      const { name, code = "" } = typeof entry === "string" ? { name: entry } : entry;
+      rows.push({ type, name, code });
     }
   };
 

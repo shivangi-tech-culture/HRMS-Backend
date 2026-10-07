@@ -29,11 +29,11 @@ const router = express.Router();
  *       `permissions` = only **true** actions (false keys omitted).
  *
  *       **Seed (password 123456):**
- *       - globaladmin@techculture.ai — Global Admin (all companies)
- *       - shivangi@techculture.ai — Super Admin (own company)
- *       - hr@techculture.ai — HR Manager
- *       - manager@techculture.ai — Manager
- *       - shivig5964@gmail.com — Employee
+ *       - superadmin@gmail.com — Super Admin (all companies, only 1)
+ *       - admin@gmail.com — Admin (all companies, many)
+ *       - hr@gmail.com — HR Manager
+ *       - manager@gmail.com — Reporting Manager
+ *       - employee@gmail.com — Employee
  *     requestBody:
  *       required: true
  *       content:
@@ -41,7 +41,7 @@ const router = express.Router();
  *           schema:
  *             $ref: '#/components/schemas/LoginBody'
  *           example:
- *             officialEmail: shivangi@techculture.ai
+ *             officialEmail: superadmin@gmail.com
  *             password: "123456"
  *     responses:
  *       200:
