@@ -1,6 +1,8 @@
 /**
- * COMPANY CONTROLLER — /api/companies
- * Super Admin and Admin only. Company CRUD is under Administration.
+ * COMPANY CONTROLLER — /api/companies (plain CRUD)
+ * Create / Update / Delete: Super Admin and Admin only.
+ * List / Get: Super Admin and Admin see every company; HR / Reporting Manager see only their own.
+ * GET /:id is the full company — branches → shifts → monthlySchedule + reportingManagers.
  * branches[].branchId / shifts[].shiftId are master ids; responses populate { _id, name, code }.
  */
 const mongoose = require("mongoose");
@@ -12,12 +14,10 @@ const {
   hasGlobalCompanyAccess,
   userCompanyIds,
 } = require("../utils/companyScope");
+const { MANAGER_ROLES } = require("../utils/teamScope");
 
 const { MASTER_POPULATE } = Company;
 const okId = (id) => mongoose.Types.ObjectId.isValid(id);
-
-const publicMaster = (m) =>
-  m && m._id ? { _id: m._id, name: m.name, code: m.code || "" } : null;
 
 /** 400 message when a branchId / shiftId is not an existing master, else "" */
 const missingMasters = async (branches = []) => {
@@ -69,6 +69,9 @@ const listCompanies = async (req, res) => {
     const skip = (page - 1) * limit;
     const filter = {};
 
+    if (!hasGlobalCompanyAccess(req.user)) {
+      filter._id = { $in: userCompanyIds(req.user) };
+    }
     if (typeof isActive === "boolean") filter.isActive = isActive;
 
     if (search) {
@@ -102,9 +105,34 @@ const getCompany = async (req, res) => {
     if (!okId(req.params.id)) {
       return res.status(400).json({ message: "Invalid company id" });
     }
-    const row = await Company.findById(req.params.id).populate(MASTER_POPULATE);
+    const row = await Company.findById(req.params.id)
+      .populate(MASTER_POPULATE)
+      .lean();
     if (!row) return res.status(404).json({ message: "Company not found" });
-    return res.json({ data: row });
+    if (!canViewCompany(req.user, row._id)) {
+      return res.status(403).json({ message: "You cannot view this company" });
+    }
+
+    const managers = await User.find({
+      role: { $in: MANAGER_ROLES },
+      status: "Active",
+      "official.companyIds": row._id,
+    })
+      .select("name official.employeeCode official.officialEmail")
+      .sort({ name: 1 })
+      .lean();
+
+    return res.json({
+      data: {
+        ...row,
+        reportingManagers: managers.map((m) => ({
+          _id: m._id,
+          name: m.name,
+          employeeCode: m.official?.employeeCode || "",
+          email: m.official?.officialEmail || "",
+        })),
+      },
+    });
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
@@ -203,87 +231,9 @@ const deleteCompany = async (req, res) => {
   }
 };
 
-const listCompanyBranches = async (req, res) => {
-  try {
-    if (!okId(req.params.id)) {
-      return res.status(400).json({ message: "Invalid company id" });
-    }
-    const row = await Company.findById(req.params.id)
-      .select("companyName companyCode isActive branches")
-      .populate(MASTER_POPULATE)
-      .lean();
-    if (!row) return res.status(404).json({ message: "Company not found" });
-    if (!canViewCompany(req.user, row._id)) {
-      return res.status(403).json({ message: "You cannot view this company" });
-    }
-
-    const branches = (row.branches || [])
-      .filter((b) => b.isActive !== false && b.branchId)
-      .map((b) => ({
-        ...publicMaster(b.branchId),
-        address: b.address || "",
-        city: b.city || "",
-        state: b.state || "",
-        shifts: (b.shifts || [])
-          .filter((s) => s.isActive !== false && s.shiftId)
-          .map((s) => publicMaster(s.shiftId)),
-      }));
-
-    return res.json({
-      data: {
-        companyId: row._id,
-        companyName: row.companyName,
-        companyCode: row.companyCode,
-        branches,
-      },
-    });
-  } catch (err) {
-    return res.status(500).json({ message: err.message });
-  }
-};
-
-const listCompanyBranchShifts = async (req, res) => {
-  try {
-    if (!okId(req.params.id) || !okId(req.params.branchId)) {
-      return res.status(400).json({ message: "Invalid company or branch id" });
-    }
-    const row = await Company.findById(req.params.id)
-      .select("companyName companyCode branches")
-      .populate(MASTER_POPULATE)
-      .lean();
-    if (!row) return res.status(404).json({ message: "Company not found" });
-    if (!canViewCompany(req.user, row._id)) {
-      return res.status(403).json({ message: "You cannot view this company" });
-    }
-
-    const branch = (row.branches || []).find(
-      (b) =>
-        b.isActive !== false &&
-        b.branchId &&
-        String(b.branchId._id) === String(req.params.branchId)
-    );
-    if (!branch) return res.status(404).json({ message: "Branch not found on this company" });
-
-    return res.json({
-      data: {
-        companyId: row._id,
-        companyName: row.companyName,
-        branch: publicMaster(branch.branchId),
-        shifts: (branch.shifts || [])
-          .filter((s) => s.isActive !== false && s.shiftId)
-          .map((s) => publicMaster(s.shiftId)),
-      },
-    });
-  } catch (err) {
-    return res.status(500).json({ message: err.message });
-  }
-};
-
 module.exports = {
   listCompanies,
   getCompany,
-  listCompanyBranches,
-  listCompanyBranchShifts,
   createCompany,
   updateCompany,
   deleteCompany,

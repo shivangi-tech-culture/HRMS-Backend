@@ -105,7 +105,7 @@ const userSchema = new mongoose.Schema(
       },
       /**
        * Company _ids (Employee / RM: one. HR: one or more).
-       * Catalog of branches/shifts is on Company — GET /api/companies/:id/branches.
+       * Catalog of branches/shifts is on Company — GET /api/companies/:id.
        * This user's workplace is official.branchId + official.shiftId (not the whole tree).
        */
       companyIds: {

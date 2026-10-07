@@ -90,7 +90,7 @@ const loadMasterNames = async (branchIds, shiftIds) => {
   return byId;
 };
 
-/** Response only: branchId / shiftId become { _id, name, code } like populated companyIds. */
+/** Response only: branchId / shiftId become { _id, name, code } like populated companyIds (lists stop here). */
 const applyPublicPlacement = (official, placed, names) => {
   if (!official) return;
   const bId = placed?.ok && placed.branch ? oid(placed.branch.branchId) : "";
@@ -106,6 +106,18 @@ const placedIds = (placed) => ({
   s: placed?.ok && placed.shift ? [oid(placed.shift.shiftId)] : [],
 });
 
+/** Single-user response: branch gets its company address, shift its company week 1–5 day timings */
+const applyPlacementDetails = (official, placed) => {
+  if (!placed?.ok) return;
+  if (official.branchId && placed.branch) {
+    const { address = "", city = "", state = "" } = placed.branch;
+    Object.assign(official.branchId, { address, city, state });
+  }
+  if (official.shiftId && placed.shift) {
+    official.shiftId.monthlySchedule = placed.shift.monthlySchedule || [];
+  }
+};
+
 const attachPlacement = async (user) => {
   if (!user?.official) return user;
   const placed = await assertUserPlacement({
@@ -115,6 +127,7 @@ const attachPlacement = async (user) => {
   });
   const { b, s } = placedIds(placed);
   applyPublicPlacement(user.official, placed, await loadMasterNames(b, s));
+  applyPlacementDetails(user.official, placed);
   return user;
 };
 

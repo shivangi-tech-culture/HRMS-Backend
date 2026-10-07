@@ -20,9 +20,6 @@ const TYPES = [
   "gender",
   "maritalStatus",
   "bloodGroup",
-  "country",
-  "state",
-  "city",
   "branch",
   "shift",
   "courseType",
@@ -45,9 +42,6 @@ const COLLECTION_BY_TYPE = {
   gender: "genders",
   maritalStatus: "maritalstatuses",
   bloodGroup: "bloodgroups",
-  country: "countries",
-  state: "states",
-  city: "cities",
   branch: "branches",
   shift: "shifts",
   courseType: "coursetypes",
@@ -64,12 +58,6 @@ const GENERAL_INFO_DROPDOWNS = {
   personal: {
     gender: "gender",
     maritalStatus: "maritalStatus",
-    "presentAddress.country": "country",
-    "presentAddress.state": "state",
-    "presentAddress.city": "city",
-    "permanentAddress.country": "country",
-    "permanentAddress.state": "state",
-    "permanentAddress.city": "city",
   },
   official: {
     department: "department",
@@ -102,7 +90,6 @@ const GENERAL_INFO_DROPDOWNS = {
     designation: "designation",
   },
   visas: {
-    countryName: "country",
     visaType: "visaType",
   },
 };

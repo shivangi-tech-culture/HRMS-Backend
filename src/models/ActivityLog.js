@@ -1,8 +1,9 @@
 /**
- * ActivityLog — who changed which employee (nested like User: easy to identify)
+ * ActivityLog — who changed which employee, field by field
  *
  * employee{} = jis pe change hua
  * actor{}    = jisne change kiya
+ * changes[]  = { field, label, from, to } per changed field
  */
 const mongoose = require("mongoose");
 
@@ -45,12 +46,17 @@ const activityLogSchema = new mongoose.Schema(
     section: { type: String, default: "" },
     /** UI line: "Shivangi Gupta updated employee Vivek Thakur" */
     summary: { type: String, default: "" },
-    /** Changed top-level keys / item ids */
-    changes: { type: [String], default: [] },
+    /** Field-level diff: [{ field, label, from, to, itemId? }] */
+    changes: { type: [mongoose.Schema.Types.Mixed], default: [] },
     /** Extra bag (optional) */
     meta: { type: mongoose.Schema.Types.Mixed, default: {} },
-    /** Denormalized for company filter (same as employee.company) */
+    /** Employee's company names at log time (display only, same as employee.company) */
     company: { type: String, default: "", index: true },
+    /** Employee's official.companyIds at log time — company-wise filter */
+    companyIds: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Company" }],
+      default: [],
+    },
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );
@@ -58,6 +64,7 @@ const activityLogSchema = new mongoose.Schema(
 activityLogSchema.index({ "employee.id": 1, createdAt: -1 });
 activityLogSchema.index({ "actor.id": 1, createdAt: -1 });
 activityLogSchema.index({ company: 1, createdAt: -1 });
+activityLogSchema.index({ companyIds: 1, createdAt: -1 });
 activityLogSchema.index({ action: 1, createdAt: -1 });
 
 module.exports = mongoose.model("ActivityLog", activityLogSchema);

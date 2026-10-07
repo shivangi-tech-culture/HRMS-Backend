@@ -39,6 +39,7 @@ const {
   LIST_POPULATE,
   safeUser,
 } = require("../utils/userAccount");
+const { logEmployeeActivity } = require("../utils/activityLog");
 
 const loadManagedUser = async (req, id) => {
   if (String(req.user._id) === String(id)) {
@@ -194,6 +195,7 @@ const createAccessUserAccount = async (req) => {
     }
 
     const user = await User.create(createDoc);
+    await logEmployeeActivity({ actor: req.user, employee: user, action: "create" });
 
     const mailCompany = platform
       ? "All companies"
@@ -319,6 +321,8 @@ const updateUser = async (req, res) => {
         return res.status(403).json({ message: scopeErr });
       }
     }
+
+    const before = user.toObject(); // snapshot for activity log diff
 
     if (req.body.name !== undefined) {
       user.name = String(req.body.name).trim();
@@ -468,6 +472,7 @@ const updateUser = async (req, res) => {
     }
 
     await user.save();
+    await logEmployeeActivity({ actor: req.user, employee: user, action: "update", before });
 
     const fresh = await User.findById(user._id).select("-password");
     return res.json({
@@ -496,6 +501,7 @@ const deleteUser = async (req, res) => {
       });
     }
 
+    await logEmployeeActivity({ actor: req.user, employee: loaded.user, action: "delete" });
     await loaded.user.deleteOne();
     return res.json({
       message: "User deleted",

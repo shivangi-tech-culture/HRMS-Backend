@@ -19,6 +19,7 @@ const {
   companyFilter,
   companyRefs,
   COMPANY_POPULATE,
+  findCompany,
 } = require("./companyScope");
 const { applyAnniversary } = require("./anniversary");
 const { attachPlacement } = require("./companyShift");
@@ -186,18 +187,26 @@ const buildListQuery = async (req, { forceRole, roleScope } = {}) => {
 
   const company = filterValue(req, "company", "companyId");
   if (company) {
-    if (/^[a-fA-F0-9]{24}$/.test(company)) {
-      and.push({ "official.companyIds": company });
-    } else {
-      const Company = require("../models/Company");
-      const doc = await Company.findOne({
-        companyName: exact(company),
-        isActive: true,
-      })
-        .select("_id")
-        .lean();
-      and.push(doc ? { "official.companyIds": doc._id } : { _id: null });
+    const doc = await findCompany(company);
+    and.push(doc ? { "official.companyIds": doc._id } : { _id: null });
+  }
+
+  const managerId = filterValue(req, "managerId", "reportingHead");
+  if (managerId) {
+    if (!/^[a-fA-F0-9]{24}$/.test(managerId)) {
+      return { error: { status: 400, message: "Invalid managerId" } };
     }
+    and.push({
+      $or: [
+        { "official.reportingHead1": managerId },
+        { "official.reportingHead2": managerId },
+      ],
+    });
+  }
+
+  const unassigned = filterValue(req, "unassigned") === "true";
+  if (unassigned) {
+    and.push({ "official.reportingHead1": null, "official.reportingHead2": null });
   }
 
   const branch = filterValue(req, "branch", "branchId");
@@ -221,6 +230,8 @@ const buildListQuery = async (req, { forceRole, roleScope } = {}) => {
       company: company || "",
       branch: branch || "",
       shift: shift || "",
+      managerId: managerId || "",
+      unassigned,
     },
   };
 };
@@ -252,6 +263,8 @@ const mapEmployeeListRow = (row) => ({
   shift: row.official?.shiftId?.name || "",
   status: row.status || "",
   email: row.official?.officialEmail || "",
+  reportingHead1: headRef(row.official?.reportingHead1),
+  reportingHead2: headRef(row.official?.reportingHead2),
 });
 
 const LIST_SELECT =

@@ -16,10 +16,11 @@ const {
   isSuperAdmin,
   normalizeRoleName,
   canManageRole,
+  isTeamScopedRole,
 } = require("../config/roles");
 const { hasAllAccess } = require("../middleware/auth");
 const { queueWelcomeEmail } = require("../utils/mail");
-const { logEmployeeActivity } = require("../utils/activityLog");
+const { logEmployeeActivity, humanize } = require("../utils/activityLog");
 const ActivityLog = require("../models/ActivityLog");
 const { sendExcel } = require("../utils/excel");
 const { uploadToCloudinary, UPLOAD_TYPES } = require("../middleware/upload");
@@ -32,13 +33,16 @@ const {
   hasGlobalCompanyAccess,
   attachCompany,
   writeCompanyFields,
-  COMPANY_POPULATE,
-  companyRefs,
+  userCompanyIds,
+  findCompany,
+  escapeRegex,
 } = require("../utils/companyScope");
 const {
   assertTeamOrCompanyEmployee,
   validateReportingHeads,
   headId,
+  getTeamMemberIds,
+  REPORTING_HEAD_POPULATE,
 } = require("../utils/teamScope");
 const {
   assertUserPlacement,
@@ -51,6 +55,7 @@ const {
   LIST_SELECT,
   LIST_POPULATE,
   safeUser,
+  filterValue,
 } = require("../utils/userAccount");
 
 /** True for Super Admin / Admin (lean login accounts) */
@@ -370,13 +375,7 @@ const createEmployee = async (req, res) => {
     // 4. Create User with role Employee (password already hashed above)
     const employee = await User.create(createDoc);
 
-    await logEmployeeActivity({
-      actor: req.user,
-      employee,
-      action: "create",
-      summary: `${req.user.name} created employee ${employee.name}`,
-      changes: ["name", "official", "personal"],
-    });
+    await logEmployeeActivity({ actor: req.user, employee, action: "create" });
 
     // 5. Welcome email in background (Render SMTP timeouts must not block create)
     const mail = queueWelcomeEmail({
@@ -423,11 +422,11 @@ const listEmployees = async (req, res) => {
     const [total, rows] = await Promise.all([
       User.countDocuments(filter),
       User.find(filter)
-        .select(LIST_SELECT)
+        .select(`${LIST_SELECT} official.reportingHead1 official.reportingHead2`)
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate(LIST_POPULATE)
+        .populate([...LIST_POPULATE, ...REPORTING_HEAD_POPULATE])
         .lean(),
     ]);
 
@@ -575,9 +574,7 @@ const updateEmployee = async (req, res) => {
       }
     }
 
-    const changedKeys = Object.keys(req.body || {}).filter(
-      (k) => req.body[k] !== undefined
-    );
+    const before = employee.toObject(); // snapshot for activity log diff
 
     // --- name / status / role / password ---
     if (req.body.name !== undefined) employee.name = req.body.name;
@@ -784,13 +781,7 @@ const updateEmployee = async (req, res) => {
     // --- save + response ---
     await employee.save();
 
-    await logEmployeeActivity({
-      actor: req.user,
-      employee,
-      action: "update",
-      summary: `${req.user.name} updated employee ${employee.name}`,
-      changes: changedKeys,
-    });
+    await logEmployeeActivity({ actor: req.user, employee, action: "update", before });
 
     // Role promote to Global / Super → strip heavy HR profile fields
     if (
@@ -898,6 +889,7 @@ const deleteArrayItem = async (req, res) => {
       }
     }
 
+    const before = loaded.employee.toObject();
     loaded.employee[section] = current.filter((item) => !idSet.has(String(item._id)));
     loaded.employee.markModified(section);
     await loaded.employee.save();
@@ -907,8 +899,7 @@ const deleteArrayItem = async (req, res) => {
       employee: loaded.employee,
       action: "section_delete",
       section,
-      summary: `${req.user.name} deleted ${idSet.size} ${section} item(s) for ${loaded.employee.name}`,
-      changes: [...idSet],
+      before,
     });
 
     return res.json({
@@ -1005,6 +996,7 @@ const deleteObjectSection = async (req, res) => {
       return res.status(loaded.status).json({ message: loaded.message });
     }
 
+    const before = loaded.employee.toObject();
     loaded.employee.payroll = { ...EMPTY_PAYROLL };
     loaded.employee.markModified("payroll");
     await loaded.employee.save();
@@ -1014,8 +1006,7 @@ const deleteObjectSection = async (req, res) => {
       employee: loaded.employee,
       action: "section_delete",
       section: "payroll",
-      summary: `${req.user.name} cleared payroll for ${loaded.employee.name}`,
-      changes: ["payroll"],
+      before,
     });
 
     return res.json({
@@ -1053,13 +1044,7 @@ const deleteEmployee = async (req, res) => {
       }
     }
 
-    await logEmployeeActivity({
-      actor: req.user,
-      employee,
-      action: "delete",
-      summary: `${req.user.name} deleted employee ${employee.name}`,
-      changes: ["employee"],
-    });
+    await logEmployeeActivity({ actor: req.user, employee, action: "delete" });
 
     await employee.deleteOne();
 
@@ -1124,118 +1109,149 @@ const deleteSection = (req, res) => {
   return deleteArrayItem(req, res);
 };
 
+/** One log row for the UI */
+const toActivityRow = (log) => ({
+  _id: log._id,
+  at: log.createdAt,
+  action: log.action,
+  section: log.section || "",
+  summary: log.summary || "",
+  company: log.company || "",
+  employee: {
+    id: log.employee?.id,
+    name: log.employee?.name || "",
+    employeeCode: log.employee?.employeeCode || "",
+    email: log.employee?.officialEmail || "",
+  },
+  by: {
+    id: log.actor?.id,
+    name: log.actor?.name || "",
+    role: log.actor?.role || "",
+    self: String(log.actor?.id) === String(log.employee?.id),
+  },
+  changes: (log.changes || []).map((c) =>
+    typeof c === "string" ? { field: c, label: humanize(c.split(".").pop()), from: null, to: null } : c
+  ),
+});
+
 /**
- * ACTIVITY LOG (employee) — GET /api/employees/:id/activity
- * Employee sees own tracking. Admin sees that employee's full history.
+ * ACTIVITY LOG — GET /api/employees/activity
+ * Every change to an employee: create / update (field by field) / delete / manager assign.
+ *
+ * Employee          → own logs only (filters except from / to / action ignored)
+ * Reporting Manager → own team
+ * HR Manager        → own companies
+ * Super Admin/Admin → all (or one company via companyId)
+ *
+ * Query: companyId, employeeId (changes on OR by this person), action, from, to, search, page, limit
  */
-const listEmployeeActivity = async (req, res) => {
+const listActivity = async (req, res) => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ message: "Invalid employee id" });
-    }
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+    const and = [];
+    const isAdmin = hasAllAccess(req.user);
 
-    if (!hasAllAccess(req.user) && !isOwnRecord(req, req.params.id)) {
-      return res.status(403).json({ message: "You can only view your own activity" });
-    }
+    const personMatch = (id) => ({ $or: [{ "employee.id": id }, { "actor.id": id }] });
 
-    const employee = await User.findById(req.params.id)
-      .select("name role official")
-      .populate(COMPANY_POPULATE);
-    if (!employee) {
-      return res.status(404).json({ message: "Employee not found" });
-    }
-
-    if (hasAllAccess(req.user) && !hasGlobalCompanyAccess(req.user)) {
-      const scopeErr = assertTeamOrCompanyEmployee(req.user, employee);
-      if (scopeErr) {
-        return res.status(403).json({ message: scopeErr });
+    // ── scope: who can see what ──
+    if (!isAdmin) {
+      and.push(personMatch(req.user._id));
+    } else if (isTeamScopedRole(req.user.role)) {
+      and.push({ "employee.id": { $in: await getTeamMemberIds(req.user) } });
+    } else if (!hasGlobalCompanyAccess(req.user)) {
+      const mine = userCompanyIds(req.user);
+      if (!mine.length) {
+        return res.status(403).json({ message: "Your profile has no company — cannot view activity" });
       }
+      and.push({ companyIds: { $in: mine } });
     }
 
-    const page = Math.max(1, Number(req.query.page) || 1);
-    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
-    const skip = (page - 1) * limit;
+    // ── company filter ──
+    let company = null;
+    const companyValue = isAdmin ? filterValue(req, "companyId", "company") : "";
+    if (companyValue) {
+      company = await findCompany(companyValue);
+      if (!company) {
+        return res.status(404).json({ message: `Company not found: ${companyValue}` });
+      }
+      if (
+        !hasGlobalCompanyAccess(req.user) &&
+        !isTeamScopedRole(req.user.role) &&
+        !userCompanyIds(req.user).includes(String(company._id))
+      ) {
+        return res.status(403).json({ message: "This company is not assigned to you" });
+      }
+      and.push({ companyIds: company._id });
+    }
 
-    const filter = { "employee.id": employee._id };
-    if (req.query.action) filter.action = String(req.query.action).trim();
+    // ── one employee ──
+    let employee = null;
+    const employeeId = isAdmin ? filterValue(req, "employeeId") : String(req.user._id);
+    if (employeeId) {
+      if (!mongoose.Types.ObjectId.isValid(employeeId)) {
+        return res.status(400).json({ message: "Invalid employeeId" });
+      }
+      employee = await User.findById(employeeId)
+        .select("name official.employeeCode official.officialEmail")
+        .lean();
+      if (isAdmin) and.push(personMatch(new mongoose.Types.ObjectId(employeeId)));
+    }
 
+    const action = filterValue(req, "action");
+    if (action) and.push({ action });
+
+    const from = filterValue(req, "from");
+    const to = filterValue(req, "to");
+    if (from || to) {
+      const range = {};
+      if (from) range.$gte = new Date(`${from}T00:00:00.000Z`);
+      if (to) range.$lte = new Date(`${to}T23:59:59.999Z`);
+      if (Object.values(range).some((d) => Number.isNaN(d.getTime()))) {
+        return res.status(400).json({ message: "from / to must be YYYY-MM-DD" });
+      }
+      and.push({ createdAt: range });
+    }
+
+    const search = isAdmin ? filterValue(req, "search", "q") : "";
+    if (search) {
+      const rx = new RegExp(escapeRegex(search), "i");
+      and.push({
+        $or: [
+          { "employee.name": rx },
+          { "employee.employeeCode": rx },
+          { "employee.officialEmail": rx },
+          { "actor.name": rx },
+          { summary: rx },
+        ],
+      });
+    }
+
+    const filter = and.length ? { $and: and } : {};
     const [total, logs] = await Promise.all([
       ActivityLog.countDocuments(filter),
       ActivityLog.find(filter)
         .sort({ createdAt: -1 })
-        .skip(skip)
+        .skip((page - 1) * limit)
         .limit(limit)
         .lean(),
     ]);
 
     return res.json({
-      employee: {
-        id: employee._id,
-        name: employee.name,
-        officialEmail: employee.official?.officialEmail || "",
-        employeeCode: employee.official?.employeeCode || "",
-        companies: companyRefs(employee),
-        department: employee.official?.department || "",
-      },
-      count: logs.length,
+      company: company ? { _id: company._id, companyName: company.companyName } : null,
+      employee: employee
+        ? {
+            id: employee._id,
+            name: employee.name,
+            employeeCode: employee.official?.employeeCode || "",
+            email: employee.official?.officialEmail || "",
+          }
+        : null,
       total,
       page,
       limit,
       pages: Math.ceil(total / limit) || 1,
-      logs,
-    });
-  } catch (err) {
-    return res.status(500).json({ message: err.message });
-  }
-};
-
-/**
- * ACTIVITY LOG (admin) — GET /api/employees/activity
- * All employee edits in company (Global Admin = all companies).
- */
-const listCompanyActivity = async (req, res) => {
-  try {
-    if (!hasAllAccess(req.user)) {
-      return res.status(403).json({ message: "Only admin can view company activity" });
-    }
-
-    const page = Math.max(1, Number(req.query.page) || 1);
-    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
-    const skip = (page - 1) * limit;
-
-    const filter = {};
-    if (!hasGlobalCompanyAccess(req.user)) {
-      filter.company = String(req.user.official?.company || "").trim();
-    } else if (req.query.company) {
-      filter.company = String(req.query.company).trim();
-    }
-    if (req.query.action) filter.action = String(req.query.action).trim();
-    if (req.query.actorId && mongoose.Types.ObjectId.isValid(req.query.actorId)) {
-      filter["actor.id"] = req.query.actorId;
-    }
-    if (
-      req.query.employeeId &&
-      mongoose.Types.ObjectId.isValid(req.query.employeeId)
-    ) {
-      filter["employee.id"] = req.query.employeeId;
-    }
-
-    const [total, logs] = await Promise.all([
-      ActivityLog.countDocuments(filter),
-      ActivityLog.find(filter)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-    ]);
-
-    return res.json({
-      count: logs.length,
-      total,
-      page,
-      limit,
-      pages: Math.ceil(total / limit) || 1,
-      logs,
+      logs: logs.map(toActivityRow),
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -1248,8 +1264,7 @@ module.exports = {
   exportEmployees,
   getEmployee,
   updateEmployee,
-  listEmployeeActivity,
-  listCompanyActivity,
+  listActivity,
   deleteSection,
   deleteEmployee,
   uploadAttachment,

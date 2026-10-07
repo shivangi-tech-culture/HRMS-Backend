@@ -188,6 +188,20 @@ const mergeAssignedCompanies = (primaryCompany, companiesIn) => {
   return list;
 };
 
+/**
+ * Company from a query/body value — 24-hex _id or exact company name.
+ * Returns { _id, companyName } or null when nothing matches.
+ */
+const findCompany = async (value) => {
+  const Company = require("../models/Company");
+  const v = String(value || "").trim();
+  if (!v) return null;
+  const filter = /^[a-fA-F0-9]{24}$/.test(v)
+    ? { _id: v }
+    : { companyName: companyExactRegex(v), isActive: true };
+  return Company.findOne(filter).select("companyName").lean();
+};
+
 /** Given company, or DEFAULT_COMPANY if empty */
 const withDefaultCompany = (company) => {
   const value = String(company || "").trim();
@@ -353,6 +367,7 @@ module.exports = {
   assertSameCompanyEmployee,
   companyFilter,
   mergeAssignedCompanies,
+  findCompany,
   withDefaultCompany,
   companyListForUser,
   attachCompany,

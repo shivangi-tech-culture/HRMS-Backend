@@ -1,13 +1,12 @@
 /**
- * COMPANY ROUTES → /api/companies
- * Super Admin and Admin only.
+ * COMPANY ROUTES → /api/companies — plain CRUD (5 APIs)
+ * Create / Update / Delete: Super Admin and Admin only.
+ * List / Get: Super Admin and Admin (all companies); HR / Reporting Manager (own companies only).
  */
 const express = require("express");
 const {
   listCompanies,
   getCompany,
-  listCompanyBranches,
-  listCompanyBranchShifts,
   createCompany,
   updateCompany,
   deleteCompany,
@@ -15,6 +14,7 @@ const {
 const { protect, authorize, ALL_ACCESS } = require("../middleware/auth");
 const { checkPermission } = require("../controllers/permission.controller");
 const { SUPER_ADMIN, ADMIN } = require("../config/roles");
+const { hasGlobalCompanyAccess } = require("../utils/companyScope");
 const { validate, validateQuery } = require("../middleware/validate");
 const {
   createCompanySchema,
@@ -25,16 +25,26 @@ const {
 const router = express.Router();
 const companyRoles = [SUPER_ADMIN, ADMIN];
 
+/** Company permission exists only for Super Admin / Admin; others read their own companies. */
+const canView = [
+  protect,
+  authorize(...ALL_ACCESS),
+  (req, res, next) =>
+    hasGlobalCompanyAccess(req.user)
+      ? checkPermission("Administration", "Company", "view")(req, res, next)
+      : next(),
+];
+
 /**
  * @swagger
  * tags:
  *   - name: Admin / Company
  *     description: |
- *       Branch / shift names + codes are masters (`/api/masters?type=branch|shift`), shared by all companies.
+ *       Plain CRUD. Branch / shift names + codes are masters (`/api/masters?type=branch|shift`).
  *       A company links them: branches[].branchId → shifts[].shiftId → monthlySchedule (days/times).
- *       Users save official.companyIds + one branchId + one shiftId (same master ids).
- *       Dropdown: GET /api/companies/{id}/branches then GET .../branches/{branchId}.
- *       **CRUD: Super Admin and Admin only.** HR can GET branches of assigned companies.
+ *       GET /api/companies/{id} = full company details (branches → shifts → monthlySchedule + reportingManagers)
+ *       — use it for create-employee dropdowns too.
+ *       **Create / Update / Delete: Super Admin and Admin.** HR / Reporting Manager: List + Get of own companies.
  */
 
 /**
@@ -42,7 +52,8 @@ const companyRoles = [SUPER_ADMIN, ADMIN];
  * /api/companies:
  *   get:
  *     tags: [Admin / Company]
- *     summary: List companies (Super Admin / Admin)
+ *     summary: List companies
+ *     description: Super Admin / Admin → all companies. HR / Reporting Manager → own companies only.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -103,14 +114,7 @@ const companyRoles = [SUPER_ADMIN, ADMIN];
  *       400: { description: "Unknown branch / shift master id or invalid schedule" }
  *       409: { description: Duplicate company name or code }
  */
-router.get(
-  "/",
-  protect,
-  authorize(...companyRoles),
-  checkPermission("Administration", "Company", "view"),
-  validateQuery(listCompanyQuerySchema),
-  listCompanies
-);
+router.get("/", ...canView, validateQuery(listCompanyQuerySchema), listCompanies);
 
 router.post(
   "/",
@@ -123,49 +127,18 @@ router.post(
 
 /**
  * @swagger
- * /api/companies/{id}/branches/{branchId}:
- *   get:
- *     tags: [Admin / Company]
- *     summary: Shifts of one branch (create-user cascade)
- *     security:
- *       - bearerAuth: []
- */
-router.get(
-  "/:id/branches/:branchId",
-  protect,
-  authorize(...ALL_ACCESS),
-  listCompanyBranchShifts
-);
-
-/**
- * @swagger
- * /api/companies/{id}/branches:
- *   get:
- *     tags: [Admin / Company]
- *     summary: Company branches + shift names (create-user dropdown)
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema: { type: string }
- *     responses:
- *       200: { description: Active branches and their shifts }
- */
-router.get(
-  "/:id/branches",
-  protect,
-  authorize(...ALL_ACCESS),
-  listCompanyBranches
-);
-
-/**
- * @swagger
  * /api/companies/{id}:
  *   get:
  *     tags: [Admin / Company]
- *     summary: Get one company
+ *     summary: Get one company — all details
+ *     description: |
+ *       Everything about the company in one call: companyName, companyCode, isActive,
+ *       branches[] (branchId { _id, name, code }, address, city, state, isActive,
+ *       shifts[] (shiftId { _id, name, code }, isActive, monthlySchedule)) and
+ *       reportingManagers[] { _id, name, employeeCode, email } (active managers of this company).
+ *       Create-employee form: companyIds ← _id, branchId ← branches[].branchId._id,
+ *       shiftId ← shifts[].shiftId._id, reportingHead1 ← reportingManagers[]._id.
+ *       HR / Reporting Manager → own companies only (403 otherwise).
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -174,7 +147,8 @@ router.get(
  *         required: true
  *         schema: { type: string }
  *     responses:
- *       200: { description: Company }
+ *       200: { description: Company with branches, shifts, schedule and reportingManagers }
+ *       403: { description: Not your company }
  *       404: { description: Not found }
  *   put:
  *     tags: [Admin / Company]
@@ -203,13 +177,7 @@ router.get(
  *       200: { description: Deleted }
  *       409: { description: Company still in use }
  */
-router.get(
-  "/:id",
-  protect,
-  authorize(...companyRoles),
-  checkPermission("Administration", "Company", "view"),
-  getCompany
-);
+router.get("/:id", ...canView, getCompany);
 
 router.put(
   "/:id",

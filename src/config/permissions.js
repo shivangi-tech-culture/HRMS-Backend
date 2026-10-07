@@ -43,10 +43,11 @@ const ADMIN_TREE = [
     subModules: [
       {
         name: "Employee",
+        // assign = bulk assign / remove Reporting Manager (POST /api/employees/assign-manager)
         actions: [
           "view", "create", "edit", "delete",
           "approve", "reject",
-          "export", "import", "upload", "download", "email",
+          "export", "import", "upload", "download", "email", "assign",
         ],
       },
     ],
@@ -181,9 +182,6 @@ const ADMIN_TREE = [
       { name: "Gender", actions: CRUD },
       { name: "Marital Status", actions: CRUD },
       { name: "Blood Group", actions: CRUD },
-      { name: "Country", actions: CRUD },
-      { name: "State", actions: CRUD },
-      { name: "City", actions: CRUD },
       { name: "Branch", actions: CRUD },
       { name: "Shift", actions: CRUD },
       { name: "Course Type", actions: CRUD },
@@ -245,15 +243,16 @@ const ADMIN_TREE = [
     heading: "Administration",
     subModules: [
       // Access & Control: login users of any role (create ≠ Employee Management)
-      { name: "Access & Control", actions: ["view", "create", "edit", "delete", "export", "import", "upload", "download", "email"] },
+      // assign = bulk assign / remove Reporting Manager (POST /api/users/assign-manager)
+      { name: "Access & Control", actions: ["view", "create", "edit", "delete", "export", "import", "upload", "download", "email", "assign"] },
       {
         name: "Roles & Permissions",
         actions: ["view", "create", "edit", "delete", "export"],
       },
       { name: "System Configuration", actions: VEd },
-      // Org tree + manual reporting-manager assignment (/api/hierarchy)
-      // Super Admin / Admin / HR → full org; Reporting Manager → own team only (view)
-      { name: "Hierarchy", actions: ["view", "assign"] },
+      // Org hierarchy (GET /api/hierarchy) — Super Admin / Admin / HR → full org;
+      // Reporting Manager → own team. Assigning managers uses Employee / Access & Control → assign.
+      { name: "Hierarchy", actions: ["view"] },
     ],
   },
 ];

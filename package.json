@@ -7,7 +7,8 @@
     "start": "node src/server.js",
     "dev": "nodemon --watch src src/server.js",
     "seed": "node src/seed.js",
-    "seed:masters": "node src/scripts/seedMasters.js"
+    "seed:masters": "node src/scripts/seedMasters.js",
+    "backfill:activity": "node src/scripts/backfillActivityCompanies.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

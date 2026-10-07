@@ -67,7 +67,7 @@ router.get(
  *         required: true
  *         schema:
  *           type: string
- *           enum: [department, designation, division, employeeGroup, grade, jobRole, gender, maritalStatus, bloodGroup, country, state, city, courseType, courseLevel, bankName, relation, nominateFor, visaType]
+ *           enum: [department, designation, division, employeeGroup, grade, jobRole, gender, maritalStatus, bloodGroup, courseType, courseLevel, bankName, relation, nominateFor, visaType]
  *       - in: query
  *         name: company
  *         schema: { type: string }
@@ -102,7 +102,7 @@ router.get(
  *             properties:
  *               type:
  *                 type: string
- *                 enum: [department, designation, division, employeeGroup, grade, jobRole, gender, maritalStatus, bloodGroup, country, state, city, branch, shift, courseType, courseLevel, bankName, relation, nominateFor, visaType, regularizationReason, markAttendanceReason]
+ *                 enum: [department, designation, division, employeeGroup, grade, jobRole, gender, maritalStatus, bloodGroup, branch, shift, courseType, courseLevel, bankName, relation, nominateFor, visaType, regularizationReason, markAttendanceReason]
  *               name: { type: string, example: Noida }
  *               code: { type: string, description: "Optional short code, unique inside the type", example: NOIDA }
  *               status: { type: string, enum: [Active, Inactive] }

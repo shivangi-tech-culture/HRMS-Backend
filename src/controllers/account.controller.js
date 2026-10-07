@@ -15,6 +15,7 @@ const {
   compactPermissions,
   permissionsForRole,
 } = require("../config/permissions");
+const { logEmployeeActivity } = require("../utils/activityLog");
 
 const LOCKED_ROLES = new Set(["Super Admin", "Admin"]);
 
@@ -102,6 +103,7 @@ const updateMyProfile = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
+    const before = user.toObject(); // snapshot for activity log diff
 
     if (req.body.name !== undefined) {
       const name = String(req.body.name || "").trim();
@@ -116,6 +118,7 @@ const updateMyProfile = async (req, res) => {
     }
 
     await user.save();
+    await logEmployeeActivity({ actor: req.user, employee: user, action: "update", before });
 
     const roleDoc = await Role.findOne({ name: user.role }).lean();
     const lean = user.toObject();

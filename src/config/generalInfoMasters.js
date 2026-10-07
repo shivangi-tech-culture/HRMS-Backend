@@ -36,18 +36,6 @@ const UI_DROPDOWNS = {
     "Other",
   ],
   nominateFor: ["PF", "FNF", "Gratuity", "GTLI", "GPA", "GHI"],
-  country: [
-    "India",
-    "United States",
-    "United Kingdom",
-    "United Arab Emirates",
-    "Singapore",
-    "Germany",
-    "Canada",
-    "Australia",
-    "Japan",
-    "Saudi Arabia",
-  ],
   visaType: [
     "Employment Visa",
     "Business Visa",
@@ -89,9 +77,7 @@ const OFFICIAL_DROPDOWNS = {
 };
 
 /**
- * Attendance UI reason dropdowns (separate masters)
- * Regularization: /attendance/regularization
- * Mark Attendance: Daily Attendance → Mark Attendance modal
+ * Attendance reason dropdowns (separate masters, seeded only)
  */
 const ATTENDANCE_DROPDOWNS = {
   regularizationReason: [

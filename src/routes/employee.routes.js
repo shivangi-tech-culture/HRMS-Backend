@@ -10,13 +10,12 @@ const {
   exportEmployees,
   getEmployee,
   updateEmployee,
-  listEmployeeActivity,
-  listCompanyActivity,
+  listActivity,
   deleteSection,
   deleteEmployee,
   uploadAttachment,
 } = require("../controllers/employee.controller");
-const { protect, authorize, ALL_ACCESS } = require("../middleware/auth");
+const { protect, authorize, ALL_ACCESS, hasAllAccess } = require("../middleware/auth");
 const {
   checkPermission,
   checkEmployeeProfilePermission,
@@ -28,6 +27,8 @@ const {
   updateUserSchema,
   validateSectionDelete,
 } = require("../validators/user.validation");
+const { assignReportingManager } = require("../controllers/reportingManager.controller");
+const { assignManagerSchema } = require("../validators/reportingManager.validation");
 
 const router = express.Router();
 
@@ -116,7 +117,12 @@ router.post(
  *       - **designation** — All Designations
  *       - **gender** — All Gender
  *       - **company** / branch — optional company filter
+ *       - **managerId** — employees reporting to this manager (either head)
+ *       - **unassigned=true** — employees with no reporting manager (bulk assign screen)
  *       - page (default 1), limit (default 10, max 100)
+ *
+ *       Each row has `reportingHead1` / `reportingHead2` ({ _id, name, email, employeeCode } or null).
+ *       Bulk assign the selected rows → `POST /api/employees/assign-manager` with the same companyId.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -141,6 +147,12 @@ router.post(
  *         schema: { type: string }
  *         description: Company _id (24-hex) or company name. Matches official.companyIds.
  *       - in: query
+ *         name: managerId
+ *         schema: { type: string }
+ *       - in: query
+ *         name: unassigned
+ *         schema: { type: boolean }
+ *       - in: query
  *         name: page
  *         schema: { type: integer, default: 1, example: 1 }
  *       - in: query
@@ -163,24 +175,35 @@ router.get(
  * @swagger
  * /api/employees/activity:
  *   get:
- *     tags: [Admin / Employees]
- *     summary: Admin activity log (all employees)
+ *     tags: [Admin / Employees, Employee / ESS]
+ *     summary: Activity log — every employee change, company-wise
  *     description: |
- *       Company-wide tracking — who edited which employee.
- *       **Who:** Global Admin, Super Admin, HR Manager, Manager
- *       Each log has nested `employee{}` + `actor{}` (name, email, code, role, company).
+ *       One API for all tracking: create / update / delete / manager assign, with field-level changes.
+ *       Each log = `{ at, action, summary, company, employee{}, by{}, changes[{ field, label, from, to }] }`.
+ *       **Employee** → own logs only (companyId / employeeId / search ignored).
+ *       **Reporting Manager** → own team. **HR Manager** → own companies.
+ *       **Super Admin / Admin** → all companies (pick one with companyId).
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
- *         name: company
+ *         name: companyId
  *         schema: { type: string }
+ *         description: Company _id or company name
  *       - in: query
  *         name: employeeId
  *         schema: { type: string }
+ *         description: One person — changes made on them OR by them
  *       - in: query
- *         name: actorId
+ *         name: from
+ *         schema: { type: string, example: "2026-10-01" }
+ *       - in: query
+ *         name: to
+ *         schema: { type: string, example: "2026-10-31" }
+ *       - in: query
+ *         name: search
  *         schema: { type: string }
+ *         description: Employee name / code / email, changed-by name or summary text
  *       - in: query
  *         name: action
  *         schema: { type: string, enum: [create, update, delete, section_update, section_delete] }
@@ -196,9 +219,11 @@ router.get(
 router.get(
   "/activity",
   protect,
-  authorize(...ALL_ACCESS),
-  checkPermission("Employee", "Employee", "view"),
-  listCompanyActivity
+  (req, res, next) =>
+    hasAllAccess(req.user)
+      ? checkPermission("Employee", "Employee", "view")(req, res, next)
+      : next(),
+  listActivity
 );
 
 /**
@@ -228,6 +253,52 @@ router.get(
   authorize(...ALL_ACCESS),
   checkPermission("Employee", "Employee", "export"),
   exportEmployees
+);
+
+/**
+ * @swagger
+ * /api/employees/assign-manager:
+ *   post:
+ *     tags: [Admin / Employees]
+ *     summary: Bulk assign / remove Reporting Manager (company-wise)
+ *     description: |
+ *       Employee list → select company → tick employees → pick a manager of that company
+ *       (`reportingManagers[]` from GET /api/companies/{id}) → send here.
+ *       **Who:** Super Admin, Admin, HR Manager (own companies) with Employee → Employee → assign.
+ *       `managerId: null` removes the manager (that `level`, or both heads when level is not sent).
+ *       **Checks (all-or-nothing):** company active + yours; manager is an Active Reporting Manager
+ *       of that company; every employee has role Employee and belongs to that company;
+ *       same manager cannot be both heads. Any failure → 400 with `errors[]`, nothing changes.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [companyId, managerId, employeeIds]
+ *             properties:
+ *               companyId: { type: string, example: 6ac5e399dfa4b7cd5ad879a9 }
+ *               managerId: { type: string, nullable: true, example: 6ac4b3e4d269e78d0eae7f64 }
+ *               employeeIds:
+ *                 type: array
+ *                 items: { type: string }
+ *                 example: [6ac4b3e7d269e78d0eae7f66, 6ac4b3f2d269e78d0eae7f68]
+ *               level: { type: integer, enum: [1, 2], default: 1 }
+ *     responses:
+ *       200: { description: Updated employees with reportingHead1 / reportingHead2 }
+ *       400: { description: "Validation failed — errors[] per employee" }
+ *       403: { description: Company not yours / no edit permission }
+ *       404: { description: Company or employee not found }
+ */
+router.post(
+  "/assign-manager",
+  protect,
+  authorize("Super Admin", "Admin", "HR Manager"),
+  checkPermission("Employee", "Employee", "assign"),
+  validate(assignManagerSchema),
+  assignReportingManager
 );
 
 /**
@@ -292,40 +363,6 @@ router.post(
     });
   },
   uploadAttachment
-);
-
-/**
- * @swagger
- * /api/employees/{id}/activity:
- *   get:
- *     tags: [Admin / Employees, Employee / ESS]
- *     summary: Employee activity log (by id)
- *     description: |
- *       Tracking for one employee — who changed their profile.
- *       **Employee:** own id only. **Admin:** same company.
- *       Log shape: `employee{}`, `actor{}`, `action`, `section`, `summary`, `changes`, `createdAt`.
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - $ref: '#/components/parameters/UserId'
- *       - in: query
- *         name: action
- *         schema: { type: string, enum: [create, update, delete, section_update, section_delete] }
- *       - in: query
- *         name: page
- *         schema: { type: integer, default: 1 }
- *       - in: query
- *         name: limit
- *         schema: { type: integer, default: 20 }
- *     responses:
- *       200: { description: Paginated activity logs for this employee }
- */
-router.get(
-  "/:id/activity",
-  protect,
-  authorize(...ALL_ACCESS, "Employee"),
-  checkEmployeeProfilePermission("view"),
-  listEmployeeActivity
 );
 
 /**

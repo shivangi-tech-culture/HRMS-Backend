@@ -21,6 +21,8 @@ const {
   updateAccessUserSchema,
   accessSendMailSchema,
 } = require("../validators/accessControl.validation");
+const { assignReportingManager } = require("../controllers/reportingManager.controller");
+const { assignManagerSchema } = require("../validators/reportingManager.validation");
 
 const router = express.Router();
 
@@ -33,6 +35,31 @@ const ACCESS_ROLES = require("../middleware/auth").ALL_ACCESS;
  *   - name: Admin / Users
  *     description: Access & Control — CRUD, export Excel, send mail
  */
+
+/**
+ * @swagger
+ * /api/users/assign-manager:
+ *   post:
+ *     tags: [Admin / Users]
+ *     summary: Bulk assign / remove Reporting Manager (company-wise)
+ *     description: |
+ *       Same API as POST /api/employees/assign-manager, for the Access & Control screen.
+ *       Body `{ companyId, managerId, employeeIds, level? }` — `managerId: null` removes.
+ *       Only Employee-role users of that company can get a manager; all-or-nothing checks.
+ *       **Who:** Super Admin, Admin, HR Manager with Access & Control → assign.
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: Updated employees }
+ *       400: { description: "errors[] per employee — nothing changed" }
+ */
+router.post(
+  "/assign-manager",
+  protect,
+  authorize("Super Admin", "Admin", "HR Manager"),
+  checkPermission("Administration", "Access & Control", "assign"),
+  validate(assignManagerSchema),
+  assignReportingManager
+);
 
 /**
  * @swagger

@@ -2,7 +2,7 @@
  * TEAM SCOPE — Reporting Manager sees only their direct reports
  *
  * employee.official.reportingHead1 | reportingHead2 = manager's User _id.
- * Assigned manually (POST /api/hierarchy/assign) — never derived from company.
+ * Assigned manually (POST /api/employees/assign-manager or /api/users/assign-manager).
  */
 const User = require("../models/User");
 const {

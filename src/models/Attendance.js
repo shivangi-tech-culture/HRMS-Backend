@@ -1,7 +1,7 @@
 /**
  * ATTENDANCE MODEL — one document = one employee + one calendar day
  *
- * Used by: punch-in/out, manual mark, timesheet, close-absent
+ * Used by: self punch-in/out, my today, my web punches
  * Unique key: (employee, date)
  */
 const mongoose = require("mongoose");
@@ -10,7 +10,7 @@ const { todayDate } = require("../utils/shiftTiming"); // YYYY-MM-DD in app TZ
 /** Allowed punch source values */
 const PUNCH_SOURCES = ["web", "mobile", "biometric", "manual"];
 
-/** Day status after metrics / close-absent */
+/** Day status after metrics */
 const DAY_STATUSES = [
   "Pending", // punched in, waiting for out
   "Present", // full day In+Out
