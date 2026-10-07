@@ -99,8 +99,8 @@ const companyRoles = [SUPER_ADMIN, ADMIN];
  *                             type: array
  *                             description: weekNumber 1-5; each week must include all 7 days
  *     responses:
- *       201: { description: Company created (branchId / shiftId populated to { _id, name, code }) }
- *       400: { description: Unknown branch / shift master id or invalid schedule }
+ *       201: { description: "Company created (branchId / shiftId populated to { _id, name, code })" }
+ *       400: { description: "Unknown branch / shift master id or invalid schedule" }
  *       409: { description: Duplicate company name or code }
  */
 router.get(
