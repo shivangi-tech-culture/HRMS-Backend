@@ -45,11 +45,18 @@ const userCompanyIds = (user) => {
 /** Mongoose populate option for User.official.companyIds → { _id, companyName } */
 const COMPANY_POPULATE = { path: "official.companyIds", select: "companyName" };
 
-/** [{ _id, companyName }] from a user whose official.companyIds is populated. */
+/**
+ * [{ _id, companyName }] from populated official.companyIds.
+ * Order is the rule: index 0 is the person's own company (branch + shift).
+ * Every later id is assigned access only — all branches, shifts and employees of that company.
+ */
 const companyRefs = (user) =>
   (Array.isArray(user?.official?.companyIds) ? user.official.companyIds : [])
     .filter((c) => c && c.companyName !== undefined)
     .map((c) => ({ _id: c._id, companyName: c.companyName || "" }));
+
+/** Companies this login may manage — same official.companyIds list (own + assigned). */
+const managementCompanyIds = (user) => userCompanyIds(user);
 
 /** @deprecated Name is not stored on the user. Use companyNamesForUser. */
 const getUserCompany = () => "";
@@ -114,7 +121,7 @@ const isSameCompany = (companyA, companyB) => {
 /** True if actor and employee share at least one company id. */
 const sharesCompany = (actor, employee) => {
   if (hasGlobalCompanyAccess(actor)) return true;
-  const mine = new Set(userCompanyIds(actor));
+  const mine = new Set(managementCompanyIds(actor));
   if (!mine.size) return false;
   return userCompanyIds(employee).some((id) => mine.has(id));
 };
@@ -150,11 +157,11 @@ const assertSameCompanyEmployee = (actor, employee) => {
   }
   if (hasGlobalCompanyAccess(actor)) return null;
   if (String(actor._id) === String(employee._id)) return null;
-  if (!userCompanyIds(actor).length) {
+  if (!managementCompanyIds(actor).length) {
     return "Your profile has no company — cannot manage employees";
   }
   if (!sharesCompany(actor, employee)) {
-    return userCompanyIds(actor).length === 1
+    return managementCompanyIds(actor).length === 1
       ? "You can only manage employees for your own company"
       : "You can only manage employees for your assigned companies";
   }
@@ -162,12 +169,14 @@ const assertSameCompanyEmployee = (actor, employee) => {
 };
 
 /**
- * Mongo filter for user list APIs.
- * null = all companies; false = block; object = scoped filter on companyIds.
+ * Mongo filter for user / employee list APIs.
+ * null  = Super Admin / Admin → all companies
+ * false = no company assigned → block
+ * object = HR / others → users whose official.companyIds overlap theirs
  */
 const companyFilter = (actor) => {
   if (hasGlobalCompanyAccess(actor)) return null;
-  const ids = userCompanyIds(actor);
+  const ids = managementCompanyIds(actor);
   if (!ids.length) return false;
   return { "official.companyIds": { $in: ids } };
 };
@@ -227,7 +236,7 @@ const companyListForUser = async (user) => {
     }));
   }
 
-  const ids = userCompanyIds(user);
+  const ids = managementCompanyIds(user);
 
   if (!ids.length) return [];
 
@@ -352,6 +361,7 @@ module.exports = {
   companyExactRegex,
   getUserCompany,
   userCompanyIds,
+  managementCompanyIds,
   COMPANY_POPULATE,
   companyRefs,
   hasGlobalCompanyAccess,

@@ -1,7 +1,11 @@
 /**
- * Catalog = Company tree (branches[].branchId → shifts[].shiftId, master ids).
- * Assignment = User.official.branchId + shiftId (same master ids).
- * Names / codes come from the branch / shift masters; days stay on the company shift.
+ * COMPANY ↔ BRANCH ↔ SHIFT placement (employee / Access & Control assign).
+ *
+ * Catalog  = Company.branches[].branchId → shifts[].shiftId (master ids)
+ * Assignment = User.official.companyIds + branchId + shiftId
+ *
+ * Attendance punch does NOT use attachPlacement / applyPublicPlacement.
+ * Punch reads via src/utils/attendancePlacement.js (separate, read-only).
  */
 const Company = require("../models/Company");
 const { getModel } = require("../models/Master");
@@ -152,7 +156,14 @@ const attachPlacementMany = async (rows) => {
   return rows;
 };
 
-/** { day, shift: { _id, name, code } } for the user's company shift on dateStr, or null */
+/**
+ * READ-ONLY day timings from company tree for a date.
+ * Returns { day, shift: { _id, name, code } } or null.
+ *
+ * IMPORTANT: Do NOT use this to change employee assignment.
+ * Company / employee assign still uses assertUserPlacement + attachPlacement only.
+ * Attendance punch uses src/utils/attendancePlacement.js (separate helper).
+ */
 const getUserDaySchedule = async (user, dateStr) => {
   const placed = await assertUserPlacement({
     companyIds: userCompanyIds(user),

@@ -1,12 +1,16 @@
 /**
- * SHIFT TIMING HELPERS — punch / timesheet window
- * Uses the user's assigned company shift (branchId + shiftId).
+ * SHIFT TIMING HELPERS — used by attendance punch / day metrics only.
+ *
+ * Does NOT create or change company / employee assignment.
+ * Reads placement via attendancePlacement.js (attendance-only helper).
  */
 const TZ = () => process.env.TZ || "Asia/Kolkata";
 
+/** Today as YYYY-MM-DD in app timezone (default Asia/Kolkata) */
 const todayDate = () =>
   new Date().toLocaleDateString("en-CA", { timeZone: TZ() });
 
+/** Minutes from midnight for a Date in app TZ (e.g. 10:30 → 630) */
 const minutesOfDay = (date) => {
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: TZ(),
@@ -19,6 +23,7 @@ const minutesOfDay = (date) => {
   return hour * 60 + minute;
 };
 
+/** "HH:mm" → minutes from midnight (or null if bad) */
 const parseHm = (hm) => {
   if (!hm || typeof hm !== "string") return null;
   const [h, m] = hm.split(":").map(Number);
@@ -26,12 +31,53 @@ const parseHm = (hm) => {
   return h * 60 + m;
 };
 
+/** Weekday number 0=Sun … 6=Sat for a YYYY-MM-DD string */
 const weekdayOf = (dateStr) => {
   const d = new Date(`${String(dateStr).slice(0, 10)}T12:00:00+05:30`);
   return d.getUTCDay();
 };
 
+const WEEKDAY_NAMES = [
+  "sunday",
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+];
+
+/**
+ * That date's row from a company shift monthlySchedule.
+ * Week 1 = days 1–7, week 2 = 8–14, … week 5 = 29–31.
+ */
+const dayScheduleOf = (monthlySchedule, dateStr) => {
+  const date = new Date(`${String(dateStr).slice(0, 10)}T12:00:00+05:30`);
+  if (Number.isNaN(date.getTime())) return null;
+  const weekNumber = Math.min(5, Math.ceil(date.getUTCDate() / 7));
+  const weekday = WEEKDAY_NAMES[date.getUTCDay()];
+  const weeks = Array.isArray(monthlySchedule) ? monthlySchedule : [];
+  const week =
+    weeks.find((w) => w.weekNumber === weekNumber) ||
+    weeks.find((w) => w.weekNumber === 4) ||
+    weeks[0];
+  return (week?.days || []).find((d) => d.day === weekday) || null;
+};
+
+/** Minutes late vs that day's shift start + grace. 0 when on time or start is missing. */
+const lateByMinutesOf = (punchAt, startTime, graceMinutes = DEFAULT_SHIFT.graceMinutes) => {
+  const start = parseHm(startTime);
+  if (start == null || !punchAt) return 0;
+  const grace = Number(graceMinutes) || 0;
+  return Math.max(0, minutesOfDay(new Date(punchAt)) - (start + grace));
+};
+
+/**
+ * Fallback when employee has no company shift assigned.
+ * Used only for punch window / metrics — never written to User.
+ */
 const DEFAULT_SHIFT = {
+  _id: null,
   code: "DEFAULT",
   name: "Default Shift",
   startTime: "10:00",
@@ -40,48 +86,109 @@ const DEFAULT_SHIFT = {
   graceMinutes: 10,
   allowEarlyPunchIn: true,
   allowLatePunchOut: true,
-  weeklyOffDays: [0],
-  halfDayDays: [6],
+  weeklyOffDays: [0], // Sunday
+  halfDayDays: [6], // Saturday
   status: "Active",
   isDefault: true,
 };
 
+/** Standard full day = 9 hours → OT = worked − 9h (if positive) */
+const STANDARD_WORK_MINUTES = 9 * 60;
+
+const overtimeMinutesOf = (workedMinutes) => {
+  const worked = Number(workedMinutes) || 0;
+  return Math.max(0, worked - STANDARD_WORK_MINUTES);
+};
+
+const emptyPlacement = () => ({
+  company: null,
+  branch: null,
+});
+
+/**
+ * Resolve shift + company + branch for attendance punch.
+ *
+ * READ-ONLY: does not update User.official / Company assignment.
+ * Uses attendancePlacement (separate from employee assign APIs).
+ *
+ * @returns {{ assignment, shift, company, branch }}
+ */
 const getAssignedShift = async (employeeId, dateStr) => {
   try {
     const User = require("../models/User");
-    const { getUserDaySchedule } = require("./companyShift");
+    // Attendance-only helper — NOT companyShift.attachPlacement
+    const { getAttendanceDayPlacement } = require("./attendancePlacement");
+
     const user = await User.findById(employeeId).select("official").lean();
     const resolved = user
-      ? await getUserDaySchedule(user, dateStr || todayDate())
+      ? await getAttendanceDayPlacement(user, dateStr || todayDate())
       : null;
+
     const day = resolved?.day;
-    if (!day) {
-      return { assignment: null, shift: { ...DEFAULT_SHIFT } };
+    const placement = {
+      company: resolved?.company || null,
+      branch: resolved?.branch || null,
+    };
+    const shiftId = resolved?.shift?._id || null;
+
+    // No workplace on the user → caller must not save a fake company/shift
+    if (!placement.company || !placement.branch || !shiftId) {
+      return {
+        assignment: null,
+        shift: { ...DEFAULT_SHIFT },
+        ...emptyPlacement(),
+      };
     }
 
-    const weekday = weekdayOf(dateStr || todayDate());
     const shiftName = resolved.shift?.name || DEFAULT_SHIFT.name;
     const shiftCode = resolved.shift?.code || DEFAULT_SHIFT.code;
-    if (day.isOff) {
+
+    // Shift is assigned but today's row is missing → keep company/branch/shift, default hours
+    if (!day) {
       return {
         assignment: { source: "company" },
+        ...placement,
         shift: {
           ...DEFAULT_SHIFT,
+          _id: shiftId,
           name: shiftName,
           code: shiftCode,
-          weeklyOffDays: [weekday],
-          halfDayDays: [],
+          isDefault: false,
         },
       };
     }
 
+    const weekday = weekdayOf(dateStr || todayDate());
+
+    // Weekly off day on company schedule
+    if (day.isOff) {
+      return {
+        assignment: { source: "company" },
+        ...placement,
+        shift: {
+          ...DEFAULT_SHIFT,
+          _id: shiftId,
+          name: shiftName,
+          code: shiftCode,
+          weeklyOffDays: [weekday],
+          halfDayDays: [],
+          isDefault: false,
+        },
+      };
+    }
+
+    // Working day — copy start/end from company day row
     const start = parseHm(day.startTime);
     const end = parseHm(day.endTime);
+    // Treat ≤ 5h window as half-day for that weekday
     const half = start != null && end != null && end - start <= 5 * 60;
+
     return {
       assignment: { source: "company" },
+      ...placement,
       shift: {
         ...DEFAULT_SHIFT,
+        _id: shiftId,
         name: shiftName,
         code: shiftCode,
         startTime: day.startTime || DEFAULT_SHIFT.startTime,
@@ -93,10 +200,16 @@ const getAssignedShift = async (employeeId, dateStr) => {
       },
     };
   } catch (_err) {
-    return { assignment: null, shift: { ...DEFAULT_SHIFT } };
+    // Any DB error → safe default (punch still works)
+    return {
+      assignment: null,
+      shift: { ...DEFAULT_SHIFT },
+      ...emptyPlacement(),
+    };
   }
 };
 
+/** holiday | weeklyOff | halfDay | fullDay */
 const dayTypeOf = (shift, dateStr, holidayMap = {}) => {
   if (holidayMap && holidayMap[dateStr]) return "holiday";
   const day = weekdayOf(dateStr);
@@ -114,6 +227,10 @@ const effectiveEndTime = (shift, dateStr) => {
   return shift?.endTime || "19:00";
 };
 
+/**
+ * Gatekeeper for punch-in / punch-out time.
+ * Returns { ok, message, isEarly, isLate }.
+ */
 const validatePunchAgainstShift = (shift, punchAt, punchType, dateStr) => {
   if (!shift) {
     return { ok: true, message: null, isEarly: false, isLate: false };
@@ -142,15 +259,18 @@ const validatePunchAgainstShift = (shift, punchAt, punchType, dateStr) => {
       };
     }
     const grace = Number(shift.graceMinutes) || 0;
+    const lateByMinutes = Math.max(0, punchMin - (start + grace));
     return {
       ok: true,
       message: null,
       isEarly: punchMin < start,
-      isLate: punchMin > start + grace,
+      isLate: lateByMinutes > 0,
+      lateByMinutes,
       dayType: type,
     };
   }
 
+  // Punch-out: always allowed; late/early flags for metrics
   return {
     ok: true,
     message: null,
@@ -160,6 +280,7 @@ const validatePunchAgainstShift = (shift, punchAt, punchType, dateStr) => {
   };
 };
 
+/** "14:30" style clock for UI */
 const formatPunchStamp = (date) => {
   if (!date) return "";
   return new Date(date).toLocaleTimeString("en-GB", {
@@ -170,6 +291,7 @@ const formatPunchStamp = (date) => {
   });
 };
 
+/** Minutes → "H:MM" */
 const formatHours = (mins) => {
   if (!Number.isFinite(mins) || mins <= 0) return "0:00";
   const h = Math.floor(mins / 60);
@@ -177,6 +299,10 @@ const formatHours = (mins) => {
   return `${h}:${String(m).padStart(2, "0")}`;
 };
 
+/**
+ * After punch-out: Present / HalfDay / Absent + late / early / OT.
+ * Status values match Attendance.DAY_STATUSES (no spaces).
+ */
 const computeDayMetrics = (record, shift, dateStr, holidayMap = {}) => {
   const shiftObj = shift || DEFAULT_SHIFT;
   const date = dateStr || record?.date || todayDate();
@@ -186,8 +312,9 @@ const computeDayMetrics = (record, shift, dateStr, holidayMap = {}) => {
       statusCode: "HO",
       status: "Holiday",
       workedMinutes: 0,
-      lateMinutes: 0,
-      earlyExitMinutes: 0,
+      overtimeMinutes: 0,
+      lateByMinutes: 0,
+      earlyByMinutes: 0,
       isLate: false,
       isEarlyExit: false,
     };
@@ -197,22 +324,25 @@ const computeDayMetrics = (record, shift, dateStr, holidayMap = {}) => {
   if (type === "weeklyOff") {
     return {
       statusCode: "WO",
-      status: "Weekly Off",
+      status: "WeeklyOff",
       workedMinutes: 0,
-      lateMinutes: 0,
-      earlyExitMinutes: 0,
+      overtimeMinutes: 0,
+      lateByMinutes: 0,
+      earlyByMinutes: 0,
       isLate: false,
       isEarlyExit: false,
     };
   }
 
+  // Incomplete punches → Absent (until both in + out)
   if (!record?.punchIn || !record?.punchOut) {
     return {
       statusCode: "A",
       status: "Absent",
       workedMinutes: 0,
-      lateMinutes: 0,
-      earlyExitMinutes: 0,
+      overtimeMinutes: 0,
+      lateByMinutes: 0,
+      earlyByMinutes: 0,
       isLate: false,
       isEarlyExit: false,
     };
@@ -224,22 +354,24 @@ const computeDayMetrics = (record, shift, dateStr, holidayMap = {}) => {
   const inMin = minutesOfDay(record.punchIn);
   const outMin = minutesOfDay(record.punchOut);
   const workedMinutes = Math.max(0, outMin - inMin);
-  const lateMinutes = Math.max(0, inMin - (start + grace));
-  const earlyExitMinutes = Math.max(0, end - outMin);
+  const lateByMinutes = Math.max(0, inMin - (start + grace));
+  const earlyByMinutes = Math.max(0, end - outMin);
   const isHalf = type === "halfDay";
+  const overtimeMinutes = overtimeMinutesOf(workedMinutes);
 
   return {
     statusCode: isHalf ? "HD" : "P",
-    status: isHalf ? "Half Day" : "Present",
+    status: isHalf ? "HalfDay" : "Present",
     workedMinutes,
-    lateMinutes,
-    earlyExitMinutes,
-    isLate: lateMinutes > 0,
-    isEarlyExit: earlyExitMinutes > 0,
+    overtimeMinutes,
+    lateByMinutes,
+    earlyByMinutes,
+    isLate: lateByMinutes > 0,
+    isEarlyExit: earlyByMinutes > 0,
   };
 };
 
-/** @deprecated Shift master removed */
+/** @deprecated old Shift master removed — kept so old imports don't crash */
 const getShiftById = async () => null;
 
 module.exports = {
@@ -248,9 +380,13 @@ module.exports = {
   minutesOfDay,
   parseHm,
   weekdayOf,
+  dayScheduleOf,
+  lateByMinutesOf,
   dayTypeOf,
   effectiveEndTime,
   DEFAULT_SHIFT,
+  STANDARD_WORK_MINUTES,
+  overtimeMinutesOf,
   getAssignedShift,
   validatePunchAgainstShift,
   computeDayMetrics,

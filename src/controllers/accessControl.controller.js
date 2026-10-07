@@ -13,6 +13,7 @@ const {
   normalizeRoleName,
   isSuperAdmin,
   isPlatformRole,
+  isMultiCompanyRole,
 } = require("../config/roles");
 const { queueWelcomeEmail, sendEmail } = require("../utils/mail");
 const { sendExcel } = require("../utils/excel");
@@ -24,6 +25,7 @@ const {
   hasGlobalCompanyAccess,
   attachCompany,
   writeCompanyFields,
+  userCompanyIds,
 } = require("../utils/companyScope");
 const { assertTeamOrCompanyEmployee } = require("../utils/teamScope");
 const {
@@ -570,6 +572,79 @@ const exportUsers = async (req, res) => {
   }
 };
 
+/**
+ * POST /api/users/:id/assign-companies
+ * Super Admin only. Keeps companyIds[0] as the HR user's own company.
+ * Every other id in the body is appended as assigned (all branches and shifts).
+ * branchId and shiftId are left as they are.
+ */
+const assignHrCompanies = async (req, res) => {
+  try {
+    if (!isSuperAdmin(req.user)) {
+      return res.status(403).json({
+        message: "Only Super Admin can assign companies to HR",
+      });
+    }
+
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const roleName = normalizeRoleName(user.role);
+    if (isPlatformRole(roleName)) {
+      return res.status(400).json({
+        message:
+          "Admin and Super Admin already have access to all companies — do not assign companyIds",
+      });
+    }
+    if (!isMultiCompanyRole(roleName)) {
+      return res.status(400).json({
+        message: "Companies can be assigned only to an HR Manager",
+      });
+    }
+
+    const before = user.toObject();
+    const assigned = await attachCompany(req.user, roleName, {
+      companyIds: req.body.companyIds,
+    });
+    if (!assigned.ok) {
+      return res.status(assigned.status).json({ message: assigned.message });
+    }
+
+    if (!user.official) user.official = {};
+    const ownId = userCompanyIds(user)[0] || null;
+    const incoming = assigned.companyIds.map((id) => String(id));
+    const rest = incoming.filter((id) => id !== String(ownId || ""));
+    user.official.companyIds = ownId ? [ownId, ...rest] : incoming;
+    user.markModified("official");
+    await user.save();
+    await User.updateOne(
+      { _id: user._id },
+      { $unset: { "official.assignedCompanies": 1 } }
+    );
+
+    await logEmployeeActivity({
+      actor: req.user,
+      employee: user,
+      action: "update",
+      section: "companies",
+      before,
+    });
+
+    const fresh = await User.findById(user._id).select("-password");
+    const safe = await safeUser(fresh);
+    return res.json({
+      message:
+        "Companies assigned. First company stays their own. Later companies are access only — all branches, shifts and employees. Branch and shift are unchanged.",
+      companies: safe?.official?.companyIds || [],
+      user: safe,
+    });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
 const sendUserMail = async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select(
@@ -625,6 +700,7 @@ module.exports = {
   updateUser,
   deleteUser,
   exportUsers,
+  assignHrCompanies,
   sendUserMail,
   maxSuperAdmins,
 };

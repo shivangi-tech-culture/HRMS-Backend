@@ -105,8 +105,9 @@ const userSchema = new mongoose.Schema(
       },
       /**
        * Company _ids (Employee / RM: one. HR: one or more).
-       * Catalog of branches/shifts is on Company — GET /api/companies/:id.
-       * This user's workplace is official.branchId + official.shiftId (not the whole tree).
+       * Index 0 is this person's own workplace (branchId + shiftId sit on it).
+       * Later ids are assigned to an HR Manager for access only:
+       * every branch, shift and employee of that company. No extra flag on the id.
        */
       companyIds: {
         type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Company" }],
@@ -314,8 +315,12 @@ userSchema.index(...uniquePartial("personal.panNo"));
 userSchema.index(...uniquePartial("personal.aadhaarNo"));
 userSchema.index(...uniquePartial("personal.drivingLicenseNo"));
 userSchema.index(...uniquePartial("personal.passportNo"));
+userSchema.index({ "official.companyIds": 1 });
 userSchema.index({ "official.branchId": 1 });
 userSchema.index({ "official.shiftId": 1 });
+userSchema.index({ role: 1, status: 1, name: 1 });
+userSchema.index({ role: 1, status: 1, "official.companyIds": 1 });
+userSchema.index({ createdAt: -1 });
 userSchema.index({ "official.reportingHead1": 1 });
 userSchema.index({ "official.reportingHead2": 1 });
 

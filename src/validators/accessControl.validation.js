@@ -84,8 +84,14 @@ const accessSendMailSchema = Joi.object({
   isHtml: Joi.boolean().default(false),
 }).unknown(false);
 
+/** Super Admin assigns the full company list on an HR Manager. */
+const assignHrCompaniesSchema = Joi.object({
+  companyIds: companyIdsField.required(),
+}).unknown(false);
+
 module.exports = {
   createAccessUserSchema,
   updateAccessUserSchema,
   accessSendMailSchema,
+  assignHrCompaniesSchema,
 };

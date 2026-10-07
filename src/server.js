@@ -69,7 +69,7 @@ app.use(
 app.use(cookieParser());
 
 /** JSON body parser — max 1 MB so huge payloads are rejected early */
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: "10mb" }));
 
 /** Morgan — colored request log (method, URL, status, ms) */
 app.use(
@@ -162,7 +162,7 @@ app.use("/api/hierarchy", hierarchyRoutes); // org hierarchy tree
 app.use("/api/permissions", permissionRoutes); // catalogs + my permissions
 app.use("/api/employees", employeeRoutes); // employees only (role = Employee)
 app.use("/api/users", accessControlRoutes); // Access & Control (any role)
-app.use("/api/attendance", attendanceRoutes); // self punch in/out + today + my punches
+app.use("/api/attendance", attendanceRoutes); // punch · daily · calendar · late-early · approve/reject
 app.use("/api/mail", mailRoutes); // Organization → Mail send
 app.use("/api/masters", masterRoutes); // SaaS masters (typed collections, including Branch + Shift)
 app.use("/api/companies", companyRoutes); // Company CRUD
