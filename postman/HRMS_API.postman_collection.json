@@ -1,7 +1,7 @@
 {
   "info": {
     "_postman_id": "6f1c2a4e-8b3d-4c7a-9e21-5d4b8a7c3f10",
-    "name": "HRMS Project All API",
+    "name": "HRMS ALL APIs",
     "description": "**How to use**\n**Use with No Environment** (or an environment without baseUrl / token / password / *Id keys) — environment values override these collection variables.\n\n1. **0. Login & My Account → 1. Login** (saves {{token}}; every request sends it as Bearer auth).\n2. **1. ADMIN** = all admin modules, **2. EMPLOYEE (ESS)** = employee self-service (starts with Login as Employee).\n3. Every module folder lists all its APIs: **Create → List → Update → Delete** first (all body / query params), then the module's other routes.\n   - Create saves the new id, Update / Delete use it, Delete clears it.\n   - List: optional filters are in the Params tab (unticked) — tick the ones you want.\n4. **1.2 Masters**: one folder per master type (Department, Designation, Branch, Shift, …) with Create / List / Get / Update / Delete.\n5. Company / branch / shift / manager / employee ids are auto-filled before send when empty.\n\nSeed logins (password 123456): superadmin@gmail.com, admin@gmail.com, hr@gmail.com, manager@gmail.com, employee@gmail.com.\n\n**How to read params:** Each request → Docs / description has **Parameters (type + how to send)**. Query & form fields also show descriptions in the Params / Body tabs. JSON: unquoted numbers/booleans; dates `YYYY-MM-DD`; times `HH:mm`.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
@@ -45,7 +45,7 @@
           "  call('/api/masters?type=branch&status=Active&limit=2', (j) => { cv.set('branchId', pick(j.masters, 0)); cv.set('branchId2', pick(j.masters, 1)); });",
           "  call('/api/masters?type=shift&status=Active&limit=2', (j) => { cv.set('shiftId', pick(j.masters, 0)); cv.set('shiftId2', pick(j.masters, 1)); });",
           "};",
-          "const needCompany = ['companyId', 'branchId', 'branchId2', 'shiftId', 'shiftId2', 'managerId'].some(missing);",
+          "const needCompany = ['companyId', 'companyId2', 'branchId', 'branchId2', 'shiftId', 'shiftId2', 'managerId'].some(missing);",
           "const needEmployees = ['employeeId1', 'employeeId2'].some(missing);",
           "const fillEmployees = (coId) => call('/api/employees?limit=2' + (coId ? '&companyId=' + coId : ''), (j) => {",
           "  cv.set('employeeId1', pick(j.employees, 0));",
@@ -62,7 +62,9 @@
           "    const br2 = branches.find((b) => b !== br) || br;",
           "    const shifts = live(br.shifts);",
           "    const masterId = (m) => (m && m._id) || m || '';",
+          "    const co2 = list.find((c) => String(c._id) !== String(co._id)) || co;",
           "    cv.set('companyId', co._id);",
+          "    cv.set('companyId2', co2._id);",
           "    cv.set('branchId', masterId(br.branchId));",
           "    cv.set('branchId2', masterId(br2.branchId));",
           "    cv.set('shiftId', masterId((shifts[0] || {}).shiftId));",
@@ -469,7 +471,7 @@
       "item": [
         {
           "name": "1.1 Company",
-          "description": "Plain CRUD — 5 APIs. Create / Update / Delete: Super Admin / Admin. List + Get: HR / Reporting Manager see their own companies.\nGet Company = all details of one company (branches → shifts → monthlySchedule + reportingManagers) — use it for create-employee dropdowns too.\nCRUD uses {{newCompanyId}}.",
+          "description": "Plain CRUD — 5 APIs. Create / Update / Delete: Super Admin and Admin only.\nList + Get: Super Admin and Admin see every company (scope all). HR sees every assigned company on their companyIds (scope assigned) — own company plus later assigned ids, with all branches, shifts and employees. Reporting Manager sees their one company.\nGet Company = all details of one company (branches → shifts → monthlySchedule + reportingManagers).\nCRUD uses {{newCompanyId}}.",
           "item": [
             {
               "name": "1. Create Company",
@@ -555,7 +557,7 @@
                     }
                   ]
                 },
-                "description": "GET /api/companies — tick `search` / `isActive` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `search` — string | optional | match company name or company code\n- `isActive` — boolean | optional | `true` or `false` — omit to list all\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                "description": "GET /api/companies — who sees what depends on the login token.\n- Super Admin → every company (`scope: all`)\n- Admin → every company (`scope: all`)\n- HR Manager → every company assigned on their account (`scope: assigned`). First company is their own. Later companies are access only: all branches, shifts and employees of that company.\n- Reporting Manager / Employee → their one company (`scope: assigned`)\nA company id that is not on the HR user returns nothing in this list. Tick `search` / `isActive` in Params to filter inside that set.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `search` — string | optional | match company name or company code\n- `isActive` — boolean | optional | `true` or `false` — omit to list all\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
               }
             },
             {
@@ -574,7 +576,7 @@
                     "{{newCompanyId}}"
                   ]
                 },
-                "description": "All details of one company: companyName, companyCode, isActive, branches[] → shifts[] → monthlySchedule (week 1–5 day timings), and reportingManagers[] (active managers of this company).\nCreate-employee form: companyIds ← `_id`, branchId ← `branches[].branchId._id`, shiftId ← `branches[].shifts[].shiftId._id`, reportingHead1 ← `reportingManagers[]._id`.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `newCompanyId` → {{newCompanyId}} — string (MongoId / id) | set collection variable after create/list\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                "description": "All details of one company: companyName, companyCode, isActive, branches[] → shifts[] → monthlySchedule (week 1–5 day timings), and reportingManagers[] (active managers of this company).\nSuper Admin and Admin can open any company. HR can open only a company on their companyIds (own or assigned) — that response includes every branch and shift of that company. Any other id is 403.\nCreate-employee form: companyIds ← `_id`, branchId ← `branches[].branchId._id`, shiftId ← `branches[].shifts[].shiftId._id`, reportingHead1 ← `reportingManagers[]._id`.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `newCompanyId` → {{newCompanyId}} — string (MongoId / id) | set collection variable after create/list\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
               }
             },
             {
@@ -4374,7 +4376,7 @@
         },
         {
           "name": "1.4 Access & Control (Users)",
-          "description": "Login accounts: Admin, HR Manager, Reporting Manager, Employee.",
+          "description": "Login accounts: Admin, HR Manager, Reporting Manager, Employee. Super Admin assigns extra companies onto HR companyIds (6. Assign Companies to HR). First company is their own. Later companies are access only (all branches, shifts, employees). No extra flag. Branch and shift stay. Admin and Super Admin see every company.",
           "item": [
             {
               "name": "1. Create User",
@@ -4427,7 +4429,7 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                  "raw": "{{baseUrl}}/api/users?page={{page}}&limit={{limit}}",
+                  "raw": "{{baseUrl}}/api/users?company={{companyId}}&page={{page}}&limit={{limit}}",
                   "host": [
                     "{{baseUrl}}"
                   ],
@@ -4463,8 +4465,14 @@
                     {
                       "key": "company",
                       "value": "{{companyId}}",
+                      "disabled": false,
+                      "description": "string | optional | Company _id ({{companyId}}) or exact company name — SA/Admin any; HR assigned only"
+                    },
+                    {
+                      "key": "companyId",
+                      "value": "{{companyId}}",
                       "disabled": true,
-                      "description": "string | optional | company name (exact master name)"
+                      "description": "alias of company — Company MongoId"
                     },
                     {
                       "key": "branch",
@@ -4490,7 +4498,7 @@
                     }
                   ]
                 },
-                "description": "GET /api/users — tick any filter in Params. `company` = id or name, `branch` / `shift` = id, name or code.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `search` — string | optional | name / email / employee code text search\n- `role` — string | optional filter | role name e.g. `Employee` / `HR Manager`\n- `status` — string | optional | `Active` or `Inactive`\n- `department` — string | optional | department name\n- `company` — string | optional | company name (exact master name)\n- `branch` — string | optional | current branch filter — Branch `_id`, branch name or branch code (e.g. `NOI`)\n- `shift` — string | optional | current shift filter — Shift `_id`, shift name or shift code (e.g. `GS-01`)\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                "description": "GET /api/users — tick any filter in Params. `company` = id or name, `branch` / `shift` = id, name or code.\nHR `companies[]` is `{ _id, companyName }` only. Index 0 is their own company. Later items are assigned for access (all branches, shifts and employees of that company). `branch` and `shift` stay on the person.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `search` — string | optional | name / email / employee code text search\n- `role` — string | optional filter | role name e.g. `Employee` / `HR Manager`\n- `status` — string | optional | `Active` or `Inactive`\n- `department` — string | optional | department name\n- `company` — string | optional | company name (exact master name)\n- `branch` — string | optional | current branch filter — Branch `_id`, branch name or branch code (e.g. `NOI`)\n- `shift` — string | optional | current shift filter — Shift `_id`, shift name or shift code (e.g. `GS-01`)\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
               }
             },
             {
@@ -4509,7 +4517,7 @@
                     "{{userId}}"
                   ]
                 },
-                "description": "\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `userId` → {{userId}} — string (MongoId / id) | set collection variable after create/list\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                "description": "GET /api/users/{{userId}}. `official.companyIds[0]` is the HR user's own company (`branchId` + `shiftId`). Every later id is assigned access: all branches, shifts and employees of that company. Companies are `{ _id, companyName }` — no extra flag.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `userId` → {{userId}} — string (MongoId / id) | set collection variable after create/list\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
               }
             },
             {
@@ -4579,7 +4587,41 @@
               }
             },
             {
-              "name": "6. Export Users (Excel)",
+              "name": "6. Assign Companies to HR",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/users/{{userId}}/assign-companies",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "users",
+                    "{{userId}}",
+                    "assign-companies"
+                  ]
+                },
+                "description": "POST /api/users/{{userId}}/assign-companies — Super Admin only.\nLogin as Super Admin first. Target `{{userId}}` must be an **HR Manager**.\nBody `companyIds` are the companies to assign. `companyIds[0]` stays the HR user's own company. Every other id is stored after it for access only: all branches, shifts and employees of that company. Branch and shift are not changed. Response companies stay `{ _id, companyName }`.\nAdmin and Super Admin are not assigned.\n\nResponse `companies`:\n```\n[\n  { \"_id\": \"...\", \"companyName\": \"TechCulture.Ai Private Limited\" },\n  { \"_id\": \"...\", \"companyName\": \"Other Company\" }\n]\n```\nFirst object is their own company. Every object after it is assigned access.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `userId` → {{userId}} — string (MongoId / id) | set collection variable after create/list\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `companyIds` — string[] (MongoId) | required | companies to assign. First existing company stays index 0 (their own). Later ids are access only (all branches, shifts, employees). Does not change branch or shift.\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"companyIds\": [\n    \"{{companyId}}\",\n    \"{{companyId2}}\"\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "7. Export Users (Excel)",
               "request": {
                 "method": "GET",
                 "header": [],
@@ -4642,7 +4684,7 @@
               }
             },
             {
-              "name": "7. Send Mail to User",
+              "name": "8. Send Mail to User",
               "request": {
                 "method": "POST",
                 "header": [
@@ -4676,7 +4718,7 @@
               }
             },
             {
-              "name": "8. Send Email (any address)",
+              "name": "9. Send Email (any address)",
               "request": {
                 "method": "POST",
                 "header": [
@@ -4709,7 +4751,7 @@
               }
             },
             {
-              "name": "9. Delete User",
+              "name": "10. Delete User",
               "request": {
                 "method": "DELETE",
                 "header": [],
@@ -5074,7 +5116,7 @@
               }
             },
             {
-              "name": "8. Delete List Row (bank account)",
+              "name": "8. Delete List Row",
               "request": {
                 "method": "DELETE",
                 "header": [
@@ -5084,7 +5126,7 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{baseUrl}}/api/employees/{{employeeId}}/accounts",
+                  "raw": "{{baseUrl}}/api/employees/{{employeeId}}/{{section}}",
                   "host": [
                     "{{baseUrl}}"
                   ],
@@ -5092,10 +5134,10 @@
                     "api",
                     "employees",
                     "{{employeeId}}",
-                    "accounts"
+                    "{{section}}"
                   ]
                 },
-                "description": "DELETE /api/employees/{{employeeId}}/:section — section: education | accounts | family | nominees | experience | visas | payroll. Body `{ _id }` of the row (not needed for payroll).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `employeeId` → {{employeeId}} — string (MongoId / id) | set collection variable after create/list\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `_id` — string (MongoId) | optional | existing sub-document id for edit\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                "description": "DELETE /api/employees/{{employeeId}}/:section — section: education | accounts | family | nominees | experience | visas | payroll. Body `{ _id }` of the row (not needed for payroll).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `employeeId` → {{employeeId}} — string (MongoId / id) | set collection variable after create/list\n- `section` → {{section}} — `education` | `accounts` | `family` | `nominees` | `experience` | `visas` | `payroll`\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `_id` — string (MongoId) | row id to delete. Omit for `payroll` (clears payroll)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"_id\": \"{{itemId}}\"\n}",
@@ -5241,6 +5283,458 @@
                 },
                 "description": "Nested `tree`: Super Admin → Admins → HR Managers → Reporting Managers. Each role node = `{ level, role, label, count, users[], children[] }` — `children[]` is the next role down. Every Reporting Manager in `users[]` has `teamCount` + `children[]` = their employees (`reportingLevel` 1 = primary, 2 = secondary). `unassignedEmployees[]` = no manager yet. Untick `companyId` for all companies.\nLogin as Reporting Manager → `scope: team`, tree rooted at \"Me\" with their team.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `companyId` → {{companyId}} — string (MongoId / id) | set collection variable after create/list\n\n**Query params** *(Params tab — each has description)*\n- `companyId` — string (MongoId 24-hex or company name) | optional | company selected in the UI ({{companyId}}) — untick / omit for all companies\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
               }
+            }
+          ]
+        },
+        {
+          "name": "1.7 Attendance",
+          "description": "Today's daily list, calendar, late/early arrivals, missed-punch mark, and one review API.\nPOST /api/attendance/{{attendanceId}}/review?decision=approve or decision=reject, body { reason }. Only Late. Day status stays Present.\nattendanceStatus is Early | On time | Late | Approved | Rejected. Overtime is minutes after that day's shift end, only after punch out.\nPOST /api/attendance/mark sets a missed punch in, punch out, or both. It does not change the employee's company, branch, or shift.\nScope: Super Admin/Admin = all · HR = assigned companies · Manager = team.",
+          "item": [
+            {
+              "name": "1. Daily Attendance",
+              "item": [
+                {
+                  "name": "1. List Daily (today)",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/attendance/daily?page={{page}}&limit={{limit}}",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "attendance",
+                        "daily"
+                      ],
+                      "query": [
+                        {
+                          "key": "search",
+                          "value": "",
+                          "disabled": true,
+                          "description": "string | optional | name / email / employee code text search"
+                        },
+                        {
+                          "key": "department",
+                          "value": "",
+                          "disabled": true,
+                          "description": "string | optional | department name"
+                        },
+                        {
+                          "key": "branchId",
+                          "value": "{{branchId}}",
+                          "disabled": true,
+                          "description": "string (MongoId 24-hex) | path | Branch master `_id` that is on this company (from GET /api/companies/{id} → branches[].branchId._id)"
+                        },
+                        {
+                          "key": "shiftId",
+                          "value": "{{shiftId}}",
+                          "disabled": true,
+                          "description": "see sample value | send same JSON type as example (string/number/boolean/array/object/null)"
+                        },
+                        {
+                          "key": "companyId",
+                          "value": "{{companyId}}",
+                          "disabled": true,
+                          "description": "string (MongoId 24-hex or company name) | optional | company selected in the UI ({{companyId}}) — untick / omit for all companies"
+                        },
+                        {
+                          "key": "workMode",
+                          "value": "ALL",
+                          "disabled": true,
+                          "description": "string | optional | `WFO` | `WFH` | `Hybrid` | `ALL`"
+                        },
+                        {
+                          "key": "status",
+                          "value": "ALL",
+                          "disabled": true,
+                          "description": "string | optional | Present | Absent | Late | Working | WFH | OnLeave | HalfDay | WeeklyOff | Holiday | MissedPunch | ALL"
+                        },
+                        {
+                          "key": "hasRemark",
+                          "value": "true",
+                          "disabled": true,
+                          "description": "string | optional | `true` = only rows that have a remark"
+                        },
+                        {
+                          "key": "attendanceStatus",
+                          "value": "Late",
+                          "disabled": true,
+                          "description": "string | optional | `Early` | `On time` | `Late` | `Approved` | `Rejected` | `ALL`"
+                        },
+                        {
+                          "key": "page",
+                          "value": "{{page}}",
+                          "description": "number | optional | page number, default `1`"
+                        },
+                        {
+                          "key": "limit",
+                          "value": "{{limit}}",
+                          "description": "number | optional | rows per page (usually 1–200)"
+                        }
+                      ]
+                    },
+                    "description": "Today's attendance. Server date is today.\nRow: employee, company, branch, shift (start, end, graceMinutes), punch times, workingHours, overtime, overtimeMinutes, status Present after punch-in, attendanceStatus Early | On time | Late | Approved | Rejected, lateByMinutes, earlyByMinutes, canApproveReject.\nEarly = before shift start. On time = start through grace (10 min). Late = after grace. canApproveReject is true only for Late.\nworkingHours is punch-in to punch-out. overtime is time after that day's shift end. Both stay 0 until punch out.\nNo companyId → first created company. Pass companyId to see that company.\nTest script saves the first employee `_id` into {{employeeId}} for Mark Attendance.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n- `search` — name / email / employee code\n- `department` `branchId` `shiftId` `companyId` — optional filters\n- `workMode` — WFO | WFH | Hybrid | ALL\n- `status` — Present | Absent | Late | Working | WFH | OnLeave | HalfDay | WeeklyOff | Holiday | MissedPunch | ALL\n- `attendanceStatus` — Early | On time | Late | Approved | Rejected | ALL. Use Late for the approval queue.\n- `hasRemark` — true = rows that have a remark\n- `page` `limit`\n"
+                  },
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "const j = pm.response.json();",
+                          "const row = (j.data || [])[0];",
+                          "const id = row && row.employee && row.employee._id;",
+                          "if (id) pm.collectionVariables.set('employeeId', id);"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "name": "2. Late rows (today)",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/attendance/daily?attendanceStatus=Late&page=1&limit=20",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "attendance",
+                        "daily"
+                      ],
+                      "query": [
+                        {
+                          "key": "attendanceStatus",
+                          "value": "Late",
+                          "description": "Late only. Early and On time are not in this list."
+                        },
+                        {
+                          "key": "page",
+                          "value": "1",
+                          "description": "number | optional | page number, default `1`"
+                        },
+                        {
+                          "key": "limit",
+                          "value": "20",
+                          "description": "number | optional | rows per page (usually 1–200)"
+                        }
+                      ]
+                    },
+                    "description": "Late punches waiting for approval. Early and On time are not included.\nTest script saves the first row attendanceId into {{attendanceId}}.\nThen run 3. Approve or 4. Reject. Both call the same API; only the decision param changes.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n- `attendanceStatus` — Late\n- `page` / `limit`\n"
+                  },
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "const j = pm.response.json();",
+                          "const row = (j.data || []).find(r => r.attendanceId) || (j.data || [])[0];",
+                          "if (row && row.attendanceId) pm.collectionVariables.set('attendanceId', row.attendanceId);"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "name": "3. Approve",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/attendance/{{attendanceId}}/review?decision=approve",
+                      "host": ["{{baseUrl}}"],
+                      "path": ["api", "attendance", "{{attendanceId}}", "review"],
+                      "query": [
+                        {
+                          "key": "decision",
+                          "value": "approve",
+                          "description": "string | required | `approve` or `reject`. Same API for both."
+                        }
+                      ]
+                    },
+                    "description": "Same API as Reject. Only Late can be approved.\nDay status stays Present. attendanceStatus becomes Approved.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n**Path:** `attendanceId` — from 2. Late rows\n**Query:** `decision` — `approve`\n**Body:** `reason` — required, why it was approved (max 500)\n",
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"reason\": \"Checked punch time. Approved.\"\n}",
+                      "options": { "raw": { "language": "json" } }
+                    }
+                  }
+                },
+                {
+                  "name": "4. Reject",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/attendance/{{attendanceId}}/review?decision=reject",
+                      "host": ["{{baseUrl}}"],
+                      "path": ["api", "attendance", "{{attendanceId}}", "review"],
+                      "query": [
+                        {
+                          "key": "decision",
+                          "value": "reject",
+                          "description": "string | required | `approve` or `reject`. Same API for both."
+                        }
+                      ]
+                    },
+                    "description": "Same API as Approve. Only Late can be rejected.\nDay status stays Present. attendanceStatus becomes Rejected.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n**Path:** `attendanceId` — from 2. Late rows\n**Query:** `decision` — `reject`\n**Body:** `reason` — required, why it was rejected (max 500)\n",
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"reason\": \"Punch time is too late. Rejected.\"\n}",
+                      "options": { "raw": { "language": "json" } }
+                    }
+                  }
+                },
+                {
+                  "name": "5. Mark Attendance",
+                  "request": {
+                    "method": "POST",
+                    "header": [{ "key": "Content-Type", "value": "application/json" }],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/attendance/mark",
+                      "host": ["{{baseUrl}}"],
+                      "path": ["api", "attendance", "mark"]
+                    },
+                    "description": "Missed punch only. Does not change the employee's company, branch, or shift.\n`employeeId` comes from 1. List Daily ({{employeeId}}).\nTime is 24-hour HH:mm. 09:30 stays 09:30. 15:30 is 3:30 PM.\nFinished day: send both punchInTime and punchOutTime.\nToday, punch in missed: send only punchInTime. Remove punchOutTime. They punch out themselves.\nPunch out missed: send only punchOutTime. Remove punchInTime.\nDoes not overwrite a punch that is already saved. Punch out must be after punch in. Future time is rejected.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n**Body:**\n- `employeeId` — required, employee `_id`\n- `date` — required, YYYY-MM-DD, today or earlier\n- `punchInTime` — optional HH:mm\n- `punchOutTime` — optional HH:mm\n- `reason` — required\n- `remarks` — optional\n",
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"employeeId\": \"{{employeeId}}\",\n  \"date\": \"{{attendanceDate}}\",\n  \"punchInTime\": \"09:30\",\n  \"punchOutTime\": \"18:30\",\n  \"reason\": \"Forgot to punch\",\n  \"remarks\": \"\"\n}",
+                      "options": { "raw": { "language": "json" } }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "name": "2. Attendance Calendar",
+              "item": [
+                {
+                  "name": "1. Calendar (month + day)",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/attendance/calendar?month={{attendanceMonth}}&date={{attendanceDate}}&page={{page}}&limit={{limit}}",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "attendance",
+                        "calendar"
+                      ],
+                      "query": [
+                        {
+                          "key": "month",
+                          "value": "{{attendanceMonth}}",
+                          "description": "YYYY-MM. Month grid. Default current month."
+                        },
+                        {
+                          "key": "date",
+                          "value": "{{attendanceDate}}",
+                          "description": "YYYY-MM-DD. Which day's employee rows are in data."
+                        },
+                        {
+                          "key": "companyId",
+                          "value": "{{companyId}}",
+                          "disabled": true,
+                          "description": "Company _id. Omit to use the first company (Super Admin/Admin) or the HR company."
+                        },
+                        {
+                          "key": "search",
+                          "value": "",
+                          "disabled": true,
+                          "description": "Name, email, or employee code. Filters that day's rows only."
+                        },
+                        {
+                          "key": "department",
+                          "value": "ALL",
+                          "disabled": true,
+                          "description": "Department name, or ALL."
+                        },
+                        {
+                          "key": "branchId",
+                          "value": "ALL",
+                          "disabled": true,
+                          "description": "Branch master _id, or ALL."
+                        },
+                        {
+                          "key": "shiftId",
+                          "value": "ALL",
+                          "disabled": true,
+                          "description": "Shift master _id, or ALL."
+                        },
+                        {
+                          "key": "workMode",
+                          "value": "ALL",
+                          "disabled": true,
+                          "description": "WFO | WFH | Hybrid | ALL"
+                        },
+                        {
+                          "key": "status",
+                          "value": "ALL",
+                          "disabled": true,
+                          "description": "Present | Absent | Late | Working | WFH | OnLeave | HalfDay | WeeklyOff | Holiday | MissedPunch | ALL"
+                        },
+                        {
+                          "key": "attendanceStatus",
+                          "value": "ALL",
+                          "disabled": true,
+                          "description": "Early | On time | Late | Approved | Rejected | ALL"
+                        },
+                        {
+                          "key": "hasRemark",
+                          "value": "true",
+                          "disabled": true,
+                          "description": "true = only rows that have a remark"
+                        },
+                        {
+                          "key": "page",
+                          "value": "{{page}}",
+                          "description": "Page of that day's rows. Default 1."
+                        },
+                        {
+                          "key": "limit",
+                          "value": "{{limit}}",
+                          "description": "Rows per page. Default 50, max 200."
+                        }
+                      ]
+                    },
+                    "description": "One call for the calendar screen.\n`employees` = headcount.\n`day` = selected date counts.\n`days[]` = counts for every date in the month. A future day has absent 0.\n`summary` = those counts added up for the month.\n`data[]` = that day's employee rows: punch times, workingHours, overtime, status, attendanceStatus.\nSearch, status, and attendanceStatus filter `data` only. The month grid stays the company roster.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n- `month` YYYY-MM\n- `date` YYYY-MM-DD\n- `companyId` `search` `department` `branchId` `shiftId`\n- `workMode` `status` `attendanceStatus` `hasRemark`\n- `page` `limit`\n"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "3. Late & Early",
+              "item": [
+                {
+                  "name": "1. List (late / early / all)",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/attendance/late-early?type=all&companyId={{companyId}}&page=1&limit=10",
+                      "host": ["{{baseUrl}}"],
+                      "path": ["api", "attendance", "late-early"],
+                      "query": [
+                        {
+                          "key": "type",
+                          "value": "all",
+                          "description": "`late` = late arrival (after grace) · `early` = early arrival (before shift start) · `all` = both. Counts for both tabs always come back."
+                        },
+                        {
+                          "key": "date",
+                          "value": "{{attendanceDate}}",
+                          "disabled": true,
+                          "description": "YYYY-MM-DD. Leave off to use today. Punches on 2026-10-08 will not show if this is 2026-10-07."
+                        },
+                        {
+                          "key": "from",
+                          "value": "",
+                          "disabled": true,
+                          "description": "YYYY-MM-DD range start. Use with to instead of date."
+                        },
+                        {
+                          "key": "to",
+                          "value": "",
+                          "disabled": true,
+                          "description": "YYYY-MM-DD range end."
+                        },
+                        {
+                          "key": "companyId",
+                          "value": "{{companyId}}",
+                          "description": "Company _id. Super Admin/Admin: omit to use the first company. HR: own company, or another only if assigned."
+                        },
+                        {
+                          "key": "search",
+                          "value": "",
+                          "disabled": true,
+                          "description": "Name, email, or employee code."
+                        },
+                        {
+                          "key": "department",
+                          "value": "ALL",
+                          "disabled": true,
+                          "description": "Department name, or ALL."
+                        },
+                        {
+                          "key": "branchId",
+                          "value": "ALL",
+                          "disabled": true,
+                          "description": "Branch master _id, or ALL."
+                        },
+                        {
+                          "key": "shiftId",
+                          "value": "ALL",
+                          "disabled": true,
+                          "description": "Shift master _id, or ALL."
+                        },
+                        {
+                          "key": "page",
+                          "value": "1",
+                          "description": "Page number. Default 1."
+                        },
+                        {
+                          "key": "limit",
+                          "value": "10",
+                          "description": "Rows per page. Default 10, max 200."
+                        }
+                      ]
+                    },
+                    "description": "One API for Late Arrivals and Early Arrivals.\n`type=late` after shift start + 10 min grace. `type=early` before shift start. `type=all` both.\nEach row: isLate, isEarly, lateByMinutes, earlyByMinutes, attendanceStatus (Early | On time | Late | Approved | Rejected), punch times, shift, company.\nApproved or Rejected still shows isLate when the punch was late.\n`counts.late` and `counts.early` are the tab badges. They do not change when type filters the page.\nLeave `date` off to use today. A past date returns that day only.\nSearch, department, branch, shift, company, page and limit are on this call.\n"
+                  },
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "const j = pm.response.json();",
+                          "const row = (j.data || [])[0];",
+                          "if (row && row._id) pm.collectionVariables.set('attendanceId', row._id);"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "name": "2. Detail",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/attendance/late-early/{{attendanceId}}",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "attendance",
+                        "late-early",
+                        "{{attendanceId}}"
+                      ]
+                    },
+                    "description": "One attendance row. Use the `_id` saved by 1. List.\nSame isLate, isEarly, lateByMinutes, earlyByMinutes, and attendanceStatus as the list.\nAlso returns punch, workInfo, timeline, and summary (shift start/end, break, overtime after shift end).\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n**Path:** `attendanceId` — from 1. List\n"
+                  }
+                }
+              ]
             }
           ]
         }
@@ -5483,7 +5977,7 @@
         },
         {
           "name": "2.2 Attendance (Punch)",
-          "description": "Employee punch + time sheet (login as Employee first — 2.1 → 1).",
+          "description": "Employee self punch. Response includes company, branch, shift, remarks, overtime after punch-out.\nLogin as Employee first (2.1 → 1).",
           "item": [
             {
               "name": "1. Punch In",
@@ -5506,10 +6000,10 @@
                     "punch-in"
                   ]
                 },
-                "description": "`source`: web | mobile | biometric. latitude / longitude as numbers.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `source` — string | required for punch | `web` | `mobile` | `biometric`\n- `latitude` — number | required | GPS latitude (-90…90) — send as number, not string\n- `longitude` — number | required | GPS longitude (-180…180) — send as number, not string\n- `remarks` — string | optional | max ~500 chars\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                "description": "Punch in for the logged-in employee. Day status becomes Present.\nattendanceStatus is Early (before shift start), On time (start through 10 min grace), or Late (after grace).\nAny same-day time before shift start is allowed.\n\n**Body:** `source` (web|mobile|biometric), `latitude`, `longitude`, optional `remarks`.\n",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"source\": \"web\",\n  \"latitude\": 28.6301,\n  \"longitude\": 77.2242,\n  \"remarks\": \"\"\n}",
+                  "raw": "{\n  \"source\": \"web\",\n  \"latitude\": 28.6301,\n  \"longitude\": 77.2242,\n  \"remarks\": \"Reached office\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -5524,7 +6018,7 @@
                     "type": "text/javascript",
                     "exec": [
                       "const j = pm.response.json();",
-                      "const id = j.record && j.record._id;",
+                      "const id = (j.record && (j.record.attendanceId || j.record._id)) || j.attendanceId || j._id;",
                       "if (id) pm.collectionVariables.set('attendanceId', id);"
                     ]
                   }
@@ -5552,7 +6046,7 @@
                     "punch-out"
                   ]
                 },
-                "description": "Same body as Punch In. Computes day status (Present / HalfDay / late / early).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `source` — string | required for punch | `web` | `mobile` | `biometric`\n- `latitude` — number | required | GPS latitude (-90…90) — send as number, not string\n- `longitude` — number | required | GPS longitude (-180…180) — send as number, not string\n- `remarks` — string | optional | max ~500 chars\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                "description": "Punch out. Working hours are from punch-in to punch-out. Day stays Present.\nOvertime is the time after that day's shift end. Early punch-in is not overtime.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n**Body:** `source` web | mobile | biometric, `latitude`, `longitude`, optional `remarks`\n",
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"source\": \"web\",\n  \"latitude\": 28.6301,\n  \"longitude\": 77.2242,\n  \"remarks\": \"\"\n}",
@@ -5562,7 +6056,20 @@
                     }
                   }
                 }
-              }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const j = pm.response.json();",
+                      "const id = (j.record && (j.record.attendanceId || j.record._id)) || j.attendanceId || j._id;",
+                      "if (id) pm.collectionVariables.set('attendanceId', id);"
+                    ]
+                  }
+                }
+              ]
             },
             {
               "name": "3. My Today",
@@ -5580,7 +6087,7 @@
                     "today"
                   ]
                 },
-                "description": "Today's attendance record (or null) + shift timings.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                "description": "Today's record + company / branch / shift.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
               }
             },
             {
@@ -5611,13 +6118,13 @@
                     },
                     {
                       "key": "date",
-                      "value": "",
+                      "value": "{{attendanceDate}}",
                       "disabled": true,
                       "description": "string (YYYY-MM-DD) | optional/required by API | single day"
                     },
                     {
                       "key": "status",
-                      "value": "",
+                      "value": "ALL",
                       "disabled": true,
                       "description": "string | optional | `ALL` | `Pending` | `Present` | `Absent` | `HalfDay` | `WeeklyOff` | `Holiday` | `MissedPunch` | `OnLeave` | `WFH`"
                     },
@@ -5633,7 +6140,7 @@
                     }
                   ]
                 },
-                "description": "Own punches only — each day split into IN / OUT rows, newest first. Untick from/to for all.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `from` — string (YYYY-MM-DD) | optional | range start date\n- `to` — string (YYYY-MM-DD) | optional | range end date\n- `date` — string (YYYY-MM-DD) | optional/required by API | single day\n- `status` — string | optional | `ALL` | `Pending` | `Present` | `Absent` | `HalfDay` | `WeeklyOff` | `Holiday` | `MissedPunch` | `OnLeave` | `WFH`\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                "description": "Own IN/OUT punch rows.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `from` — string (YYYY-MM-DD) | optional | range start date\n- `to` — string (YYYY-MM-DD) | optional | range end date\n- `date` — string (YYYY-MM-DD) | optional/required by API | single day\n- `status` — string | optional | `ALL` | `Pending` | `Present` | `Absent` | `HalfDay` | `WeeklyOff` | `Holiday` | `MissedPunch` | `OnLeave` | `WFH`\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
               }
             }
           ]
@@ -5747,6 +6254,10 @@
       "value": ""
     },
     {
+      "key": "companyId2",
+      "value": ""
+    },
+    {
       "key": "courseLevelMasterId",
       "value": ""
     },
@@ -5855,6 +6366,10 @@
       "value": ""
     },
     {
+      "key": "section",
+      "value": "accounts"
+    },
+    {
       "key": "shiftId",
       "value": ""
     },
@@ -5868,11 +6383,11 @@
     },
     {
       "key": "fromDate",
-      "value": "2026-09-01"
+      "value": "2026-10-01"
     },
     {
       "key": "toDate",
-      "value": "2026-09-30"
+      "value": "2026-10-31"
     },
     {
       "key": "token",
@@ -5885,6 +6400,18 @@
     {
       "key": "visaTypeMasterId",
       "value": ""
+    },
+    {
+      "key": "attendanceId",
+      "value": ""
+    },
+    {
+      "key": "attendanceDate",
+      "value": "2026-10-08"
+    },
+    {
+      "key": "attendanceMonth",
+      "value": "2026-10"
     }
   ]
 }

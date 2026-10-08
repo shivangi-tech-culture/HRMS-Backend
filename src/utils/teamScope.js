@@ -55,13 +55,22 @@ const validateReportingHeads = async (official) => {
   );
   for (const key of keys) {
     if (official[key] === "") official[key] = null;
-    if (!official[key]) continue;
-    const mgr = await User.findById(official[key]).select("role status").lean();
-    if (!mgr || !MANAGER_ROLES.includes(normalizeRoleName(mgr.role))) {
-      return `official.${key} must be a Reporting Manager _id`;
-    }
-    if (mgr.status !== "Active") {
-      return `official.${key} — Reporting Manager is inactive`;
+  }
+  const ids = keys.map((k) => official[k]).filter(Boolean);
+  if (ids.length) {
+    const managers = await User.find({ _id: { $in: ids } })
+      .select("role status")
+      .lean();
+    const byId = new Map(managers.map((m) => [String(m._id), m]));
+    for (const key of keys) {
+      if (!official[key]) continue;
+      const mgr = byId.get(String(official[key]));
+      if (!mgr || !MANAGER_ROLES.includes(normalizeRoleName(mgr.role))) {
+        return `official.${key} must be a Reporting Manager _id`;
+      }
+      if (mgr.status !== "Active") {
+        return `official.${key} — Reporting Manager is inactive`;
+      }
     }
   }
   if (

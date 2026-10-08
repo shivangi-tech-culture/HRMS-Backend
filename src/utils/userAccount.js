@@ -20,10 +20,21 @@ const {
   companyRefs,
   COMPANY_POPULATE,
   findCompany,
+  hasGlobalCompanyAccess,
+  managementCompanyIds,
 } = require("./companyScope");
 const { applyAnniversary } = require("./anniversary");
 const { attachPlacement } = require("./companyShift");
 const { getModel } = require("../models/Master");
+const mongoose = require("mongoose");
+
+/** Users whose companyIds include this company (own or assigned — same array). */
+const usersInCompanyFilter = (companyId) => {
+  const id = mongoose.Types.ObjectId.isValid(String(companyId))
+    ? new mongoose.Types.ObjectId(String(companyId))
+    : companyId;
+  return { "official.companyIds": id };
+};
 
 /** Populate for list / export queries */
 const LIST_POPULATE = [COMPANY_POPULATE];
@@ -44,6 +55,9 @@ const safeUser = async (doc) => {
   if (obj.official) {
     obj.official.reportingHead1 = headRef(obj.official.reportingHead1);
     obj.official.reportingHead2 = headRef(obj.official.reportingHead2);
+    if (Array.isArray(obj.official.companyIds)) {
+      obj.official.companyIds = companyRefs(obj);
+    }
   }
   await attachPlacement(obj);
   return obj;
@@ -132,27 +146,27 @@ const buildListQuery = async (req, { forceRole, roleScope } = {}) => {
   const search = filterValue(req, "search", "q", "query", "keyword");
   if (search) {
     const rx = new RegExp(escapeRegex(search), "i");
-    if (forceRole === EMPLOYEE || forceRole === "Employee") {
-      and.push({
-        $or: [
-          { name: rx },
-          { "official.employeeCode": rx },
-          { "official.officialEmail": rx },
-          { "official.designation": rx },
-          { "official.department": rx },
-        ],
-      });
-    } else {
-      and.push({
-        $or: [
-          { name: rx },
-          { "official.officialEmail": rx },
-          { "official.department": rx },
-          { role: rx },
-          { "official.employeeCode": rx },
-        ],
-      });
+    // Match company name → include those company ids in search
+    const Company = require("../models/Company");
+    const companyHits = await Company.find({ companyName: rx })
+      .select("_id")
+      .lean();
+    const companySearchIds = companyHits.map((c) => c._id);
+
+    const or = [
+      { name: rx },
+      { "official.officialEmail": rx },
+      { "official.employeeCode": rx },
+      { "official.department": rx },
+      { "official.designation": rx },
+    ];
+    if (!(forceRole === EMPLOYEE || forceRole === "Employee")) {
+      or.push({ role: rx });
     }
+    if (companySearchIds.length) {
+      or.push({ "official.companyIds": { $in: companySearchIds } });
+    }
+    and.push({ $or: or });
   }
 
   const role = !forceRole ? filterValue(req, "role") : null;
@@ -185,10 +199,41 @@ const buildListQuery = async (req, { forceRole, roleScope } = {}) => {
   const gender = filterValue(req, "gender");
   if (gender) and.push({ "personal.gender": exact(gender) });
 
+  /**
+   * Company filter — query: company= OR companyId=
+   * Super Admin / Admin → any company (full access for that selection)
+   * HR → only companies already on their official.companyIds (own + assigned)
+   */
   const company = filterValue(req, "company", "companyId");
+  let appliedCompanyId = "";
+  let appliedCompanyName = "";
   if (company) {
     const doc = await findCompany(company);
-    and.push(doc ? { "official.companyIds": doc._id } : { _id: null });
+    if (!doc) {
+      return {
+        error: {
+          status: 400,
+          message: "Company not found — use a valid company _id or exact name",
+        },
+      };
+    }
+
+    // HR / Manager: selected company must be in their allowed list
+    if (!hasGlobalCompanyAccess(req.user)) {
+      const allowed = new Set(managementCompanyIds(req.user).map(String));
+      if (!allowed.has(String(doc._id))) {
+        return {
+          error: {
+            status: 403,
+            message: "You can only filter by companies assigned to you",
+          },
+        };
+      }
+    }
+
+    and.push(usersInCompanyFilter(doc._id));
+    appliedCompanyId = String(doc._id);
+    appliedCompanyName = doc.companyName || "";
   }
 
   const managerId = filterValue(req, "managerId", "reportingHead");
@@ -210,10 +255,13 @@ const buildListQuery = async (req, { forceRole, roleScope } = {}) => {
   }
 
   const branch = filterValue(req, "branch", "branchId");
-  if (branch) and.push({ "official.branchId": await masterIdFilter("branch", branch) });
-
   const shift = filterValue(req, "shift", "shiftId");
-  if (shift) and.push({ "official.shiftId": await masterIdFilter("shift", shift) });
+  const [branchCond, shiftCond] = await Promise.all([
+    branch ? masterIdFilter("branch", branch) : null,
+    shift ? masterIdFilter("shift", shift) : null,
+  ]);
+  if (branchCond) and.push({ "official.branchId": branchCond });
+  if (shiftCond) and.push({ "official.shiftId": shiftCond });
 
   return {
     page,
@@ -228,6 +276,8 @@ const buildListQuery = async (req, { forceRole, roleScope } = {}) => {
       designation: designation || "",
       gender: gender || "",
       company: company || "",
+      companyId: appliedCompanyId,
+      companyName: appliedCompanyName,
       branch: branch || "",
       shift: shift || "",
       managerId: managerId || "",

@@ -34,6 +34,7 @@ const {
   attachCompany,
   writeCompanyFields,
   userCompanyIds,
+  managementCompanyIds,
   findCompany,
   escapeRegex,
 } = require("../utils/companyScope");
@@ -1160,7 +1161,7 @@ const listActivity = async (req, res) => {
     } else if (isTeamScopedRole(req.user.role)) {
       and.push({ "employee.id": { $in: await getTeamMemberIds(req.user) } });
     } else if (!hasGlobalCompanyAccess(req.user)) {
-      const mine = userCompanyIds(req.user);
+      const mine = managementCompanyIds(req.user);
       if (!mine.length) {
         return res.status(403).json({ message: "Your profile has no company — cannot view activity" });
       }
@@ -1178,7 +1179,7 @@ const listActivity = async (req, res) => {
       if (
         !hasGlobalCompanyAccess(req.user) &&
         !isTeamScopedRole(req.user.role) &&
-        !userCompanyIds(req.user).includes(String(company._id))
+        !managementCompanyIds(req.user).includes(String(company._id))
       ) {
         return res.status(403).json({ message: "This company is not assigned to you" });
       }

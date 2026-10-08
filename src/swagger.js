@@ -30,7 +30,8 @@ const description = [
   "| --- | --- |",
   "| My permissions | `GET /api/permissions/my` |",
   "| My profile | `GET/PUT /api/employees/:id` (own id only) |",
-  "| Attendance (self) | `/api/attendance` punch-in/out (lat/long), today, web-punches |",
+  "| Attendance (self) | `POST /punch-in` `/punch-out` · `GET /today` `/web-punches` |",
+  "| Attendance (admin) | `GET /daily` `/calendar` `/late-early` · `POST /:id/approve` `/reject` |",
   "| Masters (dropdowns) | `GET /api/masters?type=…` |",
   "",
   "**Custom roles:** pick `catalog` admin|employee → grant modules → `checkPermission` enforces each action.",
@@ -742,8 +743,14 @@ module.exports = swaggerJsdoc({
             },
             remarks: {
               type: "string",
-              example: "WFH approved",
-              description: "Optional note",
+              example: "Reached late due to traffic",
+              description:
+                "Optional note (same as reason). If set, Daily Attendance shows Approve/Reject.",
+            },
+            reason: {
+              type: "string",
+              example: "Reached late due to traffic",
+              description: "Alias of remarks — same stored field",
             },
           },
         },

@@ -44,7 +44,10 @@ const canView = [
  *       A company links them: branches[].branchId → shifts[].shiftId → monthlySchedule (days/times).
  *       GET /api/companies/{id} = full company details (branches → shifts → monthlySchedule + reportingManagers)
  *       — use it for create-employee dropdowns too.
- *       **Create / Update / Delete: Super Admin and Admin.** HR / Reporting Manager: List + Get of own companies.
+ *       **Create / Update / Delete: Super Admin and Admin.**
+ *       **List / Get:** Super Admin and Admin see every company (`scope: all`).
+ *       HR sees every company stored on them (`scope: assigned`) — own company plus assigned companies
+ *       (all branches, shifts and employees of those companies).
  */
 
 /**
@@ -53,7 +56,11 @@ const canView = [
  *   get:
  *     tags: [Admin / Company]
  *     summary: List companies
- *     description: Super Admin / Admin → all companies. HR / Reporting Manager → own companies only.
+ *     description: |
+ *       Super Admin and Admin → every company (`scope: all`).
+ *       HR Manager → every company on their companyIds (`scope: assigned`):
+ *       index 0 is their own, later ids are assigned access (all branches, shifts, employees).
+ *       Reporting Manager and Employee → their one company.
  *     security:
  *       - bearerAuth: []
  *     parameters:

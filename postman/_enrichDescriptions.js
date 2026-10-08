@@ -68,7 +68,7 @@ const PARAM_DOCS = {
   "official.companyIds":
     "string[] (MongoId) | required | array of Company `_id`s ({{companyOrgId}}). Employee and Reporting Manager: exactly one id. HR: one or more. Only Super Admin may send more than one",
   companyIds:
-    "string[] (MongoId) | company ids on the user",
+    "string[] (MongoId) | required on assign | extra companies for an HR Manager. companyIds[0] stays their own. Later ids are access only (all branches, shifts, employees of that company). No extra flag. Does not change branch or shift. Super Admin only: POST /api/users/{id}/assign-companies",
   "official.companies":
     "string[] | optional | multi-company list — Super Admin assigns to HR Manager only",
   "official.department": "string | often required | department master name",
@@ -175,6 +175,13 @@ const PARAM_DOCS = {
   // type already covered — master create uses specific values
 
   // attendance / punch
+  decision:
+    'string | required | query `decision=approve` or `decision=reject` on POST /api/attendance/{id}/review. Body is `{ reason }`.',
+  hasRemark: "string | optional | `true` = only rows that have a remark",
+  attendanceStatus: "string | optional | `Early` | `On time` | `Late` | `Approved` | `Rejected` | `ALL`",
+  workMode: "string | optional | `WFO` | `WFH` | `Hybrid` | `ALL`",
+  attendanceDate: "string (YYYY-MM-DD) | optional | day for daily / late-early lists",
+  attendanceMonth: "string (YYYY-MM) | optional | calendar month e.g. `2026-10`",
   latitude: "number | required | GPS latitude (-90…90) — send as number, not string",
   longitude: "number | required | GPS longitude (-180…180) — send as number, not string",
   remarks: "string | optional | max ~500 chars",
@@ -260,6 +267,8 @@ function contextualDoc(key, ctx) {
   }
 
   if (key === "type") {
+    if (url.includes("/late-early"))
+      return "string | optional | `late` = Late Arrivals, `early` = Early Departures, `all`";
     if (isMasterApi || url.includes("/masters"))
       return "string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)";
     if (name.includes("upload") || name.includes("attachment"))

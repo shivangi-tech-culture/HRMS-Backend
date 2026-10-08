@@ -42,6 +42,7 @@ const {
   companyRefs, // populated companyIds → [{ _id, companyName }]
   hasGlobalCompanyAccess, // true for Super Admin / Admin (all companies)
   userCompanyIds, // user's official.companyIds as string ids
+  managementCompanyIds, // HR → assigned companies; others → workplace companyIds
 } = require("../utils/companyScope");
 const { logEmployeeActivity } = require("../utils/activityLog");
 
@@ -85,7 +86,7 @@ const assignReportingManager = async (req, res) => {
     // Super Admin / Admin → any company. HR Manager → only companies in their own official.companyIds
     if (
       !hasGlobalCompanyAccess(req.user) &&
-      !userCompanyIds(req.user).includes(String(company._id))
+      !managementCompanyIds(req.user).includes(String(company._id))
     ) {
       return res.status(403).json({ message: "This company is not assigned to you" });
     }
@@ -113,7 +114,9 @@ const assignReportingManager = async (req, res) => {
     }
 
     // ── 4. Load all employees; any unknown id → 404 with the missing ids ──
-    const employees = await User.find({ _id: { $in: ids } }).select(EMPLOYEE_SELECT);
+    const employees = await User.find({ _id: { $in: ids } })
+      .select(EMPLOYEE_SELECT)
+      .lean();
     const found = new Set(employees.map((e) => String(e._id)));
     const missing = ids.filter((id) => !found.has(id));
     if (missing.length) {

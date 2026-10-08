@@ -1,7 +1,8 @@
 /**
  * COMPANY CONTROLLER — /api/companies (plain CRUD)
  * Create / Update / Delete: Super Admin and Admin only.
- * List / Get: Super Admin and Admin see every company; HR / Reporting Manager see only their own.
+ * List / Get: Super Admin and Admin see every company.
+ * HR sees every company on official.companyIds (own + assigned). Others see only their company.
  * GET /:id is the full company — branches → shifts → monthlySchedule + reportingManagers.
  * branches[].branchId / shifts[].shiftId are master ids; responses populate { _id, name, code }.
  */
@@ -12,11 +13,24 @@ const { getModel } = require("../models/Master");
 const {
   escapeRegex,
   hasGlobalCompanyAccess,
-  userCompanyIds,
+  managementCompanyIds,
 } = require("../utils/companyScope");
 const { MANAGER_ROLES } = require("../utils/teamScope");
+const { normalizeDayClock } = require("../utils/shiftTiming");
 
 const { MASTER_POPULATE } = Company;
+
+const normalizeBranches = (branches) =>
+  (branches || []).map((branch) => ({
+    ...branch,
+    shifts: (branch.shifts || []).map((shift) => ({
+      ...shift,
+      monthlySchedule: (shift.monthlySchedule || []).map((week) => ({
+        ...week,
+        days: (week.days || []).map((day) => normalizeDayClock(day)),
+      })),
+    })),
+  }));
 const okId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 /** 400 message when a branchId / shiftId is not an existing master, else "" */
@@ -40,7 +54,7 @@ const missingMasters = async (branches = []) => {
 };
 
 const canViewCompany = (user, companyId) =>
-  hasGlobalCompanyAccess(user) || userCompanyIds(user).includes(String(companyId));
+  hasGlobalCompanyAccess(user) || managementCompanyIds(user).includes(String(companyId));
 
 const nameTaken = async (companyName, excludeId) => {
   const filter = {
@@ -70,7 +84,7 @@ const listCompanies = async (req, res) => {
     const filter = {};
 
     if (!hasGlobalCompanyAccess(req.user)) {
-      filter._id = { $in: userCompanyIds(req.user) };
+      filter._id = { $in: managementCompanyIds(req.user) };
     }
     if (typeof isActive === "boolean") filter.isActive = isActive;
 
@@ -82,13 +96,19 @@ const listCompanies = async (req, res) => {
     const [total, data] = await Promise.all([
       Company.countDocuments(filter),
       Company.find(filter)
+        .select(
+          "companyName companyCode isActive branches.branchId branches.isActive branches.shifts.shiftId branches.shifts.isActive"
+        )
         .sort({ companyName: 1 })
         .skip(skip)
         .limit(limit)
-        .populate(MASTER_POPULATE),
+        .populate(MASTER_POPULATE)
+        .lean(),
     ]);
 
+    const all = hasGlobalCompanyAccess(req.user);
     return res.json({
+      scope: all ? "all" : "assigned",
       total,
       page,
       limit,
@@ -156,7 +176,7 @@ const createCompany = async (req, res) => {
       companyName,
       companyCode,
       isActive: req.body.isActive !== false,
-      branches: req.body.branches || [],
+      branches: normalizeBranches(req.body.branches || []),
     });
     await row.populate(MASTER_POPULATE);
 
@@ -196,7 +216,7 @@ const updateCompany = async (req, res) => {
     if (req.body.branches !== undefined) {
       const missing = await missingMasters(req.body.branches);
       if (missing) return res.status(400).json({ message: missing });
-      row.branches = req.body.branches;
+      row.branches = normalizeBranches(req.body.branches);
     }
 
     await row.save();

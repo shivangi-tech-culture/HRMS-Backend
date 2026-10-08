@@ -11,6 +11,7 @@ const {
   updateUser,
   deleteUser,
   exportUsers,
+  assignHrCompanies,
   sendUserMail,
 } = require("../controllers/accessControl.controller");
 const { protect, authorize } = require("../middleware/auth");
@@ -20,6 +21,7 @@ const {
   createAccessUserSchema,
   updateAccessUserSchema,
   accessSendMailSchema,
+  assignHrCompaniesSchema,
 } = require("../validators/accessControl.validation");
 const { assignReportingManager } = require("../controllers/reportingManager.controller");
 const { assignManagerSchema } = require("../validators/reportingManager.validation");
@@ -63,6 +65,51 @@ router.post(
 
 /**
  * @swagger
+ * /api/users/{id}/assign-companies:
+ *   post:
+ *     tags: [Admin / Users]
+ *     summary: Assign companies to an HR Manager (Super Admin)
+ *     description: |
+ *       Keeps `companyIds[0]` as the HR user's own company. Every other id is appended
+ *       for access only: all branches, shifts and employees of that company.
+ *       Response companies stay `{ _id, companyName }` — order is the rule, no extra flag.
+ *       `branchId` and `shiftId` are not changed.
+ *       **Who:** Super Admin only.
+ *       **Target:** role must be HR Manager.
+ *       Admin and Super Admin are not assigned companies — they already see every company.
+ *       Employee and Reporting Manager stay on a single company (set on create / edit).
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - $ref: '#/components/parameters/UserId'
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [companyIds]
+ *             properties:
+ *               companyIds:
+ *                 type: array
+ *                 minItems: 1
+ *                 maxItems: 50
+ *                 items: { type: string, example: "6ac4ca7070e8935d51b17035" }
+ *     responses:
+ *       200: { description: Companies assigned }
+ *       400: { description: Not an HR Manager, or company not found }
+ *       403: { description: Caller is not Super Admin }
+ */
+router.post(
+  "/:id/assign-companies",
+  protect,
+  authorize("Super Admin"),
+  checkPermission("Administration", "Access & Control", "assign"),
+  validate(assignHrCompaniesSchema),
+  assignHrCompanies
+);
+
+/**
+ * @swagger
  * /api/users:
  *   post:
  *     tags: [Admin / Users]
@@ -90,31 +137,33 @@ router.post(
  *     tags: [Admin / Users]
  *     summary: List users (search + filters + pagination)
  *     description: |
- *       Access & Control table filters (UI):
- *       - **search** / q — name, email, department, role, company
- *       - **role** — All roles dropdown (ignore "All roles")
- *       - **department** — All departments
- *       - **company** — All companies
- *       - **status** — Active | Inactive
- *       - page, limit
+ *       Access & Control filters:
+ *       - search — name, email, code, dept, role, company name
+ *       - company / companyId — Company `_id` or exact name
+ *         Super Admin/Admin: any company. HR: only assigned companies.
+ *       - role, department, status, branch, shift, page, limit
  *     security: [{ bearerAuth: [] }]
  *     parameters:
  *       - in: query
  *         name: search
  *         schema: { type: string, example: Vivek }
- *         description: Search name, email, department, role, company
  *       - in: query
  *         name: role
- *         schema: { type: string, example: Super Admin }
+ *         schema: { type: string, example: Employee }
  *       - in: query
  *         name: status
  *         schema: { type: string, enum: [Active, Inactive] }
  *       - in: query
  *         name: department
- *         schema: { type: string, example: Engineering }
+ *         schema: { type: string }
  *       - in: query
  *         name: company
  *         schema: { type: string }
+ *         description: Company _id or name (alias of companyId)
+ *       - in: query
+ *         name: companyId
+ *         schema: { type: string }
+ *         description: Company MongoId — Super Admin/Admin any; HR assigned only
  *       - in: query
  *         name: page
  *         schema: { type: integer, default: 1 }

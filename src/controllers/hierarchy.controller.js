@@ -37,7 +37,7 @@ const {
   COMPANY_POPULATE,
   companyRefs,
   hasGlobalCompanyAccess,
-  userCompanyIds,
+  managementCompanyIds,
   findCompany,
 } = require("../utils/companyScope");
 const { filterValue } = require("../utils/userAccount");
@@ -94,8 +94,10 @@ const managerNode = (mgr, employees) => {
 
 /** Reporting Manager → tree rooted at themselves with their team */
 const myHierarchy = async (req, res) => {
-  const [me] = await findCards({ _id: req.user._id });
-  const team = await findCards(teamMemberFilter(req.user));
+  const [[me], team] = await Promise.all([
+    findCards({ _id: req.user._id }),
+    findCards(teamMemberFilter(req.user)),
+  ]);
   return res.json({
     message: "My hierarchy",
     scope: "team",
@@ -115,7 +117,7 @@ const getHierarchy = async (req, res) => {
   try {
     if (isTeamScopedRole(req.user.role)) return await myHierarchy(req, res);
 
-    const mine = hasGlobalCompanyAccess(req.user) ? null : userCompanyIds(req.user);
+    const mine = hasGlobalCompanyAccess(req.user) ? null : managementCompanyIds(req.user);
     const companyValue = filterValue(req, "companyId", "company");
     let company = null;
     let companyMatch = mine ? { "official.companyIds": { $in: mine } } : {};

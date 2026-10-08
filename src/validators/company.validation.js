@@ -4,9 +4,13 @@
 const Joi = require("joi");
 const { WEEK_DAYS } = require("../models/Company");
 
+const { normalizeHm } = require("../utils/shiftTiming");
+
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const toMinutes = (value) => {
-  const [h, m] = String(value).split(":").map(Number);
+  const norm = normalizeHm(value);
+  if (!norm) return NaN;
+  const [h, m] = norm.split(":").map(Number);
   return h * 60 + m;
 };
 
@@ -29,12 +33,17 @@ const dayScheduleSchema = Joi.object({
   breakStartTime: Joi.string().trim().allow("").default(""),
   breakEndTime: Joi.string().trim().allow("").default(""),
 }).custom((day, helpers) => {
+  day.startTime = normalizeHm(day.startTime);
+  day.endTime = normalizeHm(day.endTime);
+  day.breakStartTime = normalizeHm(day.breakStartTime);
+  day.breakEndTime = normalizeHm(day.breakEndTime);
+
   const pairError = (start, end, label) => {
     const hasStart = Boolean(start);
     const hasEnd = Boolean(end);
     if (hasStart !== hasEnd) return `${day.day}: ${label} needs both start and end`;
     if (hasStart && (!TIME_RE.test(start) || !TIME_RE.test(end))) {
-      return `${day.day}: ${label} must be HH:mm`;
+      return `${day.day}: ${label} must be 24-hour HH:mm (3:30 PM = 15:30)`;
     }
     if (hasStart && toMinutes(end) <= toMinutes(start)) {
       return `${day.day}: ${label} end must be after start`;
@@ -44,7 +53,7 @@ const dayScheduleSchema = Joi.object({
 
   if (!day.isOff) {
     if (!TIME_RE.test(day.startTime) || !TIME_RE.test(day.endTime)) {
-      return helpers.message(`${day.day}: startTime and endTime are required (HH:mm)`);
+      return helpers.message(`${day.day}: startTime and endTime are required as 24-hour HH:mm (3:30 PM = 15:30)`);
     }
     if (toMinutes(day.endTime) <= toMinutes(day.startTime)) {
       return helpers.message(`${day.day}: endTime must be after startTime`);

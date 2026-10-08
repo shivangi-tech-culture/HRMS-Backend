@@ -58,7 +58,21 @@ const ADMIN_TREE = [
     module: "Attendance",
     heading: "Attendance & Time",
     subModules: [
-      { name: "Daily Attendance", actions: ATT },
+      {
+        name: "Daily Attendance",
+        actions: [
+          "view",
+          "create",
+          "edit",
+          "approve",
+          "reject",
+          "export",
+          "import",
+          "upload",
+          "download",
+          "print",
+        ],
+      },
       { name: "Attendance Calendar", actions: V },
       {
         name: "Attendance Regularization",
@@ -243,7 +257,8 @@ const ADMIN_TREE = [
     heading: "Administration",
     subModules: [
       // Access & Control: login users of any role (create ≠ Employee Management)
-      // assign = bulk assign / remove Reporting Manager (POST /api/users/assign-manager)
+      // assign = Reporting Manager (POST /api/users/assign-manager)
+      //        + HR companies (POST /api/users/:id/assign-companies, Super Admin only)
       { name: "Access & Control", actions: ["view", "create", "edit", "delete", "export", "import", "upload", "download", "email", "assign"] },
       {
         name: "Roles & Permissions",
