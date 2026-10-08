@@ -13,10 +13,11 @@
  * GET    /daily                 today only — ?search=&department=&branchId=&shiftId=&…
  * GET    /calendar              ?month=YYYY-MM&date=YYYY-MM-DD  (month counts + that day's rows)
  * GET    /late-early            ?type=late|early&date=
- * GET    /late-early/:id        detail drawer
- * GET    /late-early/:id/history
- * POST   /:id/review-remark     { decision: "approve"|"reject" } → Present / Absent
- * POST   /:id/approve | /:id/reject   shortcuts (same update)
+ * GET    /late-early/:id        one record (same late/early numbers as the list)
+ * POST   /mark                  { employeeId, date, punchInTime?, punchOutTime?, reason, remarks? }
+ *                        Missed punch only. Does not change employee assignment.
+ * POST   /:id/review?decision=approve|reject   body: { reason }
+ *                        One API. Late only. Day stays Present.
  *
  * Scope: SA/Admin = all · HR = assigned companies · Manager = team
  */
@@ -28,18 +29,17 @@ const {
   listWebPunches,
   listDailyAttendance,
   attendanceCalendar,
+  markAttendance,
   reviewRemark,
-  approveRemark,
-  rejectRemark,
 } = require("../controllers/attendance.controller");
 const {
   listLateEarly,
   getLateEarlyDetail,
-  getLateEarlyHistory,
 } = require("../controllers/lateEarly.controller");
 const { protect, hasAllAccess } = require("../middleware/auth");
 const { checkPermission } = require("../controllers/permission.controller");
 const { hasGlobalCompanyAccess } = require("../utils/companyScope");
+const { normalizeRoleName, ALL_ACCESS } = require("../config/roles");
 const { validate, validateQuery } = require("../middleware/validate");
 const {
   punchSchema,
@@ -47,8 +47,8 @@ const {
   dailyQuerySchema,
   calendarQuerySchema,
   remarkReviewSchema,
+  markAttendanceSchema,
   lateEarlyQuerySchema,
-  lateEarlyHistoryQuerySchema,
 } = require("../validators/attendance.validation");
 
 const router = express.Router();
@@ -59,9 +59,11 @@ const needAttendance = (subModule, action = "view") => (req, res, next) => {
   return checkPermission("Attendance", subModule, action)(req, res, next);
 };
 
-/** Approve/reject guard — Super Admin/Admin always; others need matrix flag */
-const needRemarkReview = (action) => (req, res, next) => {
-  if (hasGlobalCompanyAccess(req.user)) return next();
+/** Approve or reject a late punch. Body.decision picks the permission. */
+const needRemarkReview = (req, res, next) => {
+  const role = normalizeRoleName(req.user?.role);
+  if (ALL_ACCESS.includes(role) || hasGlobalCompanyAccess(req.user)) return next();
+  const action = String(req.body.decision || "").toLowerCase() === "reject" ? "reject" : "approve";
   return checkPermission("Attendance", "Daily Attendance", action)(req, res, next);
 };
 
@@ -113,48 +115,36 @@ router.get(
 );
 
 router.get(
-  "/late-early/:id/history",
-  protect,
-  validateQuery(lateEarlyHistoryQuerySchema),
-  needAttendance("Late & Early Departures", "view"),
-  getLateEarlyHistory
-);
-
-router.get(
   "/late-early/:id",
   protect,
   needAttendance("Late & Early Departures", "view"),
   getLateEarlyDetail
 );
 
-// ─── Remark approve / reject (simple) ────────────────────────
+/** Copy ?decision=approve|reject onto the body so one route serves both Postman calls. */
+const attachReviewDecision = (req, _res, next) => {
+  const fromQuery = String(req.query.decision || "").trim().toLowerCase();
+  if (fromQuery && !req.body?.decision) {
+    req.body = { ...(req.body || {}), decision: fromQuery };
+  }
+  next();
+};
 
-/** Easy: POST /api/attendance/:id/approve — no body */
 router.post(
-  "/:id/approve",
+  "/mark",
   protect,
-  needRemarkReview("approve"),
-  approveRemark
+  validate(markAttendanceSchema),
+  needAttendance("Daily Attendance", "create"),
+  markAttendance
 );
 
-/** Easy: POST /api/attendance/:id/reject — no body */
+/** POST /api/attendance/:id/review?decision=approve|reject — body: { reason } */
 router.post(
-  "/:id/reject",
+  "/:id/review",
   protect,
-  needRemarkReview("reject"),
-  rejectRemark
-);
-
-/** Also: POST /api/attendance/:id/review-remark { decision } */
-router.post(
-  "/:id/review-remark",
-  protect,
+  attachReviewDecision,
   validate(remarkReviewSchema),
-  (req, res, next) => {
-    const decision = String(req.body.decision || "").toLowerCase();
-    const action = decision === "reject" ? "reject" : "approve";
-    return needRemarkReview(action)(req, res, next);
-  },
+  needRemarkReview,
   reviewRemark
 );
 

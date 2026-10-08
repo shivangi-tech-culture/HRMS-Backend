@@ -18,18 +18,58 @@ const minutesOfDay = (date) => {
     minute: "2-digit",
     hour12: false,
   }).formatToParts(date);
-  const hour = Number(parts.find((p) => p.type === "hour")?.value || 0);
+  const hourRaw = Number(parts.find((p) => p.type === "hour")?.value || 0);
+  const hour = hourRaw === 24 ? 0 : hourRaw;
   const minute = Number(parts.find((p) => p.type === "minute")?.value || 0);
   return hour * 60 + minute;
 };
 
-/** "HH:mm" → minutes from midnight (or null if bad) */
+/** "3:30 PM" / "15:30" / "03:30" → 24-hour "HH:mm". 15:30 stays 15:30. 03:30 stays 03:30. */
+const normalizeHm = (value) => {
+  const raw = String(value || "").trim();
+  const ampm = raw.match(/^(\d{1,2}):(\d{2})\s*([ap]m)$/i);
+  if (ampm) {
+    let h = Number(ampm[1]);
+    const m = Number(ampm[2]);
+    const ap = ampm[3].toLowerCase();
+    if (ap === "pm" && h < 12) h += 12;
+    if (ap === "am" && h === 12) h = 0;
+    if (h > 23 || m > 59) return "";
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  }
+  const hm = raw.match(/^(\d{1,2}):(\d{2})$/);
+  if (!hm) return "";
+  const h = Number(hm[1]);
+  const m = Number(hm[2]);
+  if (h > 23 || m > 59) return "";
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+};
+
+/** "HH:mm" → minutes from midnight (or null if bad). 24-hour only. */
 const parseHm = (hm) => {
-  if (!hm || typeof hm !== "string") return null;
-  const [h, m] = hm.split(":").map(Number);
-  if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+  const norm = normalizeHm(hm);
+  if (!norm) return null;
+  const [h, m] = norm.split(":").map(Number);
   return h * 60 + m;
 };
+
+/** Pad a schedule day to 24-hour HH:mm. Does not move 03:30 to 15:30. */
+const normalizeDayClock = (day) => {
+  if (!day) return day;
+  return {
+    ...day,
+    startTime: normalizeHm(day.startTime),
+    endTime: normalizeHm(day.endTime),
+    breakStartTime: normalizeHm(day.breakStartTime),
+    breakEndTime: normalizeHm(day.breakEndTime),
+  };
+};
+
+/** 24-hour start/end for punch comparison. No AM/PM guess. */
+const sameDayClock = (startTime, endTime) => ({
+  startTime: normalizeHm(startTime),
+  endTime: normalizeHm(endTime),
+});
 
 /** Weekday number 0=Sun … 6=Sat for a YYYY-MM-DD string */
 const weekdayOf = (dateStr) => {
@@ -64,12 +104,52 @@ const dayScheduleOf = (monthlySchedule, dateStr) => {
   return (week?.days || []).find((d) => d.day === weekday) || null;
 };
 
-/** Minutes late vs that day's shift start + grace. 0 when on time or start is missing. */
+/** Missing grace stays 10. An explicit 0 is kept. */
+const graceMinutesOf = (value) => {
+  const raw = value && typeof value === "object" ? value.graceMinutes : value;
+  if (raw === undefined || raw === null || raw === "") return 10;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : 10;
+};
+
+/**
+ * Punch-in vs shift start.
+ * Before start → Early.
+ * Start through start+grace (10 min late is still grace) → On time, not late.
+ * After grace → Late. lateByMinutes is only the minutes past grace.
+ */
+const punchInWindow = (punchMin, startMin, graceMinutes) => {
+  const grace = graceMinutesOf(graceMinutes);
+  if (punchMin == null || startMin == null) {
+    return { isEarly: false, isLate: false, lateByMinutes: 0, earlyByMinutes: 0, graceMinutes: grace };
+  }
+  if (punchMin < startMin) {
+    return {
+      isEarly: true,
+      isLate: false,
+      lateByMinutes: 0,
+      earlyByMinutes: startMin - punchMin,
+      graceMinutes: grace,
+    };
+  }
+  const afterStart = punchMin - startMin;
+  if (afterStart <= grace) {
+    return { isEarly: false, isLate: false, lateByMinutes: 0, earlyByMinutes: 0, graceMinutes: grace };
+  }
+  return {
+    isEarly: false,
+    isLate: true,
+    lateByMinutes: afterStart - grace,
+    earlyByMinutes: 0,
+    graceMinutes: grace,
+  };
+};
+
+/** Minutes late vs that day's shift start + grace. 0 when inside grace or start is missing. */
 const lateByMinutesOf = (punchAt, startTime, graceMinutes = DEFAULT_SHIFT.graceMinutes) => {
   const start = parseHm(startTime);
   if (start == null || !punchAt) return 0;
-  const grace = Number(graceMinutes) || 0;
-  return Math.max(0, minutesOfDay(new Date(punchAt)) - (start + grace));
+  return punchInWindow(minutesOfDay(new Date(punchAt)), start, graceMinutes).lateByMinutes;
 };
 
 /**
@@ -95,9 +175,20 @@ const DEFAULT_SHIFT = {
 /** Standard full day = 9 hours → OT = worked − 9h (if positive) */
 const STANDARD_WORK_MINUTES = 9 * 60;
 
-const overtimeMinutesOf = (workedMinutes) => {
+/** Minutes worked after that day's shift end. Early punch is not overtime. */
+const overtimeAfterShiftEnd = (punchOut, endTime) => {
+  if (!punchOut || !endTime) return 0;
+  const outMin = minutesOfDay(punchOut);
+  const endMin = parseHm(endTime);
+  if (endMin == null) return 0;
+  return Math.max(0, outMin - endMin);
+};
+
+/** Fallback when shift end is unknown: worked time over 9 hours. */
+const overtimeMinutesOf = (workedMinutes, shiftMinutes) => {
   const worked = Number(workedMinutes) || 0;
-  return Math.max(0, worked - STANDARD_WORK_MINUTES);
+  const span = Number(shiftMinutes) > 0 ? Number(shiftMinutes) : STANDARD_WORK_MINUTES;
+  return Math.max(0, worked - span);
 };
 
 const emptyPlacement = () => ({
@@ -178,8 +269,9 @@ const getAssignedShift = async (employeeId, dateStr) => {
     }
 
     // Working day — copy start/end from company day row
-    const start = parseHm(day.startTime);
-    const end = parseHm(day.endTime);
+    const clock = sameDayClock(day.startTime, day.endTime);
+    const start = parseHm(clock.startTime);
+    const end = parseHm(clock.endTime);
     // Treat ≤ 5h window as half-day for that weekday
     const half = start != null && end != null && end - start <= 5 * 60;
 
@@ -191,9 +283,9 @@ const getAssignedShift = async (employeeId, dateStr) => {
         _id: shiftId,
         name: shiftName,
         code: shiftCode,
-        startTime: day.startTime || DEFAULT_SHIFT.startTime,
-        endTime: day.endTime || DEFAULT_SHIFT.endTime,
-        halfDayEndTime: day.endTime || DEFAULT_SHIFT.halfDayEndTime,
+        startTime: clock.startTime || DEFAULT_SHIFT.startTime,
+        endTime: clock.endTime || DEFAULT_SHIFT.endTime,
+        halfDayEndTime: clock.endTime || DEFAULT_SHIFT.halfDayEndTime,
         weeklyOffDays: [],
         halfDayDays: half ? [weekday] : [],
         isDefault: false,
@@ -248,24 +340,14 @@ const validatePunchAgainstShift = (shift, punchAt, punchType, dateStr) => {
   }
 
   if (punchType === "in") {
-    const punchStart = parseHm(shift.punchStartTime || "00:00") ?? 0;
-    if (punchMin < punchStart && shift.allowEarlyPunchIn === false) {
-      return {
-        ok: false,
-        message: `Punch-in not allowed before ${shift.punchStartTime || "00:00"}`,
-        isEarly: true,
-        isLate: false,
-        dayType: type,
-      };
-    }
-    const grace = Number(shift.graceMinutes) || 0;
-    const lateByMinutes = Math.max(0, punchMin - (start + grace));
+    const window = punchInWindow(punchMin, start, shift.graceMinutes);
     return {
       ok: true,
       message: null,
-      isEarly: punchMin < start,
-      isLate: lateByMinutes > 0,
-      lateByMinutes,
+      isEarly: window.isEarly,
+      isLate: window.isLate,
+      lateByMinutes: window.lateByMinutes,
+      earlyByMinutes: window.earlyByMinutes,
       dayType: type,
     };
   }
@@ -283,12 +365,13 @@ const validatePunchAgainstShift = (shift, punchAt, punchType, dateStr) => {
 /** "14:30" style clock for UI */
 const formatPunchStamp = (date) => {
   if (!date) return "";
-  return new Date(date).toLocaleTimeString("en-GB", {
+  const stamp = new Date(date).toLocaleTimeString("en-GB", {
     timeZone: TZ(),
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
   });
+  return stamp.replace(/^24:/, "00:");
 };
 
 /** Minutes → "H:MM" */
@@ -350,14 +433,13 @@ const computeDayMetrics = (record, shift, dateStr, holidayMap = {}) => {
 
   const start = parseHm(shiftObj.startTime) ?? 600;
   const end = parseHm(effectiveEndTime(shiftObj, date)) ?? 1140;
-  const grace = Number(shiftObj.graceMinutes) || 0;
   const inMin = minutesOfDay(record.punchIn);
   const outMin = minutesOfDay(record.punchOut);
   const workedMinutes = Math.max(0, outMin - inMin);
-  const lateByMinutes = Math.max(0, inMin - (start + grace));
+  const lateByMinutes = punchInWindow(inMin, start, shiftObj.graceMinutes).lateByMinutes;
   const earlyByMinutes = Math.max(0, end - outMin);
   const isHalf = type === "halfDay";
-  const overtimeMinutes = overtimeMinutesOf(workedMinutes);
+  const overtimeMinutes = Math.max(0, outMin - end);
 
   return {
     statusCode: isHalf ? "HD" : "P",
@@ -378,7 +460,12 @@ module.exports = {
   TZ,
   todayDate,
   minutesOfDay,
+  graceMinutesOf,
+  punchInWindow,
   parseHm,
+  normalizeHm,
+  sameDayClock,
+  normalizeDayClock,
   weekdayOf,
   dayScheduleOf,
   lateByMinutesOf,
@@ -387,6 +474,7 @@ module.exports = {
   DEFAULT_SHIFT,
   STANDARD_WORK_MINUTES,
   overtimeMinutesOf,
+  overtimeAfterShiftEnd,
   getAssignedShift,
   validatePunchAgainstShift,
   computeDayMetrics,

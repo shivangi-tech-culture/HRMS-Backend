@@ -2,8 +2,8 @@
  * LATE & EARLY DEPARTURES — /api/attendance/late-early
  *
  * UI tabs:
- *   - Late Arrivals   → lateByMinutes > 0
- *   - Early Departures → earlyByMinutes > 0
+ *   - Late Arrivals   → punch after shift start + grace
+ *   - Early Arrivals  → punch before shift start
  *
  * READ-ONLY attendance data. Does NOT change:
  *   - User.official.companyIds / branchId / shiftId
@@ -14,23 +14,29 @@
 const Attendance = require("../models/Attendance"); // daily punch rows
 const User = require("../models/User"); // employee names / dept
 const { getModel } = require("../models/Master"); // branch / shift names
+const Company = require("../models/Company");
+const { resolveListCompanyId, applyListCompany } = require("./attendance.controller");
 const {
-  todayDate, // YYYY-MM-DD today
-  getAssignedShift, // read shift timings for detail panel
-  formatPunchStamp, // "09:24" clock
+  todayDate,
+  formatPunchStamp,
+  dayScheduleOf,
+  sameDayClock,
+  punchInWindow,
+  minutesOfDay,
+  parseHm,
+  DEFAULT_SHIFT,
+  overtimeAfterShiftEnd,
 } = require("../utils/shiftTiming");
 const {
   formatDurationLabel, // "11m" / "9h 18m"
   oid, // id → string
-  companySummary,
-  branchSummary,
-  shiftSummary,
 } = require("../utils/attendanceFormat");
 const {
   companyFilter, // HR scoped to their companies
   hasGlobalCompanyAccess, // Super Admin / Admin → all
   userCompanyIds,
   managementCompanyIds,
+  escapeRegex,
 } = require("../utils/companyScope");
 const { teamMemberFilter } = require("../utils/teamScope"); // RM → team only
 const {
@@ -159,16 +165,11 @@ const breakMinutesOf = (record) => {
 /**
  * Map one Attendance lean doc + employee → list row for the table.
  */
-const toListRow = (att, emp, shiftMaster, branchMaster) => {
-  const late = Number(att.lateByMinutes) || 0;
-  const early = Number(att.earlyByMinutes) || 0;
+const toListRow = (att, emp, shiftMaster, branchMaster, timing) => {
+  const late = timing.lateByMinutes;
+  const early = timing.earlyByMinutes;
   const worked = Number(att.workedMinutes) || 0;
-
-  // Status badge text for UI chips
-  let status = "On Time";
-  if (late > 0 && early > 0) status = "Late & Early";
-  else if (late > 0) status = "Late";
-  else if (early > 0) status = "Early Departure";
+  const company = timing.company;
 
   return {
     _id: att._id,
@@ -176,55 +177,100 @@ const toListRow = (att, emp, shiftMaster, branchMaster) => {
     employee: {
       _id: emp?._id || att.employee,
       name: emp?.name || "",
-      official: {
-        employeeCode: emp?.official?.employeeCode || "",
-        department: emp?.official?.department || "",
-        designation: emp?.official?.designation || "",
-      },
+      email: emp?.official?.officialEmail || "",
+      employeeCode: emp?.official?.employeeCode || "",
+      department: emp?.official?.department || "",
+      designation: emp?.official?.designation || "",
     },
     department: emp?.official?.department || "",
+    company: company || null,
     branch: branchMaster || null,
-    location: branchMaster?.name || "", // UI "Location" column / detail
-    shift: shiftMaster || null,
-    punchIn: att.punchIn || null,
-    punchOut: att.punchOut || null,
+    location: branchMaster?.name || "",
+    shift: shiftMaster
+      ? { ...shiftMaster, startTime: timing.startTime || "", endTime: timing.endTime || "" }
+      : null,
     punchInTime: att.punchIn ? formatPunchStamp(att.punchIn) : "",
     punchOutTime: att.punchOut ? formatPunchStamp(att.punchOut) : "",
     lateByMinutes: late,
     lateBy: minutesLabel(late),
     earlyByMinutes: early,
     earlyBy: minutesLabel(early),
+    isLate: timing.isLate,
+    isEarly: timing.isEarly,
     workedMinutes: worked,
     workingHours: formatDurationLabel(worked),
-    status,
+    status: timing.status,
+    attendanceStatus: timing.attendanceStatus,
     verification: att.punchInSource || att.punchOutSource || null,
     workMode: att.workMode || "WFO",
     remarks: att.remarks || "",
-    reason: att.remarks || "",
+  };
+};
+
+const dayClock = (company, branchId, shiftId, dateStr) => {
+  if (!company) return null;
+  const branch = (company.branches || []).find((b) => oid(b.branchId) === branchId);
+  const shift = (branch?.shifts || []).find(
+    (s) => oid(s.shiftId) === shiftId && s.isActive !== false
+  );
+  if (!shift) return null;
+  const day = dayScheduleOf(shift.monthlySchedule, dateStr);
+  if (!day || day.isOff) return { isOff: true, startTime: "", endTime: "" };
+  const clock = sameDayClock(day.startTime, day.endTime);
+  return { isOff: false, startTime: clock.startTime || "", endTime: clock.endTime || "" };
+};
+
+const classifyPunch = (att, emp, companies) => {
+  const companyId = oid(att.companyId) || userCompanyIds(emp)[0] || "";
+  const company = companies.get(companyId) || null;
+  const branchId = oid(att.branchId) || oid(emp?.official?.branchId);
+  const shiftId = oid(att.shift) || oid(emp?.official?.shiftId);
+  const clock = dayClock(company?.doc, branchId, shiftId, att.date);
+  const startMin = parseHm(clock?.startTime);
+  const punchMin = att.punchIn ? minutesOfDay(att.punchIn) : null;
+  const window =
+    punchMin != null && startMin != null
+      ? punchInWindow(punchMin, startMin, DEFAULT_SHIFT.graceMinutes)
+      : null;
+  const isLate = window ? window.isLate : (Number(att.lateByMinutes) || 0) > 0;
+  const isEarly = window ? window.isEarly : false;
+  const reviewed = att.attendanceStatus === "Approved" || att.attendanceStatus === "Rejected";
+  let attendanceStatus = null;
+  if (!att.punchIn) attendanceStatus = null;
+  else if (reviewed) attendanceStatus = att.attendanceStatus;
+  else if (isLate) attendanceStatus = "Late";
+  else if (isEarly) attendanceStatus = "Early";
+  else attendanceStatus = "On time";
+  const status = isLate ? "Late" : isEarly ? "Early" : att.punchIn ? "On time" : "Absent";
+  return {
+    isLate,
+    isEarly,
+    lateByMinutes: window ? window.lateByMinutes : isLate ? Number(att.lateByMinutes) || 0 : 0,
+    earlyByMinutes: window ? window.earlyByMinutes : 0,
+    attendanceStatus,
+    status,
+    startTime: clock?.startTime || "",
+    endTime: clock?.endTime || "",
+    company: company ? { _id: company._id, companyName: company.companyName } : null,
+    shiftId,
+    branchId,
   };
 };
 
 /**
  * LIST — GET /api/attendance/late-early
- *
- * Query:
- *   type=late|early|all   (default late)
- *   date=YYYY-MM-DD       (default today)  OR from=&to=
- *   search= name / emp code
- *   department= / shiftId= / companyId=
- *   page= / limit=
+ * One call for Late Arrivals and Early Arrivals.
+ * type=late | early | all
+ * Company, search, department, branch, shift, date, page, limit.
+ * isLate / isEarly come from punch-in vs that day's shift start + 10 min grace.
  */
 const listLateEarly = async (req, res) => {
   try {
-    // Which tab: late arrivals vs early departures
-    const type = String(req.query.type || "late").toLowerCase();
+    const type = String(req.query.type || "all").toLowerCase();
     if (!["late", "early", "all"].includes(type)) {
-      return res.status(400).json({
-        message: 'type must be "late", "early", or "all"',
-      });
+      return res.status(400).json({ message: 'type must be "late", "early", or "all"' });
     }
 
-    // Date range (single day by default = today)
     let from = req.query.from;
     let to = req.query.to;
     const date = req.query.date || todayDate();
@@ -236,140 +282,140 @@ const listLateEarly = async (req, res) => {
       if (!to) to = from;
     }
 
-    // Pagination
-    const page = Number(req.query.page) || 1;
-    const limit = Math.min(Number(req.query.limit) || 10, 200);
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 200);
     const skip = (page - 1) * limit;
 
-    // Employee scope + optional filters (search / dept / shift)
-    const empFilter = scopedEmployeeFilter(req.user);
+    const companyScope = await resolveListCompanyId(req.user, req.query.companyId);
+    if (companyScope.error) {
+      return res.status(companyScope.status).json({ message: companyScope.error });
+    }
 
+    const empFilter = scopedEmployeeFilter(req.user);
+    applyListCompany(empFilter, companyScope);
     if (req.query.department && req.query.department !== "ALL") {
       empFilter["official.department"] = req.query.department;
+    }
+    if (req.query.branchId && req.query.branchId !== "ALL") {
+      empFilter["official.branchId"] = req.query.branchId;
     }
     if (req.query.shiftId && req.query.shiftId !== "ALL") {
       empFilter["official.shiftId"] = req.query.shiftId;
     }
-    if (req.query.companyId && req.query.companyId !== "ALL") {
-      empFilter["official.companyIds"] = req.query.companyId;
-    }
-    if (req.query.search) {
-      const q = String(req.query.search).trim();
-      if (q) {
-        empFilter.$or = [
-          { name: { $regex: q, $options: "i" } },
-          { "official.employeeCode": { $regex: q, $options: "i" } },
-        ];
+    const q = String(req.query.search || "").trim();
+    if (q) {
+      const rx = new RegExp(escapeRegex(q), "i");
+      const clause = {
+        $or: [
+          { name: rx },
+          { "official.employeeCode": rx },
+          { "official.officialEmail": rx },
+        ],
+      };
+      if (empFilter.$or) {
+        empFilter.$and = [{ $or: empFilter.$or }, clause];
+        delete empFilter.$or;
+      } else {
+        empFilter.$or = clause.$or;
       }
     }
 
-    // Ids only for scope — full employee cards loaded for the page
-    const empIds = await User.distinct("_id", empFilter);
+    const employees = await User.find(empFilter)
+      .select(
+        "name official.employeeCode official.officialEmail official.department official.designation official.branchId official.shiftId official.companyIds"
+      )
+      .lean();
+    const empById = new Map(employees.map((e) => [oid(e._id), e]));
+    const empIds = employees.map((e) => e._id);
 
-    if (!empIds.length) {
-      return res.json({
+    const empty = {
+      type,
+      from,
+      to,
+      companyId: companyScope.companyId || null,
+      counts: { late: 0, early: 0, all: 0 },
+      total: 0,
+      page,
+      limit,
+      pages: 1,
+      filters: {
         type,
+        date: req.query.date || date,
         from,
         to,
-        counts: { late: 0, early: 0, all: 0 },
-        total: 0,
-        page,
-        limit,
-        pages: 1,
-        data: [],
-      });
-    }
+        search: req.query.search || "",
+        department: req.query.department || "ALL",
+        branchId: req.query.branchId || "ALL",
+        shiftId: req.query.shiftId || "ALL",
+        companyId: companyScope.companyId || "ALL",
+      },
+      data: [],
+    };
+    if (!empIds.length) return res.json(empty);
 
-    const attFilter = {
+    const records = await Attendance.find({
       employee: { $in: empIds },
       date: { $gte: from, $lte: to },
-    };
-    if (type === "late") attFilter.lateByMinutes = { $gt: 0 };
-    else if (type === "early") attFilter.earlyByMinutes = { $gt: 0 };
-    else {
-      attFilter.$or = [
-        { lateByMinutes: { $gt: 0 } },
-        { earlyByMinutes: { $gt: 0 } },
-      ];
-    }
+      punchIn: { $ne: null },
+    })
+      .select(
+        "employee date shift branchId companyId punchIn punchOut punchInSource punchOutSource workMode workedMinutes lateByMinutes earlyByMinutes status remarks attendanceStatus"
+      )
+      .lean();
 
-    const baseScope = {
-      employee: { $in: empIds },
-      date: { $gte: from, $lte: to },
-    };
-
-    const [lateCount, earlyCount, total, rows] = await Promise.all([
-      Attendance.countDocuments({ ...baseScope, lateByMinutes: { $gt: 0 } }),
-      Attendance.countDocuments({ ...baseScope, earlyByMinutes: { $gt: 0 } }),
-      Attendance.countDocuments(attFilter),
-      Attendance.find(attFilter)
-        .select(
-          "employee date shift branchId companyId punchIn punchOut punchInSource workMode workedMinutes lateByMinutes earlyByMinutes status remarks"
-        )
-        .sort({ date: -1, lateByMinutes: -1, earlyByMinutes: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-    ]);
-
-    const pageEmpIds = [...new Set(rows.map((r) => oid(r.employee)).filter(Boolean))];
-    const employees = pageEmpIds.length
-      ? await User.find({ _id: { $in: pageEmpIds } })
-          .select(
-            "name official.employeeCode official.department official.designation official.branchId official.shiftId official.companyIds"
-          )
+    const companyIds = [
+      ...records.map((r) => oid(r.companyId)),
+      ...employees.flatMap((e) => userCompanyIds(e)),
+    ].filter(Boolean);
+    const companyDocs = companyIds.length
+      ? await Company.find({ _id: { $in: [...new Set(companyIds)] } })
+          .select("companyName branches")
           .lean()
       : [];
-    const empById = new Map(employees.map((e) => [oid(e._id), e]));
+    const companies = new Map(
+      companyDocs.map((c) => [oid(c._id), { _id: c._id, companyName: c.companyName || "", doc: c }])
+    );
 
-    const shiftIds = [
-      ...rows.map((r) => oid(r.shift)),
-      ...employees.map((e) => oid(e.official?.shiftId)),
-    ];
-    const branchIds = [
-      ...rows.map((r) => oid(r.branchId)),
-      ...employees.map((e) => oid(e.official?.branchId)),
-    ];
+    const allRows = [];
+    for (const att of records) {
+      const emp = empById.get(oid(att.employee));
+      allRows.push({ att, emp, timing: classifyPunch(att, emp, companies) });
+    }
+    const classified = allRows.filter((r) => {
+      if (type === "late") return r.timing.isLate;
+      if (type === "early") return r.timing.isEarly;
+      return r.timing.isLate || r.timing.isEarly;
+    });
+
+    classified.sort((a, b) => {
+      if (a.att.date !== b.att.date) return a.att.date < b.att.date ? 1 : -1;
+      return (b.timing.lateByMinutes || b.timing.earlyByMinutes) - (a.timing.lateByMinutes || a.timing.earlyByMinutes);
+    });
+
+    const late = allRows.filter((r) => r.timing.isLate).length;
+    const early = allRows.filter((r) => r.timing.isEarly).length;
+    const pageRows = classified.slice(skip, skip + limit);
+
+    const shiftIds = pageRows.map((r) => r.timing.shiftId);
+    const branchIds = pageRows.map((r) => r.timing.branchId);
     const [shifts, branches] = await Promise.all([
       loadMasterMap("shift", shiftIds),
       loadMasterMap("branch", branchIds),
     ]);
 
-    const data = rows.map((att) => {
-      const emp = empById.get(oid(att.employee));
-      const shiftId = oid(att.shift) || oid(emp?.official?.shiftId);
-      const branchId = oid(att.branchId) || oid(emp?.official?.branchId);
-      return toListRow(
-        att,
-        emp,
-        shifts.get(shiftId) || null,
-        branches.get(branchId) || null
-      );
-    });
+    const data = pageRows.map(({ att, emp, timing }) =>
+      toListRow(att, emp, shifts.get(timing.shiftId) || null, branches.get(timing.branchId) || null, timing)
+    );
 
     return res.json({
-      type,
-      from,
-      to,
+      ...empty,
       counts: {
-        late: lateCount,
-        early: earlyCount,
-        all: lateCount + earlyCount,
+        late,
+        early,
+        all: allRows.filter((r) => r.timing.isLate || r.timing.isEarly).length,
       },
-      total,
-      page,
-      limit,
-      pages: Math.max(1, Math.ceil(total / limit)),
-      filters: {
-        type,
-        date: req.query.date || "",
-        from,
-        to,
-        search: req.query.search || "",
-        department: req.query.department || "ALL",
-        shiftId: req.query.shiftId || "ALL",
-        companyId: req.query.companyId || "ALL",
-      },
+      total: classified.length,
+      pages: Math.max(1, Math.ceil(classified.length / limit)),
       data,
     });
   } catch (err) {
@@ -379,15 +425,14 @@ const listLateEarly = async (req, res) => {
 
 /**
  * DETAIL — GET /api/attendance/late-early/:id
- * Side drawer: punches, timeline, shift timing, late/early summary.
+ * One record. Same late/early numbers as the list.
  */
 const getLateEarlyDetail = async (req, res) => {
   try {
-    // Load attendance + employee for the drawer header
     const record = await Attendance.findById(req.params.id)
       .populate(
         "employee",
-        "name role official.employeeCode official.department official.designation official.branchId official.shiftId official.companyIds"
+        "name role official.employeeCode official.officialEmail official.department official.designation official.branchId official.shiftId official.companyIds"
       )
       .lean();
 
@@ -397,8 +442,10 @@ const getLateEarlyDetail = async (req, res) => {
 
     const emp = record.employee;
     const empId = emp?._id || record.employee;
+    const companyId = oid(record.companyId) || userCompanyIds(emp)[0] || "";
+    const shiftId = oid(record.shift) || oid(emp?.official?.shiftId);
+    const branchId = oid(record.branchId) || oid(emp?.official?.branchId);
 
-    // Access check + shift + masters in parallel
     const accessCheck = async () => {
       if (hasGlobalCompanyAccess(req.user)) return null;
       if (isTeamScopedRole(normalizeRoleName(req.user.role))) {
@@ -409,151 +456,75 @@ const getLateEarlyDetail = async (req, res) => {
         if (!onTeam) return "Access denied";
       } else {
         const mine = new Set(managementCompanyIds(req.user));
-        const theirs = userCompanyIds(record.employee || {});
+        const theirs = userCompanyIds(emp || {});
         if (!theirs.some((id) => mine.has(id))) return "Access denied";
       }
       return null;
     };
 
-    const [accessErr, placed, shiftMap, branchMap] = await Promise.all([
+    const [accessErr, companyDoc, shiftMap, branchMap] = await Promise.all([
       accessCheck(),
-      getAssignedShift(empId, record.date),
-      loadMasterMap("shift", [oid(record.shift) || oid(emp?.official?.shiftId)]),
-      loadMasterMap("branch", [oid(record.branchId) || oid(emp?.official?.branchId)]),
+      companyId
+        ? Company.findById(companyId).select("companyName branches").lean()
+        : null,
+      loadMasterMap("shift", [shiftId]),
+      loadMasterMap("branch", [branchId]),
     ]);
     if (accessErr) return res.status(403).json({ message: accessErr });
-    const { shift, company, branch } = placed;
-    const shiftMaster =
-      shiftMap.get(oid(record.shift) || oid(emp?.official?.shiftId)) ||
-      shiftSummary(shift);
-    const branchMaster =
-      branchMap.get(oid(record.branchId) || oid(emp?.official?.branchId)) ||
-      branchSummary(branch);
 
-    const late = Number(record.lateByMinutes) || 0;
-    const early = Number(record.earlyByMinutes) || 0;
+    const companies = new Map();
+    if (companyDoc) {
+      companies.set(oid(companyDoc._id), {
+        _id: companyDoc._id,
+        companyName: companyDoc.companyName || "",
+        doc: companyDoc,
+      });
+    }
+    const timing = classifyPunch(record, emp, companies);
+    const shiftMaster = shiftMap.get(shiftId) || null;
+    const branchMaster = branchMap.get(branchId) || null;
     const worked = Number(record.workedMinutes) || 0;
+    const overtime = overtimeAfterShiftEnd(record.punchOut, timing.endTime);
     const breakMins = breakMinutesOf(record);
 
-    // Status chip for drawer header
-    let status = "On Time";
-    if (late > 0 && early > 0) status = "Late & Early";
-    else if (late > 0) status = "Late";
-    else if (early > 0) status = "Early Departure";
-
     return res.json({
-      _id: record._id,
-      date: record.date,
-      employee: {
-        _id: emp?._id,
-        name: emp?.name || "",
-        official: {
-          employeeCode: emp?.official?.employeeCode || "",
-          department: emp?.official?.department || "",
-          designation: emp?.official?.designation || "",
-        },
-      },
-      status,
-      verification: record.punchInSource || null,
-      // Today's punch block
+      ...toListRow(record, emp, shiftMaster, branchMaster, timing),
       punch: {
-        punchIn: record.punchIn || null,
-        punchOut: record.punchOut || null,
         punchInTime: record.punchIn ? formatPunchStamp(record.punchIn) : "",
         punchOutTime: record.punchOut ? formatPunchStamp(record.punchOut) : "",
         totalHours: formatDurationLabel(worked),
         workedMinutes: worked,
       },
-      // Work info block
       workInfo: {
         department: emp?.official?.department || "",
         location: branchMaster?.name || "",
         branch: branchMaster,
-        company: companySummary(company),
-        shift: shiftMaster,
+        company: timing.company,
+        shift: shiftMaster
+          ? { ...shiftMaster, startTime: timing.startTime || "", endTime: timing.endTime || "" }
+          : null,
         workMode: record.workMode || "WFO",
       },
-      // Punch timeline (in / breaks / out)
       timeline: buildTimeline(record),
-      // Attendance summary footer
       summary: {
-        shiftTiming: shift
-          ? `${shift.startTime || ""} – ${shift.endTime || ""}`
-          : "",
-        shiftStart: shift?.startTime || "",
-        shiftEnd: shift?.endTime || "",
+        shiftStart: timing.startTime || "",
+        shiftEnd: timing.endTime || "",
+        shiftTiming:
+          timing.startTime || timing.endTime
+            ? `${timing.startTime || ""} – ${timing.endTime || ""}`
+            : "",
         breakDuration: minutesLabel(breakMins),
         breakMinutes: breakMins,
-        lateDuration: minutesLabel(late),
-        lateByMinutes: late,
-        earlyDuration: minutesLabel(early),
-        earlyByMinutes: early,
-        overtime: formatDurationLabel(Number(record.overtimeMinutes) || 0),
-        overtimeMinutes: Number(record.overtimeMinutes) || 0,
+        lateBy: minutesLabel(timing.lateByMinutes),
+        lateByMinutes: timing.lateByMinutes,
+        earlyBy: minutesLabel(timing.earlyByMinutes),
+        earlyByMinutes: timing.earlyByMinutes,
+        isLate: timing.isLate,
+        isEarly: timing.isEarly,
+        overtime: formatDurationLabel(overtime),
+        overtimeMinutes: overtime,
       },
-      remarks: record.remarks || "",
-      reason: record.remarks || "",
-      // Frontend can link these actions
-      actions: {
-        viewHistory: true,
-        regularize: true,
-      },
-    });
-  } catch (err) {
-    return res.status(500).json({ message: err.message });
-  }
-};
-
-/**
- * HISTORY — GET /api/attendance/late-early/:id/history
- * Past late/early days for the same employee (View History button).
- */
-const getLateEarlyHistory = async (req, res) => {
-  try {
-    // Parent attendance row → find employee
-    const parent = await Attendance.findById(req.params.id)
-      .select("employee")
-      .lean();
-    if (!parent) {
-      return res.status(404).json({ message: "Attendance record not found" });
-    }
-
-    const limit = Math.min(Number(req.query.limit) || 30, 100);
-
-    const rows = await Attendance.find({
-      employee: parent.employee,
-      $or: [{ lateByMinutes: { $gt: 0 } }, { earlyByMinutes: { $gt: 0 } }],
-    })
-      .select(
-        "date punchIn punchOut lateByMinutes earlyByMinutes workedMinutes"
-      )
-      .sort({ date: -1 })
-      .limit(limit)
-      .lean();
-
-    const data = rows.map((r) => ({
-      _id: r._id,
-      date: r.date,
-      punchInTime: r.punchIn ? formatPunchStamp(r.punchIn) : "",
-      punchOutTime: r.punchOut ? formatPunchStamp(r.punchOut) : "",
-      lateByMinutes: Number(r.lateByMinutes) || 0,
-      lateBy: minutesLabel(r.lateByMinutes),
-      earlyByMinutes: Number(r.earlyByMinutes) || 0,
-      earlyBy: minutesLabel(r.earlyByMinutes),
-      workingHours: formatDurationLabel(r.workedMinutes),
-      status:
-        (Number(r.lateByMinutes) || 0) > 0 &&
-        (Number(r.earlyByMinutes) || 0) > 0
-          ? "Late & Early"
-          : (Number(r.lateByMinutes) || 0) > 0
-            ? "Late"
-            : "Early Departure",
-    }));
-
-    return res.json({
-      employeeId: parent.employee,
-      total: data.length,
-      data,
+      reviewReason: String(record.reviewReason || "").trim(),
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -563,5 +534,4 @@ const getLateEarlyHistory = async (req, res) => {
 module.exports = {
   listLateEarly,
   getLateEarlyDetail,
-  getLateEarlyHistory,
 };

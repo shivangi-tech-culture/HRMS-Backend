@@ -12,6 +12,7 @@
  */
 const Attendance = require("../models/Attendance");
 const User = require("../models/User");
+const Company = require("../models/Company");
 const { getModel } = require("../models/Master");
 const { SELF_SOURCES } = require("../validators/attendance.validation");
 const { resolvePunchLocation } = require("../utils/geocode");
@@ -20,10 +21,14 @@ const {
   getAssignedShift, // attendance-only read of company/branch/shift
   validatePunchAgainstShift,
   computeDayMetrics,
-  overtimeMinutesOf,
+  overtimeAfterShiftEnd,
   formatPunchStamp,
   dayScheduleOf,
-  lateByMinutesOf,
+  minutesOfDay,
+  parseHm,
+  normalizeHm,
+  punchInWindow,
+  sameDayClock,
   DEFAULT_SHIFT,
 } = require("../utils/shiftTiming");
 const {
@@ -40,6 +45,7 @@ const {
   hasGlobalCompanyAccess,
   userCompanyIds,
   managementCompanyIds,
+  escapeRegex,
 } = require("../utils/companyScope");
 const {
   teamMemberFilter,
@@ -75,18 +81,16 @@ const assertSelfSource = (source) => {
 };
 
 /**
- * Copy day metrics onto Attendance row after punch-out.
- * holdForRemark=true → keep status Pending until admin approve/reject.
+ * Copy worked / late / early minutes after punch-out.
+ * Day status stays Present once the employee has punched in.
  */
-const applyMetrics = (record, shift, { holdForRemark = false } = {}) => {
+const applyMetrics = (record, shift) => {
   const metrics = computeDayMetrics(record, shift, record.date);
   record.workedMinutes = metrics.workedMinutes;
-  record.overtimeMinutes =
-    metrics.overtimeMinutes ?? overtimeMinutesOf(metrics.workedMinutes);
+  record.overtimeMinutes = metrics.overtimeMinutes;
   record.lateByMinutes = metrics.lateByMinutes;
   record.earlyByMinutes = metrics.earlyByMinutes;
-  // Remark pending → admin decides Present/Absent later
-  record.status = holdForRemark ? "Pending" : metrics.status;
+  if (record.punchIn) record.status = "Present";
   return metrics;
 };
 
@@ -109,13 +113,17 @@ const punchExtras = ({ company, branch, shift }) => ({
 
 const remarkText = (body) => String(body?.remarks ?? "").trim();
 
-/** Non-empty note → remarkStatus Pending (admin can approve/reject) */
+/** Saved when a late punch has no employee note */
+const DEFAULT_LATE_REMARK = "Late punch-in";
+
+/** Fields needed so every punch / review card includes official email */
+const EMPLOYEE_CARD_SELECT =
+  "name role official.employeeCode official.officialEmail official.department official.designation";
+
+/** Punch-out note only. Day stays Present. Late approval is unchanged. */
 const applyRemarkOnPunch = (record, text) => {
   if (!text) return;
   record.remarks = text;
-  if (record.remarkStatus !== "Approved" && record.remarkStatus !== "Rejected") {
-    record.remarkStatus = "Pending";
-  }
 };
 
 /** Punch-in / punch-out. Company, branch, shift, location and remarks live only on record. */
@@ -159,7 +167,7 @@ const punchIn = async (req, res) => {
     if (record && record.punchIn) {
       await record.populate(
         "employee",
-        "name role official.employeeCode official.officialEmail official.department official.designation"
+        EMPLOYEE_CARD_SELECT
       );
       return res.status(400).json({
         message: "Already punched in today",
@@ -175,30 +183,37 @@ const punchIn = async (req, res) => {
     record.punchInSource = source;
     record.punchInLocation = location;
     applyPlacement(record, { company, branch, shift });
-    record.status = "Pending";
     record.workedMinutes = 0;
     record.overtimeMinutes = 0;
-    applyRemarkOnPunch(record, remarks);
-    // Late vs that day's shift → Late + Pending review until approve → Present
+    record.lateByMinutes = windowCheck.isLate ? windowCheck.lateByMinutes || 0 : 0;
+    record.earlyByMinutes = windowCheck.isEarly ? windowCheck.earlyByMinutes || 0 : 0;
+    record.reviewReason = "";
+    // Day stays Present. attendanceStatus follows punch-in vs shift start.
+    record.status = "Present";
+    record.remarks = remarks;
     if (windowCheck.isLate) {
-      record.lateByMinutes = windowCheck.lateByMinutes || 0;
-      record.status = "Late";
-      record.remarkStatus = "Pending";
+      record.remarks = remarks || DEFAULT_LATE_REMARK;
+      record.attendanceStatus = "Late";
+    } else if (windowCheck.isEarly) {
+      record.attendanceStatus = "Early";
+    } else {
+      record.attendanceStatus = "On time";
     }
     await record.save();
 
     await record.populate(
       "employee",
-      "name role official.employeeCode official.department official.designation"
+      EMPLOYEE_CARD_SELECT
     );
 
-    return res.status(201).json(
-      punchPayload(
-        windowCheck.isEarly
+    const punchInMessage = windowCheck.isLate
+      ? "Punched in late — marked Present"
+      : windowCheck.isEarly
         ? "Punched in (early — before shift start, allowed)"
-        : "Punched in successfully",
-        { company, branch, shift, record }
-      )
+        : "Punched in on time (within grace)";
+
+    return res.status(201).json(
+      punchPayload(punchInMessage, { company, branch, shift, record })
     );
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -228,7 +243,7 @@ const punchOut = async (req, res) => {
     if (record.punchOut) {
       await record.populate(
         "employee",
-        "name role official.employeeCode official.officialEmail official.department official.designation"
+        EMPLOYEE_CARD_SELECT
       );
       const placed = await getAssignedShift(employeeId, date);
       return res.status(400).json({
@@ -258,18 +273,31 @@ const punchOut = async (req, res) => {
     record.punchOutSource = source;
     record.punchOutLocation = location;
     applyRemarkOnPunch(record, remarks);
-
-    // Late punch or a remark stays Late/Pending until the review API approves it
-    const holdForRemark = record.remarkStatus === "Pending";
-    const wasLate =
-      record.status === "Late" || (Number(record.lateByMinutes) || 0) > 0;
-    applyMetrics(record, shift, { holdForRemark });
-    if (holdForRemark && wasLate) record.status = "Late";
+    applyMetrics(record, shift);
+    if (record.attendanceStatus !== "Approved" && record.attendanceStatus !== "Rejected") {
+      const arrived = punchInWindow(
+        record.punchIn ? minutesOfDay(record.punchIn) : null,
+        parseHm(shift?.startTime),
+        shift?.graceMinutes
+      );
+      record.lateByMinutes = arrived.lateByMinutes;
+      if (arrived.isLate) {
+        record.attendanceStatus = "Late";
+        if (!String(record.remarks || "").trim()) record.remarks = DEFAULT_LATE_REMARK;
+      } else if (arrived.isEarly) {
+        record.attendanceStatus = "Early";
+        if (record.remarks === DEFAULT_LATE_REMARK) record.remarks = "";
+      } else {
+        record.attendanceStatus = "On time";
+        if (record.remarks === DEFAULT_LATE_REMARK) record.remarks = "";
+      }
+    }
+    record.status = "Present";
     await record.save();
 
     await record.populate(
       "employee",
-      "name role official.employeeCode official.department official.designation"
+      EMPLOYEE_CARD_SELECT
     );
 
     return res.json(
@@ -290,7 +318,7 @@ const myToday = async (req, res) => {
   try {
     const date = today();
     const empSelect =
-      "name role official.employeeCode official.department official.designation";
+      EMPLOYEE_CARD_SELECT;
 
     const [record, placed] = await Promise.all([
       Attendance.findOne({ employee: req.user._id, date }),
@@ -309,13 +337,13 @@ const myToday = async (req, res) => {
         }
       }
       applyPlacement(record, { company, branch, shift });
-      if (record.punchIn && record.punchOut && (dirty || record.status === "Pending")) {
-        const holdForRemark =
-          Boolean(record.remarks) && record.remarkStatus === "Pending";
-        if (!holdForRemark || dirty) {
-          applyMetrics(record, shift, { holdForRemark });
-          dirty = true;
-        }
+      if (record.punchIn && record.status !== "Present") {
+        record.status = "Present";
+        dirty = true;
+      }
+      if (record.punchIn && record.punchOut) {
+        applyMetrics(record, shift);
+        dirty = true;
       }
       if (dirty) await record.save();
       await record.populate("employee", empSelect);
@@ -354,13 +382,17 @@ const listWebPunches = async (req, res) => {
     const employee = {
       _id: req.user._id,
       name: req.user.name || "",
-      official: { employeeCode: req.user.official?.employeeCode || "" },
+      email: req.user.official?.officialEmail || "",
+      official: {
+        employeeCode: req.user.official?.employeeCode || "",
+        officialEmail: req.user.official?.officialEmail || "",
+      },
     };
 
     // Own history only — lean select (no populate). Cap scan for safety.
     const records = await Attendance.find(filter)
       .select(
-        "date status punchIn punchOut punchInSource punchOutSource punchInLocation punchOutLocation remarks remarkStatus"
+        "date status punchIn punchOut punchInSource punchOutSource punchInLocation punchOutLocation remarks attendanceStatus"
       )
       .sort({ date: -1, punchIn: -1 })
       .limit(500)
@@ -379,7 +411,7 @@ const listWebPunches = async (req, res) => {
           punchType: r.punchInSource === "manual" ? "Manual" : "Work From Office",
           location: r.punchInLocation || {},
           remarks: r.remarks || "",
-          remarkStatus: r.remarkStatus || null,
+          attendanceStatus: r.attendanceStatus || null,
           source: r.punchInSource,
           date: r.date,
         });
@@ -395,7 +427,7 @@ const listWebPunches = async (req, res) => {
           punchType: r.punchOutSource === "manual" ? "Manual" : "Work From Office",
           location: r.punchOutLocation || {},
           remarks: r.remarks || "",
-          remarkStatus: r.remarkStatus || null,
+          attendanceStatus: r.attendanceStatus || null,
           source: r.punchOutSource,
           date: r.date,
         });
@@ -421,8 +453,8 @@ const listWebPunches = async (req, res) => {
  * Which employees this admin/HR can see on daily/calendar.
  * Scope only — does not change any employee assignment fields.
  *
- * Super Admin / Admin → all employees
- * HR → employees in ANY of HR's official.companyIds (multi-company OK)
+ * Super Admin / Admin → one company at a time (see resolveListCompanyId)
+ * HR → employees in their assigned companies
  * Reporting Manager → team members only
  */
 const scopedEmployeeFilter = (actor) => {
@@ -445,8 +477,58 @@ const scopedEmployeeFilter = (actor) => {
   return base;
 };
 
+/**
+ * Company for daily + calendar rows.
+ * Super Admin / Admin → pass companyId, or the first created active company.
+ * HR → own company (first official.companyIds). Another id only if it is assigned.
+ * Reporting Manager → no company default; optional companyId narrows the team.
+ */
+const resolveListCompanyId = async (actor, raw) => {
+  const requested = String(raw || "").trim();
+  const explicit = Boolean(requested && requested !== "ALL");
+
+  if (isTeamScopedRole(normalizeRoleName(actor?.role))) {
+    return explicit ? { companyId: requested } : {};
+  }
+
+  if (hasGlobalCompanyAccess(actor)) {
+    if (explicit) {
+      const doc = await Company.findOne({ _id: requested, isActive: { $ne: false } })
+        .select("_id")
+        .lean();
+      if (!doc) return { error: "Company not found", status: 404 };
+      return { companyId: String(doc._id) };
+    }
+    const first = await Company.findOne({ isActive: { $ne: false } })
+      .sort({ createdAt: 1, _id: 1 })
+      .select("_id")
+      .lean();
+    if (!first) return { none: true };
+    return { companyId: String(first._id) };
+  }
+
+  const ids = managementCompanyIds(actor);
+  if (!ids.length) return { none: true };
+  if (!explicit) return { companyId: ids[0] };
+  if (!ids.includes(requested)) {
+    return {
+      error: "You can only view attendance for your assigned company",
+      status: 403,
+    };
+  }
+  return { companyId: requested };
+};
+
+const applyListCompany = (empFilter, resolved) => {
+  if (resolved.none) {
+    empFilter._id = { $in: [] };
+    return;
+  }
+  if (resolved.companyId) empFilter["official.companyIds"] = resolved.companyId;
+};
+
 const ATTENDANCE_LIST_SELECT =
-  "employee date companyId branchId shift punchIn punchOut punchInSource workMode workedMinutes overtimeMinutes lateByMinutes earlyByMinutes status remarks remarkStatus";
+  "employee date companyId branchId shift punchIn punchOut punchInSource workMode workedMinutes overtimeMinutes lateByMinutes earlyByMinutes status remarks attendanceStatus reviewReason";
 
 const EMPLOYEE_DAILY_SELECT =
   "name role status avatar official.employeeCode official.officialEmail official.department official.designation official.companyIds official.branchId official.shiftId personal.mobileNo";
@@ -511,10 +593,12 @@ const dayTimingOf = (company, branchId, shiftId, dateStr) => {
   if (!shift) return null;
   const day = dayScheduleOf(shift.monthlySchedule, dateStr);
   if (!day) return null;
+  const clock = sameDayClock(day.startTime, day.endTime);
   return {
-    startTime: day.isOff ? "" : day.startTime || "",
-    endTime: day.isOff ? "" : day.endTime || "",
+    startTime: day.isOff ? "" : clock.startTime || "",
+    endTime: day.isOff ? "" : clock.endTime || "",
     isOff: !!day.isOff,
+    graceMinutes: DEFAULT_SHIFT.graceMinutes,
   };
 };
 
@@ -526,6 +610,7 @@ const shiftWithTiming = (master, timing) => {
     code: master?.code || "",
     startTime: timing?.startTime || "",
     endTime: timing?.endTime || "",
+    graceMinutes: timing?.graceMinutes ?? DEFAULT_SHIFT.graceMinutes,
     isOff: !!timing?.isOff,
   };
 };
@@ -543,52 +628,89 @@ const employeeDailyCard = (emp) => ({
 });
 
 /**
- * Late vs that day's shift start → Late + canApproveReject.
- * Approve → Present · Reject → Absent · On-time open punch → Working.
+ * Punch-in → Present, even when late.
+ * attendanceStatus: Early · On time · Late · Approved · Rejected
  */
 const applyLateStatus = (att, timing) => {
-  const decided = att?.remarkStatus === "Approved" || att?.remarkStatus === "Rejected";
+  const reviewed =
+    att?.attendanceStatus === "Approved" || att?.attendanceStatus === "Rejected";
   let lateBy = Number(att?.lateByMinutes) || 0;
+  let earlyBy = 0;
+  let isEarly = false;
   if (att?.punchIn && timing && !timing.isOff && timing.startTime) {
-    lateBy = lateByMinutesOf(att.punchIn, timing.startTime, DEFAULT_SHIFT.graceMinutes);
+    const punchMin = minutesOfDay(att.punchIn);
+    const startMin = parseHm(timing.startTime);
+    const grace = timing.graceMinutes ?? DEFAULT_SHIFT.graceMinutes;
+    const arrived = punchInWindow(punchMin, startMin, grace);
+    isEarly = arrived.isEarly;
+    earlyBy = arrived.earlyByMinutes;
+    lateBy = arrived.lateByMinutes;
   }
   const isLate = lateBy > 0;
-  let remarkStatus = att?.remarkStatus || null;
-  let status = att?.status || "Absent";
+  const written = String(att?.remarks || "").trim();
+  const needsReview = Boolean(att?.punchIn) && isLate && !reviewed;
+  let attendanceStatus = null;
+  let status = "Absent";
   let canApproveReject = false;
+  let remarks = written;
 
   if (!att?.punchIn) {
     status = "Absent";
-    remarkStatus = null;
-  } else if (decided) {
-    status = att.remarkStatus === "Approved" ? "Present" : "Absent";
-  } else if (isLate) {
-    status = "Late";
-    remarkStatus = "Pending";
-    canApproveReject = true;
-  } else if (remarkStatus === "Pending") {
-    status = att.punchOut ? "Present" : "Working";
-    canApproveReject = true;
-  } else if (!att.punchOut) {
-    status = "Working";
-  } else if (status === "Pending" || status === "Late") {
+  } else {
     status = "Present";
+    if (reviewed) attendanceStatus = att.attendanceStatus;
+    else if (isLate) {
+      attendanceStatus = "Late";
+      canApproveReject = true;
+      if (!remarks) remarks = DEFAULT_LATE_REMARK;
+    } else {
+      attendanceStatus = isEarly ? "Early" : "On time";
+    }
   }
 
   const persist =
     att?._id &&
-    isLate &&
-    !decided &&
-    (att.remarkStatus !== "Pending" ||
-      att.status !== "Late" ||
-      Number(att.lateByMinutes) !== lateBy);
+    Boolean(att?.punchIn) &&
+    !reviewed &&
+    (att.attendanceStatus !== attendanceStatus ||
+      att.status !== "Present" ||
+      Number(att.lateByMinutes) !== lateBy ||
+      (needsReview && !written));
 
-  return { status, remarkStatus, canApproveReject, isLate, lateBy, persist };
+  return {
+    status,
+    attendanceStatus,
+    canApproveReject,
+    isLate,
+    isEarly,
+    lateBy,
+    earlyBy,
+    persist,
+    remarks,
+    defaultRemark: needsReview && !written ? DEFAULT_LATE_REMARK : "",
+  };
 };
 
 const queueLateFixes = (fixes) => {
   if (!fixes.length) return;
   Attendance.bulkWrite(fixes).catch(() => {});
+};
+
+const lateFixOp = (att, late) => {
+  const $set = {
+    status: "Present",
+    attendanceStatus: late.attendanceStatus,
+    lateByMinutes: late.lateBy,
+    earlyByMinutes: late.earlyBy,
+  };
+  if (late.defaultRemark) $set.remarks = late.defaultRemark;
+  if (!late.isLate && String(att.remarks || "").trim() === DEFAULT_LATE_REMARK) $set.remarks = "";
+  return {
+    updateOne: {
+      filter: { _id: att._id },
+      update: { $set },
+    },
+  };
 };
 
 /** Lean daily / calendar row — table columns only, no duplicate fields */
@@ -599,6 +721,7 @@ const buildDailyRow = (emp, att, date, maps) => {
   const timing = dayTimingOf(maps.schedules.get(companyId), branchId, shiftId, date);
   const late = applyLateStatus(att, timing);
   const worked = Number(att?.workedMinutes) || 0;
+  const overtime = overtimeAfterShiftEnd(att?.punchOut, timing?.endTime);
 
   return {
     row: {
@@ -611,14 +734,18 @@ const buildDailyRow = (emp, att, date, maps) => {
       punchInTime: att?.punchIn ? formatPunchStamp(att.punchIn) : "",
       punchOutTime: att?.punchOut ? formatPunchStamp(att.punchOut) : "",
       workingHours: formatDurationLabel(worked),
+      overtime: formatDurationLabel(overtime),
+      overtimeMinutes: overtime,
       status: late.status,
       workMode: att?.workMode || "WFO",
       verification: att?.punchInSource || null,
       isLate: late.isLate,
+      isEarly: late.isEarly,
       lateByMinutes: late.lateBy,
-      earlyByMinutes: Number(att?.earlyByMinutes) || 0,
-      remarks: String(att?.remarks || "").trim(),
-      remarkStatus: late.remarkStatus,
+      earlyByMinutes: late.earlyBy,
+      remarks: late.remarks,
+      attendanceStatus: late.attendanceStatus,
+      reviewReason: String(att?.reviewReason || "").trim(),
       canApproveReject: late.canApproveReject,
     },
     late,
@@ -672,15 +799,51 @@ const tallyDailySummary = (summary, row) => {
   if (row.canApproveReject || row.needsRemarkReview) summary.pending += 1;
 };
 
+const applyEmployeeSearch = (filter, search) => {
+  const q = String(search || "").trim();
+  if (!q) return filter;
+  const rx = new RegExp(escapeRegex(q), "i");
+  const clause = {
+    $or: [
+      { name: rx },
+      { "official.employeeCode": rx },
+      { "official.officialEmail": rx },
+    ],
+  };
+  if (filter.$or || filter.$and) {
+    filter.$and = [...(filter.$and || []), ...(filter.$or ? [{ $or: filter.$or }] : []), clause];
+    delete filter.$or;
+  } else {
+    filter.$or = clause.$or;
+  }
+  return filter;
+};
+
+const needsAttendanceRowFilter = (q) =>
+  (q.workMode && q.workMode !== "ALL") ||
+  (q.status && q.status !== "ALL") ||
+  q.hasRemark === "true" ||
+  q.hasRemark === "1" ||
+  q.hasRemark === "false" ||
+  q.hasRemark === "0" ||
+  (q.attendanceStatus && q.attendanceStatus !== "ALL");
 const passesDailyAttFilters = (row, q) => {
   if (q.workMode && q.workMode !== "ALL" && row.workMode !== q.workMode) return false;
   if (q.status && q.status !== "ALL") {
-    if (q.status === "Late") {
-      if (!(row.status === "Late" || row.isLate)) return false;
-    } else if (row.status !== q.status) return false;
+    const s = q.status;
+    if (s === "Late") {
+      if (!(row.isLate || row.attendanceStatus === "Late")) return false;
+    } else if (s === "Working") {
+      if (!(row.punchInTime && !row.punchOutTime)) return false;
+    } else if (s === "WFH") {
+      if (!(row.status === "WFH" || row.workMode === "WFH")) return false;
+    } else if (s === "Present") {
+      if (row.status !== "Present" || row.isLate) return false;
+    } else if (row.status !== s) return false;
   }
   if ((q.hasRemark === "true" || q.hasRemark === "1") && !row.remarks) return false;
-  if (q.remarkStatus && q.remarkStatus !== "ALL" && row.remarkStatus !== q.remarkStatus) {
+  if ((q.hasRemark === "false" || q.hasRemark === "0") && row.remarks) return false;
+  if (q.attendanceStatus && q.attendanceStatus !== "ALL" && row.attendanceStatus !== q.attendanceStatus) {
     return false;
   }
   return true;
@@ -690,6 +853,8 @@ const passesDailyAttFilters = (row, q) => {
  * DAILY ATTENDANCE — GET /api/attendance/daily
  * Permission: Attendance → Daily Attendance → view
  * Always today. Filters: search, department, branchId, shiftId, workMode, status, companyId.
+ * Super Admin / Admin: one company. No companyId → first created company.
+ * HR: own assigned company (companyIds[0]), or another id only if assigned to them.
  * One row has every daily-table field: employee, code, department, shift,
  * punch in/out, working hours, status, verification, approve/reject.
  */
@@ -700,7 +865,13 @@ const listDailyAttendance = async (req, res) => {
     const limit = Math.min(Number(req.query.limit) || 50, 200);
     const skip = (page - 1) * limit;
 
+    const companyScope = await resolveListCompanyId(req.user, req.query.companyId);
+    if (companyScope.error) {
+      return res.status(companyScope.status).json({ message: companyScope.error });
+    }
+
     const empFilter = scopedEmployeeFilter(req.user);
+    applyListCompany(empFilter, companyScope);
     if (req.query.department && req.query.department !== "ALL") {
       empFilter["official.department"] = req.query.department;
     }
@@ -710,26 +881,9 @@ const listDailyAttendance = async (req, res) => {
     if (req.query.shiftId && req.query.shiftId !== "ALL") {
       empFilter["official.shiftId"] = req.query.shiftId;
     }
-    if (req.query.companyId && req.query.companyId !== "ALL") {
-      empFilter["official.companyIds"] = req.query.companyId;
-    }
-    if (req.query.search) {
-      const q = String(req.query.search).trim();
-      if (q) {
-        empFilter.$or = [
-          { name: { $regex: q, $options: "i" } },
-          { "official.employeeCode": { $regex: q, $options: "i" } },
-          { "official.officialEmail": { $regex: q, $options: "i" } },
-        ];
-      }
-    }
+    applyEmployeeSearch(empFilter, req.query.search);
 
-    const needsAttFilter =
-      (req.query.workMode && req.query.workMode !== "ALL") ||
-      (req.query.status && req.query.status !== "ALL") ||
-      req.query.hasRemark === "true" ||
-      req.query.hasRemark === "1" ||
-      (req.query.remarkStatus && req.query.remarkStatus !== "ALL");
+    const needsAttFilter = needsAttendanceRowFilter(req.query);
 
     const meta = () => ({
       reviewerScope: reviewerScopeOf(req.user),
@@ -742,11 +896,11 @@ const listDailyAttendance = async (req, res) => {
         department: req.query.department || "ALL",
         branchId: req.query.branchId || "ALL",
         shiftId: req.query.shiftId || "ALL",
-        companyId: req.query.companyId || "ALL",
+        companyId: companyScope.companyId || req.query.companyId || "ALL",
         workMode: req.query.workMode || "ALL",
         status: req.query.status || "ALL",
         hasRemark: req.query.hasRemark || "",
-        remarkStatus: req.query.remarkStatus || "ALL",
+        attendanceStatus: req.query.attendanceStatus || "ALL",
       },
     });
 
@@ -788,7 +942,7 @@ const listDailyAttendance = async (req, res) => {
         empIds.length
           ? Attendance.find({ employee: { $in: empIds }, date })
               .select(
-                "employee status workMode lateByMinutes remarks remarkStatus punchIn punchOut"
+                "employee status workMode lateByMinutes remarks attendanceStatus punchIn punchOut"
               )
               .lean()
           : [],
@@ -801,18 +955,7 @@ const listDailyAttendance = async (req, res) => {
         const att = byEmp.get(oid(emp._id));
         const built = buildDailyRow(emp, att, date, maps);
         if (built.late.persist && att) {
-          lateFixes.push({
-            updateOne: {
-              filter: { _id: att._id },
-              update: {
-                $set: {
-                  status: "Late",
-                  remarkStatus: "Pending",
-                  lateByMinutes: built.late.lateBy,
-                },
-              },
-            },
-          });
+          lateFixes.push(lateFixOp(att, built.late));
         }
         return built.row;
       });
@@ -822,20 +965,15 @@ const listDailyAttendance = async (req, res) => {
       const punched = new Set();
       for (const att of allAtt) {
         punched.add(oid(att.employee));
-        const decided =
-          att.remarkStatus === "Approved" || att.remarkStatus === "Rejected";
+        const reviewed =
+          att.attendanceStatus === "Approved" || att.attendanceStatus === "Rejected";
         const isLate = (Number(att.lateByMinutes) || 0) > 0;
-        let status = att.status || "Absent";
-        if (!att.punchIn) status = "Absent";
-        else if (decided) status = att.remarkStatus === "Approved" ? "Present" : "Absent";
-        else if (isLate) status = "Late";
-        else if (att.punchIn && !att.punchOut) status = "Working";
+        const status = att.punchIn ? "Present" : "Absent";
         tallyDailySummary(summary, {
           status,
           workMode: att.workMode || "WFO",
           isLate,
-          canApproveReject:
-            (isLate && !decided) || att.remarkStatus === "Pending",
+          canApproveReject: Boolean(att.punchIn) && isLate && !reviewed,
         });
       }
       const absentExtra = Math.max(0, empIds.length - punched.size);
@@ -874,18 +1012,7 @@ const listDailyAttendance = async (req, res) => {
       const att = byEmp.get(oid(emp._id));
       const built = buildDailyRow(emp, att, date, maps);
       if (built.late.persist && att) {
-        lateFixes.push({
-          updateOne: {
-            filter: { _id: att._id },
-            update: {
-              $set: {
-                status: "Late",
-                remarkStatus: "Pending",
-                lateByMinutes: built.late.lateBy,
-              },
-            },
-          },
-        });
+        lateFixes.push(lateFixOp(att, built.late));
       }
       if (passesDailyAttFilters(built.row, req.query)) rows.push(built.row);
     }
@@ -928,63 +1055,48 @@ const attendanceCalendar = async (req, res) => {
       date = today() >= from && today() <= to ? today() : from;
     }
 
-    const empFilter = scopedEmployeeFilter(req.user);
-    if (req.query.companyId && req.query.companyId !== "ALL") {
-      empFilter["official.companyIds"] = req.query.companyId;
+    const companyScope = await resolveListCompanyId(req.user, req.query.companyId);
+    if (companyScope.error) {
+      return res.status(companyScope.status).json({ message: companyScope.error });
     }
+
+    const empFilter = scopedEmployeeFilter(req.user);
+    applyListCompany(empFilter, companyScope);
     if (req.query.department && req.query.department !== "ALL") {
       empFilter["official.department"] = req.query.department;
     }
     if (req.query.branchId && req.query.branchId !== "ALL") {
       empFilter["official.branchId"] = req.query.branchId;
     }
+    if (req.query.shiftId && req.query.shiftId !== "ALL") {
+      empFilter["official.shiftId"] = req.query.shiftId;
+    }
+
+    const todayStr = today();
+    const dayFilter = applyEmployeeSearch({ ...empFilter }, req.query.search);
+    const rowFilterOn = needsAttendanceRowFilter(req.query);
 
     const page = Math.max(Number(req.query.page) || 1, 1);
     const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 200);
     const skip = (page - 1) * limit;
 
-    const dayFilter = { ...empFilter };
-    if (req.query.search) {
-      const q = String(req.query.search).trim();
-      if (q) {
-        dayFilter.$or = [
-          { name: { $regex: q, $options: "i" } },
-          { "official.employeeCode": { $regex: q, $options: "i" } },
-          { "official.officialEmail": { $regex: q, $options: "i" } },
-        ];
-      }
-    }
-
-    const [empIds, dayTotal, dayEmployees] = await Promise.all([
+    const [empIds, listEmployees] = await Promise.all([
       User.distinct("_id", empFilter),
-      User.countDocuments(dayFilter),
       User.find(dayFilter)
         .select(EMPLOYEE_DAILY_SELECT)
         .sort({ name: 1 })
-        .skip(skip)
-        .limit(limit)
         .lean(),
     ]);
     const employeeCount = empIds.length;
 
-    const [monthRecords, dayRows] = await Promise.all([
-      empIds.length
-        ? Attendance.find({
-            employee: { $in: empIds },
-            date: { $gte: from, $lte: to },
-          })
-            .select("date status lateByMinutes workMode punchIn punchOut")
-            .lean()
-        : [],
-      dayEmployees.length
-        ? Attendance.find({
-            employee: { $in: dayEmployees.map((e) => e._id) },
-            date,
-          })
-            .select(ATTENDANCE_LIST_SELECT)
-            .lean()
-        : [],
-    ]);
+    const monthRecords = empIds.length
+      ? await Attendance.find({
+          employee: { $in: empIds },
+          date: { $gte: from, $lte: to },
+        })
+          .select("date status lateByMinutes workMode punchIn punchOut employee")
+          .lean()
+      : [];
 
     const byDate = new Map();
     const ensure = (d) => {
@@ -1022,15 +1134,19 @@ const attendanceCalendar = async (req, res) => {
     }
 
     const days = [...byDate.values()]
-      .map((d) => ({
-        date: d.date,
-        present: d.present,
-        absent: d.absent + Math.max(0, employeeCount - d.punched),
-        late: d.late,
-        onLeave: d.onLeave,
-        wfh: d.wfh,
-        halfDay: d.halfDay,
-      }))
+      .map((d) => {
+        const started = d.date <= todayStr;
+        return {
+          date: d.date,
+          employees: employeeCount,
+          present: d.present,
+          absent: started ? d.absent + Math.max(0, employeeCount - d.punched) : 0,
+          late: d.late,
+          onLeave: d.onLeave,
+          wfh: d.wfh,
+          halfDay: d.halfDay,
+        };
+      })
       .sort((a, b) => a.date.localeCompare(b.date));
 
     const summary = { present: 0, absent: 0, late: 0, onLeave: 0, wfh: 0, halfDay: 0 };
@@ -1043,40 +1159,53 @@ const attendanceCalendar = async (req, res) => {
       summary.halfDay += d.halfDay;
     }
 
+    const dayRows = listEmployees.length
+      ? await Attendance.find({
+          employee: { $in: listEmployees.map((e) => e._id) },
+          date,
+        })
+          .select(ATTENDANCE_LIST_SELECT)
+          .lean()
+      : [];
     const byEmp = new Map(dayRows.map((r) => [oid(r.employee), r]));
-    const maps = await loadDailyMaps(dayEmployees, dayRows);
+    const maps = await loadDailyMaps(listEmployees, dayRows);
     const lateFixes = [];
-    const data = dayEmployees.map((emp) => {
+    const rows = [];
+    for (const emp of listEmployees) {
       const att = byEmp.get(oid(emp._id));
       const built = buildDailyRow(emp, att, date, maps);
-      if (built.late.persist && att) {
-        lateFixes.push({
-          updateOne: {
-            filter: { _id: att._id },
-            update: {
-              $set: {
-                status: "Late",
-                remarkStatus: "Pending",
-                lateByMinutes: built.late.lateBy,
-              },
-            },
-          },
-        });
-      }
-      return built.row;
-    });
+      if (date > todayStr && !att?.punchIn) built.row.status = "";
+      if (built.late.persist && att) lateFixes.push(lateFixOp(att, built.late));
+      if (!rowFilterOn || passesDailyAttFilters(built.row, req.query)) rows.push(built.row);
+    }
     queueLateFixes(lateFixes);
+
+    const total = rows.length;
+    const data = rows.slice(skip, skip + limit);
 
     return res.json({
       month,
       date,
+      companyId: companyScope.companyId || null,
+      employees: employeeCount,
       summary,
       day: days.find((d) => d.date === date) || null,
       days,
-      total: dayTotal,
+      total,
       page,
       limit,
-      pages: Math.max(1, Math.ceil(dayTotal / limit)),
+      pages: Math.max(1, Math.ceil(total / limit)),
+      filters: {
+        search: req.query.search || "",
+        department: req.query.department || "ALL",
+        branchId: req.query.branchId || "ALL",
+        shiftId: req.query.shiftId || "ALL",
+        companyId: companyScope.companyId || "ALL",
+        workMode: req.query.workMode || "ALL",
+        status: req.query.status || "ALL",
+        attendanceStatus: req.query.attendanceStatus || "ALL",
+        hasRemark: req.query.hasRemark || "",
+      },
       data,
     });
   } catch (err) {
@@ -1085,38 +1214,160 @@ const attendanceCalendar = async (req, res) => {
 };
 
 /**
- * REMARK REVIEW — POST /api/attendance/:id/review-remark
- * Body: { decision: "approve" | "reject" }
- * Approve → Present · Reject → Absent
- *
- * Access (never changes User assignment):
- *   Super Admin / Admin → every company
- *   HR Manager          → employee whose company is IN HR's official.companyIds
- *                         (HR can have many companies — all assigned ones work)
- *   Reporting Manager   → team only (reportingHead1 / reportingHead2)
+ * MARK MISSED PUNCH — POST /api/attendance/mark
+ * Body: { employeeId, date, punchInTime?, punchOutTime?, reason, remarks? }
+ * Sets only the punches sent. Does not change the employee's company, branch, or shift.
+ * A finished day can take both times. Today can take the one they forgot.
+ */
+const clockOnDate = (dateStr, hm, label) => {
+  const norm = normalizeHm(hm);
+  if (!norm) return { error: `${label} must be 24-hour HH:mm` };
+  const at = new Date(`${dateStr}T${norm}:00+05:30`);
+  if (Number.isNaN(at.getTime())) return { error: `${label} must be 24-hour HH:mm` };
+  if (at.getTime() > Date.now()) return { error: `${label} cannot be in the future` };
+  return { at, hm: norm };
+};
+
+const markAttendance = async (req, res) => {
+  try {
+    const employeeId = req.body.employeeId;
+    const date = req.body.date;
+    if (date > today()) {
+      return res.status(400).json({ message: "Date cannot be in the future" });
+    }
+
+    const inRaw = String(req.body.punchInTime || "").trim();
+    const outRaw = String(req.body.punchOutTime || "").trim();
+    if (!inRaw && !outRaw) {
+      return res.status(400).json({ message: "punchInTime or punchOutTime is required" });
+    }
+    const punchIn = inRaw ? clockOnDate(date, inRaw, "Punch in") : null;
+    const punchOut = outRaw ? clockOnDate(date, outRaw, "Punch out") : null;
+    if (punchIn?.error) return res.status(400).json({ message: punchIn.error });
+    if (punchOut?.error) return res.status(400).json({ message: punchOut.error });
+
+    const employee = await User.findById(employeeId).select(
+      `${EMPLOYEE_CARD_SELECT} official.companyIds official.reportingHead1 official.reportingHead2 status`
+    );
+    if (!employee || employee.status === "Deleted") {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+    const scopeErr = assertTeamOrCompanyEmployee(req.user, employee);
+    if (scopeErr) return res.status(403).json({ message: scopeErr });
+
+    const { shift, company, branch } = await getAssignedShift(employeeId, date);
+    let record = await Attendance.findOne({ employee: employeeId, date });
+    if (!record) record = new Attendance({ employee: employeeId, date });
+    const created = record.isNew;
+
+    if (punchIn && record.punchIn) {
+      return res.status(400).json({ message: "Punch in is already marked for this day" });
+    }
+    if (punchOut && record.punchOut) {
+      return res.status(400).json({ message: "Punch out is already marked for this day" });
+    }
+    if (punchOut && !record.punchIn && !punchIn) {
+      return res.status(400).json({ message: "Punch in is required before punch out" });
+    }
+
+    const inAt = punchIn ? punchIn.at : record.punchIn;
+    const outAt = punchOut ? punchOut.at : record.punchOut;
+    if (inAt && outAt && new Date(outAt).getTime() <= new Date(inAt).getTime()) {
+      return res.status(400).json({ message: "Punch out must be after punch in" });
+    }
+
+    applyPlacement(record, { company, branch, shift });
+    record.markedBy = req.user._id;
+    record.markReason = String(req.body.reason || "").trim();
+    if (String(req.body.remarks || "").trim()) {
+      record.remarks = String(req.body.remarks).trim();
+    }
+
+    if (punchIn) {
+      record.punchIn = punchIn.at;
+      record.punchInSource = "manual";
+      const windowCheck = validatePunchAgainstShift(shift, punchIn.at, "in", date);
+      const reviewed =
+        record.attendanceStatus === "Approved" || record.attendanceStatus === "Rejected";
+      if (!reviewed) {
+        record.lateByMinutes = windowCheck.isLate ? windowCheck.lateByMinutes || 0 : 0;
+        record.earlyByMinutes = windowCheck.isEarly ? windowCheck.earlyByMinutes || 0 : 0;
+        record.reviewReason = "";
+        if (windowCheck.isLate) {
+          if (!String(record.remarks || "").trim()) record.remarks = DEFAULT_LATE_REMARK;
+          record.attendanceStatus = "Late";
+        } else if (windowCheck.isEarly) {
+          record.attendanceStatus = "Early";
+        } else {
+          record.attendanceStatus = "On time";
+        }
+      }
+      record.status = "Present";
+    }
+
+    if (punchOut) {
+      record.punchOut = punchOut.at;
+      record.punchOutSource = "manual";
+      const inMin = minutesOfDay(record.punchIn);
+      const outMin = minutesOfDay(record.punchOut);
+      record.workedMinutes = Math.max(0, outMin - inMin);
+      record.overtimeMinutes = overtimeAfterShiftEnd(record.punchOut, shift?.endTime);
+      record.status = "Present";
+    } else if (punchIn) {
+      record.workedMinutes = 0;
+      record.overtimeMinutes = 0;
+    }
+
+    await record.save();
+    await record.populate("employee", EMPLOYEE_CARD_SELECT);
+
+    const marked = [
+      punchIn ? `punch in ${punchIn.hm}` : "",
+      punchOut ? `punch out ${punchOut.hm}` : "",
+    ].filter(Boolean).join(" and ");
+
+    return res.status(created ? 201 : 200).json(
+      punchPayload(`Marked ${marked}`, { company, branch, shift, record })
+    );
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+/**
+ * LATE REVIEW — POST /api/attendance/:id/review?decision=approve|reject
+ * Body: { reason }
+ * Only Late. Day status stays Present.
  */
 const reviewRemark = async (req, res) => {
   try {
     const decision = String(req.body.decision || "").toLowerCase();
+    const reason = String(req.body.reason || "").trim();
     if (!["approve", "reject"].includes(decision)) {
       return res.status(400).json({
         message: 'decision must be "approve" or "reject"',
       });
     }
+    if (!reason) {
+      return res.status(400).json({ message: "reason is required" });
+    }
 
     // Need companyIds + reporting heads for scope checks
     const record = await Attendance.findById(req.params.id).populate(
       "employee",
-      "name role official.employeeCode official.department official.designation official.companyIds official.reportingHead1 official.reportingHead2"
+      `${EMPLOYEE_CARD_SELECT} official.companyIds official.reportingHead1 official.reportingHead2`
     );
     if (!record) {
       return res.status(404).json({ message: "Attendance record not found" });
     }
 
-    if (record.remarkStatus !== "Pending") {
+    const awaiting = record.attendanceStatus === "Late" || record.attendanceStatus === "Pending";
+    const already =
+      record.attendanceStatus === "Approved" || record.attendanceStatus === "Rejected";
+    if (!awaiting) {
       return res.status(400).json({
-        message: record.remarkStatus
-          ? `Already ${record.remarkStatus}`
+        message: already
+          ? `Already ${record.attendanceStatus}`
           : "Nothing to approve or reject",
       });
     }
@@ -1129,17 +1380,16 @@ const reviewRemark = async (req, res) => {
       return res.status(403).json({ message: scopeErr });
     }
 
-    if (decision === "approve") {
-      record.status = "Present";
-      record.remarkStatus = "Approved";
-    } else {
-      record.status = "Absent";
-      record.remarkStatus = "Rejected";
-    }
-
+    record.status = "Present";
+    record.attendanceStatus = decision === "approve" ? "Approved" : "Rejected";
+    record.reviewReason = reason;
     record.remarkReviewedBy = req.user._id;
     record.remarkReviewedAt = new Date();
     await record.save();
+    await record.populate({
+      path: "remarkReviewedBy",
+      select: "name role official.officialEmail",
+    });
 
     const { shift, company, branch } = await getAssignedShift(
       record.employee._id || record.employee,
@@ -1154,9 +1404,16 @@ const reviewRemark = async (req, res) => {
     return res.json({
       message:
         decision === "approve"
-          ? "Approved — status is Present"
-          : "Rejected — status is Absent",
+          ? "Late punch approved — status stays Present"
+          : "Late punch rejected — status stays Present",
       decision,
+      reason,
+      reviewedBy: {
+        _id: req.user._id,
+        name: req.user.name || "",
+        role: req.user.role || "",
+        email: req.user.official?.officialEmail || "",
+      },
       // all | assigned_companies | team
       reviewerScope: reviewerScopeOf(req.user),
       // HR: list of company ids they can approve for (all assigned)
@@ -1171,18 +1428,6 @@ const reviewRemark = async (req, res) => {
   }
 };
 
-/** Simple shortcut — POST /api/attendance/:id/approve (no body) */
-const approveRemark = (req, res) => {
-  req.body = { ...(req.body || {}), decision: "approve" };
-  return reviewRemark(req, res);
-};
-
-/** Simple shortcut — POST /api/attendance/:id/reject (no body) */
-const rejectRemark = (req, res) => {
-  req.body = { ...(req.body || {}), decision: "reject" };
-  return reviewRemark(req, res);
-};
-
 module.exports = {
   punchIn,
   punchOut,
@@ -1190,7 +1435,8 @@ module.exports = {
   listWebPunches,
   listDailyAttendance,
   attendanceCalendar,
+  markAttendance,
   reviewRemark,
-  approveRemark,
-  rejectRemark,
+  resolveListCompanyId,
+  applyListCompany,
 };

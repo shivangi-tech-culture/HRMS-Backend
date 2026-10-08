@@ -32,13 +32,13 @@ const getReq = (name, raw, description, query) => ({
   },
 });
 
-const postJson = (name, raw, description, bodyObj, events) => {
+const postJson = (name, raw, description, bodyObj, events, query) => {
   const item = {
     name,
     request: {
       method: "POST",
       header: [{ key: "Content-Type", value: "application/json" }],
-      url: urlOf(raw),
+      url: urlOf(raw, query),
       description,
       body: {
         mode: "raw",
@@ -171,7 +171,7 @@ const adminAttendance = {
             },
             { key: "status", value: "ALL", disabled: true },
             { key: "hasRemark", value: "true", disabled: true },
-            { key: "remarkStatus", value: "Pending", disabled: true },
+            { key: "attendanceStatus", value: "Late", disabled: true },
             { key: "page", value: "{{page}}" },
             { key: "limit", value: "{{limit}}" },
           ]
@@ -179,12 +179,12 @@ const adminAttendance = {
         {
           ...getReq(
             "2. List Daily (pending remarks → save id)",
-            "{{baseUrl}}/api/attendance/daily?date={{attendanceDate}}&hasRemark=true&remarkStatus=Pending&page=1&limit=20",
+            "{{baseUrl}}/api/attendance/daily?date={{attendanceDate}}&hasRemark=true&attendanceStatus=Late&page=1&limit=20",
             "Pending remarks — test script saves first row `_id` → {{attendanceId}}.",
             [
               { key: "date", value: "{{attendanceDate}}" },
               { key: "hasRemark", value: "true" },
-              { key: "remarkStatus", value: "Pending" },
+              { key: "attendanceStatus", value: "Late" },
               { key: "page", value: "1" },
               { key: "limit", value: "20" },
             ]
@@ -203,21 +203,21 @@ const adminAttendance = {
             },
           ],
         },
-        postEmpty(
-          "3. Approve Remark (simple)",
-          "{{baseUrl}}/api/attendance/{{attendanceId}}/approve",
-          "No body. Sets Present.\nScope: SA/Admin=all · HR=assigned companies · Manager=team."
-        ),
-        postEmpty(
-          "4. Reject Remark (simple)",
-          "{{baseUrl}}/api/attendance/{{attendanceId}}/reject",
-          "No body. Sets Absent."
+        postJson(
+          "3. Approve",
+          "{{baseUrl}}/api/attendance/{{attendanceId}}/review?decision=approve",
+          "Same API as Reject. Query decision=approve. Body { reason }. Only Late. Day stays Present. attendanceStatus becomes Approved.",
+          { reason: "Checked punch time. Approved." },
+          null,
+          [{ key: "decision", value: "approve", description: "approve or reject. Same API." }]
         ),
         postJson(
-          "5. Review Remark (decision body)",
-          "{{baseUrl}}/api/attendance/{{attendanceId}}/review-remark",
-          "Alternative to approve/reject.\nBody: `{ \"decision\": \"approve\" }` or `\"reject\"`.",
-          { decision: "approve" }
+          "4. Reject",
+          "{{baseUrl}}/api/attendance/{{attendanceId}}/review?decision=reject",
+          "Same API as Approve. Query decision=reject. Body { reason }. Only Late. Day stays Present. attendanceStatus becomes Rejected.",
+          { reason: "Punch time is too late. Rejected." },
+          null,
+          [{ key: "decision", value: "reject", description: "approve or reject. Same API." }]
         ),
       ],
     },
@@ -299,15 +299,9 @@ const adminAttendance = {
           ],
         },
         getReq(
-          "3. Detail (drawer)",
+          "2. Detail",
           "{{baseUrl}}/api/attendance/late-early/{{attendanceId}}",
-          "Side panel: punch, workInfo, timeline, late/early summary."
-        ),
-        getReq(
-          "4. View History",
-          "{{baseUrl}}/api/attendance/late-early/{{attendanceId}}/history?limit=30",
-          "Past late/early days for same employee.",
-          [{ key: "limit", value: "30" }]
+          "One attendance row. Same isLate / isEarly numbers as the list, plus punch, timeline, and shift summary."
         ),
       ],
     },

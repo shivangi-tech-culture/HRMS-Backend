@@ -27,8 +27,8 @@ const DAY_STATUSES = [
   "Working", // display-only for open on-time punch; may also be stored
 ];
 
-/** When employee left a remark → admin approve/reject */
-const REMARK_STATUSES = ["Pending", "Approved", "Rejected"];
+/** Punch-in timing, then late review. Early · On time · Late · Approved · Rejected */
+const ATTENDANCE_STATUSES = ["Early", "On time", "Late", "Approved", "Rejected"];
 
 const breakSchema = new mongoose.Schema(
   {
@@ -85,12 +85,12 @@ const attendanceSchema = new mongoose.Schema(
 
     punchIn: { type: Date, default: null },
     punchOut: { type: Date, default: null },
-    punchInSource: { type: String, default: null }, // web|mobile|biometric|manual
-    punchOutSource: { type: String, default: null },
+    punchInSource: { type: String, enum: [...PUNCH_SOURCES, null], default: null },
+    punchOutSource: { type: String, enum: [...PUNCH_SOURCES, null], default: null },
     punchInLocation: { type: locationSchema, default: () => ({}) },
     punchOutLocation: { type: locationSchema, default: () => ({}) },
 
-    status: { type: String, default: "Pending" },
+    status: { type: String, enum: DAY_STATUSES, default: "Absent" },
     workedMinutes: { type: Number, default: 0 },
     /** Minutes over 9-hour standard day */
     overtimeMinutes: { type: Number, default: 0 },
@@ -105,8 +105,17 @@ const attendanceSchema = new mongoose.Schema(
      */
     remarks: { type: String, default: "" },
 
-    /** null = no review needed; Pending/Approved/Rejected when remarks set */
-    remarkStatus: { type: String, default: null },
+    /**
+     * From punch-in time vs shift start.
+     * Early (before start) · On time (start through grace) · Late · Approved · Rejected
+     */
+    attendanceStatus: {
+      type: String,
+      enum: [...ATTENDANCE_STATUSES, null],
+      default: null,
+    },
+    /** Why HR / manager approved or rejected the late punch */
+    reviewReason: { type: String, default: "" },
     remarkReviewedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -120,19 +129,22 @@ const attendanceSchema = new mongoose.Schema(
       ref: "User",
       default: null,
     },
+    /** Reason selected when HR marks a missed punch */
+    markReason: { type: String, default: "" },
   },
   { timestamps: true }
 );
 
 attendanceSchema.pre("save", function (next) {
   if (!this.date) this.date = todayDate();
+  if (this.attendanceStatus === "Pending") this.attendanceStatus = "Late";
   next();
 });
 
 attendanceSchema.index({ employee: 1, date: 1 }, { unique: true });
 attendanceSchema.index({ date: 1, status: 1 });
 attendanceSchema.index({ date: 1, companyId: 1 });
-attendanceSchema.index({ date: 1, remarkStatus: 1 });
+attendanceSchema.index({ date: 1, attendanceStatus: 1 });
 attendanceSchema.index({ lateByMinutes: 1, date: -1 });
 attendanceSchema.index({ earlyByMinutes: 1, date: -1 });
 attendanceSchema.index({ employee: 1, lateByMinutes: 1, date: -1 });
@@ -141,5 +153,5 @@ attendanceSchema.index({ employee: 1, earlyByMinutes: 1, date: -1 });
 module.exports = mongoose.model("Attendance", attendanceSchema);
 module.exports.PUNCH_SOURCES = PUNCH_SOURCES;
 module.exports.DAY_STATUSES = DAY_STATUSES;
-module.exports.REMARK_STATUSES = REMARK_STATUSES;
+module.exports.ATTENDANCE_STATUSES = ATTENDANCE_STATUSES;
 module.exports.todayDate = todayDate;

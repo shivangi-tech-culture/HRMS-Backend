@@ -3,7 +3,7 @@
  * Formats punch / daily / calendar rows for the API.
  * Pure formatting — does not touch User or Company assignment.
  */
-const { formatPunchStamp, overtimeMinutesOf } = require("./shiftTiming");
+const { formatPunchStamp, minutesOfDay, parseHm, punchInWindow, graceMinutesOf, overtimeAfterShiftEnd } = require("./shiftTiming");
 
 const oid = (value) => {
   if (value === undefined || value === null || value === "") return "";
@@ -20,7 +20,7 @@ const shiftSummary = (shift) =>
         startTime: shift.startTime || "",
         endTime: shift.endTime || "",
         halfDayEndTime: shift.halfDayEndTime || "",
-        graceMinutes: Number(shift.graceMinutes || 0),
+        graceMinutes: graceMinutesOf(shift.graceMinutes),
         isDefault: !!shift.isDefault,
       }
     : null;
@@ -71,14 +71,42 @@ const formatAttendanceRecord = (record, extras = {}) => {
     typeof record.toObject === "function" ? record.toObject() : { ...record };
 
   const worked = Number(r.workedMinutes) || 0;
-  const overtime =
-    r.overtimeMinutes != null
-      ? Number(r.overtimeMinutes) || 0
-      : overtimeMinutesOf(worked);
+  const endTime =
+    (extras.shift && extras.shift.endTime) ||
+    (r.shift && r.shift.endTime) ||
+    "";
+  const overtime = r.punchOut
+    ? overtimeAfterShiftEnd(r.punchOut, endTime)
+    : 0;
 
   const remarks = String(r.remarks || "").trim();
-  const remarkStatus = r.remarkStatus || null;
-  const canApproveReject = remarkStatus === "Pending";
+  const startMin = parseHm(
+    (extras.shift && extras.shift.startTime) ||
+      (r.shift && r.shift.startTime) ||
+      ""
+  );
+  const punchMin = r.punchIn ? minutesOfDay(r.punchIn) : null;
+  const grace = graceMinutesOf(
+    (extras.shift && extras.shift.graceMinutes) ??
+      (r.shift && r.shift.graceMinutes)
+  );
+  const window =
+    startMin != null && punchMin != null
+      ? punchInWindow(punchMin, startMin, grace)
+      : null;
+  const punchedBeforeStart = window ? window.isEarly : false;
+  const lateBy = window ? window.lateByMinutes : Number(r.lateByMinutes) || 0;
+  const isLate = window ? window.isLate : lateBy > 0;
+  const earlyBy = window ? window.earlyByMinutes : 0;
+  let attendanceStatus = r.attendanceStatus || null;
+  if (attendanceStatus !== "Approved" && attendanceStatus !== "Rejected") {
+    if (!r.punchIn) attendanceStatus = null;
+    else if (isLate) attendanceStatus = "Late";
+    else if (punchedBeforeStart) attendanceStatus = "Early";
+    else attendanceStatus = "On time";
+  }
+  const canApproveReject = attendanceStatus === "Late";
+  const shownRemarks = !isLate && remarks === "Late punch-in" ? "" : remarks;
 
   const employee = r.employee
     ? {
@@ -108,15 +136,28 @@ const formatAttendanceRecord = (record, extras = {}) => {
     punchInTime: formatPunchStamp(r.punchIn),
     punchOutTime: formatPunchStamp(r.punchOut),
     verification: r.punchInSource || null,
-    status: r.status || "Pending",
+    status: r.status || "",
     workMode: r.workMode || "WFO",
     workingHours: formatDurationLabel(worked),
     overtime: formatDurationLabel(overtime),
-    lateByMinutes: Number(r.lateByMinutes) || 0,
-    earlyByMinutes: Number(r.earlyByMinutes) || 0,
-    isLate: (Number(r.lateByMinutes) || 0) > 0,
-    remarks,
-    remarkStatus,
+    lateByMinutes: lateBy,
+    earlyByMinutes: earlyBy,
+    isLate,
+    isEarly: punchedBeforeStart,
+    remarks: shownRemarks,
+    attendanceStatus,
+    reviewReason: String(r.reviewReason || "").trim(),
+    reviewedBy:
+      r.remarkReviewedBy && r.remarkReviewedBy.name
+        ? {
+            _id: r.remarkReviewedBy._id,
+            name: r.remarkReviewedBy.name || "",
+            role: r.remarkReviewedBy.role || "",
+            email: r.remarkReviewedBy.official?.officialEmail || "",
+          }
+        : r.remarkReviewedBy
+          ? { _id: r.remarkReviewedBy._id || r.remarkReviewedBy }
+          : null,
     canApproveReject,
   };
 };

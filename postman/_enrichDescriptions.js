@@ -176,9 +176,9 @@ const PARAM_DOCS = {
 
   // attendance / punch
   decision:
-    'string | required | `"approve"` or `"reject"` — POST /api/attendance/{id}/review-remark',
+    'string | required | query `decision=approve` or `decision=reject` on POST /api/attendance/{id}/review. Body is `{ reason }`.',
   hasRemark: "string | optional | `true` = only rows that have a remark",
-  remarkStatus: "string | optional | `Pending` | `Approved` | `Rejected` | `ALL`",
+  attendanceStatus: "string | optional | `Early` | `On time` | `Late` | `Approved` | `Rejected` | `ALL`",
   workMode: "string | optional | `WFO` | `WFH` | `Hybrid` | `ALL`",
   attendanceDate: "string (YYYY-MM-DD) | optional | day for daily / late-early lists",
   attendanceMonth: "string (YYYY-MM) | optional | calendar month e.g. `2026-10`",

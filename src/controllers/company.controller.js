@@ -16,8 +16,21 @@ const {
   managementCompanyIds,
 } = require("../utils/companyScope");
 const { MANAGER_ROLES } = require("../utils/teamScope");
+const { normalizeDayClock } = require("../utils/shiftTiming");
 
 const { MASTER_POPULATE } = Company;
+
+const normalizeBranches = (branches) =>
+  (branches || []).map((branch) => ({
+    ...branch,
+    shifts: (branch.shifts || []).map((shift) => ({
+      ...shift,
+      monthlySchedule: (shift.monthlySchedule || []).map((week) => ({
+        ...week,
+        days: (week.days || []).map((day) => normalizeDayClock(day)),
+      })),
+    })),
+  }));
 const okId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 /** 400 message when a branchId / shiftId is not an existing master, else "" */
@@ -163,7 +176,7 @@ const createCompany = async (req, res) => {
       companyName,
       companyCode,
       isActive: req.body.isActive !== false,
-      branches: req.body.branches || [],
+      branches: normalizeBranches(req.body.branches || []),
     });
     await row.populate(MASTER_POPULATE);
 
@@ -203,7 +216,7 @@ const updateCompany = async (req, res) => {
     if (req.body.branches !== undefined) {
       const missing = await missingMasters(req.body.branches);
       if (missing) return res.status(400).json({ message: missing });
-      row.branches = req.body.branches;
+      row.branches = normalizeBranches(req.body.branches);
     }
 
     await row.save();

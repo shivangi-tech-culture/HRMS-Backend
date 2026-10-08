@@ -5288,7 +5288,7 @@
         },
         {
           "name": "1.7 Attendance",
-          "description": "Daily is today only. Approve and reject are one call: POST /api/attendance/{{attendanceId}}/review-remark with decision approve (Present) or reject (Absent). Late punch stays Pending until that call.\nCalendar is one call: month counts + that day's rows.\nScope: Super Admin/Admin = all · HR = assigned companies · Manager = team.",
+          "description": "Today's daily list, calendar, late/early arrivals, missed-punch mark, and one review API.\nPOST /api/attendance/{{attendanceId}}/review?decision=approve or decision=reject, body { reason }. Only Late. Day status stays Present.\nattendanceStatus is Early | On time | Late | Approved | Rejected. Overtime is minutes after that day's shift end, only after punch out.\nPOST /api/attendance/mark sets a missed punch in, punch out, or both. It does not change the employee's company, branch, or shift.\nScope: Super Admin/Admin = all · HR = assigned companies · Manager = team.",
           "item": [
             {
               "name": "1. Daily Attendance",
@@ -5349,7 +5349,7 @@
                           "key": "status",
                           "value": "ALL",
                           "disabled": true,
-                          "description": "string | optional | ALL | Pending | Present | Absent | Late | OnLeave | WFH | HalfDay"
+                          "description": "string | optional | Present | Absent | Late | Working | WFH | OnLeave | HalfDay | WeeklyOff | Holiday | MissedPunch | ALL"
                         },
                         {
                           "key": "hasRemark",
@@ -5358,10 +5358,10 @@
                           "description": "string | optional | `true` = only rows that have a remark"
                         },
                         {
-                          "key": "remarkStatus",
-                          "value": "Pending",
+                          "key": "attendanceStatus",
+                          "value": "Late",
                           "disabled": true,
-                          "description": "string | optional | `Pending` | `Approved` | `Rejected` | `ALL`"
+                          "description": "string | optional | `Early` | `On time` | `Late` | `Approved` | `Rejected` | `ALL`"
                         },
                         {
                           "key": "page",
@@ -5375,16 +5375,30 @@
                         }
                       ]
                     },
-                    "description": "Today's attendance only. No date param — the server uses today.\nOne row has employee (name, email, employeeCode, department, designation, mobileNo, avatar, role), shift (that day's startTime and endTime), punchInTime, punchOutTime, workingHours, status, verification, canApproveReject.\nPunch-in after that day's shift start + grace → status Late, canApproveReject true. Approve → Present, reject → Absent. No punch → Absent. On-time open punch → Working.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `search` — string | optional | name / email / employee code text search\n- `department` — string | optional | department name\n- `branchId` — string (MongoId 24-hex) | path | Branch master `_id` that is on this company (from GET /api/companies/{id} → branches[].branchId._id)\n- `shiftId` — see sample value | send same JSON type as example (string/number/boolean/array/object/null)\n- `companyId` — string (MongoId 24-hex or company name) | optional | company selected in the UI ({{companyId}}) — untick / omit for all companies\n- `workMode` — string | optional | `WFO` | `WFH` | `Hybrid` | `ALL`\n- `status` — string | optional | `ALL` | `Pending` | `Present` | `Absent` | `HalfDay` | `WeeklyOff` | `Holiday` | `MissedPunch` | `OnLeave` | `WFH`\n- `hasRemark` — string | optional | `true` = only rows that have a remark\n- `remarkStatus` — string | optional | `Pending` | `Approved` | `Rejected` | `ALL`\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
-                  }
+                    "description": "Today's attendance. Server date is today.\nRow: employee, company, branch, shift (start, end, graceMinutes), punch times, workingHours, overtime, overtimeMinutes, status Present after punch-in, attendanceStatus Early | On time | Late | Approved | Rejected, lateByMinutes, earlyByMinutes, canApproveReject.\nEarly = before shift start. On time = start through grace (10 min). Late = after grace. canApproveReject is true only for Late.\nworkingHours is punch-in to punch-out. overtime is time after that day's shift end. Both stay 0 until punch out.\nNo companyId → first created company. Pass companyId to see that company.\nTest script saves the first employee `_id` into {{employeeId}} for Mark Attendance.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n- `search` — name / email / employee code\n- `department` `branchId` `shiftId` `companyId` — optional filters\n- `workMode` — WFO | WFH | Hybrid | ALL\n- `status` — Present | Absent | Late | Working | WFH | OnLeave | HalfDay | WeeklyOff | Holiday | MissedPunch | ALL\n- `attendanceStatus` — Early | On time | Late | Approved | Rejected | ALL. Use Late for the approval queue.\n- `hasRemark` — true = rows that have a remark\n- `page` `limit`\n"
+                  },
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "const j = pm.response.json();",
+                          "const row = (j.data || [])[0];",
+                          "const id = row && row.employee && row.employee._id;",
+                          "if (id) pm.collectionVariables.set('employeeId', id);"
+                        ]
+                      }
+                    }
+                  ]
                 },
                 {
-                  "name": "2. Pending rows (today)",
+                  "name": "2. Late rows (today)",
                   "request": {
                     "method": "GET",
                     "header": [],
                     "url": {
-                      "raw": "{{baseUrl}}/api/attendance/daily?remarkStatus=Pending&page=1&limit=20",
+                      "raw": "{{baseUrl}}/api/attendance/daily?attendanceStatus=Late&page=1&limit=20",
                       "host": [
                         "{{baseUrl}}"
                       ],
@@ -5395,14 +5409,9 @@
                       ],
                       "query": [
                         {
-                          "key": "hasRemark",
-                          "value": "true",
-                          "description": "string | optional | `true` = only rows that have a remark"
-                        },
-                        {
-                          "key": "remarkStatus",
-                          "value": "Pending",
-                          "description": "string | optional | `Pending` | `Approved` | `Rejected` | `ALL`"
+                          "key": "attendanceStatus",
+                          "value": "Late",
+                          "description": "Late only. Early and On time are not in this list."
                         },
                         {
                           "key": "page",
@@ -5416,7 +5425,7 @@
                         }
                       ]
                     },
-                    "description": "Today's rows that are still Pending (late punch-in, or a remark waiting).\nTest script saves the first row attendanceId into {{attendanceId}}.\nThen run Approve or Reject.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n- `remarkStatus` — Pending\n- `page` / `limit`\n"
+                    "description": "Late punches waiting for approval. Early and On time are not included.\nTest script saves the first row attendanceId into {{attendanceId}}.\nThen run 3. Approve or 4. Reject. Both call the same API; only the decision param changes.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n- `attendanceStatus` — Late\n- `page` / `limit`\n"
                   },
                   "event": [
                     {
@@ -5433,7 +5442,7 @@
                   ]
                 },
                 {
-                  "name": "3. Approve or Reject",
+                  "name": "3. Approve",
                   "request": {
                     "method": "POST",
                     "header": [
@@ -5443,26 +5452,70 @@
                       }
                     ],
                     "url": {
-                      "raw": "{{baseUrl}}/api/attendance/{{attendanceId}}/review-remark",
-                      "host": [
-                        "{{baseUrl}}"
-                      ],
-                      "path": [
-                        "api",
-                        "attendance",
-                        "{{attendanceId}}",
-                        "review-remark"
+                      "raw": "{{baseUrl}}/api/attendance/{{attendanceId}}/review?decision=approve",
+                      "host": ["{{baseUrl}}"],
+                      "path": ["api", "attendance", "{{attendanceId}}", "review"],
+                      "query": [
+                        {
+                          "key": "decision",
+                          "value": "approve",
+                          "description": "string | required | `approve` or `reject`. Same API for both."
+                        }
                       ]
                     },
-                    "description": "Same API for Approve and Reject.\n`{ \"decision\": \"approve\" }` → status Present.\n`{ \"decision\": \"reject\" }` → status Absent.\nLate punch-in stays Pending until this call.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n**Path:** `attendanceId` → {{attendanceId}} (from Pending rows)\n**Body:** `decision` — `approve` or `reject`\n",
+                    "description": "Same API as Reject. Only Late can be approved.\nDay status stays Present. attendanceStatus becomes Approved.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n**Path:** `attendanceId` — from 2. Late rows\n**Query:** `decision` — `approve`\n**Body:** `reason` — required, why it was approved (max 500)\n",
                     "body": {
                       "mode": "raw",
-                      "raw": "{\n  \"decision\": \"approve\"\n}",
-                      "options": {
-                        "raw": {
-                          "language": "json"
-                        }
+                      "raw": "{\n  \"reason\": \"Checked punch time. Approved.\"\n}",
+                      "options": { "raw": { "language": "json" } }
+                    }
+                  }
+                },
+                {
+                  "name": "4. Reject",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
                       }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/attendance/{{attendanceId}}/review?decision=reject",
+                      "host": ["{{baseUrl}}"],
+                      "path": ["api", "attendance", "{{attendanceId}}", "review"],
+                      "query": [
+                        {
+                          "key": "decision",
+                          "value": "reject",
+                          "description": "string | required | `approve` or `reject`. Same API for both."
+                        }
+                      ]
+                    },
+                    "description": "Same API as Approve. Only Late can be rejected.\nDay status stays Present. attendanceStatus becomes Rejected.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n**Path:** `attendanceId` — from 2. Late rows\n**Query:** `decision` — `reject`\n**Body:** `reason` — required, why it was rejected (max 500)\n",
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"reason\": \"Punch time is too late. Rejected.\"\n}",
+                      "options": { "raw": { "language": "json" } }
+                    }
+                  }
+                },
+                {
+                  "name": "5. Mark Attendance",
+                  "request": {
+                    "method": "POST",
+                    "header": [{ "key": "Content-Type", "value": "application/json" }],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/attendance/mark",
+                      "host": ["{{baseUrl}}"],
+                      "path": ["api", "attendance", "mark"]
+                    },
+                    "description": "Missed punch only. Does not change the employee's company, branch, or shift.\n`employeeId` comes from 1. List Daily ({{employeeId}}).\nTime is 24-hour HH:mm. 09:30 stays 09:30. 15:30 is 3:30 PM.\nFinished day: send both punchInTime and punchOutTime.\nToday, punch in missed: send only punchInTime. Remove punchOutTime. They punch out themselves.\nPunch out missed: send only punchOutTime. Remove punchInTime.\nDoes not overwrite a punch that is already saved. Punch out must be after punch in. Future time is rejected.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n**Body:**\n- `employeeId` — required, employee `_id`\n- `date` — required, YYYY-MM-DD, today or earlier\n- `punchInTime` — optional HH:mm\n- `punchOutTime` — optional HH:mm\n- `reason` — required\n- `remarks` — optional\n",
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"employeeId\": \"{{employeeId}}\",\n  \"date\": \"{{attendanceDate}}\",\n  \"punchInTime\": \"09:30\",\n  \"punchOutTime\": \"18:30\",\n  \"reason\": \"Forgot to punch\",\n  \"remarks\": \"\"\n}",
+                      "options": { "raw": { "language": "json" } }
                     }
                   }
                 }
@@ -5477,7 +5530,7 @@
                     "method": "GET",
                     "header": [],
                     "url": {
-                      "raw": "{{baseUrl}}/api/attendance/calendar?month={{attendanceMonth}}&date={{attendanceDate}}",
+                      "raw": "{{baseUrl}}/api/attendance/calendar?month={{attendanceMonth}}&date={{attendanceDate}}&page={{page}}&limit={{limit}}",
                       "host": [
                         "{{baseUrl}}"
                       ],
@@ -5490,133 +5543,162 @@
                         {
                           "key": "month",
                           "value": "{{attendanceMonth}}",
-                          "description": "string (YYYY-MM) | optional | month grid, default current month"
+                          "description": "YYYY-MM. Month grid. Default current month."
                         },
                         {
                           "key": "date",
                           "value": "{{attendanceDate}}",
-                          "description": "string (YYYY-MM-DD) | optional | which day's employee rows to return inside that month"
-                        },
-                        {
-                          "key": "search",
-                          "value": "",
-                          "disabled": true,
-                          "description": "string | optional | filter that day's employees by name or code"
-                        }
-                      ]
-                    },
-                    "description": "One call for the calendar screen.\n`day` = selected date counts (present, absent, late, onLeave, wfh, halfDay).\n`days[]` = same counts for every date in the month.\n`summary` = those counts added up for the month.\n`data[]` = that day's employee rows (same fields as daily: name, code, department, shift, punch times, workingHours, status, verification).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params**\n- `month` — string (YYYY-MM) | optional | default current month\n- `date` — string (YYYY-MM-DD) | optional | day whose rows are in `data`\n- `search` — string | optional | name or employee code\n"
-                  }
-                }
-              ]
-            },
-            {
-              "name": "3. Late & Early Departures",
-              "item": [
-                {
-                  "name": "1. Late Arrivals",
-                  "request": {
-                    "method": "GET",
-                    "header": [],
-                    "url": {
-                      "raw": "{{baseUrl}}/api/attendance/late-early?type=late&date={{attendanceDate}}&page=1&limit=10",
-                      "host": [
-                        "{{baseUrl}}"
-                      ],
-                      "path": [
-                        "api",
-                        "attendance",
-                        "late-early"
-                      ],
-                      "query": [
-                        {
-                          "key": "type",
-                          "value": "late",
-                          "description": "string | optional | `late` = Late Arrivals, `early` = Early Departures, `all`"
-                        },
-                        {
-                          "key": "date",
-                          "value": "{{attendanceDate}}",
-                          "description": "string (YYYY-MM-DD) | optional/required by API | single day"
-                        },
-                        {
-                          "key": "search",
-                          "value": "",
-                          "disabled": true,
-                          "description": "string | optional | name / email / employee code text search"
-                        },
-                        {
-                          "key": "department",
-                          "value": "",
-                          "disabled": true,
-                          "description": "string | optional | department name"
-                        },
-                        {
-                          "key": "shiftId",
-                          "value": "{{shiftId}}",
-                          "disabled": true,
-                          "description": "see sample value | send same JSON type as example (string/number/boolean/array/object/null)"
+                          "description": "YYYY-MM-DD. Which day's employee rows are in data."
                         },
                         {
                           "key": "companyId",
                           "value": "{{companyId}}",
                           "disabled": true,
-                          "description": "string (MongoId 24-hex or company name) | optional | company selected in the UI ({{companyId}}) — untick / omit for all companies"
+                          "description": "Company _id. Omit to use the first company (Super Admin/Admin) or the HR company."
+                        },
+                        {
+                          "key": "search",
+                          "value": "",
+                          "disabled": true,
+                          "description": "Name, email, or employee code. Filters that day's rows only."
+                        },
+                        {
+                          "key": "department",
+                          "value": "ALL",
+                          "disabled": true,
+                          "description": "Department name, or ALL."
+                        },
+                        {
+                          "key": "branchId",
+                          "value": "ALL",
+                          "disabled": true,
+                          "description": "Branch master _id, or ALL."
+                        },
+                        {
+                          "key": "shiftId",
+                          "value": "ALL",
+                          "disabled": true,
+                          "description": "Shift master _id, or ALL."
+                        },
+                        {
+                          "key": "workMode",
+                          "value": "ALL",
+                          "disabled": true,
+                          "description": "WFO | WFH | Hybrid | ALL"
+                        },
+                        {
+                          "key": "status",
+                          "value": "ALL",
+                          "disabled": true,
+                          "description": "Present | Absent | Late | Working | WFH | OnLeave | HalfDay | WeeklyOff | Holiday | MissedPunch | ALL"
+                        },
+                        {
+                          "key": "attendanceStatus",
+                          "value": "ALL",
+                          "disabled": true,
+                          "description": "Early | On time | Late | Approved | Rejected | ALL"
+                        },
+                        {
+                          "key": "hasRemark",
+                          "value": "true",
+                          "disabled": true,
+                          "description": "true = only rows that have a remark"
                         },
                         {
                           "key": "page",
-                          "value": "1",
-                          "description": "number | optional | page number, default `1`"
+                          "value": "{{page}}",
+                          "description": "Page of that day's rows. Default 1."
                         },
                         {
                           "key": "limit",
-                          "value": "10",
-                          "description": "number | optional | rows per page (usually 1–200)"
+                          "value": "{{limit}}",
+                          "description": "Rows per page. Default 50, max 200."
                         }
                       ]
                     },
-                    "description": "Late Arrivals tab. Use `counts.late` / `counts.early` for badges.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | optional | `late` = Late Arrivals, `early` = Early Departures, `all`\n- `date` — string (YYYY-MM-DD) | optional/required by API | single day\n- `search` — string | optional | name / email / employee code text search\n- `department` — string | optional | department name\n- `shiftId` — see sample value | send same JSON type as example (string/number/boolean/array/object/null)\n- `companyId` — string (MongoId 24-hex or company name) | optional | company selected in the UI ({{companyId}}) — untick / omit for all companies\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                    "description": "One call for the calendar screen.\n`employees` = headcount.\n`day` = selected date counts.\n`days[]` = counts for every date in the month. A future day has absent 0.\n`summary` = those counts added up for the month.\n`data[]` = that day's employee rows: punch times, workingHours, overtime, status, attendanceStatus.\nSearch, status, and attendanceStatus filter `data` only. The month grid stays the company roster.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n- `month` YYYY-MM\n- `date` YYYY-MM-DD\n- `companyId` `search` `department` `branchId` `shiftId`\n- `workMode` `status` `attendanceStatus` `hasRemark`\n- `page` `limit`\n"
                   }
-                },
+                }
+              ]
+            },
+            {
+              "name": "3. Late & Early",
+              "item": [
                 {
-                  "name": "2. Early Departures",
+                  "name": "1. List (late / early / all)",
                   "request": {
                     "method": "GET",
                     "header": [],
                     "url": {
-                      "raw": "{{baseUrl}}/api/attendance/late-early?type=early&date={{attendanceDate}}&page=1&limit=10",
-                      "host": [
-                        "{{baseUrl}}"
-                      ],
-                      "path": [
-                        "api",
-                        "attendance",
-                        "late-early"
-                      ],
+                      "raw": "{{baseUrl}}/api/attendance/late-early?type=all&companyId={{companyId}}&page=1&limit=10",
+                      "host": ["{{baseUrl}}"],
+                      "path": ["api", "attendance", "late-early"],
                       "query": [
                         {
                           "key": "type",
-                          "value": "early",
-                          "description": "string | optional | `late` = Late Arrivals, `early` = Early Departures, `all`"
+                          "value": "all",
+                          "description": "`late` = late arrival (after grace) · `early` = early arrival (before shift start) · `all` = both. Counts for both tabs always come back."
                         },
                         {
                           "key": "date",
                           "value": "{{attendanceDate}}",
-                          "description": "string (YYYY-MM-DD) | optional/required by API | single day"
+                          "disabled": true,
+                          "description": "YYYY-MM-DD. Leave off to use today. Punches on 2026-10-08 will not show if this is 2026-10-07."
+                        },
+                        {
+                          "key": "from",
+                          "value": "",
+                          "disabled": true,
+                          "description": "YYYY-MM-DD range start. Use with to instead of date."
+                        },
+                        {
+                          "key": "to",
+                          "value": "",
+                          "disabled": true,
+                          "description": "YYYY-MM-DD range end."
+                        },
+                        {
+                          "key": "companyId",
+                          "value": "{{companyId}}",
+                          "description": "Company _id. Super Admin/Admin: omit to use the first company. HR: own company, or another only if assigned."
+                        },
+                        {
+                          "key": "search",
+                          "value": "",
+                          "disabled": true,
+                          "description": "Name, email, or employee code."
+                        },
+                        {
+                          "key": "department",
+                          "value": "ALL",
+                          "disabled": true,
+                          "description": "Department name, or ALL."
+                        },
+                        {
+                          "key": "branchId",
+                          "value": "ALL",
+                          "disabled": true,
+                          "description": "Branch master _id, or ALL."
+                        },
+                        {
+                          "key": "shiftId",
+                          "value": "ALL",
+                          "disabled": true,
+                          "description": "Shift master _id, or ALL."
                         },
                         {
                           "key": "page",
                           "value": "1",
-                          "description": "number | optional | page number, default `1`"
+                          "description": "Page number. Default 1."
                         },
                         {
                           "key": "limit",
                           "value": "10",
-                          "description": "number | optional | rows per page (usually 1–200)"
+                          "description": "Rows per page. Default 10, max 200."
                         }
                       ]
                     },
-                    "description": "Early Departures tab. Saves first `_id` → {{attendanceId}}.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | optional | `late` = Late Arrivals, `early` = Early Departures, `all`\n- `date` — string (YYYY-MM-DD) | optional/required by API | single day\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                    "description": "One API for Late Arrivals and Early Arrivals.\n`type=late` after shift start + 10 min grace. `type=early` before shift start. `type=all` both.\nEach row: isLate, isEarly, lateByMinutes, earlyByMinutes, attendanceStatus (Early | On time | Late | Approved | Rejected), punch times, shift, company.\nApproved or Rejected still shows isLate when the punch was late.\n`counts.late` and `counts.early` are the tab badges. They do not change when type filters the page.\nLeave `date` off to use today. A past date returns that day only.\nSearch, department, branch, shift, company, page and limit are on this call.\n"
                   },
                   "event": [
                     {
@@ -5633,7 +5715,7 @@
                   ]
                 },
                 {
-                  "name": "3. Detail (drawer)",
+                  "name": "2. Detail",
                   "request": {
                     "method": "GET",
                     "header": [],
@@ -5649,35 +5731,7 @@
                         "{{attendanceId}}"
                       ]
                     },
-                    "description": "Side panel: punch, workInfo, timeline, late/early summary.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `attendanceId` → {{attendanceId}} — string (MongoId / id) | set collection variable after create/list\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
-                  }
-                },
-                {
-                  "name": "4. View History",
-                  "request": {
-                    "method": "GET",
-                    "header": [],
-                    "url": {
-                      "raw": "{{baseUrl}}/api/attendance/late-early/{{attendanceId}}/history?limit=30",
-                      "host": [
-                        "{{baseUrl}}"
-                      ],
-                      "path": [
-                        "api",
-                        "attendance",
-                        "late-early",
-                        "{{attendanceId}}",
-                        "history"
-                      ],
-                      "query": [
-                        {
-                          "key": "limit",
-                          "value": "30",
-                          "description": "number | optional | rows per page (usually 1–200)"
-                        }
-                      ]
-                    },
-                    "description": "Past late/early days for same employee.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `attendanceId` → {{attendanceId}} — string (MongoId / id) | set collection variable after create/list\n\n**Query params** *(Params tab — each has description)*\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                    "description": "One attendance row. Use the `_id` saved by 1. List.\nSame isLate, isEarly, lateByMinutes, earlyByMinutes, and attendanceStatus as the list.\nAlso returns punch, workInfo, timeline, and summary (shift start/end, break, overtime after shift end).\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n**Path:** `attendanceId` — from 1. List\n"
                   }
                 }
               ]
@@ -5946,7 +6000,7 @@
                     "punch-in"
                   ]
                 },
-                "description": "Punch in. Returns company + branch + shift + remarks.\n\n**Body:** `source` (web|mobile|biometric), `latitude`, `longitude`, optional `remarks`.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `source` — string | required for punch | `web` | `mobile` | `biometric`\n- `latitude` — number | required | GPS latitude (-90…90) — send as number, not string\n- `longitude` — number | required | GPS longitude (-180…180) — send as number, not string\n- `remarks` — string | optional | max ~500 chars\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                "description": "Punch in for the logged-in employee. Day status becomes Present.\nattendanceStatus is Early (before shift start), On time (start through 10 min grace), or Late (after grace).\nAny same-day time before shift start is allowed.\n\n**Body:** `source` (web|mobile|biometric), `latitude`, `longitude`, optional `remarks`.\n",
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"source\": \"web\",\n  \"latitude\": 28.6301,\n  \"longitude\": 77.2242,\n  \"remarks\": \"Reached office\"\n}",
@@ -5964,7 +6018,7 @@
                     "type": "text/javascript",
                     "exec": [
                       "const j = pm.response.json();",
-                      "const id = (j.record && j.record._id) || j._id;",
+                      "const id = (j.record && (j.record.attendanceId || j.record._id)) || j.attendanceId || j._id;",
                       "if (id) pm.collectionVariables.set('attendanceId', id);"
                     ]
                   }
@@ -5992,7 +6046,7 @@
                     "punch-out"
                   ]
                 },
-                "description": "Punch out. Computes Present/HalfDay, late/early, overtime (over 9h). If remarks pending → status stays Pending for admin approve/reject.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `source` — string | required for punch | `web` | `mobile` | `biometric`\n- `latitude` — number | required | GPS latitude (-90…90) — send as number, not string\n- `longitude` — number | required | GPS longitude (-180…180) — send as number, not string\n- `remarks` — string | optional | max ~500 chars\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                "description": "Punch out. Working hours are from punch-in to punch-out. Day stays Present.\nOvertime is the time after that day's shift end. Early punch-in is not overtime.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n**Body:** `source` web | mobile | biometric, `latitude`, `longitude`, optional `remarks`\n",
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"source\": \"web\",\n  \"latitude\": 28.6301,\n  \"longitude\": 77.2242,\n  \"remarks\": \"\"\n}",
@@ -6010,7 +6064,7 @@
                     "type": "text/javascript",
                     "exec": [
                       "const j = pm.response.json();",
-                      "const id = (j.record && j.record._id) || j._id;",
+                      "const id = (j.record && (j.record.attendanceId || j.record._id)) || j.attendanceId || j._id;",
                       "if (id) pm.collectionVariables.set('attendanceId', id);"
                     ]
                   }
@@ -6353,7 +6407,7 @@
     },
     {
       "key": "attendanceDate",
-      "value": "2026-10-07"
+      "value": "2026-10-08"
     },
     {
       "key": "attendanceMonth",

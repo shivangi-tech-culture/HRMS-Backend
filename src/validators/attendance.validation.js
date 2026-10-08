@@ -4,7 +4,7 @@
  * Validates request shape only — no company/employee assign side effects.
  */
 const Joi = require("joi");
-const { DAY_STATUSES, REMARK_STATUSES } = require("../models/Attendance");
+const { DAY_STATUSES, ATTENDANCE_STATUSES } = require("../models/Attendance");
 
 const SELF_SOURCES = ["web", "mobile", "biometric"];
 
@@ -56,7 +56,7 @@ const dailyQuerySchema = Joi.object({
   status: Joi.string()
     .valid(...DAY_STATUSES, "ALL")
     .optional(),
-  remarkStatus: Joi.string().valid(...REMARK_STATUSES, "ALL").optional(),
+  attendanceStatus: Joi.string().valid(...ATTENDANCE_STATUSES, "ALL").optional(),
   hasRemark: Joi.string().valid("true", "false", "1", "0", "").optional(),
   page: Joi.number().integer().min(1).default(1),
   limit: Joi.number().integer().min(1).max(200).default(50),
@@ -72,39 +72,64 @@ const calendarQuerySchema = Joi.object({
   companyId: Joi.alternatives().try(objectId, Joi.string().valid("ALL")).optional(),
   department: Joi.string().trim().allow("", "ALL").optional(),
   branchId: Joi.alternatives().try(objectId, Joi.string().valid("ALL")).optional(),
+  shiftId: Joi.alternatives().try(objectId, Joi.string().valid("ALL")).optional(),
+  workMode: Joi.string().valid("WFO", "WFH", "Hybrid", "ALL").optional(),
+  status: Joi.string().valid(...DAY_STATUSES, "ALL").optional(),
+  attendanceStatus: Joi.string().valid(...ATTENDANCE_STATUSES, "ALL").optional(),
+  hasRemark: Joi.string().valid("true", "false", "1", "0", "").optional(),
   page: Joi.number().integer().min(1).default(1),
   limit: Joi.number().integer().min(1).max(200).default(50),
 }).unknown(false);
 
-/** POST /api/attendance/:id/review-remark */
+/** Reason HR / manager writes when approving or rejecting a late punch */
+const reviewReason = Joi.string().trim().min(1).max(500).required().messages({
+  "any.required": "reason is required",
+  "string.empty": "reason is required",
+  "string.min": "reason is required",
+});
+
+/** POST /api/attendance/mark — missed punch in, punch out, or both */
+const markAttendanceSchema = Joi.object({
+  employeeId: objectId.required().messages({
+    "any.required": "employeeId is required",
+  }),
+  date: dateStr.required().messages({
+    "any.required": "date is required",
+  }),
+  punchInTime: Joi.string().trim().allow("").optional(),
+  punchOutTime: Joi.string().trim().allow("").optional(),
+  reason: Joi.string().trim().min(1).max(200).required().messages({
+    "any.required": "reason is required",
+    "string.empty": "reason is required",
+  }),
+  remarks: Joi.string().trim().allow("").max(500).optional(),
+}).unknown(false);
 const remarkReviewSchema = Joi.object({
   decision: Joi.string().valid("approve", "reject").required().messages({
     "any.only": 'decision must be "approve" or "reject"',
     "any.required": "decision is required",
   }),
+  reason: reviewReason,
 }).unknown(false);
 
 /**
  * GET /api/attendance/late-early
- * type=late → Late Arrivals tab
- * type=early → Early Departures tab
+ * type=late → late arrival (after shift start + grace)
+ * type=early → early arrival (before shift start)
+ * type=all → both
  */
 const lateEarlyQuerySchema = Joi.object({
-  type: Joi.string().valid("late", "early", "all").default("late"),
+  type: Joi.string().valid("late", "early", "all").default("all"),
   date: dateStr.optional(),
   from: dateStr.optional(),
   to: dateStr.optional(),
   search: Joi.string().trim().allow("").max(100).optional(),
   department: Joi.string().trim().allow("", "ALL").optional(),
+  branchId: Joi.alternatives().try(objectId, Joi.string().valid("ALL")).optional(),
   shiftId: Joi.alternatives().try(objectId, Joi.string().valid("ALL")).optional(),
   companyId: Joi.alternatives().try(objectId, Joi.string().valid("ALL")).optional(),
   page: Joi.number().integer().min(1).default(1),
   limit: Joi.number().integer().min(1).max(200).default(10),
-}).unknown(false);
-
-/** GET /api/attendance/late-early/:id/history */
-const lateEarlyHistoryQuerySchema = Joi.object({
-  limit: Joi.number().integer().min(1).max(100).default(30),
 }).unknown(false);
 
 module.exports = {
@@ -113,7 +138,7 @@ module.exports = {
   dailyQuerySchema,
   calendarQuerySchema,
   remarkReviewSchema,
+  markAttendanceSchema,
   lateEarlyQuerySchema,
-  lateEarlyHistoryQuerySchema,
   SELF_SOURCES,
 };
