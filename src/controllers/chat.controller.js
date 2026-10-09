@@ -1,5 +1,5 @@
 /**
- * CHAT MODULE — /api/chat (team chat: direct + group, files, unread counts)
+ * CHAT MODULE — /api/chat (team chat: direct + group, files, unread counts, ticks)
  *
  * Every handler runs after protect + chatUser, so req.chatUser =
  * { employeeId, name, role, companyId, companyName, companies, headIds }.
@@ -20,7 +20,12 @@ const {
   teamDirectory,
 } = require("../utils/chatAccess");
 const { readChatFile, removeChatFiles, storeChatFiles } = require("../utils/chatFiles");
-const { broadcastMessage, closeRoom, notifyChatChanged } = require("../utils/chatRealtime");
+const {
+  broadcastMessage,
+  broadcastReceipts,
+  closeRoom,
+  notifyChatChanged,
+} = require("../utils/chatRealtime");
 
 const GROUP_NAME_MAX = 80;
 
@@ -40,7 +45,42 @@ const toMessage = (row) => ({
   createdAt: row.createdAt,
 });
 
-const toConversation = (row, userId, unreadCount = 0) => {
+/** Earliest date, or null when any member has none yet */
+const earliest = (dates) =>
+  dates.length === 0 || dates.includes(null) ? null : dates.reduce((a, b) => (b < a ? b : a));
+
+/**
+ * Ticks for the viewer's own messages: delivered/seen up to these times by every
+ * other member (states = read rows of this chat by employeeId).
+ */
+const receiptsFor = (row, viewerId, states) => {
+  const others = row.participantIds.map(String).filter((id) => id !== viewerId);
+  const reads = others.map((id) => states.get(id)?.lastReadAt || null);
+  const deliveries = others.map((id, i) => {
+    const delivered = states.get(id)?.lastDeliveredAt || null;
+    const read = reads[i];
+    if (!delivered || !read) return delivered || read;
+    return delivered > read ? delivered : read;
+  });
+  return { deliveredUpTo: earliest(deliveries), readUpTo: earliest(reads) };
+};
+
+/** Read rows of these chats: conversationId → (employeeId → row) */
+const readStatesOf = async (conversationIds) => {
+  const rows = await ChatReadState.find(
+    { conversationId: { $in: conversationIds } },
+    { conversationId: 1, employeeId: 1, unreadCount: 1, lastReadAt: 1, lastDeliveredAt: 1 }
+  ).lean();
+  const byChat = new Map();
+  for (const row of rows) {
+    const key = String(row.conversationId);
+    if (!byChat.has(key)) byChat.set(key, new Map());
+    byChat.get(key).set(row.employeeId, row);
+  }
+  return byChat;
+};
+
+const toConversation = (row, userId, unreadCount = 0, receipts = undefined) => {
   const participantIds = row.participantIds.map(String);
   const isGroup = row.type === "group";
   return {
@@ -62,6 +102,7 @@ const toConversation = (row, userId, unreadCount = 0) => {
     lastMessage: row.lastMessage || "",
     lastMessageAt: row.lastMessageAt,
     unreadCount,
+    ...receipts,
   };
 };
 
@@ -104,15 +145,16 @@ const listVisibleConversations = async (user) => {
     if (await canViewConversation(user, row)) visible.push(row);
   }
 
-  const reads = await ChatReadState.find({
-    conversationId: { $in: visible.map((row) => row._id) },
-    employeeId: user.employeeId,
+  const statesByChat = await readStatesOf(visible.map((row) => row._id));
+  return visible.map((row) => {
+    const states = statesByChat.get(String(row._id)) || new Map();
+    return toConversation(
+      row,
+      user.employeeId,
+      states.get(user.employeeId)?.unreadCount || 0,
+      receiptsFor(row, user.employeeId, states)
+    );
   });
-  const unreadByChat = new Map(reads.map((row) => [String(row.conversationId), row.unreadCount]));
-
-  return visible.map((row) =>
-    toConversation(row, user.employeeId, unreadByChat.get(String(row._id)) || 0)
-  );
 };
 
 /** Find or create the direct chat between the user and another contact */
@@ -136,11 +178,13 @@ const openConversation = async (user, otherEmployeeId) => {
       conversation = await ChatConversation.findOne({ companyId, pairKey });
     }
   }
-  const read = await ChatReadState.findOne({
-    conversationId: conversation._id,
-    employeeId: user.employeeId,
-  });
-  return toConversation(conversation, user.employeeId, read?.unreadCount || 0);
+  const states = (await readStatesOf([conversation._id])).get(String(conversation._id)) || new Map();
+  return toConversation(
+    conversation,
+    user.employeeId,
+    states.get(user.employeeId)?.unreadCount || 0,
+    receiptsFor(conversation, user.employeeId, states)
+  );
 };
 
 const listMessages = async (user, conversationId) => {
@@ -204,6 +248,20 @@ const sendMessage = async (user, conversationId, text, files = []) => {
   };
 };
 
+/** After `changedId` got or read messages: fresh ticks for every other member */
+const receiptUpdates = async (conversation, changedId) => {
+  if (!conversation.participantIds.includes(changedId)) return [];
+  const conversationId = String(conversation._id);
+  const states = (await readStatesOf([conversation._id])).get(conversationId) || new Map();
+  return conversation.participantIds
+    .filter((employeeId) => employeeId !== changedId)
+    .map((employeeId) => ({
+      employeeId,
+      receipt: { conversationId, ...receiptsFor(conversation, employeeId, states) },
+    }));
+};
+
+/** Opened the chat: unread → 0; returns the tick updates for the senders */
 const markRead = async (user, conversationId) => {
   const conversation = await loadViewableConversation(user, conversationId);
   await ChatReadState.updateOne(
@@ -211,7 +269,38 @@ const markRead = async (user, conversationId) => {
     { $set: { unreadCount: 0, lastReadAt: new Date(), companyId: conversation.companyId } },
     { upsert: true }
   );
-  return { conversationId: String(conversation._id), unreadCount: 0 };
+  return {
+    result: { conversationId: String(conversation._id), unreadCount: 0 },
+    receipts: await receiptUpdates(conversation, user.employeeId),
+  };
+};
+
+/**
+ * The user's chat is online: messages waiting for them (all chats, or one) are
+ * now delivered. Returns the tick updates for the senders.
+ */
+const markDelivered = async (user, conversationId = null) => {
+  const filter = { employeeId: user.employeeId, unreadCount: { $gt: 0 } };
+  if (conversationId !== null) {
+    if (!mongoose.isValidObjectId(conversationId)) return [];
+    filter.conversationId = conversationId;
+  }
+  const states = await ChatReadState.find(filter, { conversationId: 1, lastDeliveredAt: 1 }).lean();
+  if (states.length === 0) return [];
+
+  const deliveredAt = new Map(states.map((s) => [String(s.conversationId), s.lastDeliveredAt]));
+  const conversations = await ChatConversation.find({ _id: { $in: [...deliveredAt.keys()] } });
+  const pending = conversations.filter((c) => {
+    const at = deliveredAt.get(String(c._id));
+    return c.participantIds.includes(user.employeeId) && c.lastMessageAt && (!at || at < c.lastMessageAt);
+  });
+  if (pending.length === 0) return [];
+
+  await ChatReadState.updateMany(
+    { employeeId: user.employeeId, conversationId: { $in: pending.map((c) => c._id) } },
+    { $set: { lastDeliveredAt: new Date() } }
+  );
+  return (await Promise.all(pending.map((c) => receiptUpdates(c, user.employeeId)))).flat();
 };
 
 /** An attachment the user may open: they must be able to see its chat */
@@ -328,7 +417,9 @@ const postMessage = wrap(async (req, res) => {
 
 /** POST /api/chat/conversations/:conversationId/read */
 const readConversation = wrap(async (req, res) => {
-  res.json(await markRead(req.chatUser, req.params.conversationId));
+  const { result, receipts } = await markRead(req.chatUser, req.params.conversationId);
+  broadcastReceipts(req.app.get("io"), receipts);
+  res.json(result);
 });
 
 /** GET /api/chat/attachments/:attachmentId — file bytes (images / PDF inline) */
@@ -471,6 +562,7 @@ module.exports = {
   loadViewableConversation,
   sendMessage,
   markRead,
+  markDelivered,
   getChatMe,
   listChatPeople,
   listConversations,

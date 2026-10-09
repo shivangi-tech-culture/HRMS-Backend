@@ -3,12 +3,14 @@
  *
  * Client: io(API_URL, { auth: { token, companyId } })
  * Client → server: chat:join · chat:leave · message:send · chat:read (each with an ack)
- * Server → client: message:new · inbox:update · chat:changed (see chatRealtime.js)
+ *                  · chat:delivered (no ack)
+ * Server → client: message:new · inbox:update · chat:changed · receipt:update (see chatRealtime.js)
  */
 const { chatUserFor, loadLoginUser } = require("./chatAccess");
-const { broadcastMessage } = require("./chatRealtime");
+const { broadcastMessage, broadcastReceipts } = require("./chatRealtime");
 const {
   loadViewableConversation,
+  markDelivered,
   markRead,
   sendMessage,
 } = require("../controllers/chat.controller");
@@ -26,6 +28,11 @@ const attachChatSocket = (io) => {
 
   io.on("connection", (socket) => {
     socket.join(`user:${socket.chatUser.employeeId}`);
+
+    // Online now: everything sent while they were away is delivered
+    markDelivered(socket.chatUser)
+      .then((receipts) => broadcastReceipts(io, receipts))
+      .catch(() => {});
 
     socket.on("chat:join", async (conversationId, ack) => {
       try {
@@ -53,9 +60,17 @@ const attachChatSocket = (io) => {
       }
     });
 
+    socket.on("chat:delivered", (conversationId) => {
+      if (typeof conversationId !== "string" || !conversationId) return;
+      markDelivered(socket.chatUser, conversationId)
+        .then((receipts) => broadcastReceipts(io, receipts))
+        .catch(() => {});
+    });
+
     socket.on("chat:read", async (conversationId, ack) => {
       try {
-        const result = await markRead(socket.chatUser, conversationId);
+        const { result, receipts } = await markRead(socket.chatUser, conversationId);
+        broadcastReceipts(io, receipts);
         ack?.({ ok: true, ...result });
       } catch (err) {
         ack?.({ ok: false, message: err.message || "Could not mark the chat read" });
