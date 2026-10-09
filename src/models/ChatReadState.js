@@ -18,6 +18,8 @@ const readStateSchema = new mongoose.Schema(
     lastReadAt: { type: Date, default: null },
     /** Their chat app was online and got the messages up to this time */
     lastDeliveredAt: { type: Date, default: null },
+    /** No message sound for this person until then (far future = always) */
+    mutedUntil: { type: Date, default: null },
     unreadCount: { type: Number, default: 0, min: 0 },
   },
   { timestamps: true }

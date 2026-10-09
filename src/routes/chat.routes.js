@@ -15,6 +15,7 @@ const {
   getMessages,
   postMessage,
   readConversation,
+  muteChat,
   downloadAttachment,
   createGroup,
   renameGroup,
@@ -48,7 +49,7 @@ const chatUser = async (req, res, next) => {
  *       Employee → own Reporting Heads + company employees.
  *       **Socket.IO** on the API URL: `io(API_URL, { auth: { token, companyId } })`.
  *       Emits `chat:join`, `chat:leave`, `message:send`, `chat:read`, `chat:delivered`; listens for
- *       `message:new`, `inbox:update`, `chat:changed`, `receipt:update`.
+ *       `message:new`, `inbox:update`, `chat:changed`, `receipt:update`, `chat:muted`.
  *       **Ticks:** each conversation has `deliveredUpTo` / `readUpTo` — my messages with
  *       `createdAt` at or before them are delivered / seen by every other member.
  */
@@ -104,7 +105,7 @@ router.get("/employees", listChatPeople);
  * /api/chat/conversations:
  *   get:
  *     tags: [Chat]
- *     summary: Chats visible to the user (newest first, with unreadCount, deliveredUpTo, readUpTo)
+ *     summary: Chats visible to the user (newest first, with unreadCount, mutedUntil, deliveredUpTo, readUpTo)
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -185,6 +186,32 @@ router.post("/conversations/:conversationId/messages", uploadChatFiles, postMess
  *       200: { description: "{ conversationId, unreadCount: 0 }" }
  */
 router.post("/conversations/:conversationId/read", readConversation);
+
+/**
+ * @swagger
+ * /api/chat/conversations/{conversationId}/mute:
+ *   post:
+ *     tags: [Chat]
+ *     summary: Mute or unmute a chat for the logged-in member (no message sound)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { in: path, name: conversationId, required: true, schema: { type: string } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [duration]
+ *             properties:
+ *               duration: { type: string, enum: ["8h", "1w", "always", "off"] }
+ *     responses:
+ *       200: { description: "{ conversationId, mutedUntil } — the user's sockets also get chat:muted" }
+ *       400: { description: Invalid duration }
+ *       403: { description: Not a member of this chat }
+ */
+router.post("/conversations/:conversationId/mute", muteChat);
 
 /**
  * @swagger

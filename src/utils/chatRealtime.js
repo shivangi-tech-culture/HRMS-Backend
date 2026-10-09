@@ -1,7 +1,7 @@
 /**
  * CHAT REALTIME — Socket.IO pushes (io = req.app.get("io"))
  * Rooms: user:<User _id> (every tab of that person) · chat:<conversation _id> (open chat)
- * Events: message:new · inbox:update · chat:changed · receipt:update
+ * Events: message:new · inbox:update · chat:changed · receipt:update · chat:muted
  */
 
 /** New message: the open chat room gets the message, each other member gets an inbox update */
@@ -41,4 +41,16 @@ const broadcastReceipts = (io, updates) => {
   }
 };
 
-module.exports = { broadcastMessage, broadcastReceipts, closeRoom, notifyChatChanged };
+/** Mute changed: the user's other tabs update their chat list */
+const notifyMuted = (io, employeeId, result) => {
+  if (!io) return;
+  io.to(`user:${employeeId}`).emit("chat:muted", result);
+};
+
+module.exports = {
+  broadcastMessage,
+  broadcastReceipts,
+  closeRoom,
+  notifyChatChanged,
+  notifyMuted,
+};
