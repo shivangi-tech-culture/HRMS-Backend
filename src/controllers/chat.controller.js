@@ -25,6 +25,7 @@ const {
   broadcastReceipts,
   closeRoom,
   notifyChatChanged,
+  notifyMuted,
 } = require("../utils/chatRealtime");
 
 const GROUP_NAME_MAX = 80;
@@ -69,7 +70,14 @@ const receiptsFor = (row, viewerId, states) => {
 const readStatesOf = async (conversationIds) => {
   const rows = await ChatReadState.find(
     { conversationId: { $in: conversationIds } },
-    { conversationId: 1, employeeId: 1, unreadCount: 1, lastReadAt: 1, lastDeliveredAt: 1 }
+    {
+      conversationId: 1,
+      employeeId: 1,
+      unreadCount: 1,
+      lastReadAt: 1,
+      lastDeliveredAt: 1,
+      mutedUntil: 1,
+    }
   ).lean();
   const byChat = new Map();
   for (const row of rows) {
@@ -80,7 +88,16 @@ const readStatesOf = async (conversationIds) => {
   return byChat;
 };
 
-const toConversation = (row, userId, unreadCount = 0, receipts = undefined) => {
+/** The viewer's own unread count, mute and ticks for one chat */
+const viewerState = (row, viewerId, states) => {
+  const own = states.get(viewerId);
+  return {
+    unreadCount: own?.unreadCount || 0,
+    extra: { mutedUntil: own?.mutedUntil || null, ...receiptsFor(row, viewerId, states) },
+  };
+};
+
+const toConversation = (row, userId, unreadCount = 0, extra = undefined) => {
   const participantIds = row.participantIds.map(String);
   const isGroup = row.type === "group";
   return {
@@ -102,7 +119,7 @@ const toConversation = (row, userId, unreadCount = 0, receipts = undefined) => {
     lastMessage: row.lastMessage || "",
     lastMessageAt: row.lastMessageAt,
     unreadCount,
-    ...receipts,
+    ...extra,
   };
 };
 
@@ -148,12 +165,8 @@ const listVisibleConversations = async (user) => {
   const statesByChat = await readStatesOf(visible.map((row) => row._id));
   return visible.map((row) => {
     const states = statesByChat.get(String(row._id)) || new Map();
-    return toConversation(
-      row,
-      user.employeeId,
-      states.get(user.employeeId)?.unreadCount || 0,
-      receiptsFor(row, user.employeeId, states)
-    );
+    const { unreadCount, extra } = viewerState(row, user.employeeId, states);
+    return toConversation(row, user.employeeId, unreadCount, extra);
   });
 };
 
@@ -179,12 +192,8 @@ const openConversation = async (user, otherEmployeeId) => {
     }
   }
   const states = (await readStatesOf([conversation._id])).get(String(conversation._id)) || new Map();
-  return toConversation(
-    conversation,
-    user.employeeId,
-    states.get(user.employeeId)?.unreadCount || 0,
-    receiptsFor(conversation, user.employeeId, states)
-  );
+  const { unreadCount, extra } = viewerState(conversation, user.employeeId, states);
+  return toConversation(conversation, user.employeeId, unreadCount, extra);
 };
 
 const listMessages = async (user, conversationId) => {
@@ -303,6 +312,32 @@ const markDelivered = async (user, conversationId = null) => {
   return (await Promise.all(pending.map((c) => receiptUpdates(c, user.employeeId)))).flat();
 };
 
+const MUTE_FOREVER = new Date("9999-12-31T00:00:00.000Z");
+const MUTE_DURATIONS = {
+  "8h": 8 * 60 * 60 * 1000,
+  "1w": 7 * 24 * 60 * 60 * 1000,
+};
+
+/** duration: "8h" | "1w" | "always" | "off" — members only */
+const muteConversation = async (user, conversationId, duration) => {
+  const conversation = await loadViewableConversation(user, conversationId);
+  if (!conversation.participantIds.includes(user.employeeId)) {
+    throw chatError(403, "Only members of this chat can mute it");
+  }
+  let mutedUntil;
+  if (duration === "off") mutedUntil = null;
+  else if (duration === "always") mutedUntil = MUTE_FOREVER;
+  else if (MUTE_DURATIONS[duration]) mutedUntil = new Date(Date.now() + MUTE_DURATIONS[duration]);
+  else throw chatError(400, 'duration must be "8h", "1w", "always" or "off"');
+
+  await ChatReadState.updateOne(
+    { conversationId: conversation._id, employeeId: user.employeeId },
+    { $set: { mutedUntil, companyId: conversation.companyId } },
+    { upsert: true }
+  );
+  return { conversationId: String(conversation._id), mutedUntil };
+};
+
 /** An attachment the user may open: they must be able to see its chat */
 const findAttachment = async (user, attachmentId) => {
   if (!mongoose.isValidObjectId(attachmentId)) throw chatError(404, "File not found");
@@ -419,6 +454,13 @@ const postMessage = wrap(async (req, res) => {
 const readConversation = wrap(async (req, res) => {
   const { result, receipts } = await markRead(req.chatUser, req.params.conversationId);
   broadcastReceipts(req.app.get("io"), receipts);
+  res.json(result);
+});
+
+/** POST /api/chat/conversations/:conversationId/mute { duration } — the user's other tabs follow */
+const muteChat = wrap(async (req, res) => {
+  const result = await muteConversation(req.chatUser, req.params.conversationId, req.body?.duration);
+  notifyMuted(req.app.get("io"), req.chatUser.employeeId, result);
   res.json(result);
 });
 
@@ -570,6 +612,7 @@ module.exports = {
   getMessages,
   postMessage,
   readConversation,
+  muteChat,
   downloadAttachment,
   createGroup,
   renameGroup,
