@@ -5,8 +5,10 @@
  */
 require("dotenv").config();
 const fs = require("fs");
+const http = require("http");
 const path = require("path");
 const express = require("express");
+const { Server } = require("socket.io");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const helmet = require("helmet");
@@ -30,6 +32,8 @@ const attendanceRoutes = require("./routes/attendance.routes");
 const mailRoutes = require("./routes/mail.routes");
 const masterRoutes = require("./routes/master.routes");
 const companyRoutes = require("./routes/company.routes");
+const chatRoutes = require("./routes/chat.routes");
+const { attachChatSocket } = require("./utils/chatSocket");
 
 const app = express();
 
@@ -61,7 +65,7 @@ app.use(
   cors({
     origin: "*",
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "X-Company-Id"],
   })
 );
 
@@ -166,11 +170,18 @@ app.use("/api/attendance", attendanceRoutes); // punch · daily · calendar · l
 app.use("/api/mail", mailRoutes); // Organization → Mail send
 app.use("/api/masters", masterRoutes); // SaaS masters (typed collections, including Branch + Shift)
 app.use("/api/companies", companyRoutes); // Company CRUD
+app.use("/api/chat", chatRoutes); // team chat (REST) — live updates on Socket.IO below
+
+/** One HTTP server for the API and Socket.IO (chat) */
+const server = http.createServer(app);
+const io = new Server(server, { cors: { origin: "*" } });
+app.set("io", io);
+attachChatSocket(io);
 
 // START SERVER (colored chalk banners)
 
 connectDB().then(() => {
-  app.listen(PORT, () => {
+  server.listen(PORT, () => {
     const pad = (s, n = 72) => s.padEnd(n);
     console.log("");
     console.log(

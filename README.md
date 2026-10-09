@@ -133,6 +133,7 @@ Lean account for one company. Prefer this over `POST /api/employees` with `role:
 | Attendance punch + manual | Done | web / mobile / biometric / manual |
 | Send email (Organization → Mail) | Done | `POST /api/mail/send` |
 | Master dropdowns | Done | One `Master.js` — `type` → collection (`/api/masters?type=`) |
+| Team chat (direct + group, files) | Done | `/api/chat` + Socket.IO on the same server |
 | Swagger + Postman | Done | Keep in sync when APIs change |
 | Rate limit + Helmet + Morgan | Done | Global + login limits |
 
@@ -260,10 +261,15 @@ Clears the auth cookie.
 ├── /api/masters            ← Master.js → type picks collection (departments, …)
 │   ├── GET/POST /
 │   └── GET/PUT/DELETE /:id
-└── /api/attendance
-    ├── POST /punch-in | /punch-out | /manual
-    ├── GET  /today
-    └── GET  /
+├── /api/attendance
+│   ├── POST /punch-in | /punch-out | /manual
+│   ├── GET  /today
+│   └── GET  /
+└── /api/chat               ← team chat (header X-Company-Id)
+    ├── GET  /me | /employees | /conversations
+    ├── POST /conversations | /conversations/:id/messages | /conversations/:id/read
+    ├── GET  /conversations/:id/messages | /attachments/:attachmentId
+    └── POST/PATCH/DELETE /groups …
 ```
 
 ---
@@ -424,6 +430,27 @@ Requires Organization → Mail → `email` (Global / Super Admin bypass). Uses s
 | POST | `/manual` | Admin (missed punch; source stored as `manual`) |
 | GET | `/today` | Self |
 | GET | `/` | Admin = all (scoped); Employee = own |
+
+---
+
+## Team chat
+
+REST under `/api/chat` (Bearer token + `X-Company-Id` = company from the header switcher) and
+Socket.IO on the same server: `io(API_URL, { auth: { token, companyId } })`.
+
+| Role | Can chat with | Groups |
+|------|---------------|--------|
+| Super Admin / Admin / HR | Everyone in the company (+ Super Admins / Admins) | Create |
+| Reporting Manager | Own team | Create |
+| Employee | Own Reporting Heads + company employees | Member only |
+
+Supervisors can read chats where every member is in their contacts, but only members can send.
+
+- **Socket events** — client emits `chat:join`, `chat:leave`, `message:send`, `chat:read` (with ack);
+  server emits `message:new`, `inbox:update`, `chat:changed`.
+- **Files** — up to 5 × 10 MB per message, stored as private (authenticated) raw files on
+  Cloudinary under `hrms/chat/<companyId>`; served only through `GET /api/chat/attachments/:id`.
+- **Collections** — `chatconversations`, `chatmessages`, `chatreads`.
 
 ---
 

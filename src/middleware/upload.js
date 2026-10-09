@@ -159,5 +159,6 @@ module.exports = {
   UPLOAD_TYPES,
   uploadFile,
   uploadToCloudinary,
+  folderFor,
   cloudinary,
 };
