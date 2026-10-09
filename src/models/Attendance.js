@@ -10,7 +10,7 @@ const mongoose = require("mongoose");
 const { todayDate } = require("../utils/shiftTiming");
 
 /** Allowed punch sources */
-const PUNCH_SOURCES = ["web", "mobile", "biometric", "manual"];
+const PUNCH_SOURCES = ["web", "mobile", "biometric", "manual", "regularization"];
 
 /** Day status after punch-out / admin review */
 const DAY_STATUSES = [
@@ -25,6 +25,7 @@ const DAY_STATUSES = [
   "OnLeave",
   "WFH",
   "Working", // display-only for open on-time punch; may also be stored
+  "Rejected", // display when a regularization request was rejected; day stays absent
 ];
 
 /** Punch-in timing, then late review. Early · On time · Late · Approved · Rejected */
@@ -131,6 +132,12 @@ const attendanceSchema = new mongoose.Schema(
     },
     /** Reason selected when HR marks a missed punch */
     markReason: { type: String, default: "" },
+    /** Set when a regularization request is approved onto this day */
+    regularizationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "AttendanceRegularization",
+      default: null,
+    },
   },
   { timestamps: true }
 );

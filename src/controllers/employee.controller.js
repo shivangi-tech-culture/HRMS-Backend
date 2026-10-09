@@ -21,6 +21,7 @@ const {
 const { hasAllAccess } = require("../middleware/auth");
 const { queueWelcomeEmail } = require("../utils/mail");
 const { logEmployeeActivity, humanize } = require("../utils/activityLog");
+const { grantLeaveBalance } = require("../utils/leaveBalance");
 const ActivityLog = require("../models/ActivityLog");
 const { sendExcel } = require("../utils/excel");
 const { uploadToCloudinary, UPLOAD_TYPES } = require("../middleware/upload");
@@ -375,6 +376,7 @@ const createEmployee = async (req, res) => {
 
     // 4. Create User with role Employee (password already hashed above)
     const employee = await User.create(createDoc);
+    await grantLeaveBalance(employee);
 
     await logEmployeeActivity({ actor: req.user, employee, action: "create" });
 

@@ -5288,7 +5288,7 @@
         },
         {
           "name": "1.7 Attendance",
-          "description": "Today's daily list, calendar, late/early arrivals, missed-punch mark, and one review API.\nPOST /api/attendance/{{attendanceId}}/review?decision=approve or decision=reject, body { reason }. Only Late. Day status stays Present.\nattendanceStatus is Early | On time | Late | Approved | Rejected. Overtime is minutes after that day's shift end, only after punch out.\nPOST /api/attendance/mark sets a missed punch in, punch out, or both. It does not change the employee's company, branch, or shift.\nScope: Super Admin/Admin = all · HR = assigned companies · Manager = team.",
+          "description": "Daily list (today or a previous date), calendar, late/early, HR mark attendance, and regularization approval.\nGET /api/attendance/daily?companyId={{companyId}}&date={{attendanceDate}} — omit date for today. Punch in without punch out is MissedPunch. A pending regularization shows Pending. Rejected stays Absent. Approved becomes Present.\nPOST /api/attendance/mark is HR only. Employees send POST /api/attendance/regularize (folder 2.2).\nPOST /api/attendance/regularizations/{{regularizationId}}/review?decision=approve|reject — Reporting Manager (team), HR (assigned companies), Admin, or Super Admin. Any one approval is enough.\nScope: Super Admin/Admin = all · HR = assigned companies · Manager = team.",
           "item": [
             {
               "name": "1. Daily Attendance",
@@ -5299,7 +5299,7 @@
                     "method": "GET",
                     "header": [],
                     "url": {
-                      "raw": "{{baseUrl}}/api/attendance/daily?page={{page}}&limit={{limit}}",
+                      "raw": "{{baseUrl}}/api/attendance/daily?companyId={{companyId}}&date={{attendanceDate}}&page={{page}}&limit={{limit}}",
                       "host": [
                         "{{baseUrl}}"
                       ],
@@ -5309,6 +5309,16 @@
                         "daily"
                       ],
                       "query": [
+                        {
+                          "key": "date",
+                          "value": "{{attendanceDate}}",
+                          "description": "string (YYYY-MM-DD) | optional | previous date or today. Omit for today."
+                        },
+                        {
+                          "key": "companyId",
+                          "value": "{{companyId}}",
+                          "description": "string (MongoId 24-hex) | company to list. Super Admin / Admin / HR."
+                        },
                         {
                           "key": "search",
                           "value": "",
@@ -5332,12 +5342,6 @@
                           "value": "{{shiftId}}",
                           "disabled": true,
                           "description": "see sample value | send same JSON type as example (string/number/boolean/array/object/null)"
-                        },
-                        {
-                          "key": "companyId",
-                          "value": "{{companyId}}",
-                          "disabled": true,
-                          "description": "string (MongoId 24-hex or company name) | optional | company selected in the UI ({{companyId}}) — untick / omit for all companies"
                         },
                         {
                           "key": "workMode",
@@ -5375,7 +5379,7 @@
                         }
                       ]
                     },
-                    "description": "Today's attendance. Server date is today.\nRow: employee, company, branch, shift (start, end, graceMinutes), punch times, workingHours, overtime, overtimeMinutes, status Present after punch-in, attendanceStatus Early | On time | Late | Approved | Rejected, lateByMinutes, earlyByMinutes, canApproveReject.\nEarly = before shift start. On time = start through grace (10 min). Late = after grace. canApproveReject is true only for Late.\nworkingHours is punch-in to punch-out. overtime is time after that day's shift end. Both stay 0 until punch out.\nNo companyId → first created company. Pass companyId to see that company.\nTest script saves the first employee `_id` into {{employeeId}} for Mark Attendance.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n- `search` — name / email / employee code\n- `department` `branchId` `shiftId` `companyId` — optional filters\n- `workMode` — WFO | WFH | Hybrid | ALL\n- `status` — Present | Absent | Late | Working | WFH | OnLeave | HalfDay | WeeklyOff | Holiday | MissedPunch | ALL\n- `attendanceStatus` — Early | On time | Late | Approved | Rejected | ALL. Use Late for the approval queue.\n- `hasRemark` — true = rows that have a remark\n- `page` `limit`\n"
+                    "description": "Daily attendance for one company and one date. `date` defaults to today. Pass a previous YYYY-MM-DD to open that day.\nPunch in with no punch out → status MissedPunch (`awaitingPunchOut: true`). Both punches, or an approved regularization → Present.\nPending regularization → Pending. Rejected regularization → Rejected, and the day stays absent.\nNo companyId → first created company.\nTest script saves the first employee `_id` into {{employeeId}} for Mark Attendance.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n- `date` — YYYY-MM-DD, today or earlier\n- `companyId` — company to list\n- `search` `department` `branchId` `shiftId` — optional\n- `status` — Present | Absent | MissedPunch | Pending | Rejected | Late | Working | WFH | OnLeave | HalfDay | ALL\n- `page` `limit`\n"
                   },
                   "event": [
                     {
@@ -5735,6 +5739,924 @@
                   }
                 }
               ]
+            },
+            {
+              "name": "4. Attendance Regularization",
+              "description": "Approval queue. Login as Super Admin, Admin, HR, or Reporting Manager.\nEmployee requests are created in 2.2 Attendance → Request Regularization.\nAny one of reporting manager (own team), HR (assigned companies), Admin, or Super Admin can approve. One approval makes the day Present on the timesheet and on daily attendance. Reject leaves the day Absent.",
+              "item": [
+                {
+                  "name": "1. List requests",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/attendance/regularizations?companyId={{companyId}}&status=Pending&page={{page}}&limit={{limit}}",
+                      "host": ["{{baseUrl}}"],
+                      "path": ["api", "attendance", "regularizations"],
+                      "query": [
+                        {
+                          "key": "companyId",
+                          "value": "{{companyId}}",
+                          "description": "string (MongoId) | optional | company filter"
+                        },
+                        {
+                          "key": "status",
+                          "value": "Pending",
+                          "description": "Pending | Approved | Rejected | Cancelled | ALL. Default Pending."
+                        },
+                        {
+                          "key": "search",
+                          "value": "",
+                          "disabled": true,
+                          "description": "name / email / employee code"
+                        },
+                        {
+                          "key": "from",
+                          "value": "{{fromDate}}",
+                          "disabled": true,
+                          "description": "YYYY-MM-DD"
+                        },
+                        {
+                          "key": "to",
+                          "value": "{{toDate}}",
+                          "disabled": true,
+                          "description": "YYYY-MM-DD"
+                        },
+                        { "key": "page", "value": "{{page}}" },
+                        { "key": "limit", "value": "{{limit}}" }
+                      ]
+                    },
+                    "description": "List regularization requests in scope.\nSuper Admin / Admin: the company (or the first company when companyId is omitted).\nHR: assigned companies. Reporting Manager: own team only.\nTest script saves the first `_id` into {{regularizationId}}."
+                  },
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "const j = pm.response.json();",
+                          "const row = (j.data || [])[0];",
+                          "if (row && row._id) pm.collectionVariables.set('regularizationId', row._id);"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "name": "2. Approve",
+                  "request": {
+                    "method": "POST",
+                    "header": [{ "key": "Content-Type", "value": "application/json" }],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/attendance/regularizations/{{regularizationId}}/review?decision=approve",
+                      "host": ["{{baseUrl}}"],
+                      "path": ["api", "attendance", "regularizations", "{{regularizationId}}", "review"],
+                      "query": [
+                        { "key": "decision", "value": "approve", "description": "approve or reject" }
+                      ]
+                    },
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"reason\": \"Punch verified. Approved.\"\n}",
+                      "options": { "raw": { "language": "json" } }
+                    },
+                    "description": "Writes the requested punch in / punch out onto attendance (does not overwrite a punch that is already saved).\nDay becomes Present on daily attendance and on the employee timesheet.\nYou cannot approve your own request."
+                  }
+                },
+                {
+                  "name": "3. Reject",
+                  "request": {
+                    "method": "POST",
+                    "header": [{ "key": "Content-Type", "value": "application/json" }],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/attendance/regularizations/{{regularizationId}}/review?decision=reject",
+                      "host": ["{{baseUrl}}"],
+                      "path": ["api", "attendance", "regularizations", "{{regularizationId}}", "review"],
+                      "query": [
+                        { "key": "decision", "value": "reject", "description": "approve or reject" }
+                      ]
+                    },
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"reason\": \"Times do not match the shift. Rejected.\"\n}",
+                      "options": { "raw": { "language": "json" } }
+                    },
+                    "description": "Does not write punches. Request status becomes Rejected and the day stays Absent on the timesheet and on daily attendance."
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "1.8 Leave",
+          "description": "Leave types, balances, requests, calendar, policies, history.\nscope common = every company (Super Admin / Admin, no companyId). scope company = one company.\nSame code: the company type replaces the common type for that company only.\nLeave year is April–March. New employees get the active types for that year.\nComp Off extra days: POST /balances/adjust adds days to that type's remaining.\nApprove / reject: Reporting Manager (own team), HR (assigned companies), Admin, Super Admin.",
+          "item": [
+            {
+              "name": "1. Leave Types",
+              "item": [
+                {
+                  "name": "1. Add Common Type",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/leave/types",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "leave",
+                        "types"
+                      ]
+                    },
+                    "description": "One type for every company. Do not send companyId.\nSaves {{leaveTypeId}}.",
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"scope\": \"common\",\n  \"name\": \"Casual Leave\",\n  \"code\": \"CL\",\n  \"paid\": true,\n  \"maxDays\": 12,\n  \"carryForward\": false,\n  \"status\": \"Active\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    }
+                  },
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "const j = pm.response.json();",
+                          "const row = j.data && !Array.isArray(j.data) ? j.data : (j.data || [])[0];",
+                          "if (row && row._id) pm.collectionVariables.set('leaveTypeId', row._id);"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "name": "2. Add Company Type",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/leave/types",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "leave",
+                        "types"
+                      ]
+                    },
+                    "description": "Only this company. Same code as a common type overrides it for this company.",
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"scope\": \"company\",\n  \"companyId\": \"{{companyId}}\",\n  \"name\": \"Casual Leave\",\n  \"code\": \"CL\",\n  \"paid\": true,\n  \"maxDays\": 15,\n  \"carryForward\": false,\n  \"status\": \"Active\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "3. Add Default Types",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/leave/types/defaults",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "leave",
+                        "types",
+                        "defaults"
+                      ]
+                    },
+                    "description": "Casual, Sick, Annual, Comp Off, Unpaid, Maternity, Paternity, Bereavement.\nscope common (default for Super Admin / Admin) or company. Skips codes that already exist.",
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"scope\": \"common\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    }
+                  },
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "const j = pm.response.json();",
+                          "const row = j.data && !Array.isArray(j.data) ? j.data : (j.data || [])[0];",
+                          "if (row && row._id) pm.collectionVariables.set('leaveTypeId', row._id);"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "name": "4. List Types",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/leave/types?scope=common",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "leave",
+                        "types"
+                      ],
+                      "query": [
+                        {
+                          "key": "scope",
+                          "value": "common",
+                          "description": "string | optional | common or company. Omit for both"
+                        },
+                        {
+                          "key": "companyId",
+                          "value": "{{companyId}}",
+                          "description": "string (MongoId) | optional | with no scope, returns common + this company",
+                          "disabled": true
+                        },
+                        {
+                          "key": "status",
+                          "value": "Active",
+                          "description": "string | optional | Active or Inactive",
+                          "disabled": true
+                        },
+                        {
+                          "key": "search",
+                          "value": "",
+                          "description": "string | optional | name or code",
+                          "disabled": true
+                        },
+                        {
+                          "key": "page",
+                          "value": "1",
+                          "description": "number | optional | page, default 1",
+                          "disabled": true
+                        },
+                        {
+                          "key": "limit",
+                          "value": "10",
+                          "description": "number | optional | rows per page, max 100",
+                          "disabled": true
+                        }
+                      ]
+                    },
+                    "description": "Common types plus company types you can access."
+                  }
+                },
+                {
+                  "name": "5. Update Type",
+                  "request": {
+                    "method": "PATCH",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/leave/types/{{leaveTypeId}}",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "leave",
+                        "types",
+                        "{{leaveTypeId}}"
+                      ]
+                    },
+                    "description": "Send only the fields to change. Common types: Super Admin / Admin only.",
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"maxDays\": 14,\n  \"status\": \"Active\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "6. Delete Type",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/leave/types/{{leaveTypeId}}",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "leave",
+                        "types",
+                        "{{leaveTypeId}}"
+                      ]
+                    },
+                    "description": "Deletes this leave type for every company. Blocked when a pending or approved request uses it. Wallet lines for this type are removed."
+                  }
+                }
+              ]
+            },
+            {
+              "name": "2. Leave Balances",
+              "item": [
+                {
+                  "name": "1. List Balances",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/leave/balances?companyId={{companyId}}",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "leave",
+                        "balances"
+                      ],
+                      "query": [
+                        {
+                          "key": "companyId",
+                          "value": "{{companyId}}",
+                          "description": "string (MongoId) | optional"
+                        },
+                        {
+                          "key": "department",
+                          "value": "",
+                          "description": "string | optional | department name",
+                          "disabled": true
+                        },
+                        {
+                          "key": "search",
+                          "value": "",
+                          "description": "string | optional | name or code",
+                          "disabled": true
+                        },
+                        {
+                          "key": "page",
+                          "value": "1",
+                          "description": "number | optional | page, default 1",
+                          "disabled": true
+                        },
+                        {
+                          "key": "limit",
+                          "value": "10",
+                          "description": "number | optional | rows per page, max 100",
+                          "disabled": true
+                        }
+                      ]
+                    },
+                    "description": "One row per employee. balances[].display is remaining/total.\ntotal = type max days + Comp Off adjust. remaining = total − used − pending."
+                  }
+                },
+                {
+                  "name": "2. Adjust Balance (Comp Off)",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/leave/balances/adjust",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "leave",
+                        "balances",
+                        "adjust"
+                      ]
+                    },
+                    "description": "Adds days to that leave type's remaining (Comp Off or any type).\nadjusted increases; max days on the type stay the same.",
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"employeeId\": \"{{employeeId}}\",\n  \"leaveTypeId\": \"{{leaveTypeId}}\",\n  \"days\": 2,\n  \"reason\": \"Worked weekend\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "name": "3. Leave Requests",
+              "item": [
+                {
+                  "name": "1. List Requests",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/leave/requests",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "leave",
+                        "requests"
+                      ],
+                      "query": [
+                        {
+                          "key": "status",
+                          "value": "Pending",
+                          "description": "string | optional | Pending, Approved, Rejected, Cancelled, or All",
+                          "disabled": true
+                        },
+                        {
+                          "key": "companyId",
+                          "value": "{{companyId}}",
+                          "description": "string (MongoId) | optional",
+                          "disabled": true
+                        },
+                        {
+                          "key": "department",
+                          "value": "",
+                          "description": "string | optional",
+                          "disabled": true
+                        },
+                        {
+                          "key": "leaveTypeId",
+                          "value": "{{leaveTypeId}}",
+                          "description": "string (MongoId) | optional",
+                          "disabled": true
+                        },
+                        {
+                          "key": "search",
+                          "value": "",
+                          "description": "string | optional | employee name or code",
+                          "disabled": true
+                        },
+                        {
+                          "key": "page",
+                          "value": "1",
+                          "description": "number | optional",
+                          "disabled": true
+                        },
+                        {
+                          "key": "limit",
+                          "value": "10",
+                          "description": "number | optional",
+                          "disabled": true
+                        }
+                      ]
+                    },
+                    "description": "summary has all, pending, approved, rejected, onLeaveToday.\nManager sees their team. HR sees assigned companies."
+                  },
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "const j = pm.response.json();",
+                          "const row = j.data && !Array.isArray(j.data) ? j.data : (j.data || [])[0];",
+                          "if (row && row._id) pm.collectionVariables.set('leaveRequestId', row._id);"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "name": "2. Apply For Employee",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/leave/requests",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "leave",
+                        "requests"
+                      ]
+                    },
+                    "description": "Admin / HR / manager apply. Days are counted on the server (inclusive). Half Day must be one date.\nPending days are held on the balance. Saves {{leaveRequestId}}.",
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"employeeId\": \"{{employeeId}}\",\n  \"leaveTypeId\": \"{{leaveTypeId}}\",\n  \"from\": \"2026-10-20\",\n  \"to\": \"2026-10-21\",\n  \"dayType\": \"Full Day\",\n  \"reason\": \"Personal work\",\n  \"document\": \"\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    }
+                  },
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "const j = pm.response.json();",
+                          "const row = j.data && !Array.isArray(j.data) ? j.data : (j.data || [])[0];",
+                          "if (row && row._id) pm.collectionVariables.set('leaveRequestId', row._id);"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "name": "3. Approve",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/leave/requests/{{leaveRequestId}}/approve",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "leave",
+                        "requests",
+                        "{{leaveRequestId}}",
+                        "approve"
+                      ]
+                    },
+                    "description": "Moves the hold into used. You cannot approve your own leave.",
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"reason\": \"Approved\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "4. Reject",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/leave/requests/{{leaveRequestId}}/reject",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "leave",
+                        "requests",
+                        "{{leaveRequestId}}",
+                        "reject"
+                      ]
+                    },
+                    "description": "Releases the held days back to remaining.",
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"reason\": \"Not approved\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "5. Cancel",
+                  "request": {
+                    "method": "POST",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/leave/requests/{{leaveRequestId}}/cancel",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "leave",
+                        "requests",
+                        "{{leaveRequestId}}",
+                        "cancel"
+                      ]
+                    },
+                    "description": "Only a pending request. Releases the held days."
+                  }
+                }
+              ]
+            },
+            {
+              "name": "4. Leave Calendar",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/leave/calendar?month=2026-10&date=2026-10-20",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "leave",
+                    "calendar"
+                  ],
+                  "query": [
+                    {
+                      "key": "month",
+                      "value": "2026-10",
+                      "description": "string | YYYY-MM | optional, default this month"
+                    },
+                    {
+                      "key": "date",
+                      "value": "2026-10-20",
+                      "description": "string | YYYY-MM-DD | optional, default today"
+                    },
+                    {
+                      "key": "companyId",
+                      "value": "{{companyId}}",
+                      "description": "string (MongoId) | optional",
+                      "disabled": true
+                    },
+                    {
+                      "key": "search",
+                      "value": "",
+                      "description": "string | optional | employee name or code",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "Month counts plus the employees on the selected date (pending and approved)."
+              }
+            },
+            {
+              "name": "5. Leave Policies",
+              "description": "Shown on the policies screen. Apply and approve do not read these rules.",
+              "item": [
+                {
+                  "name": "1. List Policies",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/leave/policies",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "leave",
+                        "policies"
+                      ],
+                      "query": [
+                        {
+                          "key": "companyId",
+                          "value": "{{companyId}}",
+                          "description": "string (MongoId) | required for Super Admin / Admin when they have no single company",
+                          "disabled": true
+                        },
+                        {
+                          "key": "search",
+                          "value": "",
+                          "description": "string | optional | rule label",
+                          "disabled": true
+                        }
+                      ]
+                    },
+                    "description": "First call for a company inserts the default rules. Saves {{leavePolicyId}}."
+                  },
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "const j = pm.response.json();",
+                          "const row = j.data && !Array.isArray(j.data) ? j.data : (j.data || [])[0];",
+                          "if (row && row._id) pm.collectionVariables.set('leavePolicyId', row._id);"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "name": "2. Add Rule",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/leave/policies",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "leave",
+                        "policies"
+                      ]
+                    },
+                    "description": "Adds one rule for the company.",
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"companyId\": \"{{companyId}}\",\n  \"label\": \"Max consecutive days\",\n  \"value\": \"5 days\",\n  \"description\": \"Longest single leave application.\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    }
+                  },
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "const j = pm.response.json();",
+                          "const row = j.data && !Array.isArray(j.data) ? j.data : (j.data || [])[0];",
+                          "if (row && row._id) pm.collectionVariables.set('leavePolicyId', row._id);"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "name": "3. Update Rule",
+                  "request": {
+                    "method": "PATCH",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/leave/policies/{{leavePolicyId}}",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "leave",
+                        "policies",
+                        "{{leavePolicyId}}"
+                      ]
+                    },
+                    "description": "Send only the fields to change. Updates the shared policy for every company.",
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"value\": \"10 days\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "4. Delete Rule",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/leave/policies/{{leavePolicyId}}",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "leave",
+                        "policies",
+                        "{{leavePolicyId}}"
+                      ]
+                    },
+                    "description": "Deletes this policy for every company. companyId is not required."
+                  }
+                }
+              ]
+            },
+            {
+              "name": "6. Leave History",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/leave/history",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "leave",
+                    "history"
+                  ],
+                  "query": [
+                    {
+                      "key": "status",
+                      "value": "Approved",
+                      "description": "string | optional | Approved or Rejected. Omit for both",
+                      "disabled": true
+                    },
+                    {
+                      "key": "companyId",
+                      "value": "{{companyId}}",
+                      "description": "string (MongoId) | optional",
+                      "disabled": true
+                    },
+                    {
+                      "key": "department",
+                      "value": "",
+                      "description": "string | optional",
+                      "disabled": true
+                    },
+                    {
+                      "key": "leaveTypeId",
+                      "value": "{{leaveTypeId}}",
+                      "description": "string (MongoId) | optional",
+                      "disabled": true
+                    },
+                    {
+                      "key": "search",
+                      "value": "",
+                      "description": "string | optional | employee or approver name",
+                      "disabled": true
+                    },
+                    {
+                      "key": "page",
+                      "value": "1",
+                      "description": "number | optional",
+                      "disabled": true
+                    },
+                    {
+                      "key": "limit",
+                      "value": "10",
+                      "description": "number | optional",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "Approved and rejected requests. approvedBy and closedOn are the reviewer and review time."
+              }
             }
           ]
         }
@@ -6142,6 +7064,120 @@
                 },
                 "description": "Own IN/OUT punch rows.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `from` — string (YYYY-MM-DD) | optional | range start date\n- `to` — string (YYYY-MM-DD) | optional | range end date\n- `date` — string (YYYY-MM-DD) | optional/required by API | single day\n- `status` — string | optional | `ALL` | `Pending` | `Present` | `Absent` | `HalfDay` | `WeeklyOff` | `Holiday` | `MissedPunch` | `OnLeave` | `WFH`\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
               }
+            },
+            {
+              "name": "5. My Time Sheet",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/attendance/timesheet?month={{attendanceMonth}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "attendance", "timesheet"],
+                  "query": [
+                    {
+                      "key": "month",
+                      "value": "{{attendanceMonth}}",
+                      "description": "YYYY-MM. Or use from and to instead."
+                    },
+                    {
+                      "key": "from",
+                      "value": "{{fromDate}}",
+                      "disabled": true,
+                      "description": "YYYY-MM-DD"
+                    },
+                    {
+                      "key": "to",
+                      "value": "{{toDate}}",
+                      "disabled": true,
+                      "description": "YYYY-MM-DD"
+                    },
+                    {
+                      "key": "employeeId",
+                      "value": "{{employeeId}}",
+                      "disabled": true,
+                      "description": "Omit for yourself. HR / manager / admin may pass another employee."
+                    }
+                  ]
+                },
+                "description": "Employee timesheet for a month (or from–to).\nEach row: date, day, punchInTime, punchOutTime, hours, status.\nstatus is Present, Absent, MissedPunch, Pending, or Rejected.\nMissedPunch = punch in with no punch out. Pending until approved. Rejected stays absent. Approved becomes Present."
+              }
+            },
+            {
+              "name": "6. Request Regularization",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "url": {
+                  "raw": "{{baseUrl}}/api/attendance/regularize",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "attendance", "regularize"]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"date\": \"{{attendanceDate}}\",\n  \"punchInTime\": \"09:30\",\n  \"punchOutTime\": \"18:30\",\n  \"reason\": \"Forgot to Punch\",\n  \"remarks\": \"Biometric did not capture\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "Employee only, for yourself. Same times as HR Mark Attendance, but it does not mark the day yet.\nToday or a previous date. Send the punch you missed (in, out, or both).\nStatus stays Pending until approved. One pending request per day.\nReason comes from the Regularization Reason master (Forgot to Punch, Biometric Issue, …).\nTest script saves `_id` into {{regularizationId}}."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const j = pm.response.json();",
+                      "const id = j.request && j.request._id;",
+                      "if (id) pm.collectionVariables.set('regularizationId', id);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "7. My Regularization Requests",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/attendance/regularize?status=ALL&page=1&limit=20",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "attendance", "regularize"],
+                  "query": [
+                    {
+                      "key": "status",
+                      "value": "ALL",
+                      "description": "ALL | Pending | Approved | Rejected | Cancelled"
+                    },
+                    {
+                      "key": "from",
+                      "value": "{{fromDate}}",
+                      "disabled": true
+                    },
+                    {
+                      "key": "to",
+                      "value": "{{toDate}}",
+                      "disabled": true
+                    },
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "20" }
+                  ]
+                },
+                "description": "Your own regularization list: sheet date, in/out, reason, remarks, submit date, status Pending / Approved / Rejected."
+              }
+            },
+            {
+              "name": "8. Cancel Regularization",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/attendance/regularize/{{regularizationId}}/cancel",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "attendance", "regularize", "{{regularizationId}}", "cancel"]
+                },
+                "description": "Withdraw your own Pending request. Approved or rejected requests cannot be cancelled."
+              }
             }
           ]
         },
@@ -6213,6 +7249,98 @@
                   ]
                 },
                 "description": "\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+              }
+            }
+          ]
+        },
+        {
+          "name": "2.4 Leave",
+          "description": "Employee self-service leave. Login as Employee first (2.1 → 1).\nGET /me is the dashboard: balances, applied (pending + rejected), approved.\nApply holds remaining. Cancel of a pending request puts the days back.",
+          "item": [
+            {
+              "name": "1. My Leave",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/leave/me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "leave",
+                    "me"
+                  ]
+                },
+                "description": "Wallet for the current leave year (April–March), plus applied and approved requests.\ndisplay on each balance is remaining/total."
+              }
+            },
+            {
+              "name": "2. Apply Leave",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/leave/requests",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "leave",
+                    "requests"
+                  ]
+                },
+                "description": "Applies for the logged-in employee. Do not send employeeId.\nfrom / to = YYYY-MM-DD inside the current leave year. Half Day = one date, 0.5 day.\nSaves {{leaveRequestId}}.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"leaveTypeId\": \"{{leaveTypeId}}\",\n  \"from\": \"2026-10-20\",\n  \"to\": \"2026-10-20\",\n  \"dayType\": \"Full Day\",\n  \"reason\": \"Personal work\",\n  \"document\": \"\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const j = pm.response.json();",
+                      "const row = j.data && !Array.isArray(j.data) ? j.data : (j.data || [])[0];",
+                      "if (row && row._id) pm.collectionVariables.set('leaveRequestId', row._id);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "3. Cancel Leave",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/leave/requests/{{leaveRequestId}}/cancel",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "leave",
+                    "requests",
+                    "{{leaveRequestId}}",
+                    "cancel"
+                  ]
+                },
+                "description": "Cancels your own pending request and releases the held days."
               }
             }
           ]
@@ -6412,6 +7540,22 @@
     {
       "key": "attendanceMonth",
       "value": "2026-10"
+    },
+    {
+      "key": "regularizationId",
+      "value": ""
+    },
+    {
+      "key": "leaveTypeId",
+      "value": ""
+    },
+    {
+      "key": "leaveRequestId",
+      "value": ""
+    },
+    {
+      "key": "leavePolicyId",
+      "value": ""
     }
   ]
 }

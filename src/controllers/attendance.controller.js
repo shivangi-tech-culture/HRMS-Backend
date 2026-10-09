@@ -56,6 +56,7 @@ const {
   EMPLOYEE,
   isTeamScopedRole,
 } = require("../config/roles");
+const { resolveDisplayedStatus } = require("../utils/attendanceDayStatus");
 
 /**
  * Who can approve/reject attendance remarks:
@@ -81,8 +82,8 @@ const assertSelfSource = (source) => {
 };
 
 /**
- * Copy worked / late / early minutes after punch-out.
- * Day status stays Present once the employee has punched in.
+ * Hours and day status from the employee's shift.
+ * Punch in only → MissedPunch. Punch out → Present or HalfDay.
  */
 const applyMetrics = (record, shift) => {
   const metrics = computeDayMetrics(record, shift, record.date);
@@ -90,7 +91,7 @@ const applyMetrics = (record, shift) => {
   record.overtimeMinutes = metrics.overtimeMinutes;
   record.lateByMinutes = metrics.lateByMinutes;
   record.earlyByMinutes = metrics.earlyByMinutes;
-  if (record.punchIn) record.status = "Present";
+  record.status = metrics.status;
   return metrics;
 };
 
@@ -188,8 +189,8 @@ const punchIn = async (req, res) => {
     record.lateByMinutes = windowCheck.isLate ? windowCheck.lateByMinutes || 0 : 0;
     record.earlyByMinutes = windowCheck.isEarly ? windowCheck.earlyByMinutes || 0 : 0;
     record.reviewReason = "";
-    // Day stays Present. attendanceStatus follows punch-in vs shift start.
-    record.status = "Present";
+    // Not Present yet. Missed punch until they punch out against this shift.
+    record.status = "MissedPunch";
     record.remarks = remarks;
     if (windowCheck.isLate) {
       record.remarks = remarks || DEFAULT_LATE_REMARK;
@@ -207,10 +208,10 @@ const punchIn = async (req, res) => {
     );
 
     const punchInMessage = windowCheck.isLate
-      ? "Punched in late — marked Present"
+      ? "Punched in late — Missed punch until punch out"
       : windowCheck.isEarly
-        ? "Punched in (early — before shift start, allowed)"
-        : "Punched in on time (within grace)";
+        ? "Punched in early — Missed punch until punch out"
+        : "Punched in — Missed punch until punch out";
 
     return res.status(201).json(
       punchPayload(punchInMessage, { company, branch, shift, record })
@@ -273,7 +274,7 @@ const punchOut = async (req, res) => {
     record.punchOutSource = source;
     record.punchOutLocation = location;
     applyRemarkOnPunch(record, remarks);
-    applyMetrics(record, shift);
+    applyMetrics(record, shift); // Present or HalfDay from this shift, only because punch out is set
     if (record.attendanceStatus !== "Approved" && record.attendanceStatus !== "Rejected") {
       const arrived = punchInWindow(
         record.punchIn ? minutesOfDay(record.punchIn) : null,
@@ -292,7 +293,6 @@ const punchOut = async (req, res) => {
         if (record.remarks === DEFAULT_LATE_REMARK) record.remarks = "";
       }
     }
-    record.status = "Present";
     await record.save();
 
     await record.populate(
@@ -337,8 +337,8 @@ const myToday = async (req, res) => {
         }
       }
       applyPlacement(record, { company, branch, shift });
-      if (record.punchIn && record.status !== "Present") {
-        record.status = "Present";
+      if (record.punchIn && !record.punchOut && record.status !== "MissedPunch") {
+        record.status = "MissedPunch";
         dirty = true;
       }
       if (record.punchIn && record.punchOut) {
@@ -405,7 +405,7 @@ const listWebPunches = async (req, res) => {
           _id: `${r._id}-in`,
           attendanceId: r._id,
           employee,
-          status: r.status,
+          status: r.punchIn && !r.punchOut ? "MissedPunch" : r.status,
           punchTime: r.punchIn,
           punchMode: "IN",
           punchType: r.punchInSource === "manual" ? "Manual" : "Work From Office",
@@ -421,7 +421,7 @@ const listWebPunches = async (req, res) => {
           _id: `${r._id}-out`,
           attendanceId: r._id,
           employee,
-          status: r.status,
+          status: r.punchIn && !r.punchOut ? "MissedPunch" : r.status,
           punchTime: r.punchOut,
           punchMode: "OUT",
           punchType: r.punchOutSource === "manual" ? "Manual" : "Work From Office",
@@ -656,6 +656,8 @@ const applyLateStatus = (att, timing) => {
 
   if (!att?.punchIn) {
     status = "Absent";
+  } else if (!att?.punchOut) {
+    status = "MissedPunch";
   } else {
     status = "Present";
     if (reviewed) attendanceStatus = att.attendanceStatus;
@@ -671,6 +673,7 @@ const applyLateStatus = (att, timing) => {
   const persist =
     att?._id &&
     Boolean(att?.punchIn) &&
+    Boolean(att?.punchOut) &&
     !reviewed &&
     (att.attendanceStatus !== attendanceStatus ||
       att.status !== "Present" ||
@@ -689,6 +692,12 @@ const applyLateStatus = (att, timing) => {
     remarks,
     defaultRemark: needsReview && !written ? DEFAULT_LATE_REMARK : "",
   };
+};
+
+/** Pending / approved / rejected regularization for this day, latest per employee. */
+const loadRegularizationMap = (employeeIds, date) => {
+  const { loadLatestRegularization } = require("./regularization.controller");
+  return loadLatestRegularization(employeeIds, date);
 };
 
 const queueLateFixes = (fixes) => {
@@ -714,7 +723,7 @@ const lateFixOp = (att, late) => {
 };
 
 /** Lean daily / calendar row — table columns only, no duplicate fields */
-const buildDailyRow = (emp, att, date, maps) => {
+const buildDailyRow = (emp, att, date, maps, reg) => {
   const companyId = oid(att?.companyId) || userCompanyIds(emp)[0] || "";
   const branchId = oid(att?.branchId) || oid(emp.official?.branchId);
   const shiftId = oid(att?.shift) || oid(emp.official?.shiftId);
@@ -722,6 +731,7 @@ const buildDailyRow = (emp, att, date, maps) => {
   const late = applyLateStatus(att, timing);
   const worked = Number(att?.workedMinutes) || 0;
   const overtime = overtimeAfterShiftEnd(att?.punchOut, timing?.endTime);
+  const status = resolveDisplayedStatus({ att, reg, lateStatus: late.status });
 
   return {
     row: {
@@ -736,7 +746,7 @@ const buildDailyRow = (emp, att, date, maps) => {
       workingHours: formatDurationLabel(worked),
       overtime: formatDurationLabel(overtime),
       overtimeMinutes: overtime,
-      status: late.status,
+      status,
       workMode: att?.workMode || "WFO",
       verification: att?.punchInSource || null,
       isLate: late.isLate,
@@ -747,6 +757,9 @@ const buildDailyRow = (emp, att, date, maps) => {
       attendanceStatus: late.attendanceStatus,
       reviewReason: String(att?.reviewReason || "").trim(),
       canApproveReject: late.canApproveReject,
+      awaitingPunchOut: Boolean(att?.punchIn) && !att?.punchOut && status === "MissedPunch",
+      regularizationStatus: reg?.status || null,
+      regularizationId: reg?._id || null,
     },
     late,
   };
@@ -785,18 +798,22 @@ const emptyDailySummary = () => ({
   halfDay: 0,
   working: 0,
   pending: 0,
+  missedPunch: 0,
+  rejected: 0,
 });
 
 const tallyDailySummary = (summary, row) => {
   summary.all += 1;
   if (row.status === "Present") summary.present += 1;
-  else if (row.status === "Absent") summary.absent += 1;
+  else if (row.status === "Absent" || row.status === "Rejected") summary.absent += 1;
   else if (row.status === "OnLeave") summary.onLeave += 1;
   else if (row.status === "HalfDay") summary.halfDay += 1;
   else if (row.status === "Working") summary.working += 1;
-  if (row.status === "Late" || row.isLate) summary.late += 1;
+  else if (row.status === "MissedPunch") summary.missedPunch += 1;
+  if (row.status === "Rejected") summary.rejected += 1;
+  if (row.isLate && (row.status === "Present" || row.status === "Late")) summary.late += 1;
   if (row.status === "WFH" || row.workMode === "WFH") summary.wfh += 1;
-  if (row.canApproveReject || row.needsRemarkReview) summary.pending += 1;
+  if (row.status === "Pending" || row.canApproveReject || row.needsRemarkReview) summary.pending += 1;
 };
 
 const applyEmployeeSearch = (filter, search) => {
@@ -834,7 +851,7 @@ const passesDailyAttFilters = (row, q) => {
     if (s === "Late") {
       if (!(row.isLate || row.attendanceStatus === "Late")) return false;
     } else if (s === "Working") {
-      if (!(row.punchInTime && !row.punchOutTime)) return false;
+      if (row.status !== "Working") return false;
     } else if (s === "WFH") {
       if (!(row.status === "WFH" || row.workMode === "WFH")) return false;
     } else if (s === "Present") {
@@ -852,15 +869,18 @@ const passesDailyAttFilters = (row, q) => {
 /**
  * DAILY ATTENDANCE — GET /api/attendance/daily
  * Permission: Attendance → Daily Attendance → view
- * Always today. Filters: search, department, branchId, shiftId, workMode, status, companyId.
+ * ?date=YYYY-MM-DD (default today, previous dates allowed) and ?companyId=
+ * Punch in without punch out is MissedPunch until punch out or an approved regularization.
+ * A pending regularization shows Pending. Rejected stays Absent.
  * Super Admin / Admin: one company. No companyId → first created company.
  * HR: own assigned company (companyIds[0]), or another id only if assigned to them.
- * One row has every daily-table field: employee, code, department, shift,
- * punch in/out, working hours, status, verification, approve/reject.
  */
 const listDailyAttendance = async (req, res) => {
   try {
-    const date = today();
+    const date = String(req.query.date || "").trim() || today();
+    if (date > today()) {
+      return res.status(400).json({ message: "Date cannot be in the future" });
+    }
     const page = Number(req.query.page) || 1;
     const limit = Math.min(Number(req.query.limit) || 50, 200);
     const skip = (page - 1) * limit;
@@ -930,7 +950,7 @@ const listDailyAttendance = async (req, res) => {
         });
       }
 
-      const [pageAtt, allAtt] = await Promise.all([
+      const [pageAtt, allAtt, regByEmp] = await Promise.all([
         pageEmployees.length
           ? Attendance.find({
               employee: { $in: pageEmployees.map((e) => e._id) },
@@ -946,6 +966,7 @@ const listDailyAttendance = async (req, res) => {
               )
               .lean()
           : [],
+        loadRegularizationMap(empIds, date),
       ]);
 
       const maps = await loadDailyMaps(pageEmployees, pageAtt);
@@ -953,7 +974,7 @@ const listDailyAttendance = async (req, res) => {
       const lateFixes = [];
       const data = pageEmployees.map((emp) => {
         const att = byEmp.get(oid(emp._id));
-        const built = buildDailyRow(emp, att, date, maps);
+        const built = buildDailyRow(emp, att, date, maps, regByEmp.get(oid(emp._id)));
         if (built.late.persist && att) {
           lateFixes.push(lateFixOp(att, built.late));
         }
@@ -964,21 +985,40 @@ const listDailyAttendance = async (req, res) => {
       const summary = emptyDailySummary();
       const punched = new Set();
       for (const att of allAtt) {
-        punched.add(oid(att.employee));
+        const key = oid(att.employee);
+        punched.add(key);
         const reviewed =
           att.attendanceStatus === "Approved" || att.attendanceStatus === "Rejected";
         const isLate = (Number(att.lateByMinutes) || 0) > 0;
-        const status = att.punchIn ? "Present" : "Absent";
+        const reg = regByEmp.get(key);
+        const status = resolveDisplayedStatus({
+          att,
+          reg,
+          lateStatus: att.punchIn && att.punchOut ? "Present" : "Absent",
+        });
         tallyDailySummary(summary, {
           status,
           workMode: att.workMode || "WFO",
-          isLate,
-          canApproveReject: Boolean(att.punchIn) && isLate && !reviewed,
+          isLate: isLate && status === "Present",
+          canApproveReject:
+            status !== "Pending" && Boolean(att.punchIn) && isLate && !reviewed,
         });
       }
-      const absentExtra = Math.max(0, empIds.length - punched.size);
-      summary.absent += absentExtra;
-      summary.all += absentExtra;
+      for (const id of empIds) {
+        const key = oid(id);
+        if (punched.has(key)) continue;
+        const status = resolveDisplayedStatus({
+          att: null,
+          reg: regByEmp.get(key),
+          lateStatus: "Absent",
+        });
+        tallyDailySummary(summary, {
+          status,
+          workMode: "WFO",
+          isLate: false,
+          canApproveReject: false,
+        });
+      }
 
       return res.json({
         date,
@@ -1004,13 +1044,16 @@ const listDailyAttendance = async (req, res) => {
           .lean()
       : [];
     const byEmp = new Map(attendanceRows.map((r) => [oid(r.employee), r]));
-    const maps = await loadDailyMaps(employees, attendanceRows);
+    const [maps, regByEmp] = await Promise.all([
+      loadDailyMaps(employees, attendanceRows),
+      loadRegularizationMap(empIds, date),
+    ]);
 
     const lateFixes = [];
     const rows = [];
     for (const emp of employees) {
       const att = byEmp.get(oid(emp._id));
-      const built = buildDailyRow(emp, att, date, maps);
+      const built = buildDailyRow(emp, att, date, maps, regByEmp.get(oid(emp._id)));
       if (built.late.persist && att) {
         lateFixes.push(lateFixOp(att, built.late));
       }
@@ -1109,6 +1152,7 @@ const attendanceCalendar = async (req, res) => {
           onLeave: 0,
           wfh: 0,
           halfDay: 0,
+          missedPunch: 0,
           punched: 0,
         });
       }
@@ -1125,12 +1169,14 @@ const attendanceCalendar = async (req, res) => {
     for (const r of monthRecords) {
       const bucket = ensure(r.date);
       bucket.punched += 1;
-      if (r.status === "Present") bucket.present += 1;
-      else if (r.status === "Absent") bucket.absent += 1;
+      const openPunch = r.punchIn && !r.punchOut;
+      if (openPunch) bucket.missedPunch += 1;
       else if (r.status === "HalfDay") bucket.halfDay += 1;
       else if (r.status === "OnLeave") bucket.onLeave += 1;
       else if (r.status === "WFH" || r.workMode === "WFH") bucket.wfh += 1;
-      if (r.status === "Late" || (Number(r.lateByMinutes) || 0) > 0) bucket.late += 1;
+      else if (r.status === "Absent") bucket.absent += 1;
+      else if (r.punchIn && r.punchOut) bucket.present += 1;
+      if (!openPunch && (r.status === "Late" || (Number(r.lateByMinutes) || 0) > 0)) bucket.late += 1;
     }
 
     const days = [...byDate.values()]
@@ -1145,11 +1191,12 @@ const attendanceCalendar = async (req, res) => {
           onLeave: d.onLeave,
           wfh: d.wfh,
           halfDay: d.halfDay,
+          missedPunch: d.missedPunch,
         };
       })
       .sort((a, b) => a.date.localeCompare(b.date));
 
-    const summary = { present: 0, absent: 0, late: 0, onLeave: 0, wfh: 0, halfDay: 0 };
+    const summary = { present: 0, absent: 0, late: 0, onLeave: 0, wfh: 0, halfDay: 0, missedPunch: 0 };
     for (const d of days) {
       summary.present += d.present;
       summary.absent += d.absent;
@@ -1157,6 +1204,7 @@ const attendanceCalendar = async (req, res) => {
       summary.onLeave += d.onLeave;
       summary.wfh += d.wfh;
       summary.halfDay += d.halfDay;
+      summary.missedPunch += d.missedPunch;
     }
 
     const dayRows = listEmployees.length
@@ -1168,13 +1216,16 @@ const attendanceCalendar = async (req, res) => {
           .lean()
       : [];
     const byEmp = new Map(dayRows.map((r) => [oid(r.employee), r]));
-    const maps = await loadDailyMaps(listEmployees, dayRows);
+    const [maps, regByEmp] = await Promise.all([
+      loadDailyMaps(listEmployees, dayRows),
+      loadRegularizationMap(listEmployees.map((e) => e._id), date),
+    ]);
     const lateFixes = [];
     const rows = [];
     for (const emp of listEmployees) {
       const att = byEmp.get(oid(emp._id));
-      const built = buildDailyRow(emp, att, date, maps);
-      if (date > todayStr && !att?.punchIn) built.row.status = "";
+      const built = buildDailyRow(emp, att, date, maps, regByEmp.get(oid(emp._id)));
+      if (date > todayStr && !att?.punchIn && built.row.status !== "WeeklyOff") built.row.status = "";
       if (built.late.persist && att) lateFixes.push(lateFixOp(att, built.late));
       if (!rowFilterOn || passesDailyAttFilters(built.row, req.query)) rows.push(built.row);
     }
@@ -1302,21 +1353,17 @@ const markAttendance = async (req, res) => {
           record.attendanceStatus = "On time";
         }
       }
-      record.status = "Present";
     }
 
     if (punchOut) {
       record.punchOut = punchOut.at;
       record.punchOutSource = "manual";
-      const inMin = minutesOfDay(record.punchIn);
-      const outMin = minutesOfDay(record.punchOut);
-      record.workedMinutes = Math.max(0, outMin - inMin);
-      record.overtimeMinutes = overtimeAfterShiftEnd(record.punchOut, shift?.endTime);
-      record.status = "Present";
-    } else if (punchIn) {
-      record.workedMinutes = 0;
-      record.overtimeMinutes = 0;
     }
+
+    const metrics = computeDayMetrics(record, shift, date);
+    record.workedMinutes = metrics.workedMinutes;
+    record.overtimeMinutes = metrics.overtimeMinutes;
+    record.status = metrics.status;
 
     await record.save();
     await record.populate("employee", EMPLOYEE_CARD_SELECT);
@@ -1380,7 +1427,7 @@ const reviewRemark = async (req, res) => {
       return res.status(403).json({ message: scopeErr });
     }
 
-    record.status = "Present";
+    record.status = record.punchOut ? (record.status === "HalfDay" ? "HalfDay" : "Present") : "MissedPunch";
     record.attendanceStatus = decision === "approve" ? "Approved" : "Rejected";
     record.reviewReason = reason;
     record.remarkReviewedBy = req.user._id;
@@ -1439,4 +1486,5 @@ module.exports = {
   reviewRemark,
   resolveListCompanyId,
   applyListCompany,
+  scopedEmployeeFilter,
 };

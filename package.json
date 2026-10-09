@@ -8,6 +8,7 @@
     "dev": "nodemon --watch src src/server.js",
     "seed": "node src/seed.js",
     "seed:masters": "node src/scripts/seedMasters.js",
+    "seed:leave": "node src/scripts/seedLeave.js",
     "backfill:activity": "node src/scripts/backfillActivityCompanies.js"
   },
   "dependencies": {

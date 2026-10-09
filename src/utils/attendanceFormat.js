@@ -136,7 +136,7 @@ const formatAttendanceRecord = (record, extras = {}) => {
     punchInTime: formatPunchStamp(r.punchIn),
     punchOutTime: formatPunchStamp(r.punchOut),
     verification: r.punchInSource || null,
-    status: r.status || "",
+    status: r.punchIn && !r.punchOut ? "MissedPunch" : r.status || "",
     workMode: r.workMode || "WFO",
     workingHours: formatDurationLabel(worked),
     overtime: formatDurationLabel(overtime),

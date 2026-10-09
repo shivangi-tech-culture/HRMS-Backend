@@ -45,13 +45,14 @@ const webPunchQuerySchema = Joi.object({
   limit: Joi.number().integer().min(1).max(200).default(50),
 }).unknown(false);
 
-/** GET /api/attendance/daily — always today. No date param. */
+/** GET /api/attendance/daily — today, or a previous date with ?date=YYYY-MM-DD */
 const dailyQuerySchema = Joi.object({
+  date: dateStr.optional(),
   search: Joi.string().trim().allow("").max(100).optional(),
   department: Joi.string().trim().allow("", "ALL").optional(),
   branchId: Joi.alternatives().try(objectId, Joi.string().valid("ALL")).optional(),
   shiftId: Joi.alternatives().try(objectId, Joi.string().valid("ALL")).optional(),
-  companyId: Joi.alternatives().try(objectId, Joi.string().valid("ALL")).optional(),
+  companyId: Joi.alternatives().try(objectId, Joi.string().valid("ALL", "")).optional(),
   workMode: Joi.string().valid("WFO", "WFH", "Hybrid", "ALL").optional(),
   status: Joi.string()
     .valid(...DAY_STATUSES, "ALL")
@@ -132,6 +133,56 @@ const lateEarlyQuerySchema = Joi.object({
   limit: Joi.number().integer().min(1).max(200).default(10),
 }).unknown(false);
 
+const REQUEST_STATUSES = ["Pending", "Approved", "Rejected", "Cancelled", "ALL"];
+
+/** GET /api/attendance/timesheet */
+const timesheetQuerySchema = Joi.object({
+  month: Joi.string()
+    .pattern(/^\d{4}-\d{2}$/)
+    .optional(),
+  from: dateStr.optional(),
+  to: dateStr.optional(),
+  employeeId: objectId.optional(),
+}).unknown(false);
+
+/** POST /api/attendance/regularize — employee, self only. Same times as mark attendance. */
+const regularizeSchema = Joi.object({
+  date: dateStr.required().messages({
+    "any.required": "date is required",
+  }),
+  punchInTime: Joi.string().trim().allow("").optional(),
+  punchOutTime: Joi.string().trim().allow("").optional(),
+  reason: Joi.string().trim().min(1).max(200).required().messages({
+    "any.required": "reason is required",
+    "string.empty": "reason is required",
+  }),
+  remarks: Joi.string().trim().allow("").max(500).optional(),
+}).unknown(false);
+
+/** GET /api/attendance/regularize — own requests */
+const myRegularizeQuerySchema = Joi.object({
+  status: Joi.string()
+    .valid(...REQUEST_STATUSES)
+    .default("ALL"),
+  from: dateStr.optional(),
+  to: dateStr.optional(),
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(100).default(20),
+}).unknown(false);
+
+/** GET /api/attendance/regularizations — HR / manager / admin queue */
+const regularizationListQuerySchema = Joi.object({
+  status: Joi.string()
+    .valid(...REQUEST_STATUSES)
+    .default("Pending"),
+  search: Joi.string().trim().allow("").max(100).optional(),
+  companyId: Joi.alternatives().try(objectId, Joi.string().valid("ALL", "")).optional(),
+  from: dateStr.optional(),
+  to: dateStr.optional(),
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(100).default(20),
+}).unknown(false);
+
 module.exports = {
   punchSchema,
   webPunchQuerySchema,
@@ -140,5 +191,9 @@ module.exports = {
   remarkReviewSchema,
   markAttendanceSchema,
   lateEarlyQuerySchema,
+  timesheetQuerySchema,
+  regularizeSchema,
+  myRegularizeQuerySchema,
+  regularizationListQuerySchema,
   SELF_SOURCES,
 };
