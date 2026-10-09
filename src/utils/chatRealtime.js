@@ -1,7 +1,7 @@
 /**
  * CHAT REALTIME — Socket.IO pushes (io = req.app.get("io"))
  * Rooms: user:<User _id> (every tab of that person) · chat:<conversation _id> (open chat)
- * Events: message:new · inbox:update · chat:changed
+ * Events: message:new · inbox:update · chat:changed · receipt:update
  */
 
 /** New message: the open chat room gets the message, each other member gets an inbox update */
@@ -33,4 +33,12 @@ const notifyChatChanged = (io, employeeIds, conversationId) => {
   for (const id of employeeIds) io.to(`user:${id}`).emit("chat:changed", { conversationId });
 };
 
-module.exports = { broadcastMessage, closeRoom, notifyChatChanged };
+/** Messages delivered / seen: each sender gets { conversationId, deliveredUpTo, readUpTo } */
+const broadcastReceipts = (io, updates) => {
+  if (!io) return;
+  for (const { employeeId, receipt } of updates) {
+    io.to(`user:${employeeId}`).emit("receipt:update", receipt);
+  }
+};
+
+module.exports = { broadcastMessage, broadcastReceipts, closeRoom, notifyChatChanged };

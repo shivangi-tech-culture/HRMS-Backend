@@ -47,8 +47,10 @@ const chatUser = async (req, res, next) => {
  *       **Contacts:** Super Admin / Admin / HR → whole company · Reporting Manager → own team ·
  *       Employee → own Reporting Heads + company employees.
  *       **Socket.IO** on the API URL: `io(API_URL, { auth: { token, companyId } })`.
- *       Emits `chat:join`, `chat:leave`, `message:send`, `chat:read`; listens for
- *       `message:new`, `inbox:update`, `chat:changed`.
+ *       Emits `chat:join`, `chat:leave`, `message:send`, `chat:read`, `chat:delivered`; listens for
+ *       `message:new`, `inbox:update`, `chat:changed`, `receipt:update`.
+ *       **Ticks:** each conversation has `deliveredUpTo` / `readUpTo` — my messages with
+ *       `createdAt` at or before them are delivered / seen by every other member.
  */
 
 /**
@@ -102,7 +104,7 @@ router.get("/employees", listChatPeople);
  * /api/chat/conversations:
  *   get:
  *     tags: [Chat]
- *     summary: Chats visible to the user (newest first, with unreadCount)
+ *     summary: Chats visible to the user (newest first, with unreadCount, deliveredUpTo, readUpTo)
  *     security:
  *       - bearerAuth: []
  *     responses:
