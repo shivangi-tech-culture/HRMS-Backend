@@ -178,23 +178,24 @@ const sendMessage = async (user, conversationId, text, files = []) => {
   }
   conversation.lastMessage = previewOf(body, attachments);
   conversation.lastMessageAt = message.createdAt;
-  await conversation.save();
 
   const recipientIds = conversation.participantIds.filter((id) => id !== user.employeeId);
-  if (recipientIds.length > 0) {
-    await ChatReadState.bulkWrite(
-      recipientIds.map((employeeId) => ({
-        updateOne: {
-          filter: { conversationId: conversation._id, employeeId },
-          update: {
-            $inc: { unreadCount: 1 },
-            $setOnInsert: { companyId: conversation.companyId, lastReadAt: null },
+  await Promise.all([
+    conversation.save(),
+    recipientIds.length > 0 &&
+      ChatReadState.bulkWrite(
+        recipientIds.map((employeeId) => ({
+          updateOne: {
+            filter: { conversationId: conversation._id, employeeId },
+            update: {
+              $inc: { unreadCount: 1 },
+              $setOnInsert: { companyId: conversation.companyId, lastReadAt: null },
+            },
+            upsert: true,
           },
-          upsert: true,
-        },
-      }))
-    );
-  }
+        }))
+      ),
+  ]);
 
   return {
     message: toMessage(message),
