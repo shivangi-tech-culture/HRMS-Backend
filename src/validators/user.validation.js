@@ -308,6 +308,7 @@ const updateUserSchema = Joi.object({
   experience: listOrOne(experienceItem).optional(),
   visas: listOrOne(visaItem).optional(),
   payroll: payrollItem.optional(),
+  profileUrl: Joi.string().trim().uri().allow("", null).optional(),
 })
   .min(1)
   .unknown(false);
