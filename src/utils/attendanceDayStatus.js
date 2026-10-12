@@ -3,16 +3,16 @@
  * Punch in without punch out is MissedPunch. Present only after punch out.
  * The screen follows punch-out and the regularization request.
  *
- * Pending request → Pending (not Present).
- * Rejected, and the day is not fully punched → Rejected (day stays absent).
- * Approved request, or both punches exist → the shift result (Present, Late, HalfDay, or Absent).
- * Punch in without punch out, and nobody has approved → MissedPunch.
+ * Pending request → Pending.
+ * Rejected request on a closed day → Rejected.
+ * Approved request, and both punches exist → Present, Late, EarlyLeave, HalfDay, or Absent.
+ * Punch in without punch out → MissedPunch.
  */
 const resolveDisplayedStatus = ({ att, reg, lateStatus } = {}) => {
   const closed = Boolean(att?.punchIn) && Boolean(att?.punchOut);
   const open = Boolean(att?.punchIn) && !att?.punchOut;
   const regStatus = reg?.status || "";
-  const shiftStatus = ["Present", "Late", "HalfDay", "Absent", "WeeklyOff", "Holiday", "OnLeave"].includes(
+  const shiftStatus = ["Present", "Late", "EarlyLeave", "HalfDay", "Absent", "WeeklyOff", "Holiday", "OnLeave"].includes(
     lateStatus
   )
     ? lateStatus
@@ -20,7 +20,7 @@ const resolveDisplayedStatus = ({ att, reg, lateStatus } = {}) => {
 
   if (open) return "MissedPunch";
   if (regStatus === "Pending") return "Pending";
-  if (regStatus === "Rejected" && !closed) return "Rejected";
+  if (regStatus === "Rejected") return "Rejected";
   if (closed) return shiftStatus;
   return "Absent";
 };

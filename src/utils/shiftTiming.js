@@ -398,25 +398,33 @@ const countedWorkedMinutes = (inMin, outMin, startMin) => {
   return Math.max(0, outMin - countedIn);
 };
 
+/** At least 5 counted hours, then left more than 1 hour before shift end. */
+const HALF_DAY_MINUTES = 5 * 60;
+
+/** Left inside this window before shift end, after 5 hours, is Early Leave. */
+const EARLY_LEAVE_MINUTES = 60;
+
 /**
- * Day status after both punches, from the shift clock.
- * - Punch-out before the shift midpoint → Absent
- * - Punch-out after the midpoint but before shift end → HalfDay
- * - Punch-out at shift end or later → Present
- * - That Present day is Late when punch-in is after shift start + grace
- * A scheduled half-day stays HalfDay once they clear the absent line.
- * Coming late and still leaving at shift end is Late, not Half Day.
+ * Day status after both punches. Shift 10:00–19:00:
+ * - out at 19:00, in on time or early → Present
+ * - out at 19:00, in after grace → Late
+ * - out at 18:00 after 5 hours → EarlyLeave
+ * - out at 16:00 after 5 hours → HalfDay
+ * - out at 10:02, 10:15, or 12:00–16:00 (under 5 hours) → Absent
+ * Hours before shift start are not counted.
  */
-const statusFromShiftSpan = (outMin, startMin, endMin, scheduledHalfDay) => {
-  const span = Math.max(0, endMin - startMin);
-  const halfMark = startMin + Math.floor(span / 2);
-  if (outMin < halfMark) {
+const statusFromShiftSpan = (outMin, endMin, workedMinutes, scheduledHalfDay) => {
+  if (outMin >= endMin) {
+    if (scheduledHalfDay) return { statusCode: "HD", status: "HalfDay" };
+    return { statusCode: "P", status: "Present" };
+  }
+  if (workedMinutes < HALF_DAY_MINUTES) {
     return { statusCode: "A", status: "Absent" };
   }
-  if (scheduledHalfDay || outMin < endMin) {
-    return { statusCode: "HD", status: "HalfDay" };
+  if (outMin >= endMin - EARLY_LEAVE_MINUTES) {
+    return { statusCode: "ELE", status: "EarlyLeave" };
   }
-  return { statusCode: "P", status: "Present" };
+  return { statusCode: "HD", status: "HalfDay" };
 };
 
 /**
@@ -479,7 +487,7 @@ const computeDayMetrics = (record, shift, dateStr, holidayMap = {}) => {
   const earlyByMinutes = Math.max(0, end - outMin);
   const overtimeMinutes = Math.max(0, outMin - end);
   const shortDay = end - start > 0 && end - start <= 5 * 60;
-  const closed = statusFromShiftSpan(outMin, start, end, type === "halfDay" || shortDay);
+  const closed = statusFromShiftSpan(outMin, end, workedMinutes, type === "halfDay" || shortDay);
   const late = lateByMinutes > 0 && closed.status === "Present";
 
   return {

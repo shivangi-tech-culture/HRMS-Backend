@@ -14,14 +14,10 @@
  * GET    /calendar              ?month=YYYY-MM&date=YYYY-MM-DD  (month counts + that day's rows)
  * GET    /late-early            ?type=late|early&date=
  * GET    /late-early/:id        one record (same late/early numbers as the list)
- * POST   /mark                  { employeeId, date, punchInTime?, punchOutTime?, reason, remarks? }
- *                        Missed punch only. Does not change employee assignment.
- * POST   /:id/review?decision=approve|reject   body: { reason }
- *                        One API. Late only. Day stays Present.
  *
  * ─── EMPLOYEE TIMESHEET + REGULARIZATION ─────────────────────
  * GET    /timesheet            ?month=YYYY-MM | from=&to=  optional employeeId
- * POST   /regularize           self only. Same body as mark, without employeeId.
+ * POST   /regularize           self only. Missed punch times, or a Late day reason.
  * GET    /regularize           own requests
  * POST   /regularize/:id/cancel
  * GET    /regularizations      HR / manager / admin / super admin queue
@@ -39,8 +35,6 @@ const {
   listWebPunches,
   listDailyAttendance,
   attendanceCalendar,
-  markAttendance,
-  reviewRemark,
 } = require("../controllers/attendance.controller");
 const {
   myTimesheet,
@@ -65,7 +59,6 @@ const {
   dailyQuerySchema,
   calendarQuerySchema,
   remarkReviewSchema,
-  markAttendanceSchema,
   lateEarlyQuerySchema,
   timesheetQuerySchema,
   regularizeSchema,
@@ -112,14 +105,6 @@ const needRegularizationReview = (req, res, next) => {
   if (ALL_ACCESS.includes(role) || hasGlobalCompanyAccess(req.user)) return next();
   const action = String(req.body.decision || "").toLowerCase() === "reject" ? "reject" : "approve";
   return checkPermission("Attendance", "Attendance Regularization", action)(req, res, next);
-};
-
-/** Approve or reject a late punch. Body.decision picks the permission. */
-const needRemarkReview = (req, res, next) => {
-  const role = normalizeRoleName(req.user?.role);
-  if (ALL_ACCESS.includes(role) || hasGlobalCompanyAccess(req.user)) return next();
-  const action = String(req.body.decision || "").toLowerCase() === "reject" ? "reject" : "approve";
-  return checkPermission("Attendance", "Daily Attendance", action)(req, res, next);
 };
 
 // ─── Employee self punch ─────────────────────────────────────
@@ -185,14 +170,6 @@ const attachReviewDecision = (req, _res, next) => {
   next();
 };
 
-router.post(
-  "/mark",
-  protect,
-  validate(markAttendanceSchema),
-  needAttendance("Daily Attendance", "create"),
-  markAttendance
-);
-
 // ─── Employee timesheet + regularization ─────────────────────
 
 router.get("/timesheet", protect, validateQuery(timesheetQuerySchema), needTimesheet, myTimesheet);
@@ -235,16 +212,6 @@ router.post(
   validate(remarkReviewSchema),
   needRegularizationReview,
   reviewRegularization
-);
-
-/** POST /api/attendance/:id/review?decision=approve|reject — body: { reason } */
-router.post(
-  "/:id/review",
-  protect,
-  attachReviewDecision,
-  validate(remarkReviewSchema),
-  needRemarkReview,
-  reviewRemark
 );
 
 module.exports = router;
