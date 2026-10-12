@@ -17,6 +17,7 @@ const {
   canSend,
   canViewConversation,
   isSupervisor,
+  peopleCards,
   teamDirectory,
 } = require("../utils/chatAccess");
 const { readChatFile, removeChatFiles, storeChatFiles } = require("../utils/chatFiles");
@@ -97,6 +98,22 @@ const viewerState = (row, viewerId, states) => {
   };
 };
 
+/** Direct chat the viewer is in → the other person's id, else "" */
+const peerIdOf = (row, viewerId) => {
+  if (row.type === "group") return "";
+  const ids = row.participantIds.map(String);
+  return ids.includes(viewerId) ? ids.find((id) => id !== viewerId) || "" : "";
+};
+
+/** Direct chats get `peer` (name card of the other person, null if they no longer exist) */
+const withPeers = async (rows, viewerId) => {
+  const cards = await peopleCards(rows.map((row) => peerIdOf(row, viewerId)));
+  return (row) => {
+    const peerId = peerIdOf(row, viewerId);
+    return peerId ? { peer: cards.get(peerId) || null } : {};
+  };
+};
+
 const toConversation = (row, userId, unreadCount = 0, extra = undefined) => {
   const participantIds = row.participantIds.map(String);
   const isGroup = row.type === "group";
@@ -162,11 +179,14 @@ const listVisibleConversations = async (user) => {
     if (await canViewConversation(user, row)) visible.push(row);
   }
 
-  const statesByChat = await readStatesOf(visible.map((row) => row._id));
+  const [statesByChat, peerOf] = await Promise.all([
+    readStatesOf(visible.map((row) => row._id)),
+    withPeers(visible, user.employeeId),
+  ]);
   return visible.map((row) => {
     const states = statesByChat.get(String(row._id)) || new Map();
     const { unreadCount, extra } = viewerState(row, user.employeeId, states);
-    return toConversation(row, user.employeeId, unreadCount, extra);
+    return toConversation(row, user.employeeId, unreadCount, { ...extra, ...peerOf(row) });
   });
 };
 
@@ -191,9 +211,16 @@ const openConversation = async (user, otherEmployeeId) => {
       conversation = await ChatConversation.findOne({ companyId, pairKey });
     }
   }
-  const states = (await readStatesOf([conversation._id])).get(String(conversation._id)) || new Map();
+  const [statesByChat, peerOf] = await Promise.all([
+    readStatesOf([conversation._id]),
+    withPeers([conversation], user.employeeId),
+  ]);
+  const states = statesByChat.get(String(conversation._id)) || new Map();
   const { unreadCount, extra } = viewerState(conversation, user.employeeId, states);
-  return toConversation(conversation, user.employeeId, unreadCount, extra);
+  return toConversation(conversation, user.employeeId, unreadCount, {
+    ...extra,
+    ...peerOf(conversation),
+  });
 };
 
 const listMessages = async (user, conversationId) => {

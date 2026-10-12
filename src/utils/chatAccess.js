@@ -108,6 +108,30 @@ const toPerson = (row, relation) => ({
   relation,
 });
 
+/**
+ * Name cards for chat members, even outside the viewer's contacts (e.g. HR who
+ * messaged an employee): employeeId → { employeeId, name, role, designation, department }
+ */
+const peopleCards = async (ids) => {
+  const unique = [...new Set(ids.map(String).filter(Boolean))];
+  if (unique.length === 0) return new Map();
+  const rows = await User.find({ _id: { $in: unique } })
+    .select("name role official.designation official.department")
+    .lean();
+  return new Map(
+    rows.map((row) => [
+      String(row._id),
+      {
+        employeeId: String(row._id),
+        name: row.name || "",
+        role: normalizeRoleName(row.role),
+        designation: row.official?.designation || "",
+        department: row.official?.department || "",
+      },
+    ])
+  );
+};
+
 const findPeople = (filter) =>
   User.find({ status: "Active", ...filter }).select(PERSON_SELECT).sort({ name: 1 }).lean();
 
@@ -228,6 +252,7 @@ module.exports = {
   chatUserFor,
   loadLoginUser,
   teamDirectory,
+  peopleCards,
   assertInTeam,
   canViewConversation,
   canSend,
