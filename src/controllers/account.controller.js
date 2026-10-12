@@ -16,6 +16,7 @@ const {
   permissionsForRole,
 } = require("../config/permissions");
 const { logEmployeeActivity } = require("../utils/activityLog");
+const { forgetProfileImage } = require("../middleware/upload");
 
 const LOCKED_ROLES = new Set(["Super Admin", "Admin"]);
 
@@ -62,7 +63,7 @@ const toProfilePayload = async (user, roleDoc) => {
     mobileNo: personal.mobileNo || "",
     workPhone: personal.workPhone || "",
     lastLogin: user.lastLogin || null,
-    avatar: user.avatar || null,
+    profileUrl: user.profileUrl || null,
     signedInAs: user.name || "",
     permissionCount: permLabel(roleDoc),
     catalog: roleDoc?.catalog || null,
@@ -113,11 +114,16 @@ const updateMyProfile = async (req, res) => {
       user.name = name;
     }
 
-    if (req.body.avatar !== undefined) {
-      user.avatar = req.body.avatar || null;
+    const previousProfileUrl =
+      req.body.profileUrl !== undefined ? String(user.profileUrl || "") : null;
+    if (req.body.profileUrl !== undefined) {
+      user.profileUrl = req.body.profileUrl ? String(req.body.profileUrl).trim() : "";
     }
 
     await user.save();
+    if (previousProfileUrl !== null) {
+      await forgetProfileImage(previousProfileUrl, user.profileUrl);
+    }
     await logEmployeeActivity({ actor: req.user, employee: user, action: "update", before });
 
     const roleDoc = await Role.findOne({ name: user.role }).lean();

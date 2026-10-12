@@ -43,7 +43,7 @@ const {
 const { filterValue } = require("../utils/userAccount");
 
 const USER_SELECT =
-  "name role status avatar official.officialEmail official.employeeCode official.companyIds official.department official.designation official.reportingHead1 official.reportingHead2";
+  "name role status profileUrl official.officialEmail official.employeeCode official.companyIds official.department official.designation official.reportingHead1 official.reportingHead2";
 
 /** User.find with the card fields + populated companies and reporting heads */
 const findCards = (filter) =>
@@ -63,7 +63,7 @@ const toCard = (u) => ({
   department: u.official?.department || "",
   designation: u.official?.designation || "",
   status: u.status || "Active",
-  avatar: u.avatar || null,
+  profileUrl: u.profileUrl || null,
   reportingHead1: headRef(u.official?.reportingHead1),
   reportingHead2: headRef(u.official?.reportingHead2),
 });

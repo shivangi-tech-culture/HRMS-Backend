@@ -1,6 +1,8 @@
 /**
  * UPLOAD MIDDLEWARE — multer (memory) → Cloudinary secure URL
- * Field "document", max 5 MB. Types: education | account | leave → hrms/<type>.
+ * Field "document", max 5 MB.
+ * Types: education | account | leave | profile → hrms/<type>.
+ * profile accepts images only (JPEG, PNG, WEBP, GIF).
  */
 const multer = require("multer");
 const path = require("path");
@@ -28,7 +30,9 @@ const allowed = new Set([
 ]);
 
 /** Allowed attachment kinds. Folder on Cloudinary is hrms/<type>. */
-const UPLOAD_TYPES = ["education", "account", "leave"];
+const UPLOAD_TYPES = ["education", "account", "leave", "profile"];
+
+const IMAGE_KINDS = new Set(["jpg", "png", "gif", "webp"]);
 
 /** Multer: single field "document", max 5 MB, memory storage */
 const uploadFile = multer({
@@ -77,10 +81,10 @@ const rejectFile = (message) => {
   return err;
 };
 
-/** Cloudinary folder: hrms/education, hrms/account, or hrms/leave */
+/** Cloudinary folder: hrms/education, hrms/account, hrms/leave, or hrms/profile */
 const folderFor = (type) => {
   const configured = (process.env.CLOUDINARY_FOLDER || "hrms").replace(/\/+$/, "");
-  const root = configured.replace(/\/(education|account|leave)$/, "") || "hrms";
+  const root = configured.replace(/\/(education|account|leave|profile)$/, "") || "hrms";
   return `${root}/${type}`;
 };
 
@@ -94,6 +98,10 @@ const uploadOptionsFor = (file, type = "education") => {
     throw rejectFile(
       "This file is not a valid PDF, image, Word, or Excel file"
     );
+  }
+
+  if (type === "profile" && !IMAGE_KINDS.has(kind)) {
+    throw rejectFile("Profile image must be JPEG, PNG, WEBP, or GIF");
   }
 
   if (kind === "pdf") {
@@ -155,10 +163,71 @@ const uploadToCloudinary = (file, type = "education") => {
   });
 };
 
+/** public_id from a Cloudinary delivery URL (extension stripped; images store it that way) */
+const publicIdFromUrl = (url) => {
+  let parsed;
+  try {
+    parsed = new URL(String(url || "").trim());
+  } catch {
+    return "";
+  }
+  const marker = "/upload/";
+  const at = parsed.pathname.indexOf(marker);
+  if (at < 0) return "";
+  let rest = decodeURIComponent(parsed.pathname.slice(at + marker.length));
+  rest = rest.replace(/^v\d+\//, "");
+  return rest.replace(/\.[a-z0-9]+$/i, "");
+};
+
+/** True when the URL is an image we stored under hrms/profile */
+const isProfileImageUrl = (url) => {
+  const publicId = publicIdFromUrl(url);
+  return Boolean(publicId && publicId.startsWith(`${folderFor("profile")}/`));
+};
+
+/** Remove one profile image from Cloudinary. Other folders are rejected. */
+const deleteProfileImage = async (url) => {
+  if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY) {
+    throw new Error(
+      "Cloudinary not configured. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET in .env"
+    );
+  }
+  const publicId = publicIdFromUrl(url);
+  if (!publicId || !publicId.startsWith(`${folderFor("profile")}/`)) {
+    throw rejectFile("Only a profile image uploaded to this app can be deleted");
+  }
+  const result = await cloudinary.uploader.destroy(publicId, {
+    resource_type: "image",
+    invalidate: true,
+  });
+  if (result?.result !== "ok" && result?.result !== "not found") {
+    throw new Error("Could not delete profile image");
+  }
+  return { publicId };
+};
+
+/**
+ * After profileUrl is replaced or cleared, drop the previous Cloudinary file.
+ * A failed delete does not fail the profile save.
+ */
+const forgetProfileImage = async (previous, next = "") => {
+  const prev = String(previous || "").trim();
+  const nxt = String(next || "").trim();
+  if (!prev || prev === nxt || !isProfileImageUrl(prev)) return;
+  try {
+    await deleteProfileImage(prev);
+  } catch (err) {
+    console.error("Profile image delete failed:", err.message || err);
+  }
+};
+
 module.exports = {
   UPLOAD_TYPES,
   uploadFile,
   uploadToCloudinary,
+  deleteProfileImage,
+  forgetProfileImage,
+  isProfileImageUrl,
   folderFor,
   cloudinary,
 };

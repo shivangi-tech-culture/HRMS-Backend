@@ -12,22 +12,37 @@
  *   POST /api/attendance/regularizations/:id/review?decision=approve|reject   { reason }
  *
  * Pending  → timesheet + daily show Pending
- * Approved → punches are saved, day becomes Present
- * Rejected → no punches saved, day stays Absent
+ * Approved → missing punches are saved, or a Late day is accepted
+ * Rejected → requested punches are not saved
+ *
+ * No punch-out stays Missed Punch.
+ * A Late day is not approved on the attendance row. The employee sends
+ * POST /regularize, then Reporting Manager, HR, or Super Admin reviews it.
  */
 const mongoose = require("mongoose");
 const Attendance = require("../models/Attendance");
 const AttendanceRegularization = require("../models/AttendanceRegularization");
+const LeaveRequest = require("../models/LeaveRequest");
+const Company = require("../models/Company");
 const User = require("../models/User");
+const { getModel } = require("../models/Master");
 const {
   todayDate,
   getAssignedShift,
   normalizeHm,
   minutesOfDay,
   formatPunchStamp,
+  dayScheduleOf,
+  sameDayClock,
+  parseHm,
+  punchInWindow,
+  computeDayMetrics,
+  countedWorkedMinutes,
+  DEFAULT_SHIFT,
 } = require("../utils/shiftTiming");
 const { resolveDisplayedStatus } = require("../utils/attendanceDayStatus");
 const { shiftDbId, formatDurationLabel } = require("../utils/attendanceFormat");
+const { companyMonthOf, monthStartForUser } = require("../utils/leaveBalance");
 const { userCompanyIds } = require("../utils/companyScope");
 const { assertTeamOrCompanyEmployee } = require("../utils/teamScope");
 const { normalizeRoleName, EMPLOYEE } = require("../config/roles");
@@ -91,6 +106,123 @@ const eachDate = (from, to) => {
   return dates;
 };
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+const oid = (value) => {
+  if (value === undefined || value === null || value === "") return "";
+  return String(value._id || value).trim();
+};
+
+/** "09:30" on 2026-10-10 → "10 Oct 09:30" */
+const clockLabel = (date, hm) => {
+  if (!hm) return "";
+  const [, month, day] = String(date).split("-");
+  return `${Number(day)} ${MONTHS[Number(month) - 1] || ""} ${hm}`.trim();
+};
+
+/** Minutes → "09:00". Empty day is "00:00", matching the timesheet grid. */
+const workedClock = (mins) => {
+  const n = Math.max(0, Math.round(Number(mins) || 0));
+  const h = Math.floor(n / 60);
+  const m = n % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+};
+
+const STATUS_CODE = {
+  Present: "P",
+  Late: "L",
+  Absent: "A",
+  MissedPunch: "MP",
+  WeeklyOff: "WO",
+  Holiday: "H",
+  HalfDay: "HD",
+  Pending: "Pending",
+  Rejected: "Rejected",
+};
+
+/**
+ * Company attendance month.
+ * Start day 1 → the 1st through the last day.
+ * Start day 24 → the 24th of the previous month through the 23rd (labeled by the ending month).
+ */
+const timesheetRange = async (employee, query) => {
+  const askedMonth = /^\d{4}-\d{2}$/.test(query.month || "") ? query.month : "";
+  if (query.from || query.to) {
+    const month = askedMonth || (query.from || query.to || today()).slice(0, 7);
+    const range = monthRange(month);
+    return {
+      month,
+      label: monthLabel(month),
+      from: query.from || range.from,
+      to: query.to || range.to,
+    };
+  }
+  const month = askedMonth || today().slice(0, 7);
+  const cycle = await monthStartForUser(employee);
+  const anchor =
+    cycle.monthStartDay === 1
+      ? `${month}-01`
+      : `${month}-${String(Math.min(cycle.monthEndDay, 28)).padStart(2, "0")}`;
+  const period = companyMonthOf(anchor, cycle);
+  return { month, label: monthLabel(month), from: period.start, to: period.end };
+};
+
+const monthLabel = (month) => {
+  const [year, m] = String(month).split("-");
+  return `${(MONTHS[Number(m) - 1] || "").toUpperCase()}-${year}`;
+};
+
+const loadShiftSchedule = async (employee) => {
+  const companyId = userCompanyIds(employee)[0] || null;
+  const branchId = oid(employee.official?.branchId);
+  const shiftId = oid(employee.official?.shiftId);
+  const [company, shiftMaster] = await Promise.all([
+    companyId
+      ? Company.findById(companyId)
+          .select("branches.branchId branches.shifts.shiftId branches.shifts.isActive branches.shifts.monthlySchedule")
+          .lean()
+      : null,
+    shiftId ? getModel("shift").findById(shiftId).select("name code").lean() : null,
+  ]);
+  const branch = (company?.branches || []).find((row) => oid(row.branchId) === branchId);
+  const shift = (branch?.shifts || []).find(
+    (row) => oid(row.shiftId) === shiftId && row.isActive !== false
+  );
+  return {
+    name: shiftMaster?.name || DEFAULT_SHIFT.name,
+    code: shiftMaster?.code || "",
+    monthlySchedule: shift?.monthlySchedule || [],
+    assigned: Boolean(shift),
+  };
+};
+
+const dayTiming = (schedule, date) => {
+  const row = schedule.assigned ? dayScheduleOf(schedule.monthlySchedule, date) : null;
+  if (!row) {
+    const off = (DEFAULT_SHIFT.weeklyOffDays || []).includes(
+      new Date(`${date}T12:00:00+05:30`).getUTCDay()
+    );
+    return { isOff: off, startTime: off ? "" : DEFAULT_SHIFT.startTime, endTime: off ? "" : DEFAULT_SHIFT.endTime };
+  }
+  if (row.isOff) return { isOff: true, startTime: "", endTime: "" };
+  const clock = sameDayClock(row.startTime, row.endTime);
+  return { isOff: false, startTime: clock.startTime || DEFAULT_SHIFT.startTime, endTime: clock.endTime || DEFAULT_SHIFT.endTime };
+};
+
+const leaveUnits = (leave) => (leave?.dayType === "Half Day" ? 0.5 : 1);
+
+const leavesOnDates = (rows, from, to) => {
+  const map = new Map();
+  for (const leave of rows) {
+    const start = leave.from > from ? leave.from : from;
+    const end = leave.to < to ? leave.to : to;
+    for (const date of eachDate(start, end)) {
+      if (!map.has(date)) map.set(date, leave);
+    }
+  }
+  return map;
+};
+
 /** Latest request per employee for one day. Daily attendance uses this. */
 const loadLatestRegularization = async (employeeIds, date) => {
   const ids = (employeeIds || []).filter(Boolean);
@@ -112,19 +244,22 @@ const loadLatestRegularization = async (employeeIds, date) => {
 };
 
 const readTimes = (date, body) => {
-  const punchIn = String(body.punchInTime || "").trim()
-    ? clockOnDate(date, body.punchInTime, "Punch in")
-    : null;
-  const punchOut = String(body.punchOutTime || "").trim()
-    ? clockOnDate(date, body.punchOutTime, "Punch out")
-    : null;
-  if (!punchIn && !punchOut) return { error: "punchInTime or punchOutTime is required" };
+  const inRaw = String(body.punchInTime || "").trim();
+  const outRaw = String(body.punchOutTime || "").trim();
+  const punchIn = inRaw ? clockOnDate(date, body.punchInTime, "Punch in") : null;
+  const punchOut = outRaw ? clockOnDate(date, body.punchOutTime, "Punch out") : null;
   if (punchIn?.error) return punchIn;
   if (punchOut?.error) return punchOut;
-  return { punchIn, punchOut };
+  return { punchIn, punchOut, hasTimes: Boolean(punchIn || punchOut) };
 };
 
-/** Copy the requested times onto the attendance row and mark the day Present. */
+/** Both punches exist and the day is Late, still waiting for regularization. */
+const isOpenLateDay = (record) =>
+  Boolean(record?.punchIn && record?.punchOut) &&
+  (record.status === "Late" || record.attendanceStatus === "Late") &&
+  record.attendanceStatus !== "Approved";
+
+/** Copy requested punches, or accept an existing Late day. */
 const saveApprovedDay = async (request, actorId) => {
   const employeeId = request.employee._id || request.employee;
   const date = request.date;
@@ -134,6 +269,10 @@ const saveApprovedDay = async (request, actorId) => {
   const { shift, company, branch } = await getAssignedShift(employeeId, date);
   let record = await Attendance.findOne({ employee: employeeId, date });
   if (!record) record = new Attendance({ employee: employeeId, date });
+
+  if (!times.hasTimes && !isOpenLateDay(record)) {
+    return { error: "punchInTime or punchOutTime is required" };
+  }
 
   if (times.punchIn && !record.punchIn) {
     record.punchIn = times.punchIn.at;
@@ -152,15 +291,26 @@ const saveApprovedDay = async (request, actorId) => {
   if (branch?._id) record.branchId = branch._id;
   const shiftId = shiftDbId(shift);
   if (shiftId) record.shift = shiftId;
+
   if (record.punchIn && record.punchOut) {
-    record.workedMinutes = Math.max(0, minutesOfDay(record.punchOut) - minutesOfDay(record.punchIn));
-    record.status = "Present";
+    const acceptLate = isOpenLateDay(record) || record.attendanceStatus === "Late";
+    const metrics = computeDayMetrics(record, shift, date);
+    record.workedMinutes = metrics.workedMinutes;
+    record.overtimeMinutes = metrics.overtimeMinutes;
+    record.lateByMinutes = metrics.lateByMinutes;
+    record.earlyByMinutes = metrics.earlyByMinutes;
+    record.status = metrics.status;
+    if (metrics.status === "Late" || acceptLate) {
+      record.attendanceStatus = "Approved";
+    }
   } else if (record.punchIn) {
     record.status = "MissedPunch";
   }
   record.markedBy = actorId;
   record.markReason = request.reason || "";
   record.regularizationId = request._id;
+  record.remarkReviewedBy = actorId;
+  record.remarkReviewedAt = new Date();
   if (request.remarks) record.remarks = request.remarks;
   await record.save();
   return { record };
@@ -197,16 +347,6 @@ const sendList = async (res, filter, query) => {
 /** GET /api/attendance/timesheet?month=YYYY-MM */
 const myTimesheet = async (req, res) => {
   try {
-    const askedMonth = /^\d{4}-\d{2}$/.test(req.query.month || "") ? req.query.month : "";
-    const range = monthRange(askedMonth || today().slice(0, 7));
-    const from = req.query.from || range.from;
-    const to = req.query.to || range.to;
-    const month = askedMonth || from.slice(0, 7);
-    if (from > to) return res.status(400).json({ message: "from cannot be after to" });
-    if (addDays(from, 61) < to) {
-      return res.status(400).json({ message: "Date range cannot be longer than 62 days" });
-    }
-
     const employee = await User.findById(req.query.employeeId || req.user._id).select(CARD);
     if (!employee || employee.status === "Deleted") {
       return res.status(404).json({ message: "Employee not found" });
@@ -219,45 +359,215 @@ const myTimesheet = async (req, res) => {
       if (scopeErr) return res.status(403).json({ message: scopeErr });
     }
 
-    const [attendance, requests] = await Promise.all([
+    const range = await timesheetRange(employee, req.query);
+    const { month, label, from, to } = range;
+    if (from > to) return res.status(400).json({ message: "from cannot be after to" });
+    if (addDays(from, 61) < to) {
+      return res.status(400).json({ message: "Date range cannot be longer than 62 days" });
+    }
+
+    const [attendance, requests, leaveRows, schedule] = await Promise.all([
       Attendance.find({ employee: employee._id, date: { $gte: from, $lte: to } }).lean(),
       AttendanceRegularization.find({ employee: employee._id, date: { $gte: from, $lte: to } })
         .sort({ createdAt: -1 })
         .lean(),
+      LeaveRequest.find({
+        employee: employee._id,
+        status: "Approved",
+        from: { $lte: to },
+        to: { $gte: from },
+      })
+        .populate("leaveType", "name code paid")
+        .lean(),
+      loadShiftSchedule(employee),
     ]);
     const attByDate = new Map(attendance.map((row) => [row.date, row]));
     const regByDate = new Map();
     for (const row of requests) if (!regByDate.has(row.date)) regByDate.set(row.date, row);
+    const leaveByDate = leavesOnDates(leaveRows, from, to);
 
-    const summary = { present: 0, absent: 0, missedPunch: 0, pending: 0, rejected: 0 };
+    const summary = {
+      present: 0,
+      absent: 0,
+      missedPunch: 0,
+      pending: 0,
+      rejected: 0,
+      daySummary: { monthDays: 0, workDays: 0, weeklyOffs: 0, holidays: 0 },
+      presentSummary: { presents: 0, countWeeklyOff: 0, countHoliday: 0, compensatoryOff: 0 },
+      leaves: {
+        lateArrivals: 0,
+        leaveForLs: 0,
+        lateEarlyCount: 0,
+        shortLeave: 0,
+        leavesForLs: 0,
+        unpaidLeave: 0,
+        lta: 0,
+        totalLeaves: 0,
+      },
+      absentLate: { absents: 0, lateByMinutes: 0, earlyByMinutes: 0, lateBy: "0h 0m", earlyBy: "0h 0m" },
+      payable: { salaryDays: 0 },
+    };
+    let salaryDays = 0;
+
     const data = eachDate(from, to).map((date) => {
       const att = attByDate.get(date) || null;
       const reg = regByDate.get(date) || null;
-      const status =
-        date > today() && !att?.punchIn
-          ? ""
-          : resolveDisplayedStatus({ att, reg, lateStatus: "Present" });
-      if (status === "Present") summary.present += 1;
-      else if (status === "MissedPunch") summary.missedPunch += 1;
+      const leave = leaveByDate.get(date) || null;
+      const timing = dayTiming(schedule, date);
+      const future = date > today() && !att?.punchIn;
+      const punched = Boolean(att?.punchIn);
+      const closed = punched && Boolean(att?.punchOut);
+      let shiftStatus = "Present";
+      let workedMinutes = Number(att?.workedMinutes) || 0;
+      if (closed && !timing.isOff && timing.startTime && timing.endTime) {
+        const metrics = computeDayMetrics(
+          att,
+          {
+            startTime: timing.startTime,
+            endTime: timing.endTime,
+            graceMinutes: DEFAULT_SHIFT.graceMinutes,
+            weeklyOffDays: [],
+            halfDayDays: [],
+          },
+          date
+        );
+        shiftStatus = metrics.status;
+        workedMinutes = metrics.workedMinutes;
+      } else if (closed) {
+        const startMin = parseHm(timing.startTime);
+        workedMinutes = countedWorkedMinutes(
+          minutesOfDay(att.punchIn),
+          minutesOfDay(att.punchOut),
+          startMin
+        );
+      }
+
+      let statusLabel = future
+        ? ""
+        : resolveDisplayedStatus({ att, reg, lateStatus: shiftStatus });
+
+      let lateBy = 0;
+      let earlyBy = 0;
+      if (closed && !timing.isOff && timing.startTime) {
+        const arrived = punchInWindow(
+          minutesOfDay(att.punchIn),
+          parseHm(timing.startTime),
+          DEFAULT_SHIFT.graceMinutes
+        );
+        lateBy = arrived.lateByMinutes;
+      }
+      if (closed && !timing.isOff && timing.endTime) {
+        const endMin = parseHm(timing.endTime);
+        const outMin = minutesOfDay(att.punchOut);
+        if (endMin != null) earlyBy = Math.max(0, endMin - outMin);
+      }
+
+      let dayDesc = timing.isOff ? "WeeklyOff" : "WorkDay";
+      let shift = timing.isOff ? "Weekly Off" : schedule.name;
+      if (timing.isOff && !punched) {
+        statusLabel = "WeeklyOff";
+      } else if (timing.isOff && closed) {
+        shift = schedule.name;
+        statusLabel = "Present";
+      }
+
+      const leaveCode = String(leave?.leaveType?.code || "").toUpperCase();
+      const onLeave = Boolean(leave) && !punched && !future && statusLabel !== "Pending";
+      if (onLeave) {
+        statusLabel = leave.leaveType?.name || "On Leave";
+        dayDesc = "Leave";
+        shift = schedule.name;
+      } else if (leave?.dayType === "Half Day" && (statusLabel === "Present" || statusLabel === "Late")) {
+        statusLabel = "HalfDay";
+      }
+
+      const status = onLeave ? leaveCode || "L" : STATUS_CODE[statusLabel] || statusLabel;
+      const units = leaveUnits(leave);
+
+      summary.daySummary.monthDays += 1;
+      if (timing.isOff && !onLeave) summary.daySummary.weeklyOffs += 1;
+      else summary.daySummary.workDays += 1;
+
+      if (status === "P" || status === "L") {
+        summary.present += 1;
+        summary.presentSummary.presents += 1;
+        salaryDays += 1;
+        if (timing.isOff) summary.presentSummary.countWeeklyOff += 1;
+      } else if (status === "HD") {
+        summary.present += 1;
+        summary.presentSummary.presents += 0.5;
+        salaryDays += 0.5;
+      } else if (status === "MP") summary.missedPunch += 1;
       else if (status === "Pending") summary.pending += 1;
-      else if (status === "Rejected") summary.rejected += 1;
-      else if (status === "Absent") summary.absent += 1;
+      else if (status === "Rejected") {
+        summary.rejected += 1;
+        summary.absent += 1;
+      } else if (status === "A") summary.absent += 1;
+      else if (status === "WO") salaryDays += 1;
+      else if (onLeave) {
+        summary.leaves.totalLeaves += units;
+        if (leave?.dayType === "Half Day") summary.leaves.shortLeave += units;
+        if (leave?.leaveType?.paid === false || leaveCode === "UL") summary.leaves.unpaidLeave += units;
+        else salaryDays += units;
+        if (leaveCode === "CO") summary.presentSummary.compensatoryOff += units;
+        if (leaveCode === "LTA") summary.leaves.lta += units;
+      }
+
+      if ((status === "P" || status === "L" || status === "HD") && lateBy > 0) {
+        summary.leaves.lateArrivals += 1;
+        summary.absentLate.lateByMinutes += lateBy;
+      }
+      if ((status === "P" || status === "L" || status === "HD") && (lateBy > 0 || earlyBy > 0)) {
+        summary.leaves.lateEarlyCount += 1;
+      }
+      if ((status === "P" || status === "L" || status === "HD") && earlyBy > 0) {
+        summary.absentLate.earlyByMinutes += earlyBy;
+      }
+
+      const punchInTime = formatPunchStamp(att?.punchIn);
+      const punchOutTime = formatPunchStamp(att?.punchOut);
+      const inTime = clockLabel(date, punchInTime);
+      const outTime = clockLabel(date, punchOutTime);
+      const canApply =
+        date <= today() &&
+        dayDesc === "WorkDay" &&
+        (status === "A" || status === "MP" || status === "L" || status === "Rejected") &&
+        reg?.status !== "Pending" &&
+        reg?.status !== "Approved";
+
       return {
         date,
         day: WEEKDAYS[new Date(`${date}T12:00:00+05:30`).getUTCDay()],
-        punchInTime: formatPunchStamp(att?.punchIn),
-        punchOutTime: formatPunchStamp(att?.punchOut),
-        hours: formatDurationLabel(att?.workedMinutes),
+        shift,
+        inTime,
+        outTime,
+        inOut: inTime && outTime ? `${inTime} - ${outTime}` : inTime || outTime || "—",
+        punchInTime,
+        punchOutTime,
+        workedHours: workedClock(workedMinutes),
+        hours: formatDurationLabel(workedMinutes),
         status,
+        statusLabel,
+        dayDesc,
+        canApply,
         requestStatus: reg?.status || "",
         reason: reg?.reason || "",
         remarks: reg?.remarks || att?.remarks || "",
+        lateByMinutes: lateBy,
+        earlyByMinutes: earlyBy,
       };
     });
 
+    summary.absentLate.absents = summary.absent;
+    summary.absentLate.lateBy = formatDurationLabel(summary.absentLate.lateByMinutes);
+    summary.absentLate.earlyBy = formatDurationLabel(summary.absentLate.earlyByMinutes);
+    summary.payable.salaryDays = Math.round(salaryDays * 10) / 10;
+    summary.presentSummary.presents = Math.round(summary.presentSummary.presents * 10) / 10;
+
     return res.json({
-      employee: person(employee),
+      employee: { ...person(employee), shift: schedule.name },
       month,
+      label,
       from,
       to,
       summary,
@@ -274,8 +584,6 @@ const requestRegularization = async (req, res) => {
   try {
     const date = req.body.date;
     if (date > today()) return res.status(400).json({ message: "Date cannot be in the future" });
-    const times = readTimes(date, req.body);
-    if (times.error) return res.status(400).json({ message: times.error });
 
     const employee = await User.findById(req.user._id).select(CARD);
     if (!employee || employee.status === "Deleted") {
@@ -283,32 +591,47 @@ const requestRegularization = async (req, res) => {
     }
 
     const existing = await Attendance.findOne({ employee: employee._id, date });
-    if (times.punchIn && existing?.punchIn) {
-      return res.status(400).json({ message: "Punch in is already marked for this day" });
+    if (existing?.punchIn && existing?.punchOut && existing.attendanceStatus === "Approved") {
+      return res.status(400).json({ message: "This late day is already approved" });
     }
-    if (times.punchOut && existing?.punchOut) {
-      return res.status(400).json({ message: "Punch out is already marked for this day" });
+    const lateDay = isOpenLateDay(existing);
+
+    const times = readTimes(date, req.body);
+    if (times.error) return res.status(400).json({ message: times.error });
+    if (!times.hasTimes && !lateDay) {
+      return res.status(400).json({ message: "punchInTime or punchOutTime is required" });
     }
-    if (times.punchOut && !existing?.punchIn && !times.punchIn) {
-      return res.status(400).json({ message: "Punch in is required before punch out" });
-    }
-    if (existing?.punchIn && existing?.punchOut) {
-      return res.status(400).json({ message: "Attendance for this day is already complete" });
+
+    if (!lateDay) {
+      if (times.punchIn && existing?.punchIn) {
+        return res.status(400).json({ message: "Punch in is already marked for this day" });
+      }
+      if (times.punchOut && existing?.punchOut) {
+        return res.status(400).json({ message: "Punch out is already marked for this day" });
+      }
+      if (times.punchOut && !existing?.punchIn && !times.punchIn) {
+        return res.status(400).json({ message: "Punch in is required before punch out" });
+      }
+      if (existing?.punchIn && existing?.punchOut) {
+        return res.status(400).json({ message: "Attendance for this day is already complete" });
+      }
     }
 
     const doc = await AttendanceRegularization.create({
       employee: employee._id,
       companyId: userCompanyIds(employee)[0] || null,
       date,
-      punchInTime: times.punchIn ? times.punchIn.hm : "",
-      punchOutTime: times.punchOut ? times.punchOut.hm : "",
+      punchInTime: lateDay ? "" : times.punchIn ? times.punchIn.hm : "",
+      punchOutTime: lateDay ? "" : times.punchOut ? times.punchOut.hm : "",
       reason: String(req.body.reason || "").trim(),
       remarks: String(req.body.remarks || "").trim(),
       status: "Pending",
     });
 
     return res.status(201).json({
-      message: "Request sent. It stays Pending until approved.",
+      message: lateDay
+        ? "Late request sent. Reporting Manager, HR, or Super Admin can approve it."
+        : "Request sent. It stays Pending until approved. Punch out is still Missed Punch until then.",
       request: toRow({ ...doc.toObject(), employee }),
     });
   } catch (err) {
@@ -404,12 +727,28 @@ const reviewRegularization = async (req, res) => {
     const scopeErr = assertTeamOrCompanyEmployee(req.user, request.employee);
     if (scopeErr) return res.status(403).json({ message: scopeErr });
 
+    let dayStatus = "";
     if (decision === "approve") {
       const saved = await saveApprovedDay(request, req.user._id);
       if (saved.error) return res.status(400).json({ message: saved.error });
       request.status = "Approved";
+      dayStatus = saved.record?.status || "";
     } else {
       request.status = "Rejected";
+      const record = await Attendance.findOne({
+        employee: request.employee._id,
+        date: request.date,
+      });
+      if (record && (record.status === "Late" || record.attendanceStatus === "Late")) {
+        record.attendanceStatus = "Rejected";
+        record.reviewReason = reason;
+        record.remarkReviewedBy = req.user._id;
+        record.remarkReviewedAt = new Date();
+        await record.save();
+        dayStatus = record.status;
+      } else if (record?.punchIn && !record?.punchOut) {
+        dayStatus = "MissedPunch";
+      }
     }
     request.reviewReason = reason;
     request.reviewedBy = req.user._id;
@@ -418,7 +757,14 @@ const reviewRegularization = async (req, res) => {
     await request.populate("reviewedBy", "name role official.officialEmail");
 
     return res.json({
-      message: decision === "approve" ? "Approved. Day is Present." : "Rejected. Day stays Absent.",
+      message:
+        decision === "approve"
+          ? `Approved. Day is ${dayStatus || "updated"}.`
+          : dayStatus === "MissedPunch"
+            ? "Rejected. Punch out is still Missed Punch."
+            : dayStatus
+              ? `Rejected. Day stays ${dayStatus}.`
+              : "Rejected.",
       request: toRow(request),
     });
   } catch (err) {

@@ -14,6 +14,7 @@ const {
   deleteSection,
   deleteEmployee,
   uploadAttachment,
+  deleteAttachment,
 } = require("../controllers/employee.controller");
 const { protect, authorize, ALL_ACCESS, hasAllAccess } = require("../middleware/auth");
 const {
@@ -25,6 +26,7 @@ const { uploadFile } = require("../middleware/upload");
 const {
   createEmployeeSchema,
   updateUserSchema,
+  deleteUploadSchema,
   validateSectionDelete,
 } = require("../validators/user.validation");
 const { assignReportingManager } = require("../controllers/reportingManager.controller");
@@ -308,12 +310,14 @@ router.post(
  *     tags: [Admin / Employees, Employee / ESS]
  *     summary: Upload attachment to Cloudinary
  *     description: |
- *       No user id. Form-data: `document` (file) and `type` (`education`, `account`, or `leave`).
+ *       No user id. Form-data: `document` (file) and `type` (`education`, `account`, `leave`, or `profile`).
  *       Cloudinary folder is `hrms/<type>`. The same type always uses that same folder.
+ *       `profile` accepts JPEG, PNG, WEBP, or GIF only and stores it in `hrms/profile`.
  *       Saves nothing in the database. On Submit, put the returned `url` in:
  *       - education → `education[].document`
  *       - account → `accounts[].attachment`
  *       - leave → leave apply `document` (medical and every other leave file)
+ *       - profile → employee `profileUrl`
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -330,8 +334,8 @@ router.post(
  *                 description: PDF, image, Word, or Excel — max 5MB
  *               type:
  *                 type: string
- *                 enum: [education, account, leave]
- *                 example: leave
+ *                 enum: [education, account, leave, profile]
+ *                 example: profile
  *     responses:
  *       201:
  *         description: Cloudinary URL only
@@ -348,7 +352,7 @@ router.post(
  *       500:
  *         description: Cloudinary not configured or upload failed
  */
-// UPLOAD ATTACHMENT — Cloudinary; form-data: document + type (education|account|leave)
+// UPLOAD ATTACHMENT — Cloudinary; form-data: document + type (education|account|leave|profile)
 // Admin: Employee→edit | Employee: Self→General Info→edit
 router.post(
   "/upload",
@@ -364,6 +368,44 @@ router.post(
     });
   },
   uploadAttachment
+);
+
+/**
+ * @swagger
+ * /api/employees/upload:
+ *   delete:
+ *     tags: [Admin / Employees, Employee / ESS]
+ *     summary: Delete a profile image from Cloudinary
+ *     description: |
+ *       Body `{ url }` must be a profile image previously uploaded with `type` = `profile`
+ *       (folder `hrms/profile`). Education, account, and leave files are not deleted here.
+ *       Any employee whose `profileUrl` is this url is cleared.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [url]
+ *             properties:
+ *               url:
+ *                 type: string
+ *                 example: https://res.cloudinary.com/demo/image/upload/v1/hrms/profile/photo.jpg
+ *     responses:
+ *       200:
+ *         description: Profile image removed
+ *       400:
+ *         description: Missing url or url is not an app profile image
+ */
+router.delete(
+  "/upload",
+  protect,
+  authorize(...ALL_ACCESS, "Employee"),
+  checkEmployeeProfilePermission("edit"),
+  validate(deleteUploadSchema),
+  deleteAttachment
 );
 
 /**

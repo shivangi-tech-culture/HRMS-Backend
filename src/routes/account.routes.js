@@ -16,7 +16,7 @@ const router = express.Router();
 
 const updateProfileSchema = Joi.object({
   name: Joi.string().trim().min(2).max(120).optional(),
-  avatar: Joi.string().uri().allow("", null).optional(),
+  profileUrl: Joi.string().uri().allow("", null).optional(),
 }).unknown(false);
 
 /**
@@ -44,7 +44,7 @@ router.get("/profile", protect, getMyProfile);
  * /api/account/profile:
  *   put:
  *     tags: [Account / My Profile]
- *     summary: Update my display name / avatar
+ *     summary: Update my display name / profileUrl
  *     security: [{ bearerAuth: [] }]
  */
 router.put("/profile", protect, validate(updateProfileSchema), updateMyProfile);
