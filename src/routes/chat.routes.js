@@ -105,7 +105,7 @@ router.get("/employees", listChatPeople);
  * /api/chat/conversations:
  *   get:
  *     tags: [Chat]
- *     summary: Chats visible to the user (newest first, with unreadCount, mutedUntil, deliveredUpTo, readUpTo)
+ *     summary: Chats visible to the user (newest first, with unreadCount, mutedUntil, deliveredUpTo, readUpTo; direct chats also peer { employeeId, name, role, designation, department })
  *     security:
  *       - bearerAuth: []
  *     responses:
