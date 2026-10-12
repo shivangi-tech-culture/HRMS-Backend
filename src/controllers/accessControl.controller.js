@@ -42,6 +42,7 @@ const {
   safeUser,
 } = require("../utils/userAccount");
 const { logEmployeeActivity } = require("../utils/activityLog");
+const { grantLeaveBalance } = require("../utils/leaveBalance");
 
 const loadManagedUser = async (req, id) => {
   if (String(req.user._id) === String(id)) {
@@ -197,6 +198,7 @@ const createAccessUserAccount = async (req) => {
     }
 
     const user = await User.create(createDoc);
+    await grantLeaveBalance(user);
     await logEmployeeActivity({ actor: req.user, employee: user, action: "create" });
 
     const mailCompany = platform

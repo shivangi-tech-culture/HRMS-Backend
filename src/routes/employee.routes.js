@@ -308,11 +308,12 @@ router.post(
  *     tags: [Admin / Employees, Employee / ESS]
  *     summary: Upload attachment to Cloudinary
  *     description: |
- *       No user id. Form-data: `document` (file) and `type` (`education` or `account`).
+ *       No user id. Form-data: `document` (file) and `type` (`education`, `account`, or `leave`).
  *       Cloudinary folder is `hrms/<type>`. The same type always uses that same folder.
  *       Saves nothing in the database. On Submit, put the returned `url` in:
  *       - education → `education[].document`
  *       - account → `accounts[].attachment`
+ *       - leave → leave apply `document` (medical and every other leave file)
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -329,8 +330,8 @@ router.post(
  *                 description: PDF, image, Word, or Excel — max 5MB
  *               type:
  *                 type: string
- *                 enum: [education, account]
- *                 example: account
+ *                 enum: [education, account, leave]
+ *                 example: leave
  *     responses:
  *       201:
  *         description: Cloudinary URL only
@@ -347,7 +348,7 @@ router.post(
  *       500:
  *         description: Cloudinary not configured or upload failed
  */
-// UPLOAD ATTACHMENT — Cloudinary; form-data: document + type (education|account)
+// UPLOAD ATTACHMENT — Cloudinary; form-data: document + type (education|account|leave)
 // Admin: Employee→edit | Employee: Self→General Info→edit
 router.post(
   "/upload",

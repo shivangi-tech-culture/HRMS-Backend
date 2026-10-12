@@ -283,6 +283,46 @@ const userSchema = new mongoose.Schema(
       bankAccount: { type: String, default: "" },
       ifsc: { type: String, default: "" },
     },
+
+    /**
+     * This year's leave counters. Name, code, paid and max days stay on LeaveType
+     * and are read by leaveType id. available and remaining update on apply.
+     */
+    leaves: [
+      {
+        leaveType: { type: mongoose.Schema.Types.ObjectId, ref: "LeaveType", required: true },
+        year: { type: Number, required: true },
+        adjusted: { type: Number, default: 0 },
+        used: { type: Number, default: 0 },
+        pending: { type: Number, default: 0 },
+        available: { type: Number, default: 0 },
+        remaining: { type: Number, default: 0 },
+        /** Quarterly Leave only. Calendar quarters inside this leave year. Unused does not move forward. */
+        quarterUsed: {
+          q1: { type: Number, default: 0 },
+          q2: { type: Number, default: 0 },
+          q3: { type: Number, default: 0 },
+          q4: { type: Number, default: 0 },
+        },
+        quarterPending: {
+          q1: { type: Number, default: 0 },
+          q2: { type: Number, default: 0 },
+          q3: { type: Number, default: 0 },
+          q4: { type: Number, default: 0 },
+        },
+      },
+    ],
+    /** Comp Off and other extra-day notes for this employee. */
+    leaveAdjustments: [
+      {
+        leaveType: { type: mongoose.Schema.Types.ObjectId, ref: "LeaveType" },
+        year: { type: Number, default: 0 },
+        days: { type: Number, required: true },
+        reason: { type: String, default: "" },
+        by: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        at: { type: Date, default: Date.now },
+      },
+    ],
   },
   { timestamps: true } // adds createdAt + updatedAt automatically
 );
@@ -321,6 +361,7 @@ userSchema.index({ "official.shiftId": 1 });
 userSchema.index({ role: 1, status: 1, name: 1 });
 userSchema.index({ role: 1, status: 1, "official.companyIds": 1 });
 userSchema.index({ createdAt: -1 });
+userSchema.index({ "leaves.year": 1, "leaves.leaveType": 1 });
 userSchema.index({ "official.reportingHead1": 1 });
 userSchema.index({ "official.reportingHead2": 1 });
 

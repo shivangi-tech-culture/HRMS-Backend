@@ -33,6 +33,7 @@ const mailRoutes = require("./routes/mail.routes");
 const masterRoutes = require("./routes/master.routes");
 const companyRoutes = require("./routes/company.routes");
 const chatRoutes = require("./routes/chat.routes");
+const leaveRoutes = require("./routes/leave.routes");
 const { attachChatSocket } = require("./utils/chatSocket");
 
 const app = express();
@@ -166,11 +167,12 @@ app.use("/api/hierarchy", hierarchyRoutes); // org hierarchy tree
 app.use("/api/permissions", permissionRoutes); // catalogs + my permissions
 app.use("/api/employees", employeeRoutes); // employees only (role = Employee)
 app.use("/api/users", accessControlRoutes); // Access & Control (any role)
-app.use("/api/attendance", attendanceRoutes); // punch · daily · calendar · late-early · approve/reject
+app.use("/api/attendance", attendanceRoutes); // punch · daily · calendar · timesheet · regularization
 app.use("/api/mail", mailRoutes); // Organization → Mail send
 app.use("/api/masters", masterRoutes); // SaaS masters (typed collections, including Branch + Shift)
 app.use("/api/companies", companyRoutes); // Company CRUD
 app.use("/api/chat", chatRoutes); // team chat (REST) — live updates on Socket.IO below
+app.use("/api/leave", leaveRoutes); // types · balance · requests · calendar · policies · history
 
 /** One HTTP server for the API and Socket.IO (chat) */
 const server = http.createServer(app);
@@ -180,7 +182,9 @@ attachChatSocket(io);
 
 // START SERVER (colored chalk banners)
 
-connectDB().then(() => {
+connectDB().then(async () => {
+  const { seedLeaveDefaults } = require("./utils/seedLeave");
+  await seedLeaveDefaults();
   server.listen(PORT, () => {
     const pad = (s, n = 72) => s.padEnd(n);
     console.log("");

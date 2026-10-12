@@ -85,6 +85,13 @@ const companySchema = new mongoose.Schema(
       uppercase: true,
     },
     isActive: { type: Boolean, default: true },
+    /**
+     * Company month. Default 1 through the last day of that month (30 or 31).
+     * A shifted month stores both ends, for example 24 through 23.
+     * Casual Leave quarters are three of these months.
+     */
+    monthStartDay: { type: Number, default: 1, min: 1, max: 28 },
+    monthEndDay: { type: Number, default: 31, min: 1, max: 31 },
     branches: { type: [branchSchema], default: [] },
   },
   { timestamps: true, collection: "companyorgs" }

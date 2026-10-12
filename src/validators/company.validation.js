@@ -133,6 +133,8 @@ const createCompanySchema = Joi.object({
   companyName: Joi.string().trim().min(2).max(160).required(),
   companyCode: Joi.string().trim().uppercase().min(1).max(20).required(),
   branches: branchesField.default([]),
+  monthStartDay: Joi.number().integer().min(1).max(28).default(1),
+  monthEndDay: Joi.number().integer().min(1).max(31).default(31),
   isActive: Joi.boolean().default(true),
 }).unknown(false);
 
@@ -140,6 +142,8 @@ const updateCompanySchema = Joi.object({
   companyName: Joi.string().trim().min(2).max(160).optional(),
   companyCode: Joi.string().trim().uppercase().min(1).max(20).optional(),
   branches: branchesField.optional(),
+  monthStartDay: Joi.number().integer().min(1).max(28).optional(),
+  monthEndDay: Joi.number().integer().min(1).max(31).optional(),
   isActive: Joi.boolean().optional(),
 })
   .min(1)

@@ -417,11 +417,12 @@ const computeDayMetrics = (record, shift, dateStr, holidayMap = {}) => {
     };
   }
 
-  // Incomplete punches → Absent (until both in + out)
+  // Punch in without punch out stays MissedPunch. Present only after punch out, using this shift.
   if (!record?.punchIn || !record?.punchOut) {
+    const missed = Boolean(record?.punchIn);
     return {
-      statusCode: "A",
-      status: "Absent",
+      statusCode: missed ? "MP" : "A",
+      status: missed ? "MissedPunch" : "Absent",
       workedMinutes: 0,
       overtimeMinutes: 0,
       lateByMinutes: 0,

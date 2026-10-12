@@ -21,6 +21,7 @@ const {
 const { hasAllAccess } = require("../middleware/auth");
 const { queueWelcomeEmail } = require("../utils/mail");
 const { logEmployeeActivity, humanize } = require("../utils/activityLog");
+const { grantLeaveBalance } = require("../utils/leaveBalance");
 const ActivityLog = require("../models/ActivityLog");
 const { sendExcel } = require("../utils/excel");
 const { uploadToCloudinary, UPLOAD_TYPES } = require("../middleware/upload");
@@ -375,6 +376,7 @@ const createEmployee = async (req, res) => {
 
     // 4. Create User with role Employee (password already hashed above)
     const employee = await User.create(createDoc);
+    await grantLeaveBalance(employee);
 
     await logEmployeeActivity({ actor: req.user, employee, action: "create" });
 
@@ -1057,7 +1059,7 @@ const deleteEmployee = async (req, res) => {
 
 /**
  * UPLOAD — POST /api/employees/upload
- * Form-data: document + type (education|account). Returns url only.
+ * Form-data: document + type (education|account|leave). Returns url only.
  */
 const uploadAttachment = async (req, res) => {
   try {
@@ -1066,7 +1068,7 @@ const uploadAttachment = async (req, res) => {
       .toLowerCase();
     if (!UPLOAD_TYPES.includes(type)) {
       return res.status(400).json({
-        message: "type is required: education or account",
+        message: "type is required: education, account, or leave",
       });
     }
 
@@ -1111,14 +1113,17 @@ const deleteSection = (req, res) => {
 };
 
 /** One log row for the UI */
-const toActivityRow = (log) => ({
-  _id: log._id,
-  at: log.createdAt,
-  action: log.action,
-  section: log.section || "",
-  summary: log.summary || "",
-  company: log.company || "",
-  employee: {
+const toActivityRow = (log, fallbackCompanyId = null) => {
+  const companyId = log.companyIds?.[0] || fallbackCompanyId || null;
+  return {
+    _id: log._id,
+    at: log.createdAt,
+    action: log.action,
+    section: log.section || "",
+    summary: log.summary || "",
+    company: log.company || "",
+    companyId,
+    employee: {
     id: log.employee?.id,
     name: log.employee?.name || "",
     employeeCode: log.employee?.employeeCode || "",
@@ -1133,7 +1138,8 @@ const toActivityRow = (log) => ({
   changes: (log.changes || []).map((c) =>
     typeof c === "string" ? { field: c, label: humanize(c.split(".").pop()), from: null, to: null } : c
   ),
-});
+  };
+};
 
 /**
  * ACTIVITY LOG — GET /api/employees/activity
@@ -1184,6 +1190,10 @@ const listActivity = async (req, res) => {
         return res.status(403).json({ message: "This company is not assigned to you" });
       }
       and.push({ companyIds: company._id });
+    }
+    if (!company) {
+      const own = userCompanyIds(req.user);
+      if (own.length === 1) company = await findCompany(own[0]);
     }
 
     // ── one employee ──
@@ -1252,7 +1262,7 @@ const listActivity = async (req, res) => {
       page,
       limit,
       pages: Math.ceil(total / limit) || 1,
-      logs: logs.map(toActivityRow),
+      logs: logs.map((log) => toActivityRow(log, company?._id || null)),
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });
