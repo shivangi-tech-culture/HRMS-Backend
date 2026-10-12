@@ -5356,7 +5356,7 @@
                           "key": "search",
                           "value": "",
                           "disabled": true,
-                          "description": "string | optional | name / email / employee code text search"
+                        "description": "string | optional | name / email / employee code text search"
                         },
                         {
                           "key": "department",
