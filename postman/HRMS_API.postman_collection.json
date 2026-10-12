@@ -5321,7 +5321,7 @@
         },
         {
           "name": "1.7 Attendance",
-          "description": "Daily list, calendar, late/early, HR mark, and regularization approval.\nNo punch-out → MissedPunch, even if a regularization is pending.\nShift rules after punch-out: before the shift midpoint → Absent. After the midpoint but before shift end → HalfDay. At or after shift end → Present. Arriving after shift start + 10 min grace and still leaving at shift end → Late (not HalfDay). Time before shift start is not counted.\nA Late day is not approved on the attendance row. The employee sends POST /api/attendance/regularize (folder 2.2, request 6b). Then Reporting Manager (team), HR (assigned companies), or Super Admin approves POST /api/attendance/regularizations/{{regularizationId}}/review.\nPOST /api/attendance/{{attendanceId}}/review does not approve Late.",
+          "description": "Daily list, calendar, late/early, and regularization approval.\nNo punch-out → MissedPunch, even if a regularization is pending.\nShift rules after punch-out: before the shift midpoint → Absent. After the midpoint but before shift end → HalfDay. At or after shift end → Present. Arriving after shift start + 10 min grace and still leaving at shift end → Late.\nDaily Attendance has no approve or reject. The employee sends POST /api/attendance/regularize. Reporting Manager, HR, or Super Admin reviews it in 4. Attendance Regularization. That review updates this daily row: Pending while waiting, then Present, Late, HalfDay, Absent, or Rejected.",
           "item": [
             {
               "name": "1. Daily Attendance",
@@ -5462,7 +5462,7 @@
                         }
                       ]
                     },
-                    "description": "Rows whose punch-in is Late. This list does not approve them.\nThe employee sends 2.2 → 6b. Request Late Regularization.\nReporting Manager, HR, or Super Admin then uses 4. Attendance Regularization → Approve.\nTest script saves the first row attendanceId into {{attendanceId}}.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n- `attendanceStatus` — Late\n- `page` / `limit`\n"
+                    "description": "Rows whose punch-in is Late. Approve and reject are not on this list.\nThe employee sends 2.2 → 6b. Request Late Regularization.\nReporting Manager, HR, or Super Admin uses 4. Attendance Regularization. After that review, this daily row status updates.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n- `attendanceStatus` — Late\n- `page` / `limit`\n"
                   },
                   "event": [
                     {
@@ -5477,84 +5477,6 @@
                       }
                     }
                   ]
-                },
-                {
-                  "name": "3. Approve",
-                  "request": {
-                    "method": "POST",
-                    "header": [
-                      {
-                        "key": "Content-Type",
-                        "value": "application/json"
-                      }
-                    ],
-                    "url": {
-                      "raw": "{{baseUrl}}/api/attendance/{{attendanceId}}/review?decision=approve",
-                      "host": ["{{baseUrl}}"],
-                      "path": ["api", "attendance", "{{attendanceId}}", "review"],
-                      "query": [
-                        {
-                          "key": "decision",
-                          "value": "approve",
-                          "description": "string | required | `approve` or `reject`. Same API for both."
-                        }
-                      ]
-                    },
-                    "description": "Do not use this for Late. Late returns 400.\nLate is approved only after the employee regularization request: 4. Attendance Regularization → 2. Approve.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n**Path:** `attendanceId`\n**Query:** `decision` — `approve`\n**Body:** `reason` — required\n",
-                    "body": {
-                      "mode": "raw",
-                      "raw": "{\n  \"reason\": \"Checked punch time. Approved.\"\n}",
-                      "options": { "raw": { "language": "json" } }
-                    }
-                  }
-                },
-                {
-                  "name": "4. Reject",
-                  "request": {
-                    "method": "POST",
-                    "header": [
-                      {
-                        "key": "Content-Type",
-                        "value": "application/json"
-                      }
-                    ],
-                    "url": {
-                      "raw": "{{baseUrl}}/api/attendance/{{attendanceId}}/review?decision=reject",
-                      "host": ["{{baseUrl}}"],
-                      "path": ["api", "attendance", "{{attendanceId}}", "review"],
-                      "query": [
-                        {
-                          "key": "decision",
-                          "value": "reject",
-                          "description": "string | required | `approve` or `reject`. Same API for both."
-                        }
-                      ]
-                    },
-                    "description": "Do not use this for Late. Late returns 400.\nReject a late day from 4. Attendance Regularization → 3. Reject after the employee has sent the request.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n**Path:** `attendanceId`\n**Query:** `decision` — `reject`\n**Body:** `reason` — required\n",
-                    "body": {
-                      "mode": "raw",
-                      "raw": "{\n  \"reason\": \"Punch time is too late. Rejected.\"\n}",
-                      "options": { "raw": { "language": "json" } }
-                    }
-                  }
-                },
-                {
-                  "name": "5. Mark Attendance",
-                  "request": {
-                    "method": "POST",
-                    "header": [{ "key": "Content-Type", "value": "application/json" }],
-                    "url": {
-                      "raw": "{{baseUrl}}/api/attendance/mark",
-                      "host": ["{{baseUrl}}"],
-                      "path": ["api", "attendance", "mark"]
-                    },
-                    "description": "Missed punch only. Does not change the employee's company, branch, or shift.\n`employeeId` comes from 1. List Daily ({{employeeId}}).\nTime is 24-hour HH:mm. 09:30 stays 09:30. 15:30 is 3:30 PM.\nFinished day: send both punchInTime and punchOutTime.\nToday, punch in missed: send only punchInTime. Remove punchOutTime. They punch out themselves.\nPunch out missed: send only punchOutTime. Remove punchInTime.\nDoes not overwrite a punch that is already saved. Punch out must be after punch in. Future time is rejected.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n**Body:**\n- `employeeId` — required, employee `_id`\n- `date` — required, YYYY-MM-DD, today or earlier\n- `punchInTime` — optional HH:mm\n- `punchOutTime` — optional HH:mm\n- `reason` — required\n- `remarks` — optional\n",
-                    "body": {
-                      "mode": "raw",
-                      "raw": "{\n  \"employeeId\": \"{{employeeId}}\",\n  \"date\": \"{{attendanceDate}}\",\n  \"punchInTime\": \"09:30\",\n  \"punchOutTime\": \"18:30\",\n  \"reason\": \"Forgot to punch\",\n  \"remarks\": \"\"\n}",
-                      "options": { "raw": { "language": "json" } }
-                    }
-                  }
                 }
               ]
             },

@@ -26,7 +26,6 @@ const {
   dayScheduleOf,
   minutesOfDay,
   parseHm,
-  normalizeHm,
   punchInWindow,
   sameDayClock,
   DEFAULT_SHIFT,
@@ -189,17 +188,9 @@ const punchIn = async (req, res) => {
     record.lateByMinutes = windowCheck.isLate ? windowCheck.lateByMinutes || 0 : 0;
     record.earlyByMinutes = windowCheck.isEarly ? windowCheck.earlyByMinutes || 0 : 0;
     record.reviewReason = "";
-    // Not Present yet. Missed punch until they punch out against this shift.
     record.status = "MissedPunch";
+    record.attendanceStatus = null;
     record.remarks = remarks;
-    if (windowCheck.isLate) {
-      record.remarks = remarks || DEFAULT_LATE_REMARK;
-      record.attendanceStatus = "Late";
-    } else if (windowCheck.isEarly) {
-      record.attendanceStatus = "Early";
-    } else {
-      record.attendanceStatus = "On time";
-    }
     await record.save();
 
     await record.populate(
@@ -207,11 +198,7 @@ const punchIn = async (req, res) => {
       EMPLOYEE_CARD_SELECT
     );
 
-    const punchInMessage = windowCheck.isLate
-      ? "Punched in late — Missed punch until punch out"
-      : windowCheck.isEarly
-        ? "Punched in early — Missed punch until punch out"
-        : "Punched in — Missed punch until punch out";
+    const punchInMessage = "Punched in — Missed punch until punch out";
 
     return res.status(201).json(
       punchPayload(punchInMessage, { company, branch, shift, record })
@@ -274,22 +261,19 @@ const punchOut = async (req, res) => {
     record.punchOutSource = source;
     record.punchOutLocation = location;
     applyRemarkOnPunch(record, remarks);
-    applyMetrics(record, shift); // Present or HalfDay from this shift, only because punch out is set
+    applyMetrics(record, shift);
     if (record.attendanceStatus !== "Approved" && record.attendanceStatus !== "Rejected") {
-      const arrived = punchInWindow(
-        record.punchIn ? minutesOfDay(record.punchIn) : null,
-        parseHm(shift?.startTime),
-        shift?.graceMinutes
-      );
-      record.lateByMinutes = arrived.lateByMinutes;
-      if (arrived.isLate) {
+      if (record.status === "Late") {
         record.attendanceStatus = "Late";
         if (!String(record.remarks || "").trim()) record.remarks = DEFAULT_LATE_REMARK;
-      } else if (arrived.isEarly) {
+      } else if (record.status === "EarlyLeave") {
         record.attendanceStatus = "Early";
         if (record.remarks === DEFAULT_LATE_REMARK) record.remarks = "";
-      } else {
+      } else if (record.status === "Present") {
         record.attendanceStatus = "On time";
+        if (record.remarks === DEFAULT_LATE_REMARK) record.remarks = "";
+      } else {
+        record.attendanceStatus = null;
         if (record.remarks === DEFAULT_LATE_REMARK) record.remarks = "";
       }
     }
@@ -302,14 +286,16 @@ const punchOut = async (req, res) => {
 
     const punchOutMessage =
       record.status === "Absent"
-        ? "Punched out — Absent (left before half of the shift)"
+        ? "Punched out — Absent (worked less than 5 hours)"
         : record.status === "HalfDay"
-          ? "Punched out — Half day (left before shift end)"
-          : record.status === "Late"
-            ? "Punched out — Late (shift completed, arrived after shift start)"
-          : windowCheck.isLate
-            ? "Punched out (after shift end — allowed)"
-            : "Punched out successfully";
+          ? "Punched out — Half day (at least 5 hours, left more than 1 hour before shift end)"
+          : record.status === "EarlyLeave"
+            ? "Punched out — Early leave (left in the last hour before shift end). Send a regularization request."
+            : record.status === "Late"
+              ? "Punched out — Late (shift completed, arrived after shift start). Send a regularization request."
+              : windowCheck.isLate
+                ? "Punched out (after shift end — allowed)"
+                : "Punched out successfully";
 
     return res.json(
       punchPayload(punchOutMessage, { company, branch, shift, record })
@@ -655,7 +641,6 @@ const applyLateStatus = (att, timing) => {
   }
   const isLate = lateBy > 0;
   const written = String(att?.remarks || "").trim();
-  const needsReview = Boolean(att?.punchIn) && isLate && !reviewed;
   let attendanceStatus = null;
   let status = "Absent";
   let workedMinutes = null;
@@ -663,13 +648,20 @@ const applyLateStatus = (att, timing) => {
   let canApproveReject = false;
   let remarks = written;
 
-  const stampTiming = () => {
-    if (reviewed) attendanceStatus = att.attendanceStatus;
-    else if (isLate) {
+  const stampClosed = (dayStatus) => {
+    if (reviewed) {
+      attendanceStatus = att.attendanceStatus;
+      return;
+    }
+    if (dayStatus === "Late") {
       attendanceStatus = "Late";
       if (!remarks) remarks = DEFAULT_LATE_REMARK;
+    } else if (dayStatus === "EarlyLeave") {
+      attendanceStatus = "Early";
+    } else if (dayStatus === "Present") {
+      attendanceStatus = "On time";
     } else {
-      attendanceStatus = isEarly ? "Early" : "On time";
+      attendanceStatus = null;
     }
   };
 
@@ -677,7 +669,7 @@ const applyLateStatus = (att, timing) => {
     status = "Absent";
   } else if (!att?.punchOut) {
     status = "MissedPunch";
-    stampTiming();
+    attendanceStatus = reviewed ? att.attendanceStatus : null;
   } else if (timing?.isOff) {
     status = "WeeklyOff";
   } else {
@@ -695,8 +687,11 @@ const applyLateStatus = (att, timing) => {
     status = metrics.status;
     workedMinutes = metrics.workedMinutes;
     overtimeMinutes = metrics.overtimeMinutes;
-    stampTiming();
+    lateBy = metrics.lateByMinutes;
+    stampClosed(status);
   }
+
+  const needsReview = status === "Late" && !reviewed;
 
   const persist =
     att?._id &&
@@ -834,6 +829,7 @@ const emptyDailySummary = () => ({
   onLeave: 0,
   wfh: 0,
   halfDay: 0,
+  earlyLeave: 0,
   working: 0,
   pending: 0,
   missedPunch: 0,
@@ -846,6 +842,7 @@ const tallyDailySummary = (summary, row) => {
   else if (row.status === "Absent" || row.status === "Rejected") summary.absent += 1;
   else if (row.status === "OnLeave") summary.onLeave += 1;
   else if (row.status === "HalfDay") summary.halfDay += 1;
+  else if (row.status === "EarlyLeave") summary.earlyLeave += 1;
   else if (row.status === "Working") summary.working += 1;
   else if (row.status === "MissedPunch") summary.missedPunch += 1;
   if (row.status === "Rejected") summary.rejected += 1;
@@ -1029,7 +1026,7 @@ const listDailyAttendance = async (req, res) => {
           att.attendanceStatus === "Approved" || att.attendanceStatus === "Rejected";
         const isLate = (Number(att.lateByMinutes) || 0) > 0;
         const reg = regByEmp.get(key);
-        const stored = ["Present", "Late", "HalfDay", "Absent", "WeeklyOff", "Holiday", "OnLeave"].includes(
+        const stored = ["Present", "Late", "EarlyLeave", "HalfDay", "Absent", "WeeklyOff", "Holiday", "OnLeave"].includes(
           att.status
         )
           ? att.status
@@ -1307,234 +1304,6 @@ const attendanceCalendar = async (req, res) => {
   }
 };
 
-/**
- * MARK MISSED PUNCH — POST /api/attendance/mark
- * Body: { employeeId, date, punchInTime?, punchOutTime?, reason, remarks? }
- * Sets only the punches sent. Does not change the employee's company, branch, or shift.
- * A finished day can take both times. Today can take the one they forgot.
- */
-const clockOnDate = (dateStr, hm, label) => {
-  const norm = normalizeHm(hm);
-  if (!norm) return { error: `${label} must be 24-hour HH:mm` };
-  const at = new Date(`${dateStr}T${norm}:00+05:30`);
-  if (Number.isNaN(at.getTime())) return { error: `${label} must be 24-hour HH:mm` };
-  if (at.getTime() > Date.now()) return { error: `${label} cannot be in the future` };
-  return { at, hm: norm };
-};
-
-const markAttendance = async (req, res) => {
-  try {
-    const employeeId = req.body.employeeId;
-    const date = req.body.date;
-    if (date > today()) {
-      return res.status(400).json({ message: "Date cannot be in the future" });
-    }
-
-    const inRaw = String(req.body.punchInTime || "").trim();
-    const outRaw = String(req.body.punchOutTime || "").trim();
-    if (!inRaw && !outRaw) {
-      return res.status(400).json({ message: "punchInTime or punchOutTime is required" });
-    }
-    const punchIn = inRaw ? clockOnDate(date, inRaw, "Punch in") : null;
-    const punchOut = outRaw ? clockOnDate(date, outRaw, "Punch out") : null;
-    if (punchIn?.error) return res.status(400).json({ message: punchIn.error });
-    if (punchOut?.error) return res.status(400).json({ message: punchOut.error });
-
-    const employee = await User.findById(employeeId).select(
-      `${EMPLOYEE_CARD_SELECT} official.companyIds official.reportingHead1 official.reportingHead2 status`
-    );
-    if (!employee || employee.status === "Deleted") {
-      return res.status(404).json({ message: "Employee not found" });
-    }
-    const scopeErr = assertTeamOrCompanyEmployee(req.user, employee);
-    if (scopeErr) return res.status(403).json({ message: scopeErr });
-
-    const { shift, company, branch } = await getAssignedShift(employeeId, date);
-    let record = await Attendance.findOne({ employee: employeeId, date });
-    if (!record) record = new Attendance({ employee: employeeId, date });
-    const created = record.isNew;
-
-    if (punchIn && record.punchIn) {
-      return res.status(400).json({ message: "Punch in is already marked for this day" });
-    }
-    if (punchOut && record.punchOut) {
-      return res.status(400).json({ message: "Punch out is already marked for this day" });
-    }
-    if (punchOut && !record.punchIn && !punchIn) {
-      return res.status(400).json({ message: "Punch in is required before punch out" });
-    }
-
-    const inAt = punchIn ? punchIn.at : record.punchIn;
-    const outAt = punchOut ? punchOut.at : record.punchOut;
-    if (inAt && outAt && new Date(outAt).getTime() <= new Date(inAt).getTime()) {
-      return res.status(400).json({ message: "Punch out must be after punch in" });
-    }
-
-    applyPlacement(record, { company, branch, shift });
-    record.markedBy = req.user._id;
-    record.markReason = String(req.body.reason || "").trim();
-    if (String(req.body.remarks || "").trim()) {
-      record.remarks = String(req.body.remarks).trim();
-    }
-
-    if (punchIn) {
-      record.punchIn = punchIn.at;
-      record.punchInSource = "manual";
-      const windowCheck = validatePunchAgainstShift(shift, punchIn.at, "in", date);
-      const reviewed =
-        record.attendanceStatus === "Approved" || record.attendanceStatus === "Rejected";
-      if (!reviewed) {
-        record.lateByMinutes = windowCheck.isLate ? windowCheck.lateByMinutes || 0 : 0;
-        record.earlyByMinutes = windowCheck.isEarly ? windowCheck.earlyByMinutes || 0 : 0;
-        record.reviewReason = "";
-        if (windowCheck.isLate) {
-          if (!String(record.remarks || "").trim()) record.remarks = DEFAULT_LATE_REMARK;
-          record.attendanceStatus = "Late";
-        } else if (windowCheck.isEarly) {
-          record.attendanceStatus = "Early";
-        } else {
-          record.attendanceStatus = "On time";
-        }
-      }
-    }
-
-    if (punchOut) {
-      record.punchOut = punchOut.at;
-      record.punchOutSource = "manual";
-    }
-
-    const metrics = computeDayMetrics(record, shift, date);
-    record.workedMinutes = metrics.workedMinutes;
-    record.overtimeMinutes = metrics.overtimeMinutes;
-    record.status = metrics.status;
-
-    await record.save();
-    await record.populate("employee", EMPLOYEE_CARD_SELECT);
-
-    const marked = [
-      punchIn ? `punch in ${punchIn.hm}` : "",
-      punchOut ? `punch out ${punchOut.hm}` : "",
-    ].filter(Boolean).join(" and ");
-
-    return res.status(created ? 201 : 200).json(
-      punchPayload(`Marked ${marked}`, { company, branch, shift, record })
-    );
-  } catch (err) {
-    return res.status(500).json({ message: err.message });
-  }
-};
-
-/**
- * LATE REVIEW — POST /api/attendance/:id/review?decision=approve|reject
- * Body: { reason }
- * Only Late. Day status stays Present.
- */
-const reviewRemark = async (req, res) => {
-  try {
-    const decision = String(req.body.decision || "").toLowerCase();
-    const reason = String(req.body.reason || "").trim();
-    if (!["approve", "reject"].includes(decision)) {
-      return res.status(400).json({
-        message: 'decision must be "approve" or "reject"',
-      });
-    }
-    if (!reason) {
-      return res.status(400).json({ message: "reason is required" });
-    }
-
-    // Need companyIds + reporting heads for scope checks
-    const record = await Attendance.findById(req.params.id).populate(
-      "employee",
-      `${EMPLOYEE_CARD_SELECT} official.companyIds official.reportingHead1 official.reportingHead2`
-    );
-    if (!record) {
-      return res.status(404).json({ message: "Attendance record not found" });
-    }
-
-    const awaiting = record.attendanceStatus === "Late" || record.attendanceStatus === "Pending" || record.status === "Late";
-    const already =
-      record.attendanceStatus === "Approved" || record.attendanceStatus === "Rejected";
-    if (record.attendanceStatus === "Late" || record.status === "Late") {
-      return res.status(400).json({
-        message:
-          "Late attendance is approved through a regularization request by Reporting Manager, HR, or Super Admin.",
-      });
-    }
-    if (!awaiting) {
-      return res.status(400).json({
-        message: already
-          ? `Already ${record.attendanceStatus}`
-          : "Nothing to approve or reject",
-      });
-    }
-
-    // Super Admin / Admin → all
-    // HR → any overlap between HR.companyIds and employee.companyIds
-    // Manager → team only
-    const scopeErr = assertTeamOrCompanyEmployee(req.user, record.employee);
-    if (scopeErr) {
-      return res.status(403).json({ message: scopeErr });
-    }
-
-    const placed = await getAssignedShift(
-      record.employee._id || record.employee,
-      record.date
-    );
-
-    if (!record.punchOut) {
-      record.status = "MissedPunch";
-    } else {
-      const metrics = computeDayMetrics(record, placed.shift, record.date);
-      if (["Present", "Late", "HalfDay", "Absent"].includes(metrics.status)) {
-        record.status = metrics.status;
-        record.workedMinutes = metrics.workedMinutes;
-        record.overtimeMinutes = metrics.overtimeMinutes;
-      }
-    }
-    record.attendanceStatus = decision === "approve" ? "Approved" : "Rejected";
-    record.reviewReason = reason;
-    record.remarkReviewedBy = req.user._id;
-    record.remarkReviewedAt = new Date();
-    await record.save();
-    await record.populate({
-      path: "remarkReviewedBy",
-      select: "name role official.officialEmail",
-    });
-
-    const { shift, company, branch } = placed;
-
-    // HR's assigned company ids (for UI / debug) — empty for Super Admin/Admin
-    const assignedCompanyIds = hasGlobalCompanyAccess(req.user)
-      ? []
-      : managementCompanyIds(req.user);
-
-    return res.json({
-      message:
-        decision === "approve"
-          ? `Late punch approved — day stays ${record.status}`
-          : `Late punch rejected — day stays ${record.status}`,
-      decision,
-      reason,
-      reviewedBy: {
-        _id: req.user._id,
-        name: req.user.name || "",
-        role: req.user.role || "",
-        email: req.user.official?.officialEmail || "",
-      },
-      // all | assigned_companies | team
-      reviewerScope: reviewerScopeOf(req.user),
-      // HR: list of company ids they can approve for (all assigned)
-      assignedCompanyIds,
-      record: formatAttendanceRecord(
-        record,
-        punchExtras({ company, branch, shift })
-      ),
-    });
-  } catch (err) {
-    return res.status(500).json({ message: err.message });
-  }
-};
-
 module.exports = {
   punchIn,
   punchOut,
@@ -1542,8 +1311,6 @@ module.exports = {
   listWebPunches,
   listDailyAttendance,
   attendanceCalendar,
-  markAttendance,
-  reviewRemark,
   resolveListCompanyId,
   applyListCompany,
   scopedEmployeeFilter,

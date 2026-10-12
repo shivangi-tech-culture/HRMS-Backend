@@ -19,6 +19,7 @@ const DAY_STATUSES = [
   "Present",
   "Absent",
   "HalfDay",
+  "EarlyLeave", // left in the last hour before shift end, after at least 5 hours
   "WeeklyOff",
   "Holiday",
   "MissedPunch",

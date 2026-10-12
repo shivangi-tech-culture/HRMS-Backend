@@ -131,6 +131,7 @@ const workedClock = (mins) => {
 const STATUS_CODE = {
   Present: "P",
   Late: "L",
+  EarlyLeave: "ELE",
   Absent: "A",
   MissedPunch: "MP",
   WeeklyOff: "WO",
@@ -253,10 +254,12 @@ const readTimes = (date, body) => {
   return { punchIn, punchOut, hasTimes: Boolean(punchIn || punchOut) };
 };
 
-/** Both punches exist and the day is Late, still waiting for regularization. */
-const isOpenLateDay = (record) =>
+const ISSUE_STATUSES = ["Late", "EarlyLeave", "HalfDay", "Absent"];
+
+/** Both punches exist and the day still needs a regularization decision. */
+const isOpenIssueDay = (record) =>
   Boolean(record?.punchIn && record?.punchOut) &&
-  (record.status === "Late" || record.attendanceStatus === "Late") &&
+  (ISSUE_STATUSES.includes(record.status) || record.attendanceStatus === "Late") &&
   record.attendanceStatus !== "Approved";
 
 /** Copy requested punches, or accept an existing Late day. */
@@ -270,7 +273,7 @@ const saveApprovedDay = async (request, actorId) => {
   let record = await Attendance.findOne({ employee: employeeId, date });
   if (!record) record = new Attendance({ employee: employeeId, date });
 
-  if (!times.hasTimes && !isOpenLateDay(record)) {
+  if (!times.hasTimes && !isOpenIssueDay(record)) {
     return { error: "punchInTime or punchOutTime is required" };
   }
 
@@ -293,14 +296,14 @@ const saveApprovedDay = async (request, actorId) => {
   if (shiftId) record.shift = shiftId;
 
   if (record.punchIn && record.punchOut) {
-    const acceptLate = isOpenLateDay(record) || record.attendanceStatus === "Late";
+    const acceptIssue = isOpenIssueDay(record) || record.attendanceStatus === "Late";
     const metrics = computeDayMetrics(record, shift, date);
     record.workedMinutes = metrics.workedMinutes;
     record.overtimeMinutes = metrics.overtimeMinutes;
     record.lateByMinutes = metrics.lateByMinutes;
     record.earlyByMinutes = metrics.earlyByMinutes;
     record.status = metrics.status;
-    if (metrics.status === "Late" || acceptLate) {
+    if (ISSUE_STATUSES.includes(metrics.status) || acceptIssue) {
       record.attendanceStatus = "Approved";
     }
   } else if (record.punchIn) {
@@ -488,7 +491,7 @@ const myTimesheet = async (req, res) => {
       if (timing.isOff && !onLeave) summary.daySummary.weeklyOffs += 1;
       else summary.daySummary.workDays += 1;
 
-      if (status === "P" || status === "L") {
+      if (status === "P" || status === "L" || status === "ELE") {
         summary.present += 1;
         summary.presentSummary.presents += 1;
         salaryDays += 1;
@@ -513,14 +516,14 @@ const myTimesheet = async (req, res) => {
         if (leaveCode === "LTA") summary.leaves.lta += units;
       }
 
-      if ((status === "P" || status === "L" || status === "HD") && lateBy > 0) {
+      if ((status === "P" || status === "L" || status === "ELE" || status === "HD") && lateBy > 0) {
         summary.leaves.lateArrivals += 1;
         summary.absentLate.lateByMinutes += lateBy;
       }
-      if ((status === "P" || status === "L" || status === "HD") && (lateBy > 0 || earlyBy > 0)) {
+      if ((status === "P" || status === "L" || status === "ELE" || status === "HD") && (lateBy > 0 || earlyBy > 0)) {
         summary.leaves.lateEarlyCount += 1;
       }
-      if ((status === "P" || status === "L" || status === "HD") && earlyBy > 0) {
+      if ((status === "P" || status === "L" || status === "ELE" || status === "HD") && earlyBy > 0) {
         summary.absentLate.earlyByMinutes += earlyBy;
       }
 
@@ -531,7 +534,7 @@ const myTimesheet = async (req, res) => {
       const canApply =
         date <= today() &&
         dayDesc === "WorkDay" &&
-        (status === "A" || status === "MP" || status === "L" || status === "Rejected") &&
+        (status === "A" || status === "MP" || status === "L" || status === "ELE" || status === "HD" || status === "Rejected") &&
         reg?.status !== "Pending" &&
         reg?.status !== "Approved";
 
@@ -594,7 +597,7 @@ const requestRegularization = async (req, res) => {
     if (existing?.punchIn && existing?.punchOut && existing.attendanceStatus === "Approved") {
       return res.status(400).json({ message: "This late day is already approved" });
     }
-    const lateDay = isOpenLateDay(existing);
+    const lateDay = isOpenIssueDay(existing);
 
     const times = readTimes(date, req.body);
     if (times.error) return res.status(400).json({ message: times.error });
@@ -630,7 +633,7 @@ const requestRegularization = async (req, res) => {
 
     return res.status(201).json({
       message: lateDay
-        ? "Late request sent. Reporting Manager, HR, or Super Admin can approve it."
+        ? "Attendance request sent. Reporting Manager, HR, or Super Admin can approve it. Daily attendance updates after review."
         : "Request sent. It stays Pending until approved. Punch out is still Missed Punch until then.",
       request: toRow({ ...doc.toObject(), employee }),
     });
@@ -739,7 +742,7 @@ const reviewRegularization = async (req, res) => {
         employee: request.employee._id,
         date: request.date,
       });
-      if (record && (record.status === "Late" || record.attendanceStatus === "Late")) {
+      if (record && (ISSUE_STATUSES.includes(record.status) || record.attendanceStatus === "Late")) {
         record.attendanceStatus = "Rejected";
         record.reviewReason = reason;
         record.remarkReviewedBy = req.user._id;

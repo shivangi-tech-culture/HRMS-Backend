@@ -94,19 +94,20 @@ const formatAttendanceRecord = (record, extras = {}) => {
     startMin != null && punchMin != null
       ? punchInWindow(punchMin, startMin, grace)
       : null;
-  const punchedBeforeStart = window ? window.isEarly : false;
   const lateBy = window ? window.lateByMinutes : Number(r.lateByMinutes) || 0;
-  const isLate = window ? window.isLate : lateBy > 0;
-  const earlyBy = window ? window.earlyByMinutes : 0;
+  const earlyBy = Number(r.earlyByMinutes) || 0;
+  const isLate = Boolean(r.punchOut) && r.status === "Late";
+  const isEarly = Boolean(r.punchOut) && r.status === "EarlyLeave";
   let attendanceStatus = r.attendanceStatus || null;
   if (attendanceStatus !== "Approved" && attendanceStatus !== "Rejected") {
-    if (!r.punchIn) attendanceStatus = null;
-    else if (isLate) attendanceStatus = "Late";
-    else if (punchedBeforeStart) attendanceStatus = "Early";
-    else attendanceStatus = "On time";
+    if (!r.punchIn || !r.punchOut) attendanceStatus = null;
+    else if (r.status === "Late") attendanceStatus = "Late";
+    else if (r.status === "EarlyLeave") attendanceStatus = "Early";
+    else if (r.status === "Present") attendanceStatus = "On time";
+    else attendanceStatus = null;
   }
   const canApproveReject = false;
-  const shownRemarks = !isLate && remarks === "Late punch-in" ? "" : remarks;
+  const shownRemarks = r.status !== "Late" && remarks === "Late punch-in" ? "" : remarks;
 
   const employee = r.employee
     ? {
@@ -143,7 +144,7 @@ const formatAttendanceRecord = (record, extras = {}) => {
     lateByMinutes: lateBy,
     earlyByMinutes: earlyBy,
     isLate,
-    isEarly: punchedBeforeStart,
+    isEarly,
     remarks: shownRemarks,
     attendanceStatus,
     reviewReason: String(r.reviewReason || "").trim(),
