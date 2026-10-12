@@ -277,6 +277,7 @@ const createEmployeeSchema = Joi.object({
   experience: Joi.array().items(experienceItem).optional(),
   visas: Joi.array().items(visaItem).optional(),
   payroll: payrollItem.optional(),
+  profileUrl: Joi.string().trim().uri().allow("", null).optional(),
 }).unknown(false);
 
 /** One new/edited row, or the full list (replace). Used on update for array sections. */
@@ -310,6 +311,11 @@ const updateUserSchema = Joi.object({
 })
   .min(1)
   .unknown(false);
+
+/** DELETE /api/employees/upload — remove a profile image from Cloudinary */
+const deleteUploadSchema = Joi.object({
+  url: Joi.string().trim().uri().required(),
+}).unknown(false);
 
 /**
  * LOGIN body — POST /api/auth/login
@@ -360,6 +366,7 @@ const validateSectionDelete = (req, res, next) => {
 module.exports = {
   createEmployeeSchema,
   updateUserSchema,
+  deleteUploadSchema,
   loginSchema,
   validateSectionDelete,
   ARRAY_ITEM_SCHEMAS,

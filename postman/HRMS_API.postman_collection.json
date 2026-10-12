@@ -185,10 +185,10 @@
                 "profile"
               ]
             },
-            "description": "PUT /api/account/profile — `name` (min 2) and/or `avatar` (image URL, `\"\"` clears). Send at least one.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `name` — string | required/optional | display / full name (min 2)\n- `avatar` — string | see sample value | send same JSON type as example (string/number/boolean/array/object/null)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+            "description": "PUT /api/account/profile — `name` (min 2) and/or `profileUrl` (image URL, `\"\"` clears). Send at least one.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `name` — string | required/optional | display / full name (min 2)\n- `profileUrl` — string | see sample value | send same JSON type as example (string/number/boolean/array/object/null)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Super Admin\",\n  \"avatar\": \"\"\n}",
+              "raw": "{\n  \"name\": \"Super Admin\",\n  \"profileUrl\": \"\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -5095,7 +5095,7 @@
                     "upload"
                   ]
                 },
-                "description": "multipart form-data. `type`: `education` | `account` | `leave`. `document`: pick a file (max 5 MB). Returns a URL for education[].document, accounts[].attachment, or leave apply document. `leave` stores every leave file in the Cloudinary folder `hrms/leave`.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (form-data)**\n- `type` (text) — string | required | `education`, `account`, or `leave`\n- `document` (file) — file | required | upload binary file (multipart form-data)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                "description": "multipart form-data. `type`: `education` | `account` | `leave` | `profile`. `document`: pick a file (max 5 MB). Returns a URL for education[].document, accounts[].attachment, leave apply document, or employee `profileUrl`. `profile` stores JPEG/PNG/WEBP/GIF in Cloudinary folder `hrms/profile`. Put that url on `profileUrl`. Delete it with Delete Profile Image.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (form-data)**\n- `type` (text) — string | required | `education`, `account`, `leave`, or `profile`\n- `document` (file) — file | required | upload binary file (multipart form-data)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
                 "body": {
                   "mode": "formdata",
                   "formdata": [
@@ -5112,6 +5112,39 @@
                       "description": "file | required | upload binary file (multipart form-data)"
                     }
                   ]
+                }
+              }
+            },
+            {
+              "name": "7b. Delete Profile Image",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/employees/upload",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "employees",
+                    "upload"
+                  ]
+                },
+                "description": "Deletes a profile image from Cloudinary folder `hrms/profile`. Body `url` is the url returned by Upload Attachment with `type` = `profile`. Also clears any employee `profileUrl` that still has this url.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `url` — string (url) | required | Cloudinary profile image url\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"url\": \"{{profileImageUrl}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 }
               }
             },
@@ -6754,7 +6787,7 @@
                     "upload"
                   ]
                 },
-                "description": "`type`: `education` | `account` | `leave`. `document`: pick a file (max 5 MB). `leave` puts medical and other leave files in Cloudinary folder `hrms/leave`. Use the returned url as leave apply `document`.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (form-data)**\n- `type` (text) — string | required | `education`, `account`, or `leave`\n- `document` (file) — file | required | upload binary file (multipart form-data)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                "description": "`type`: `education` | `account` | `leave` | `profile`. `document`: pick a file (max 5 MB). `profile` puts the image in Cloudinary folder `hrms/profile` (JPEG, PNG, WEBP, GIF). Save the returned url as employee `profileUrl`. Delete that file with Delete Profile Image.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (form-data)**\n- `type` (text) — string | required | `education`, `account`, `leave`, or `profile`\n- `document` (file) — file | required | upload binary file (multipart form-data)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
                 "body": {
                   "mode": "formdata",
                   "formdata": [
@@ -6771,6 +6804,39 @@
                       "description": "file | required | upload binary file (multipart form-data)"
                     }
                   ]
+                }
+              }
+            },
+            {
+              "name": "4b. Delete Profile Image",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/employees/upload",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "employees",
+                    "upload"
+                  ]
+                },
+                "description": "Deletes a profile image from Cloudinary folder `hrms/profile`. `url` is the url from Upload Attachment with `type` = `profile`.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `url` — string (url) | required | Cloudinary profile image url\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"url\": \"{{profileImageUrl}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 }
               }
             },
@@ -7067,7 +7133,7 @@
                     }
                   ]
                 },
-                "description": "Employee timesheet for a month (or from–to).\nEach row: date, day, punchInTime, punchOutTime, hours, status.\nstatus is Present, Absent, MissedPunch, Pending, or Rejected.\nMissedPunch = punch in with no punch out. Pending until approved. Rejected stays absent. Approved becomes Present."
+                "description": "Employee timesheet for the company month (or from–to).\nmonth=YYYY-MM uses the company cycle: day 1 through month end, or a shifted month such as the 24th through the 23rd.\nEach row: date, day, shift, inOut, workedHours (HH:mm), status, dayDesc, canApply.\nstatus codes: P present, A absent, MP missed punch, WO weekly off, HD half day, Pending, Rejected, or a leave code (CL, EL, UL, CO).\nWeekly off comes from the employee shift. Future work days have a blank status.\nsummary has daySummary, presentSummary, leaves, absentLate, and payable.salaryDays."
               }
             },
             {

@@ -606,7 +606,7 @@ const listBalances = async (req, res) => {
     const [total, users] = await Promise.all([
       User.countDocuments(filter),
       User.find(filter)
-        .select("name avatar official.employeeCode official.department official.dateOfJoining leaves")
+        .select("name profileUrl official.employeeCode official.department official.dateOfJoining leaves")
         .sort({ name: 1 })
         .skip(skip)
         .limit(limit)
@@ -640,7 +640,7 @@ const listBalances = async (req, res) => {
         name: u.name,
         employeeCode: u.official?.employeeCode || "",
         department: u.official?.department || "",
-        avatar: u.avatar || "",
+        profileUrl: u.profileUrl || "",
       },
       balances: (u.leaves || [])
         .filter((row) => row.year === year)

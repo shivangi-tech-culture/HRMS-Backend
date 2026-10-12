@@ -105,7 +105,7 @@ const formatAttendanceRecord = (record, extras = {}) => {
     else if (punchedBeforeStart) attendanceStatus = "Early";
     else attendanceStatus = "On time";
   }
-  const canApproveReject = attendanceStatus === "Late";
+  const canApproveReject = false;
   const shownRemarks = !isLate && remarks === "Late punch-in" ? "" : remarks;
 
   const employee = r.employee

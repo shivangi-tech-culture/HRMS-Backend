@@ -175,6 +175,12 @@ const DEFAULT_SHIFT = {
 /** Standard full day = 9 hours → OT = worked − 9h (if positive) */
 const STANDARD_WORK_MINUTES = 9 * 60;
 
+/**
+ * Present only when punch-out is at or after shift end.
+ * Leaving any time before shift end, after the first half, is HalfDay.
+ * Leaving before the first half is Absent.
+ */
+
 /** Minutes worked after that day's shift end. Early punch is not overtime. */
 const overtimeAfterShiftEnd = (punchOut, endTime) => {
   if (!punchOut || !endTime) return 0;
@@ -383,7 +389,39 @@ const formatHours = (mins) => {
 };
 
 /**
+ * Minutes that count toward the shift.
+ * Arriving before shift start does not add hours — time starts at shift start.
+ */
+const countedWorkedMinutes = (inMin, outMin, startMin) => {
+  if (inMin == null || outMin == null || startMin == null) return 0;
+  const countedIn = Math.max(inMin, startMin);
+  return Math.max(0, outMin - countedIn);
+};
+
+/**
+ * Day status after both punches, from the shift clock.
+ * - Punch-out before the shift midpoint → Absent
+ * - Punch-out after the midpoint but before shift end → HalfDay
+ * - Punch-out at shift end or later → Present
+ * - That Present day is Late when punch-in is after shift start + grace
+ * A scheduled half-day stays HalfDay once they clear the absent line.
+ * Coming late and still leaving at shift end is Late, not Half Day.
+ */
+const statusFromShiftSpan = (outMin, startMin, endMin, scheduledHalfDay) => {
+  const span = Math.max(0, endMin - startMin);
+  const halfMark = startMin + Math.floor(span / 2);
+  if (outMin < halfMark) {
+    return { statusCode: "A", status: "Absent" };
+  }
+  if (scheduledHalfDay || outMin < endMin) {
+    return { statusCode: "HD", status: "HalfDay" };
+  }
+  return { statusCode: "P", status: "Present" };
+};
+
+/**
  * After punch-out: Present / HalfDay / Absent + late / early / OT.
+ * Punch-in without punch-out stays MissedPunch.
  * Status values match Attendance.DAY_STATUSES (no spaces).
  */
 const computeDayMetrics = (record, shift, dateStr, holidayMap = {}) => {
@@ -417,7 +455,7 @@ const computeDayMetrics = (record, shift, dateStr, holidayMap = {}) => {
     };
   }
 
-  // Punch in without punch out stays MissedPunch. Present only after punch out, using this shift.
+  // Punch in without punch out stays MissedPunch. Day status is decided only on punch out.
   if (!record?.punchIn || !record?.punchOut) {
     const missed = Boolean(record?.punchIn);
     return {
@@ -436,15 +474,17 @@ const computeDayMetrics = (record, shift, dateStr, holidayMap = {}) => {
   const end = parseHm(effectiveEndTime(shiftObj, date)) ?? 1140;
   const inMin = minutesOfDay(record.punchIn);
   const outMin = minutesOfDay(record.punchOut);
-  const workedMinutes = Math.max(0, outMin - inMin);
+  const workedMinutes = countedWorkedMinutes(inMin, outMin, start);
   const lateByMinutes = punchInWindow(inMin, start, shiftObj.graceMinutes).lateByMinutes;
   const earlyByMinutes = Math.max(0, end - outMin);
-  const isHalf = type === "halfDay";
   const overtimeMinutes = Math.max(0, outMin - end);
+  const shortDay = end - start > 0 && end - start <= 5 * 60;
+  const closed = statusFromShiftSpan(outMin, start, end, type === "halfDay" || shortDay);
+  const late = lateByMinutes > 0 && closed.status === "Present";
 
   return {
-    statusCode: isHalf ? "HD" : "P",
-    status: isHalf ? "HalfDay" : "Present",
+    statusCode: late ? "L" : closed.statusCode,
+    status: late ? "Late" : closed.status,
     workedMinutes,
     overtimeMinutes,
     lateByMinutes,
@@ -474,6 +514,7 @@ module.exports = {
   effectiveEndTime,
   DEFAULT_SHIFT,
   STANDARD_WORK_MINUTES,
+  countedWorkedMinutes,
   overtimeMinutesOf,
   overtimeAfterShiftEnd,
   getAssignedShift,

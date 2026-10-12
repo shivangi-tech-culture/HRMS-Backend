@@ -24,7 +24,12 @@ const { logEmployeeActivity, humanize } = require("../utils/activityLog");
 const { grantLeaveBalance } = require("../utils/leaveBalance");
 const ActivityLog = require("../models/ActivityLog");
 const { sendExcel } = require("../utils/excel");
-const { uploadToCloudinary, UPLOAD_TYPES } = require("../middleware/upload");
+const {
+  uploadToCloudinary,
+  UPLOAD_TYPES,
+  deleteProfileImage,
+  forgetProfileImage,
+} = require("../middleware/upload");
 const {
   normalizeSectionUniques,
   findUniqueConflict,
@@ -373,6 +378,7 @@ const createEmployee = async (req, res) => {
       createDoc[key] = withoutIds(req.body[key]);
     }
     if (req.body.payroll) createDoc.payroll = req.body.payroll;
+    if (req.body.profileUrl) createDoc.profileUrl = String(req.body.profileUrl).trim();
 
     // 4. Create User with role Employee (password already hashed above)
     const employee = await User.create(createDoc);
@@ -583,6 +589,12 @@ const updateEmployee = async (req, res) => {
     if (req.body.name !== undefined) employee.name = req.body.name;
     if (req.body.status !== undefined && isAdmin) employee.status = req.body.status;
 
+    const previousProfileUrl =
+      req.body.profileUrl !== undefined ? String(employee.profileUrl || "") : null;
+    if (req.body.profileUrl !== undefined) {
+      employee.profileUrl = req.body.profileUrl ? String(req.body.profileUrl).trim() : "";
+    }
+
     if (req.body.role !== undefined) {
       if (!isAdmin) {
         return res.status(403).json({ message: "Only admin can change role" });
@@ -783,6 +795,9 @@ const updateEmployee = async (req, res) => {
 
     // --- save + response ---
     await employee.save();
+    if (previousProfileUrl !== null) {
+      await forgetProfileImage(previousProfileUrl, employee.profileUrl);
+    }
 
     await logEmployeeActivity({ actor: req.user, employee, action: "update", before });
 
@@ -1049,7 +1064,9 @@ const deleteEmployee = async (req, res) => {
 
     await logEmployeeActivity({ actor: req.user, employee, action: "delete" });
 
+    const profileUrl = employee.profileUrl;
     await employee.deleteOne();
+    await forgetProfileImage(profileUrl, "");
 
     return res.json({ message: "Employee deleted", id: req.params.id });
   } catch (err) {
@@ -1059,7 +1076,8 @@ const deleteEmployee = async (req, res) => {
 
 /**
  * UPLOAD — POST /api/employees/upload
- * Form-data: document + type (education|account|leave). Returns url only.
+ * Form-data: document + type (education|account|leave|profile). Returns url only.
+ * profile → Cloudinary folder hrms/profile (images only). Put url on profileUrl.
  */
 const uploadAttachment = async (req, res) => {
   try {
@@ -1068,7 +1086,7 @@ const uploadAttachment = async (req, res) => {
       .toLowerCase();
     if (!UPLOAD_TYPES.includes(type)) {
       return res.status(400).json({
-        message: "type is required: education, account, or leave",
+        message: "type is required: education, account, leave, or profile",
       });
     }
 
@@ -1095,6 +1113,28 @@ const uploadAttachment = async (req, res) => {
     const status = err.statusCode || 500;
     if (status >= 500) console.error("Upload failed:", err.message || err);
     return res.status(status).json({ message: err.message || "Upload failed" });
+  }
+};
+
+/**
+ * DELETE UPLOAD — DELETE /api/employees/upload
+ * Body: { url } of a profile image in hrms/profile. Clears matching profileUrl fields.
+ */
+const deleteAttachment = async (req, res) => {
+  try {
+    const url = String(req.body.url || "").trim();
+    if (!url) {
+      return res.status(400).json({ message: "url is required" });
+    }
+
+    await deleteProfileImage(url);
+    await User.updateMany({ profileUrl: url }, { $set: { profileUrl: "" } });
+
+    return res.json({ success: true, message: "Profile image deleted" });
+  } catch (err) {
+    const status = err.statusCode || 500;
+    if (status >= 500) console.error("Profile image delete failed:", err.message || err);
+    return res.status(status).json({ message: err.message || "Delete failed" });
   }
 };
 
@@ -1279,4 +1319,5 @@ module.exports = {
   deleteSection,
   deleteEmployee,
   uploadAttachment,
+  deleteAttachment,
 };

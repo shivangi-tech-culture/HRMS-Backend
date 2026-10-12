@@ -300,13 +300,19 @@ const punchOut = async (req, res) => {
       EMPLOYEE_CARD_SELECT
     );
 
+    const punchOutMessage =
+      record.status === "Absent"
+        ? "Punched out — Absent (left before half of the shift)"
+        : record.status === "HalfDay"
+          ? "Punched out — Half day (left before shift end)"
+          : record.status === "Late"
+            ? "Punched out — Late (shift completed, arrived after shift start)"
+          : windowCheck.isLate
+            ? "Punched out (after shift end — allowed)"
+            : "Punched out successfully";
+
     return res.json(
-      punchPayload(
-        windowCheck.isLate
-        ? "Punched out (after shift end — allowed)"
-        : "Punched out successfully",
-        { company, branch, shift, record }
-      )
+      punchPayload(punchOutMessage, { company, branch, shift, record })
     );
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -531,7 +537,7 @@ const ATTENDANCE_LIST_SELECT =
   "employee date companyId branchId shift punchIn punchOut punchInSource workMode workedMinutes overtimeMinutes lateByMinutes earlyByMinutes status remarks attendanceStatus reviewReason";
 
 const EMPLOYEE_DAILY_SELECT =
-  "name role status avatar official.employeeCode official.officialEmail official.department official.designation official.companyIds official.branchId official.shiftId personal.mobileNo";
+  "name role status profileUrl official.employeeCode official.officialEmail official.department official.designation official.companyIds official.branchId official.shiftId personal.mobileNo";
 
 /** Short TTL cache — company schedule rarely changes mid-request burst */
 const companyBundleCache = new Map();
@@ -623,12 +629,13 @@ const employeeDailyCard = (emp) => ({
   department: emp.official?.department || "",
   designation: emp.official?.designation || "",
   mobileNo: emp.personal?.mobileNo || "",
-  avatar: emp.avatar || "",
+  profileUrl: emp.profileUrl || "",
   role: emp.role || "",
 });
 
 /**
- * Punch-in → Present, even when late.
+ * Open punch stays MissedPunch.
+ * After punch-out, status comes from the shift (Present / HalfDay / Absent).
  * attendanceStatus: Early · On time · Late · Approved · Rejected
  */
 const applyLateStatus = (att, timing) => {
@@ -651,32 +658,55 @@ const applyLateStatus = (att, timing) => {
   const needsReview = Boolean(att?.punchIn) && isLate && !reviewed;
   let attendanceStatus = null;
   let status = "Absent";
+  let workedMinutes = null;
+  let overtimeMinutes = null;
   let canApproveReject = false;
   let remarks = written;
+
+  const stampTiming = () => {
+    if (reviewed) attendanceStatus = att.attendanceStatus;
+    else if (isLate) {
+      attendanceStatus = "Late";
+      if (!remarks) remarks = DEFAULT_LATE_REMARK;
+    } else {
+      attendanceStatus = isEarly ? "Early" : "On time";
+    }
+  };
 
   if (!att?.punchIn) {
     status = "Absent";
   } else if (!att?.punchOut) {
     status = "MissedPunch";
+    stampTiming();
+  } else if (timing?.isOff) {
+    status = "WeeklyOff";
   } else {
-    status = "Present";
-    if (reviewed) attendanceStatus = att.attendanceStatus;
-    else if (isLate) {
-      attendanceStatus = "Late";
-      canApproveReject = true;
-      if (!remarks) remarks = DEFAULT_LATE_REMARK;
-    } else {
-      attendanceStatus = isEarly ? "Early" : "On time";
-    }
+    const metrics = computeDayMetrics(
+      att,
+      {
+        startTime: timing?.startTime || DEFAULT_SHIFT.startTime,
+        endTime: timing?.endTime || DEFAULT_SHIFT.endTime,
+        graceMinutes: timing?.graceMinutes ?? DEFAULT_SHIFT.graceMinutes,
+        weeklyOffDays: [],
+        halfDayDays: [],
+      },
+      att?.date
+    );
+    status = metrics.status;
+    workedMinutes = metrics.workedMinutes;
+    overtimeMinutes = metrics.overtimeMinutes;
+    stampTiming();
   }
 
   const persist =
     att?._id &&
     Boolean(att?.punchIn) &&
     Boolean(att?.punchOut) &&
+    !timing?.isOff &&
     !reviewed &&
     (att.attendanceStatus !== attendanceStatus ||
-      att.status !== "Present" ||
+      att.status !== status ||
+      (workedMinutes != null && Number(att.workedMinutes) !== workedMinutes) ||
       Number(att.lateByMinutes) !== lateBy ||
       (needsReview && !written));
 
@@ -688,6 +718,8 @@ const applyLateStatus = (att, timing) => {
     isEarly,
     lateBy,
     earlyBy,
+    workedMinutes,
+    overtimeMinutes,
     persist,
     remarks,
     defaultRemark: needsReview && !written ? DEFAULT_LATE_REMARK : "",
@@ -707,11 +739,13 @@ const queueLateFixes = (fixes) => {
 
 const lateFixOp = (att, late) => {
   const $set = {
-    status: "Present",
+    status: late.status,
     attendanceStatus: late.attendanceStatus,
     lateByMinutes: late.lateBy,
     earlyByMinutes: late.earlyBy,
   };
+  if (late.workedMinutes != null) $set.workedMinutes = late.workedMinutes;
+  if (late.overtimeMinutes != null) $set.overtimeMinutes = late.overtimeMinutes;
   if (late.defaultRemark) $set.remarks = late.defaultRemark;
   if (!late.isLate && String(att.remarks || "").trim() === DEFAULT_LATE_REMARK) $set.remarks = "";
   return {
@@ -729,8 +763,12 @@ const buildDailyRow = (emp, att, date, maps, reg) => {
   const shiftId = oid(att?.shift) || oid(emp.official?.shiftId);
   const timing = dayTimingOf(maps.schedules.get(companyId), branchId, shiftId, date);
   const late = applyLateStatus(att, timing);
-  const worked = Number(att?.workedMinutes) || 0;
-  const overtime = overtimeAfterShiftEnd(att?.punchOut, timing?.endTime);
+  const worked =
+    late.workedMinutes != null ? late.workedMinutes : Number(att?.workedMinutes) || 0;
+  const overtime =
+    late.overtimeMinutes != null
+      ? late.overtimeMinutes
+      : overtimeAfterShiftEnd(att?.punchOut, timing?.endTime);
   const status = resolveDisplayedStatus({ att, reg, lateStatus: late.status });
 
   return {
@@ -804,7 +842,7 @@ const emptyDailySummary = () => ({
 
 const tallyDailySummary = (summary, row) => {
   summary.all += 1;
-  if (row.status === "Present") summary.present += 1;
+  if (row.status === "Present" || row.status === "Late") summary.present += 1;
   else if (row.status === "Absent" || row.status === "Rejected") summary.absent += 1;
   else if (row.status === "OnLeave") summary.onLeave += 1;
   else if (row.status === "HalfDay") summary.halfDay += 1;
@@ -991,10 +1029,15 @@ const listDailyAttendance = async (req, res) => {
           att.attendanceStatus === "Approved" || att.attendanceStatus === "Rejected";
         const isLate = (Number(att.lateByMinutes) || 0) > 0;
         const reg = regByEmp.get(key);
+        const stored = ["Present", "Late", "HalfDay", "Absent", "WeeklyOff", "Holiday", "OnLeave"].includes(
+          att.status
+        )
+          ? att.status
+          : "Present";
         const status = resolveDisplayedStatus({
           att,
           reg,
-          lateStatus: att.punchIn && att.punchOut ? "Present" : "Absent",
+          lateStatus: att.punchIn && att.punchOut ? stored : "Absent",
         });
         tallyDailySummary(summary, {
           status,
@@ -1408,9 +1451,15 @@ const reviewRemark = async (req, res) => {
       return res.status(404).json({ message: "Attendance record not found" });
     }
 
-    const awaiting = record.attendanceStatus === "Late" || record.attendanceStatus === "Pending";
+    const awaiting = record.attendanceStatus === "Late" || record.attendanceStatus === "Pending" || record.status === "Late";
     const already =
       record.attendanceStatus === "Approved" || record.attendanceStatus === "Rejected";
+    if (record.attendanceStatus === "Late" || record.status === "Late") {
+      return res.status(400).json({
+        message:
+          "Late attendance is approved through a regularization request by Reporting Manager, HR, or Super Admin.",
+      });
+    }
     if (!awaiting) {
       return res.status(400).json({
         message: already
@@ -1427,7 +1476,21 @@ const reviewRemark = async (req, res) => {
       return res.status(403).json({ message: scopeErr });
     }
 
-    record.status = record.punchOut ? (record.status === "HalfDay" ? "HalfDay" : "Present") : "MissedPunch";
+    const placed = await getAssignedShift(
+      record.employee._id || record.employee,
+      record.date
+    );
+
+    if (!record.punchOut) {
+      record.status = "MissedPunch";
+    } else {
+      const metrics = computeDayMetrics(record, placed.shift, record.date);
+      if (["Present", "Late", "HalfDay", "Absent"].includes(metrics.status)) {
+        record.status = metrics.status;
+        record.workedMinutes = metrics.workedMinutes;
+        record.overtimeMinutes = metrics.overtimeMinutes;
+      }
+    }
     record.attendanceStatus = decision === "approve" ? "Approved" : "Rejected";
     record.reviewReason = reason;
     record.remarkReviewedBy = req.user._id;
@@ -1438,10 +1501,7 @@ const reviewRemark = async (req, res) => {
       select: "name role official.officialEmail",
     });
 
-    const { shift, company, branch } = await getAssignedShift(
-      record.employee._id || record.employee,
-      record.date
-    );
+    const { shift, company, branch } = placed;
 
     // HR's assigned company ids (for UI / debug) — empty for Super Admin/Admin
     const assignedCompanyIds = hasGlobalCompanyAccess(req.user)
@@ -1451,8 +1511,8 @@ const reviewRemark = async (req, res) => {
     return res.json({
       message:
         decision === "approve"
-          ? "Late punch approved — status stays Present"
-          : "Late punch rejected — status stays Present",
+          ? `Late punch approved — day stays ${record.status}`
+          : `Late punch rejected — day stays ${record.status}`,
       decision,
       reason,
       reviewedBy: {
