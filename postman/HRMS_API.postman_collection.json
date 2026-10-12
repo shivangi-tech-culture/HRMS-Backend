@@ -5321,7 +5321,7 @@
         },
         {
           "name": "1.7 Attendance",
-          "description": "Daily list (today or a previous date), calendar, late/early, HR mark attendance, and regularization approval.\nGET /api/attendance/daily?companyId={{companyId}}&date={{attendanceDate}} — omit date for today. Punch in without punch out is MissedPunch. A pending regularization shows Pending. Rejected stays Absent. Approved becomes Present.\nPOST /api/attendance/mark is HR only. Employees send POST /api/attendance/regularize (folder 2.2).\nPOST /api/attendance/regularizations/{{regularizationId}}/review?decision=approve|reject — Reporting Manager (team), HR (assigned companies), Admin, or Super Admin. Any one approval is enough.\nScope: Super Admin/Admin = all · HR = assigned companies · Manager = team.",
+          "description": "Daily list, calendar, late/early, HR mark, and regularization approval.\nNo punch-out → MissedPunch, even if a regularization is pending.\nShift rules after punch-out: before the shift midpoint → Absent. After the midpoint but before shift end → HalfDay. At or after shift end → Present. Arriving after shift start + 10 min grace and still leaving at shift end → Late (not HalfDay). Time before shift start is not counted.\nA Late day is not approved on the attendance row. The employee sends POST /api/attendance/regularize (folder 2.2, request 6b). Then Reporting Manager (team), HR (assigned companies), or Super Admin approves POST /api/attendance/regularizations/{{regularizationId}}/review.\nPOST /api/attendance/{{attendanceId}}/review does not approve Late.",
           "item": [
             {
               "name": "1. Daily Attendance",
@@ -5412,7 +5412,7 @@
                         }
                       ]
                     },
-                    "description": "Daily attendance for one company and one date. `date` defaults to today. Pass a previous YYYY-MM-DD to open that day.\nPunch in with no punch out → status MissedPunch (`awaitingPunchOut: true`). Both punches, or an approved regularization → Present.\nPending regularization → Pending. Rejected regularization → Rejected, and the day stays absent.\nNo companyId → first created company.\nTest script saves the first employee `_id` into {{employeeId}} for Mark Attendance.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n- `date` — YYYY-MM-DD, today or earlier\n- `companyId` — company to list\n- `search` `department` `branchId` `shiftId` — optional\n- `status` — Present | Absent | MissedPunch | Pending | Rejected | Late | Working | WFH | OnLeave | HalfDay | ALL\n- `page` `limit`\n"
+                    "description": "Daily attendance for one company and one date. `date` defaults to today.\nPunch in with no punch out → MissedPunch (`awaitingPunchOut: true`).\nAfter punch-out the status follows the shift: Absent, HalfDay, Present, or Late.\nA pending regularization on a closed day shows Pending. A pending request does not hide MissedPunch when punch-out is still missing.\nLate approval is folder 4. Attendance Regularization, not the attendance row.\nTest script saves the first employee `_id` into {{employeeId}}.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n- `date` — YYYY-MM-DD, today or earlier\n- `companyId` — company to list\n- `status` — Present | Late | Absent | MissedPunch | Pending | HalfDay | Rejected | ALL\n- `attendanceStatus` — Early | On time | Late | Approved | Rejected | ALL\n- `page` `limit`\n"
                   },
                   "event": [
                     {
@@ -5462,7 +5462,7 @@
                         }
                       ]
                     },
-                    "description": "Late punches waiting for approval. Early and On time are not included.\nTest script saves the first row attendanceId into {{attendanceId}}.\nThen run 3. Approve or 4. Reject. Both call the same API; only the decision param changes.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n- `attendanceStatus` — Late\n- `page` / `limit`\n"
+                    "description": "Rows whose punch-in is Late. This list does not approve them.\nThe employee sends 2.2 → 6b. Request Late Regularization.\nReporting Manager, HR, or Super Admin then uses 4. Attendance Regularization → Approve.\nTest script saves the first row attendanceId into {{attendanceId}}.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n- `attendanceStatus` — Late\n- `page` / `limit`\n"
                   },
                   "event": [
                     {
@@ -5500,7 +5500,7 @@
                         }
                       ]
                     },
-                    "description": "Same API as Reject. Only Late can be approved.\nDay status stays Present. attendanceStatus becomes Approved.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n**Path:** `attendanceId` — from 2. Late rows\n**Query:** `decision` — `approve`\n**Body:** `reason` — required, why it was approved (max 500)\n",
+                    "description": "Do not use this for Late. Late returns 400.\nLate is approved only after the employee regularization request: 4. Attendance Regularization → 2. Approve.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n**Path:** `attendanceId`\n**Query:** `decision` — `approve`\n**Body:** `reason` — required\n",
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"reason\": \"Checked punch time. Approved.\"\n}",
@@ -5530,7 +5530,7 @@
                         }
                       ]
                     },
-                    "description": "Same API as Approve. Only Late can be rejected.\nDay status stays Present. attendanceStatus becomes Rejected.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n**Path:** `attendanceId` — from 2. Late rows\n**Query:** `decision` — `reject`\n**Body:** `reason` — required, why it was rejected (max 500)\n",
+                    "description": "Do not use this for Late. Late returns 400.\nReject a late day from 4. Attendance Regularization → 3. Reject after the employee has sent the request.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n**Path:** `attendanceId`\n**Query:** `decision` — `reject`\n**Body:** `reason` — required\n",
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"reason\": \"Punch time is too late. Rejected.\"\n}",
@@ -5775,7 +5775,7 @@
             },
             {
               "name": "4. Attendance Regularization",
-              "description": "Approval queue only. The employee creates the request in 2.2 Attendance → 6. Request Regularization.\nLogin as Super Admin, Admin, HR, or Reporting Manager to list, approve, or reject.\nAny one approval makes the day Present. Reject leaves the day Absent. An employee cannot approve or reject.",
+              "description": "Approval queue. The employee creates the request in 2.2 Attendance.\n6. Request Regularization = missed punch (send the missing HH:mm).\n6b. Request Late Regularization = Late day, date and reason only.\nLogin as Reporting Manager (own team), HR (assigned companies), or Super Admin. Any one of them can approve or reject. An employee cannot review their own request.\nApprove on a Late day keeps status Late and sets attendanceStatus Approved. Reject keeps the day Late.\nNo punch-out stays MissedPunch until a missed-punch request is approved.",
               "item": [
                 {
                   "name": "1. List requests",
@@ -5853,7 +5853,7 @@
                       "raw": "{\n  \"reason\": \"Punch verified. Approved.\"\n}",
                       "options": { "raw": { "language": "json" } }
                     },
-                    "description": "Admin, HR, or Reporting Manager approves the employee's request. You cannot approve your own request.\nDay becomes Present on daily attendance and on the employee timesheet.\nYou cannot approve your own request."
+                    "description": "Reporting Manager (team), HR (assigned companies), or Super Admin approves the employee's request.\nYou cannot approve your own request.\nMissed punch: saved punch times are scored against the shift (Present, Late, HalfDay, or Absent).\nLate request: day stays Late and attendanceStatus becomes Approved.\nBody `reason` is required."
                   }
                 },
                 {
@@ -5874,7 +5874,7 @@
                       "raw": "{\n  \"reason\": \"Times do not match the shift. Rejected.\"\n}",
                       "options": { "raw": { "language": "json" } }
                     },
-                    "description": "Admin, HR, or Reporting Manager rejects the employee's request. An employee cannot reject."
+                    "description": "Reporting Manager (team), HR (assigned companies), or Super Admin rejects the request.\nAn employee cannot reject their own request.\nA Late day stays Late and attendanceStatus becomes Rejected.\nA missed punch-out stays MissedPunch. Body `reason` is required."
                   }
                 }
               ]
@@ -6932,7 +6932,7 @@
         },
         {
           "name": "2.2 Attendance (Punch)",
-          "description": "Employee self punch and attendance regularization. Login as Employee first (2.1 → 1).\nThe employee requests regularization here (6, 7, 8). Do not send employeeId.\nApprove and reject are not here. Login as Admin and use 1.7 Attendance → 4. Attendance Regularization.",
+          "description": "Employee self punch and regularization. Login as Employee first (2.1 → 1).\nPunch in with no punch out stays MissedPunch.\nAfter punch-out, status follows the shift: Absent, HalfDay, Present, or Late.\n6 = missed punch. 6b = Late day (reason only, no new punch times).\nApprove and reject are not here. Login as Reporting Manager, HR, or Super Admin and use 1.7 → 4. Attendance Regularization.",
           "item": [
             {
               "name": "1. Punch In",
@@ -6955,7 +6955,7 @@
                     "punch-in"
                   ]
                 },
-                "description": "Punch in for the logged-in employee. Day status becomes Present.\nattendanceStatus is Early (before shift start), On time (start through 10 min grace), or Late (after grace).\nAny same-day time before shift start is allowed.\n\n**Body:** `source` (web|mobile|biometric), `latitude`, `longitude`, optional `remarks`.\n",
+                "description": "Punch in for the logged-in employee. Status stays MissedPunch until punch-out.\nattendanceStatus is Early (before shift start), On time (start through 10 min grace), or Late (after grace).\nArriving before the shift is allowed. Those minutes are not added to working hours.\n\n**Body:** `source` (web|mobile|biometric), `latitude`, `longitude`, optional `remarks`.\n",
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"source\": \"web\",\n  \"latitude\": 28.6301,\n  \"longitude\": 77.2242,\n  \"remarks\": \"Reached office\"\n}",
@@ -7001,7 +7001,7 @@
                     "punch-out"
                   ]
                 },
-                "description": "Punch out. Working hours are from punch-in to punch-out. Day stays Present.\nOvertime is the time after that day's shift end. Early punch-in is not overtime.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n**Body:** `source` web | mobile | biometric, `latitude`, `longitude`, optional `remarks`\n",
+                "description": "Punch out. Status is calculated from the shift, not from a 1-hour early exit.\nExample shift 10:00–19:00:\n- 08:00 in, 19:00 out → Present (hours count from 10:00)\n- 11:00 or 12:00 in, 19:00 out → Late\n- 08:00 in, 18:00 out → HalfDay (left before shift end)\n- in, then out within the first half (for example 2 minutes) → Absent\nNo punch-out yet → MissedPunch.\nOvertime is only time after shift end.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n**Body:** `source` web | mobile | biometric, `latitude`, `longitude`, optional `remarks`\n",
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"source\": \"web\",\n  \"latitude\": 28.6301,\n  \"longitude\": 77.2242,\n  \"remarks\": \"\"\n}",
@@ -7133,7 +7133,7 @@
                     }
                   ]
                 },
-                "description": "Employee timesheet for the company month (or from–to).\nmonth=YYYY-MM uses the company cycle: day 1 through month end, or a shifted month such as the 24th through the 23rd.\nEach row: date, day, shift, inOut, workedHours (HH:mm), status, dayDesc, canApply.\nstatus codes: P present, A absent, MP missed punch, WO weekly off, HD half day, Pending, Rejected, or a leave code (CL, EL, UL, CO).\nWeekly off comes from the employee shift. Future work days have a blank status.\nsummary has daySummary, presentSummary, leaves, absentLate, and payable.salaryDays."
+                "description": "Employee timesheet for the company month (or from–to).\nEach row: date, day, shift, inOut, workedHours, status, statusLabel, canApply.\nstatus codes: P present, L late, A absent, MP missed punch (no punch-out), HD half day, WO weekly off, Pending, Rejected, or a leave code.\ncanApply is true for Absent, MissedPunch, and Late when no request is already Pending or Approved.\nLate uses 6b (date + reason). Missed punch uses 6 (missing HH:mm)."
               }
             },
             {
@@ -7151,7 +7151,38 @@
                   "raw": "{\n  \"date\": \"{{attendanceDate}}\",\n  \"punchInTime\": \"09:30\",\n  \"punchOutTime\": \"18:30\",\n  \"reason\": \"Forgot to Punch\",\n  \"remarks\": \"Biometric did not capture\"\n}",
                   "options": { "raw": { "language": "json" } }
                 },
-                "description": "Employee only, for yourself. Admin does not create this request. The day stays Pending until Admin, HR, or Reporting Manager approves it in 1.7 Attendance → 4. Attendance Regularization.\nToday or a previous date. Send the punch you missed (in, out, or both).\nStatus stays Pending until approved. One pending request per day.\nReason comes from the Regularization Reason master (Forgot to Punch, Biometric Issue, …).\nTest script saves `_id` into {{regularizationId}}."
+                "description": "Employee only. Use this when punch-in or punch-out is missing.\nSend the missing time: punchInTime, punchOutTime, or both, as 24-hour HH:mm, plus reason.\nUntil the request is approved, a day with no punch-out stays MissedPunch.\nDo not use this for a Late day that already has both punches. Use 6b instead.\nOne pending request per date. Test script saves `_id` into {{regularizationId}}.\nApprove in 1.7 → 4. Attendance Regularization (Reporting Manager, HR, or Super Admin)."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const j = pm.response.json();",
+                      "const id = j.request && j.request._id;",
+                      "if (id) pm.collectionVariables.set('regularizationId', id);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "6b. Request Late Regularization",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "url": {
+                  "raw": "{{baseUrl}}/api/attendance/regularize",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "attendance", "regularize"]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"date\": \"{{attendanceDate}}\",\n  \"reason\": \"Traffic delay\",\n  \"remarks\": \"Reached after shift start and left at shift end\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "Employee only, after punch-out, when the day is Late (for example shift 10:00–19:00, in at 11:00 or 12:00, out at 19:00).\nDo not send punchInTime or punchOutTime. Both punches are already saved.\nBody: `date` (YYYY-MM-DD) and `reason` (required). `remarks` is optional.\nRequest stays Pending until Reporting Manager (team), HR (assigned companies), or Super Admin approves it in 1.7 → 4. Attendance Regularization.\nApprove keeps status Late and sets attendanceStatus to Approved. Reject keeps status Late.\nOne pending request per date. Test script saves `_id` into {{regularizationId}}."
               },
               "event": [
                 {
