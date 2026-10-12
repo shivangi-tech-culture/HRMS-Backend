@@ -49,7 +49,8 @@ const chatUser = async (req, res, next) => {
  *       Employee → own Reporting Heads + company employees.
  *       **Socket.IO** on the API URL: `io(API_URL, { auth: { token, companyId } })`.
  *       Emits `chat:join`, `chat:leave`, `message:send`, `chat:read`, `chat:delivered`; listens for
- *       `message:new`, `inbox:update`, `chat:changed`, `receipt:update`, `chat:muted`.
+ *       `message:new`, `inbox:update`, `message:sent` (my message sent from another tab / device /
+ *       REST), `chat:changed`, `receipt:update`, `chat:muted`.
  *       **Ticks:** each conversation has `deliveredUpTo` / `readUpTo` — my messages with
  *       `createdAt` at or before them are delivered / seen by every other member.
  */

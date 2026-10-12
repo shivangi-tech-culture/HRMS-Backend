@@ -4,7 +4,7 @@
  * Client: io(API_URL, { auth: { token, companyId } })
  * Client → server: chat:join · chat:leave · message:send · chat:read (each with an ack)
  *                  · chat:delivered (no ack)
- * Server → client: message:new · inbox:update · chat:changed · receipt:update · chat:muted
+ * Server → client: message:new · inbox:update · message:sent · chat:changed · receipt:update · chat:muted
  *                  (see chatRealtime.js)
  */
 const { chatUserFor, loadLoginUser } = require("./chatAccess");

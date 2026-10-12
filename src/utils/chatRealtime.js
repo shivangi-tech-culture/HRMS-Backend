@@ -1,10 +1,13 @@
 /**
  * CHAT REALTIME — Socket.IO pushes (io = req.app.get("io"))
  * Rooms: user:<User _id> (every tab of that person) · chat:<conversation _id> (open chat)
- * Events: message:new · inbox:update · chat:changed · receipt:update · chat:muted
+ * Events: message:new · inbox:update · message:sent · chat:changed · receipt:update · chat:muted
  */
 
-/** New message: the open chat room gets the message, each other member gets an inbox update */
+/**
+ * New message: the open chat room gets the message, each other member gets an inbox update,
+ * and the sender's own tabs / devices get message:sent (same payload, no unread or sound)
+ */
 const broadcastMessage = (io, result) => {
   if (!io) return;
   io.to(`chat:${result.conversation.id}`).emit("message:new", result.message);
@@ -15,6 +18,7 @@ const broadcastMessage = (io, result) => {
     senderId: result.message.senderId,
   };
   for (const id of result.recipientIds) io.to(`user:${id}`).emit("inbox:update", update);
+  io.to(`user:${result.message.senderId}`).emit("message:sent", update);
 };
 
 /** Stop live messages to people removed from a chat (or to everyone when it is deleted) */
