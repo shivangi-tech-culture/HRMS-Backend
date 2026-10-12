@@ -93,6 +93,8 @@ const canView = [
  *             properties:
  *               companyName: { type: string, example: ABC Technologies }
  *               companyCode: { type: string, example: ABC }
+ *               monthStartDay: { type: integer, example: 1, description: "Default 1. Shifted month example 24." }
+ *               monthEndDay: { type: integer, example: 31, description: "Default 31 means the last day of the month (30 or 31). Shifted month example 23." }
  *               isActive: { type: boolean, example: true }
  *               branches:
  *                 type: array

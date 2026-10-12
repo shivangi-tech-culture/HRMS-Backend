@@ -3,6 +3,7 @@
  *
  * Employee
  *   GET  /me
+ *   GET  /me/types
  *   POST /requests
  *   POST /requests/:id/cancel
  *
@@ -12,7 +13,7 @@
  *   PATCH/DELETE    /types/:id      shared type. DELETE removes it for every company
  *   GET             /balances
  *   POST            /balances/adjust          comp off — adds days to that type's remaining
- *   GET/POST        /requests
+ *   GET             /requests
  *   POST            /requests/:id/approve
  *   POST            /requests/:id/reject
  *   GET             /calendar?month=YYYY-MM&date=YYYY-MM-DD
@@ -44,6 +45,7 @@ const {
   deletePolicy,
   history,
   myLeave,
+  myLeaveTypes,
 } = require("../controllers/leave.controller");
 const { protect, authorize } = require("../middleware/auth");
 const { checkPermission } = require("../controllers/permission.controller");
@@ -64,6 +66,7 @@ const {
   policyBody,
   policyPatch,
   historyQuery,
+  meQuery,
 } = require("../validators/leave.validation");
 
 const router = express.Router();
@@ -86,7 +89,8 @@ const employeeOnly = (req, res, next) => {
  *     description: Leave types, balances, requests, calendar, policies, history
  */
 
-router.get("/me", protect, employeeOnly, myLeave);
+router.get("/me/types", protect, employeeOnly, myLeaveTypes);
+router.get("/me", protect, employeeOnly, validateQuery(meQuery), myLeave);
 
 router.get("/types", ...admin, leavePerm("Leave Types", "view"), validateQuery(typeListQuery), listTypes);
 router.post("/types/defaults", ...admin, leavePerm("Leave Types", "create"), validate(defaultsBody), seedDefaultTypes);
@@ -98,10 +102,7 @@ router.get("/balances", ...admin, leavePerm("Leave Balances", "view"), validateQ
 router.post("/balances/adjust", ...admin, leavePerm("Leave Balances", "edit"), validate(adjustBody), adjustBalance);
 
 router.get("/requests", ...admin, leavePerm("Leave Requests", "view"), validateQuery(requestQuery), listRequests);
-router.post("/requests", protect, validate(applyBody), (req, res, next) => {
-  if (normalizeRoleName(req.user.role) === EMPLOYEE) return applyLeave(req, res);
-  return leavePerm("Leave Requests", "create")(req, res, () => applyLeave(req, res));
-});
+router.post("/requests", protect, employeeOnly, validate(applyBody), applyLeave);
 router.post("/requests/:id/approve", ...admin, leavePerm("Leave Requests", "approve"), validate(reviewBody), approveRequest);
 router.post("/requests/:id/reject", ...admin, leavePerm("Leave Requests", "reject"), validate(reviewBody), rejectRequest);
 router.post("/requests/:id/cancel", protect, (req, res, next) => {

@@ -5095,7 +5095,7 @@
                     "upload"
                   ]
                 },
-                "description": "multipart form-data. `type`: `education` | `account`. `document`: pick a file (max 5 MB). Returns a URL for education[].document / accounts[].attachment.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (form-data)**\n- `type` (text) — string | required | attachment category key (form-data text)\n- `document` (file) — file | required | upload binary file (multipart form-data)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                "description": "multipart form-data. `type`: `education` | `account` | `leave`. `document`: pick a file (max 5 MB). Returns a URL for education[].document, accounts[].attachment, or leave apply document. `leave` stores every leave file in the Cloudinary folder `hrms/leave`.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (form-data)**\n- `type` (text) — string | required | `education`, `account`, or `leave`\n- `document` (file) — file | required | upload binary file (multipart form-data)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
                 "body": {
                   "mode": "formdata",
                   "formdata": [
@@ -5742,7 +5742,7 @@
             },
             {
               "name": "4. Attendance Regularization",
-              "description": "Approval queue. Login as Super Admin, Admin, HR, or Reporting Manager.\nEmployee requests are created in 2.2 Attendance → Request Regularization.\nAny one of reporting manager (own team), HR (assigned companies), Admin, or Super Admin can approve. One approval makes the day Present on the timesheet and on daily attendance. Reject leaves the day Absent.",
+              "description": "Approval queue only. The employee creates the request in 2.2 Attendance → 6. Request Regularization.\nLogin as Super Admin, Admin, HR, or Reporting Manager to list, approve, or reject.\nAny one approval makes the day Present. Reject leaves the day Absent. An employee cannot approve or reject.",
               "item": [
                 {
                   "name": "1. List requests",
@@ -5820,7 +5820,7 @@
                       "raw": "{\n  \"reason\": \"Punch verified. Approved.\"\n}",
                       "options": { "raw": { "language": "json" } }
                     },
-                    "description": "Writes the requested punch in / punch out onto attendance (does not overwrite a punch that is already saved).\nDay becomes Present on daily attendance and on the employee timesheet.\nYou cannot approve your own request."
+                    "description": "Admin, HR, or Reporting Manager approves the employee's request. You cannot approve your own request.\nDay becomes Present on daily attendance and on the employee timesheet.\nYou cannot approve your own request."
                   }
                 },
                 {
@@ -5841,7 +5841,7 @@
                       "raw": "{\n  \"reason\": \"Times do not match the shift. Rejected.\"\n}",
                       "options": { "raw": { "language": "json" } }
                     },
-                    "description": "Does not write punches. Request status becomes Rejected and the day stays Absent on the timesheet and on daily attendance."
+                    "description": "Admin, HR, or Reporting Manager rejects the employee's request. An employee cannot reject."
                   }
                 }
               ]
@@ -5850,7 +5850,7 @@
         },
         {
           "name": "1.8 Leave",
-          "description": "Leave types, balances, requests, calendar, policies, history.\nscope common = every company (Super Admin / Admin, no companyId). scope company = one company.\nSame code: the company type replaces the common type for that company only.\nLeave year is April–March. New employees get the active types for that year.\nComp Off extra days: POST /balances/adjust adds days to that type's remaining.\nApprove / reject: Reporting Manager (own team), HR (assigned companies), Admin, Super Admin.",
+          "description": "Leave types, balances, requests, calendar, policies, history.\nAdmin does not apply leave. The employee applies in folder 2.4 Leave.\nThis folder lists requests and approves or rejects them.\nscope common = every company (Super Admin / Admin, no companyId). scope company = one company.\nLeave year is April–March. Casual Leave follows the company month (default 1 to 30 or 31).\nApprove / reject: Reporting Manager (own team), HR (assigned companies), Admin, Super Admin.",
           "item": [
             {
               "name": "1. Leave Types",
@@ -6184,6 +6184,7 @@
             },
             {
               "name": "3. Leave Requests",
+              "description": "Admin does not apply leave. Login as Employee and use 2.4 Leave → Apply Leave.\nHere, login as Admin, HR, or Reporting Manager: list, approve, or reject.\ncompanies in the list response is the company filter. Pass companyId to see one company.",
               "item": [
                 {
                   "name": "1. List Requests",
@@ -6210,7 +6211,7 @@
                         {
                           "key": "companyId",
                           "value": "{{companyId}}",
-                          "description": "string (MongoId) | optional",
+                          "description": "string (MongoId) | optional | one company from the companies filter list",
                           "disabled": true
                         },
                         {
@@ -6232,6 +6233,18 @@
                           "disabled": true
                         },
                         {
+                          "key": "from",
+                          "value": "{{fromDate}}",
+                          "description": "YYYY-MM-DD | requests that end on or after this date",
+                          "disabled": true
+                        },
+                        {
+                          "key": "to",
+                          "value": "{{toDate}}",
+                          "description": "YYYY-MM-DD | requests that start on or before this date",
+                          "disabled": true
+                        },
+                        {
                           "key": "page",
                           "value": "1",
                           "description": "number | optional",
@@ -6245,7 +6258,7 @@
                         }
                       ]
                     },
-                    "description": "summary has all, pending, approved, rejected, onLeaveToday.\nManager sees their team. HR sees assigned companies."
+                    "description": "Admin queue. Does not create a leave. summary has all, pending, approved, rejected, onLeaveToday. Saves {{leaveRequestId}} for Approve or Reject.\ncompanies is the filter list. Pass companyId to see one company.\nEach request includes company name, code, and month start/end day.\nManager sees their team. HR sees assigned companies."
                   },
                   "event": [
                     {
@@ -6262,53 +6275,7 @@
                   ]
                 },
                 {
-                  "name": "2. Apply For Employee",
-                  "request": {
-                    "method": "POST",
-                    "header": [
-                      {
-                        "key": "Content-Type",
-                        "value": "application/json"
-                      }
-                    ],
-                    "url": {
-                      "raw": "{{baseUrl}}/api/leave/requests",
-                      "host": [
-                        "{{baseUrl}}"
-                      ],
-                      "path": [
-                        "api",
-                        "leave",
-                        "requests"
-                      ]
-                    },
-                    "description": "Admin / HR / manager apply. Days are counted on the server (inclusive). Half Day must be one date.\nPending days are held on the balance. Saves {{leaveRequestId}}.",
-                    "body": {
-                      "mode": "raw",
-                      "raw": "{\n  \"employeeId\": \"{{employeeId}}\",\n  \"leaveTypeId\": \"{{leaveTypeId}}\",\n  \"from\": \"2026-10-20\",\n  \"to\": \"2026-10-21\",\n  \"dayType\": \"Full Day\",\n  \"reason\": \"Personal work\",\n  \"document\": \"\"\n}",
-                      "options": {
-                        "raw": {
-                          "language": "json"
-                        }
-                      }
-                    }
-                  },
-                  "event": [
-                    {
-                      "listen": "test",
-                      "script": {
-                        "type": "text/javascript",
-                        "exec": [
-                          "const j = pm.response.json();",
-                          "const row = j.data && !Array.isArray(j.data) ? j.data : (j.data || [])[0];",
-                          "if (row && row._id) pm.collectionVariables.set('leaveRequestId', row._id);"
-                        ]
-                      }
-                    }
-                  ]
-                },
-                {
-                  "name": "3. Approve",
+                  "name": "2. Approve",
                   "request": {
                     "method": "POST",
                     "header": [
@@ -6330,7 +6297,7 @@
                         "approve"
                       ]
                     },
-                    "description": "Moves the hold into used. You cannot approve your own leave.",
+                    "description": "Admin, HR, or Reporting Manager. Approves the employee's pending leave. You cannot approve your own leave.",
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"reason\": \"Approved\"\n}",
@@ -6343,7 +6310,7 @@
                   }
                 },
                 {
-                  "name": "4. Reject",
+                  "name": "3. Reject",
                   "request": {
                     "method": "POST",
                     "header": [
@@ -6365,7 +6332,7 @@
                         "reject"
                       ]
                     },
-                    "description": "Releases the held days back to remaining.",
+                    "description": "Admin, HR, or Reporting Manager. Rejects the employee's pending leave.",
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"reason\": \"Not approved\"\n}",
@@ -6378,7 +6345,7 @@
                   }
                 },
                 {
-                  "name": "5. Cancel",
+                  "name": "4. Cancel",
                   "request": {
                     "method": "POST",
                     "header": [],
@@ -6787,7 +6754,7 @@
                     "upload"
                   ]
                 },
-                "description": "`type`: education | account. `document`: pick a file (max 5 MB).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (form-data)**\n- `type` (text) — string | required | attachment category key (form-data text)\n- `document` (file) — file | required | upload binary file (multipart form-data)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                "description": "`type`: `education` | `account` | `leave`. `document`: pick a file (max 5 MB). `leave` puts medical and other leave files in Cloudinary folder `hrms/leave`. Use the returned url as leave apply `document`.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (form-data)**\n- `type` (text) — string | required | `education`, `account`, or `leave`\n- `document` (file) — file | required | upload binary file (multipart form-data)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
                 "body": {
                   "mode": "formdata",
                   "formdata": [
@@ -6899,7 +6866,7 @@
         },
         {
           "name": "2.2 Attendance (Punch)",
-          "description": "Employee self punch. Response includes company, branch, shift, remarks, overtime after punch-out.\nLogin as Employee first (2.1 → 1).",
+          "description": "Employee self punch and attendance regularization. Login as Employee first (2.1 → 1).\nThe employee requests regularization here (6, 7, 8). Do not send employeeId.\nApprove and reject are not here. Login as Admin and use 1.7 Attendance → 4. Attendance Regularization.",
           "item": [
             {
               "name": "1. Punch In",
@@ -7118,7 +7085,7 @@
                   "raw": "{\n  \"date\": \"{{attendanceDate}}\",\n  \"punchInTime\": \"09:30\",\n  \"punchOutTime\": \"18:30\",\n  \"reason\": \"Forgot to Punch\",\n  \"remarks\": \"Biometric did not capture\"\n}",
                   "options": { "raw": { "language": "json" } }
                 },
-                "description": "Employee only, for yourself. Same times as HR Mark Attendance, but it does not mark the day yet.\nToday or a previous date. Send the punch you missed (in, out, or both).\nStatus stays Pending until approved. One pending request per day.\nReason comes from the Regularization Reason master (Forgot to Punch, Biometric Issue, …).\nTest script saves `_id` into {{regularizationId}}."
+                "description": "Employee only, for yourself. Admin does not create this request. The day stays Pending until Admin, HR, or Reporting Manager approves it in 1.7 Attendance → 4. Attendance Regularization.\nToday or a previous date. Send the punch you missed (in, out, or both).\nStatus stays Pending until approved. One pending request per day.\nReason comes from the Regularization Reason master (Forgot to Punch, Biometric Issue, …).\nTest script saves `_id` into {{regularizationId}}."
               },
               "event": [
                 {
@@ -7255,15 +7222,49 @@
         },
         {
           "name": "2.4 Leave",
-          "description": "Employee self-service leave. Login as Employee first (2.1 → 1).\nGET /me is the dashboard: balances, applied (pending + rejected), approved.\nApply holds remaining. Cancel of a pending request puts the days back.",
+          "description": "Employee self-service leave. Login as Employee first (2.1 → 1).\nOnly the employee applies leave. Admin does not.\nGET /me/types is the leave type dropdown (saves {{leaveTypeId}}).\nUpload Leave Document uses POST /api/employees/upload with type `leave` (saves {{leaveDocumentUrl}} into hrms/leave).\nGET /me is this employee's leave history.\nApprove and reject are in 1.8 Leave → 3. Leave Requests, after you log in as Admin.",
           "item": [
             {
-              "name": "1. My Leave",
+              "name": "1. Leave Types",
               "request": {
                 "method": "GET",
                 "header": [],
                 "url": {
-                  "raw": "{{baseUrl}}/api/leave/me",
+                  "raw": "{{baseUrl}}/api/leave/me/types",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "leave",
+                    "me",
+                    "types"
+                  ]
+                },
+                "description": "Active leave types for the logged-in employee: Casual Leave, Earned Leave, Comp Off, Unpaid Leave.\nCasual Leave is 1 day per month of the open quarter, after the 3-month probation.\nSaves {{leaveTypeId}} from Casual Leave (CL), or the first row."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const j = pm.response.json();",
+                      "const rows = j.data || [];",
+                      "const row = rows.find((item) => item.code === 'CL') || rows[0];",
+                      "if (row && row._id) pm.collectionVariables.set('leaveTypeId', row._id);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "2. My Leave",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/leave/me?status=All&search=&page=1&limit=10",
                   "host": [
                     "{{baseUrl}}"
                   ],
@@ -7271,13 +7272,94 @@
                     "api",
                     "leave",
                     "me"
+                  ],
+                  "query": [
+                    {
+                      "key": "status",
+                      "value": "All",
+                      "description": "All | Pending | Approved | Rejected | Cancelled"
+                    },
+                    {
+                      "key": "search",
+                      "value": "",
+                      "description": "reason, leave type name or code, or date YYYY-MM-DD",
+                      "disabled": true
+                    },
+                    {
+                      "key": "from",
+                      "value": "{{fromDate}}",
+                      "description": "YYYY-MM-DD | requests that end on or after this date",
+                      "disabled": true
+                    },
+                    {
+                      "key": "to",
+                      "value": "{{toDate}}",
+                      "description": "YYYY-MM-DD | requests that start on or before this date",
+                      "disabled": true
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "10"
+                    }
                   ]
                 },
-                "description": "Wallet for the current leave year (April–March), plus applied and approved requests.\ndisplay on each balance is remaining/total."
+                "description": "Employee leave dashboard. history is this page. summary is all, pending, approved, rejected, cancelled. search matches reason, type, or date. page and limit paginate."
               }
             },
             {
-              "name": "2. Apply Leave",
+              "name": "3. Upload Leave Document",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/employees/upload",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "employees",
+                    "upload"
+                  ]
+                },
+                "description": "Same upload API. Pass `type` = `leave` only.\nMedical and every other leave file goes into Cloudinary folder `hrms/leave`.\nSaves {{leaveDocumentUrl}}. Put that url in Apply Leave `document`.",
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "type",
+                      "value": "leave",
+                      "type": "text",
+                      "description": "string | required | `leave` — Cloudinary folder hrms/leave"
+                    },
+                    {
+                      "key": "document",
+                      "type": "file",
+                      "src": [],
+                      "description": "file | required | PDF, image, Word, or Excel — max 5 MB"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const j = pm.response.json();",
+                      "if (j.url) pm.collectionVariables.set('leaveDocumentUrl', j.url);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "4. Apply Leave",
               "request": {
                 "method": "POST",
                 "header": [
@@ -7297,10 +7379,10 @@
                     "requests"
                   ]
                 },
-                "description": "Applies for the logged-in employee. Do not send employeeId.\nfrom / to = YYYY-MM-DD inside the current leave year. Half Day = one date, 0.5 day.\nSaves {{leaveRequestId}}.",
+                "description": "Applies for the logged-in employee only. Admin cannot call this.\nDo not send employeeId.\nfrom / to = YYYY-MM-DD inside the current leave year. Half Day = one date, 0.5 day.\nCasual Leave uses that employee's company month. Probation blocks dates inside the 3 company months.\n`document` is the Cloudinary url from Upload Leave Document (`type` = `leave`). Empty string if there is no file.\nSaves {{leaveRequestId}}. Approve it from 1.8 Leave → 3. Leave Requests.",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"leaveTypeId\": \"{{leaveTypeId}}\",\n  \"from\": \"2026-10-20\",\n  \"to\": \"2026-10-20\",\n  \"dayType\": \"Full Day\",\n  \"reason\": \"Personal work\",\n  \"document\": \"\"\n}",
+                  "raw": "{\n  \"leaveTypeId\": \"{{leaveTypeId}}\",\n  \"from\": \"2026-10-20\",\n  \"to\": \"2026-10-20\",\n  \"dayType\": \"Full Day\",\n  \"reason\": \"Personal work\",\n  \"document\": \"{{leaveDocumentUrl}}\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -7323,7 +7405,7 @@
               ]
             },
             {
-              "name": "3. Cancel Leave",
+              "name": "5. Cancel Leave",
               "request": {
                 "method": "POST",
                 "header": [],
@@ -7547,6 +7629,10 @@
     },
     {
       "key": "leaveTypeId",
+      "value": ""
+    },
+    {
+      "key": "leaveDocumentUrl",
       "value": ""
     },
     {

@@ -1,6 +1,6 @@
 /**
  * UPLOAD MIDDLEWARE — multer (memory) → Cloudinary secure URL
- * Field "document", max 5 MB. Types: education | account → hrms/<type>.
+ * Field "document", max 5 MB. Types: education | account | leave → hrms/<type>.
  */
 const multer = require("multer");
 const path = require("path");
@@ -28,7 +28,7 @@ const allowed = new Set([
 ]);
 
 /** Allowed attachment kinds. Folder on Cloudinary is hrms/<type>. */
-const UPLOAD_TYPES = ["education", "account"];
+const UPLOAD_TYPES = ["education", "account", "leave"];
 
 /** Multer: single field "document", max 5 MB, memory storage */
 const uploadFile = multer({
@@ -77,10 +77,10 @@ const rejectFile = (message) => {
   return err;
 };
 
-/** Cloudinary folder: hrms/education or hrms/account */
+/** Cloudinary folder: hrms/education, hrms/account, or hrms/leave */
 const folderFor = (type) => {
   const configured = (process.env.CLOUDINARY_FOLDER || "hrms").replace(/\/+$/, "");
-  const root = configured.replace(/\/(education|account)$/, "") || "hrms";
+  const root = configured.replace(/\/(education|account|leave)$/, "") || "hrms";
   return `${root}/${type}`;
 };
 

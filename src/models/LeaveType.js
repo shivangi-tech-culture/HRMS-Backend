@@ -18,7 +18,16 @@ const leaveTypeSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     code: { type: String, required: true, trim: true, uppercase: true },
     paid: { type: Boolean, default: true },
-    maxDays: { type: Number, required: true, min: 0 },
+    /** null when isUnlimited (Comp Off). Otherwise the yearly cap. */
+    maxDays: { type: Number, default: null },
+    /** quarterly = 3 per calendar quarter, unused expires. yearly = one pool. earned = only credited days. */
+    allocationType: {
+      type: String,
+      enum: ["yearly", "quarterly", "earned"],
+      default: "yearly",
+    },
+    quarterlyLimit: { type: Number, default: null },
+    isUnlimited: { type: Boolean, default: false },
     carryForward: { type: Boolean, default: false },
     status: { type: String, enum: ["Active", "Inactive"], default: "Active" },
     /** Company hid this code. The common row with the same code stays. */

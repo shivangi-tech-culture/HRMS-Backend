@@ -297,6 +297,19 @@ const userSchema = new mongoose.Schema(
         pending: { type: Number, default: 0 },
         available: { type: Number, default: 0 },
         remaining: { type: Number, default: 0 },
+        /** Quarterly Leave only. Calendar quarters inside this leave year. Unused does not move forward. */
+        quarterUsed: {
+          q1: { type: Number, default: 0 },
+          q2: { type: Number, default: 0 },
+          q3: { type: Number, default: 0 },
+          q4: { type: Number, default: 0 },
+        },
+        quarterPending: {
+          q1: { type: Number, default: 0 },
+          q2: { type: Number, default: 0 },
+          q3: { type: Number, default: 0 },
+          q4: { type: Number, default: 0 },
+        },
       },
     ],
     /** Comp Off and other extra-day notes for this employee. */

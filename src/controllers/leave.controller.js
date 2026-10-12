@@ -7,16 +7,28 @@ const LeaveType = require("../models/LeaveType");
 const LeaveRequest = require("../models/LeaveRequest");
 const LeavePolicy = require("../models/LeavePolicy");
 const User = require("../models/User");
+const Company = require("../models/Company");
 const {
   round,
   todayYmd,
   leaveYear,
   yearLabel,
   companyOf,
+  monthStartForUser,
+  monthStartForCompany,
   presentItem,
+  summarizeBalances,
   stampLine,
   leaveLine,
   moveLeave,
+  slicesFor,
+  rebuildQuarterLine,
+  quarterlyDateError,
+  probationBlock,
+  casualDatesError,
+  isEarnedType,
+  isQuarterlyType,
+  poolOf,
   pushTypeToBalances,
   ensureCompanyBalances,
   grantLeaveBalance,
@@ -31,6 +43,13 @@ const {
 const { assertTeamOrCompanyEmployee, getTeamMemberIds } = require("../utils/teamScope");
 const { EMPLOYEE, normalizeRoleName, isTeamScopedRole } = require("../config/roles");
 const { DEFAULT_TYPES } = require("../utils/seedLeave");
+
+const leaveStatus = (value) => {
+  const raw = String(value || "").trim().toLowerCase();
+  if (!raw || raw === "all") return "";
+  const match = ["Pending", "Approved", "Rejected", "Cancelled"].find((status) => status.toLowerCase() === raw);
+  return match || "";
+};
 
 const pageOf = (q) => {
   const page = Math.max(1, Number(q.page) || 1);
@@ -83,10 +102,24 @@ const mapType = (row) => ({
   name: row.name,
   code: row.code,
   paid: row.paid,
-  maxDays: row.maxDays,
+  maxDays: row.isUnlimited || row.maxDays == null ? null : row.maxDays,
+  allocationType: row.allocationType || "yearly",
+  quarterlyLimit: row.quarterlyLimit ?? null,
+  isUnlimited: !!row.isUnlimited,
   carryForward: row.carryForward,
   status: row.status,
 });
+
+const mapCompany = (row) => {
+  if (!row) return null;
+  return {
+    _id: row._id,
+    companyName: row.companyName || "",
+    companyCode: row.companyCode || "",
+    monthStartDay: row.monthStartDay ?? 1,
+    monthEndDay: row.monthEndDay ?? 31,
+  };
+};
 
 const mapRequest = (row, refs) => {
   const emp = refs.users.get(String(row.employee)) || {};
@@ -101,6 +134,9 @@ const mapRequest = (row, refs) => {
       employeeCode: emp.official?.employeeCode || "",
       department: emp.official?.department || "",
     },
+    company: row.companyId
+      ? mapCompany(refs.companies.get(String(row.companyId)) || { _id: row.companyId })
+      : null,
     leaveType: type.name || "",
     leaveTypeId: row.leaveType,
     code: type.code || "",
@@ -126,12 +162,14 @@ const refsFor = async (rows) => {
   const list = [].concat(rows).filter(Boolean);
   const userIds = new Set();
   const typeIds = new Set();
+  const companyIds = new Set();
   for (const row of list) {
     if (row.employee) userIds.add(String(row.employee));
     if (row.reviewedBy) userIds.add(String(row.reviewedBy));
     if (row.leaveType) typeIds.add(String(row.leaveType));
+    if (row.companyId) companyIds.add(String(row.companyId));
   }
-  const [users, types] = await Promise.all([
+  const [users, types, companies] = await Promise.all([
     userIds.size
       ? User.find({ _id: { $in: [...userIds] } })
           .select("name official.employeeCode official.department")
@@ -140,10 +178,16 @@ const refsFor = async (rows) => {
     typeIds.size
       ? LeaveType.find({ _id: { $in: [...typeIds] } }).select("name code paid").lean()
       : [],
+    companyIds.size
+      ? Company.find({ _id: { $in: [...companyIds] } })
+          .select("companyName companyCode monthStartDay monthEndDay")
+          .lean()
+      : [],
   ]);
   return {
     users: new Map(users.map((u) => [String(u._id), u])),
     types: new Map(types.map((t) => [String(t._id), t])),
+    companies: new Map(companies.map((row) => [String(row._id), row])),
   };
 };
 
@@ -152,15 +196,89 @@ const asRequests = async (rows) => {
   return [].concat(rows).map((row) => mapRequest(row, refs));
 };
 
+/** Leave requests for one employee, newest first. Used after apply, approve, and cancel. */
+const employeeHistory = async (employeeId) => {
+  const rows = await LeaveRequest.find({ employee: employeeId })
+    .sort({ createdAt: -1 })
+    .limit(50)
+    .lean();
+  return asRequests(rows);
+};
+
+/** Employee dashboard list: search, status, date range, and page. */
+const employeeLeavePage = async (employeeId, query = {}) => {
+  const filter = { employee: employeeId };
+  const status = leaveStatus(query.status);
+  const search = String(query.search || "").trim();
+  if (query.from) filter.to = { $gte: query.from };
+  if (query.to) filter.from = { ...(filter.from || {}), $lte: query.to };
+  if (search) {
+    const rx = new RegExp(escapeRegex(search), "i");
+    const types = await LeaveType.find({ $or: [{ name: rx }, { code: rx }] }).select("_id").lean();
+    filter.$or = [
+      { reason: rx },
+      { from: rx },
+      { to: rx },
+      ...(types.length ? [{ leaveType: { $in: types.map((row) => row._id) } }] : []),
+    ];
+  }
+  const { page, limit, skip } = pageOf(query);
+  const listFilter = status ? { ...filter, status } : filter;
+  const [total, rows, grouped] = await Promise.all([
+    LeaveRequest.countDocuments(listFilter),
+    LeaveRequest.find(listFilter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+    LeaveRequest.aggregate([{ $match: filter }, { $group: { _id: "$status", n: { $sum: 1 } } }]),
+  ]);
+  const summary = { all: 0, pending: 0, approved: 0, rejected: 0, cancelled: 0 };
+  for (const row of grouped) {
+    const key = String(row._id || "").toLowerCase();
+    if (summary[key] !== undefined) summary[key] = row.n;
+    summary.all += row.n;
+  }
+  return {
+    summary,
+    history: await asRequests(rows),
+    count: rows.length,
+    total,
+    page,
+    pages: Math.ceil(total / limit) || 1,
+  };
+};
+
 const loadEmployee = async (id) => {
   const employee = await User.findById(id)
-    .select("name role status official.employeeCode official.department official.companyIds official.reportingHead1 official.reportingHead2")
+    .select("name role status official.employeeCode official.department official.companyIds official.dateOfJoining official.reportingHead1 official.reportingHead2")
     .lean();
   return employee;
 };
 
-const holdDays = (employeeId, type, days, direction) =>
-  moveLeave(employeeId, type, days, direction);
+const holdDays = (employeeId, type, days, direction, slices) =>
+  moveLeave(employeeId, type, days, direction, slices);
+
+/** Closed-quarter Quarterly Leave is not stored. Release the hold, then delete the row. */
+const releaseExpiredQuarterly = async (employeeId) => {
+  const today = todayYmd();
+  const employeeFilter = employeeId ? { employee: employeeId } : {};
+  await LeaveRequest.deleteMany({
+    ...employeeFilter,
+    status: "Cancelled",
+    reviewReason: "Quarter ended. Unused Quarterly Leave expired.",
+  });
+  const pending = await LeaveRequest.find({
+    ...employeeFilter,
+    status: "Pending",
+    to: { $lt: today },
+  });
+  for (const request of pending) {
+    const monthStartDay = await monthStartForCompany(request.companyId);
+    if (!quarterlyDateError(request.from, request.to, today, monthStartDay)) continue;
+    const type = await LeaveType.findById(request.leaveType).lean();
+    if (!type || !isQuarterlyType(type)) continue;
+    const slices = slicesFor(request.from, request.to, request.dayType, monthStartDay);
+    await holdDays(request.employee, type, request.days, "release", slices);
+    await request.deleteOne();
+  }
+};
 
 const assertTypeWrite = (actor, type) => {
   if (type.scope === "common") return null;
@@ -179,7 +297,11 @@ const applyTypeFields = (type, body) => {
   if (body.code) type.code = String(body.code).trim().toUpperCase();
   if (body.name !== undefined) type.name = body.name.trim();
   if (body.paid !== undefined) type.paid = body.paid;
-  if (body.maxDays !== undefined) type.maxDays = body.maxDays;
+  if (body.allocationType !== undefined) type.allocationType = body.allocationType;
+  if (body.quarterlyLimit !== undefined) type.quarterlyLimit = body.quarterlyLimit;
+  if (body.isUnlimited !== undefined) type.isUnlimited = body.isUnlimited;
+  if (body.isUnlimited) type.maxDays = null;
+  else if (body.maxDays !== undefined) type.maxDays = body.maxDays;
   if (body.carryForward !== undefined) type.carryForward = body.carryForward;
   if (body.status !== undefined) type.status = body.status;
 };
@@ -275,7 +397,10 @@ const createType = async (req, res) => {
       exists.hidden = false;
       exists.name = req.body.name.trim();
       exists.paid = req.body.paid;
-      exists.maxDays = req.body.maxDays;
+      exists.maxDays = req.body.isUnlimited ? null : req.body.maxDays;
+      exists.allocationType = req.body.allocationType || "yearly";
+      exists.quarterlyLimit = req.body.quarterlyLimit ?? null;
+      exists.isUnlimited = !!req.body.isUnlimited;
       exists.carryForward = req.body.carryForward;
       exists.status = req.body.status || "Active";
       await exists.save();
@@ -288,7 +413,10 @@ const createType = async (req, res) => {
       name: req.body.name.trim(),
       code,
       paid: req.body.paid,
-      maxDays: req.body.maxDays,
+      maxDays: req.body.isUnlimited ? null : req.body.maxDays,
+      allocationType: req.body.allocationType || "yearly",
+      quarterlyLimit: req.body.quarterlyLimit ?? null,
+      isUnlimited: !!req.body.isUnlimited,
       carryForward: req.body.carryForward,
       status: req.body.status || "Active",
     });
@@ -361,6 +489,9 @@ const updateType = async (req, res) => {
           code: type.code,
           paid: type.paid,
           maxDays: type.maxDays,
+          allocationType: type.allocationType,
+          quarterlyLimit: type.quarterlyLimit,
+          isUnlimited: type.isUnlimited,
           carryForward: type.carryForward,
           status: type.status,
         });
@@ -377,7 +508,12 @@ const updateType = async (req, res) => {
       for (const bal of wallets) {
         for (const id of watchIds) {
           const item = leaveLine(bal, id, leaveYear());
-          if (item && round(row.maxDays + item.adjusted - item.used - item.pending) < 0) {
+          if (
+            item &&
+            !isEarnedType(row) &&
+            row.allocationType !== "quarterly" &&
+            round(poolOf(row, item) - item.used - item.pending) < 0
+          ) {
             return res.status(400).json({
               message: `${row.name} is already used more than ${row.maxDays} days`,
             });
@@ -470,7 +606,7 @@ const listBalances = async (req, res) => {
     const [total, users] = await Promise.all([
       User.countDocuments(filter),
       User.find(filter)
-        .select("name avatar official.employeeCode official.department leaves")
+        .select("name avatar official.employeeCode official.department official.dateOfJoining leaves")
         .sort({ name: 1 })
         .skip(skip)
         .limit(limit)
@@ -486,10 +622,18 @@ const listBalances = async (req, res) => {
     ];
     const types = typeIds.length
       ? await LeaveType.find({ _id: { $in: typeIds } })
-          .select("name code paid carryForward maxDays scope")
+          .select("name code paid carryForward maxDays allocationType quarterlyLimit isUnlimited scope")
           .lean()
       : [];
     const typeMap = new Map(types.map((t) => [String(t._id), t]));
+    for (const u of users) {
+      const lines = (u.leaves || []).filter((row) => row.year === year);
+      const monthStartDay = await monthStartForUser(u);
+      for (const line of lines) {
+        await rebuildQuarterLine(u, typeMap.get(String(line.leaveType)), line, monthStartDay);
+      }
+      u.monthStartDay = monthStartDay;
+    }
     const data = users.map((u) => ({
       employee: {
         _id: u._id,
@@ -500,16 +644,17 @@ const listBalances = async (req, res) => {
       },
       balances: (u.leaves || [])
         .filter((row) => row.year === year)
-        .map((item) => presentItem(item, typeMap.get(String(item.leaveType))))
+        .map((item) => presentItem(item, typeMap.get(String(item.leaveType)), u.official?.dateOfJoining, u.monthStartDay))
         .filter(Boolean),
     }));
+    const withSummary = data.map((row) => ({ ...row, summary: summarizeBalances(row.balances) }));
     return res.json({
       year: yearLabel(year),
-      count: data.length,
+      count: withSummary.length,
       total,
       page,
       pages: Math.ceil(total / limit) || 1,
-      data,
+      data: withSummary,
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -542,7 +687,7 @@ const adjustBalance = async (req, res) => {
       return res.status(404).json({ message: "Leave balance not found for this type" });
     }
     item.adjusted = round(item.adjusted + days);
-    stampLine(item, type.maxDays);
+    stampLine(item, type);
     balance.leaveAdjustments.push({
       leaveType: type._id,
       year,
@@ -553,9 +698,13 @@ const adjustBalance = async (req, res) => {
     });
     balance.markModified("leaves");
     await balance.save();
-    const shown = presentItem(item, type);
+    const monthStartDay = await monthStartForUser(employee);
+    const shown = presentItem(item, type, employee.official?.dateOfJoining, monthStartDay);
+    const earned = isEarnedType(type);
     return res.json({
-      message: `${shown.name} remaining increased by ${days}`,
+      message: earned
+        ? `${shown.name} earned increased by ${days}`
+        : `${shown.name} remaining increased by ${days}`,
       data: shown,
     });
   } catch (err) {
@@ -569,10 +718,22 @@ const requestScope = async (actor, query) => {
   const filter = {};
   if (isTeamScopedRole(actor.role)) {
     filter.employee = { $in: await getTeamMemberIds(actor) };
+    if (query.companyId) filter.companyId = query.companyId;
   } else if (scope.ids) {
     filter.companyId = { $in: scope.ids };
   }
-  return { filter };
+  return { filter, companies: await companiesForActor(actor) };
+};
+
+const companiesForActor = async (actor) => {
+  const scope = companyScope(actor);
+  if (scope.error) return [];
+  const filter = scope.ids ? { _id: { $in: scope.ids } } : {};
+  const rows = await Company.find(filter)
+    .select("companyName companyCode monthStartDay monthEndDay")
+    .sort({ companyName: 1 })
+    .lean();
+  return rows.map(mapCompany);
 };
 
 const narrowEmployees = async (filter, query) => {
@@ -595,11 +756,14 @@ const listRequests = async (req, res) => {
   try {
     const scoped = await requestScope(req.user, req.query);
     if (scoped.error) return res.status(403).json({ message: scoped.error });
+    await releaseExpiredQuarterly();
     const filter = await narrowEmployees({ ...scoped.filter }, req.query);
     if (req.query.leaveTypeId) filter.leaveType = req.query.leaveTypeId;
+    if (req.query.from) filter.to = { $gte: req.query.from };
+    if (req.query.to) filter.from = { ...(filter.from || {}), $lte: req.query.to };
     const today = todayYmd();
     const { page, limit, skip } = pageOf(req.query);
-    const statusFilter = req.query.status && req.query.status !== "All" ? req.query.status : "";
+    const statusFilter = leaveStatus(req.query.status);
     const listFilter = statusFilter ? { ...filter, status: statusFilter } : filter;
     const [total, rows, grouped, onLeaveToday] = await Promise.all([
       LeaveRequest.countDocuments(listFilter),
@@ -615,7 +779,7 @@ const listRequests = async (req, res) => {
         to: { $gte: today },
       }),
     ]);
-    const summary = { all: 0, pending: 0, approved: 0, rejected: 0, onLeaveToday };
+    const summary = { all: 0, pending: 0, approved: 0, rejected: 0, cancelled: 0, onLeaveToday };
     for (const row of grouped) {
       const key = String(row._id || "").toLowerCase();
       if (summary[key] !== undefined) summary[key] = row.n;
@@ -623,6 +787,7 @@ const listRequests = async (req, res) => {
     }
     return res.json({
       summary,
+      companies: scoped.companies,
       count: rows.length,
       total,
       page,
@@ -636,16 +801,10 @@ const listRequests = async (req, res) => {
 
 const applyLeave = async (req, res) => {
   try {
-    const self = isEmployee(req.user);
-    const employeeId = self ? req.user._id : req.body.employeeId || req.user._id;
-    const employee = self ? req.user : await loadEmployee(employeeId);
-    if (!employee || !isEmployee(employee)) {
-      return res.status(404).json({ message: "Employee not found" });
+    if (!isEmployee(req.user)) {
+      return res.status(403).json({ message: "Only an employee can apply leave" });
     }
-    if (!self) {
-      const denied = assertTeamOrCompanyEmployee(req.user, employee);
-      if (denied) return res.status(403).json({ message: denied });
-    }
+    const employee = req.user;
     const { from, to, dayType } = req.body;
     if (to < from) return res.status(400).json({ message: "To date is before from date" });
     const span = daysBetween(from, to);
@@ -663,6 +822,10 @@ const applyLeave = async (req, res) => {
     if (!forThisCompany) {
       return res.status(400).json({ message: "Leave type is not for this company" });
     }
+    await releaseExpiredQuarterly(employee._id);
+    const monthStartDay = await monthStartForUser(employee);
+    const blockedProbation = probationBlock(employee.official?.dateOfJoining, from, monthStartDay);
+    if (blockedProbation) return res.status(400).json({ message: blockedProbation });
     const overlap = await LeaveRequest.exists({
       employee: employee._id,
       status: { $in: ["Pending", "Approved"] },
@@ -671,12 +834,19 @@ const applyLeave = async (req, res) => {
     });
     if (overlap) return res.status(400).json({ message: "Leave already applied for these dates" });
 
-    const year = leaveYear(from);
-    if (year !== leaveYear(to) || year !== leaveYear()) {
+    const year = leaveYear(from, monthStartDay);
+    if (year !== leaveYear(to, monthStartDay) || year !== leaveYear(todayYmd(), monthStartDay)) {
       return res.status(400).json({ message: "Leave dates must stay inside the current leave year (April–March)" });
     }
+    if (isQuarterlyType(type)) {
+      const blocked = quarterlyDateError(from, to, todayYmd(), monthStartDay);
+      if (blocked) return res.status(400).json({ message: blocked });
+      const collapsed = casualDatesError(employee.official?.dateOfJoining, from, to, monthStartDay);
+      if (collapsed) return res.status(400).json({ message: collapsed });
+    }
     await grantLeaveBalance(employee);
-    const held = await holdDays(employee._id, type, days, "hold");
+    const slices = slicesFor(from, to, dayType, monthStartDay);
+    const held = await holdDays(employee._id, type, days, "hold", slices);
     if (held.error) return res.status(400).json({ message: held.error });
 
     const request = await LeaveRequest.create({
@@ -691,11 +861,11 @@ const applyLeave = async (req, res) => {
       document: req.body.document || "",
       appliedBy: req.user._id,
     });
-    const [data] = await asRequests(request);
+    const [data, history] = await Promise.all([asRequests(request), employeeHistory(employee._id)]);
     return res.status(201).json({
       message: "Leave applied",
-      data,
-      balance: held.item,
+      data: data[0],
+      history,
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -718,8 +888,15 @@ const decide = async (req, res, nextStatus) => {
 
     const type = await LeaveType.findById(request.leaveType).lean();
     if (!type) return res.status(400).json({ message: "Leave type not found" });
+    const monthStartDay = await monthStartForCompany(request.companyId);
+    const slices = slicesFor(request.from, request.to, request.dayType, monthStartDay);
+    if (nextStatus === "Approved" && isQuarterlyType(type) && quarterlyDateError(request.from, request.to, todayYmd(), monthStartDay)) {
+      await holdDays(request.employee, type, request.days, "release", slices);
+      await request.deleteOne();
+      return res.status(400).json({ message: quarterlyDateError(request.from, request.to, todayYmd(), monthStartDay) });
+    }
     const direction = nextStatus === "Approved" ? "approve" : "release";
-    const moved = await holdDays(request.employee, type, request.days, direction);
+    const moved = await holdDays(request.employee, type, request.days, direction, slices);
     if (moved.error) return res.status(400).json({ message: moved.error });
 
     request.status = nextStatus;
@@ -727,11 +904,11 @@ const decide = async (req, res, nextStatus) => {
     request.reviewedAt = new Date();
     request.reviewReason = (req.body.reason || "").trim();
     await request.save();
-    const [data] = await asRequests(request);
+    const [data, history] = await Promise.all([asRequests(request), employeeHistory(request.employee)]);
     return res.json({
       message: nextStatus === "Approved" ? "Leave approved" : "Leave rejected",
-      data,
-      balance: moved.item,
+      data: data[0],
+      history,
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -756,14 +933,20 @@ const cancelRequest = async (req, res) => {
     }
     const type = await LeaveType.findById(request.leaveType).lean();
     if (!type) return res.status(400).json({ message: "Leave type not found" });
-    const moved = await holdDays(request.employee, type, request.days, "release");
+    const slices = slicesFor(
+      request.from,
+      request.to,
+      request.dayType,
+      await monthStartForCompany(request.companyId)
+    );
+    const moved = await holdDays(request.employee, type, request.days, "release", slices);
     if (moved.error) return res.status(400).json({ message: moved.error });
     request.status = "Cancelled";
     request.reviewedBy = req.user._id;
     request.reviewedAt = new Date();
     await request.save();
-    const [data] = await asRequests(request);
-    return res.json({ message: "Leave cancelled", data, balance: moved.item });
+    const [data, history] = await Promise.all([asRequests(request), employeeHistory(request.employee)]);
+    return res.json({ message: "Leave cancelled", data: data[0], history });
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
@@ -1039,46 +1222,94 @@ const history = async (req, res) => {
   }
 };
 
-/** Employee dashboard: wallet + applied + approved. */
+const TYPE_ORDER = ["CL", "EL", "CO", "UL"];
+
+/** Active leave types this employee can apply, with this year's balance. */
+const leaveTypesForEmployee = async (user) => {
+  const companyId = companyOf(user);
+  if (!companyId) return { error: "Your profile has no company" };
+  await releaseExpiredQuarterly(user._id);
+  await grantLeaveBalance(user);
+  const monthStartDay = await monthStartForUser(user);
+  const year = leaveYear(todayYmd(), monthStartDay);
+  const [rows, employee] = await Promise.all([
+    LeaveType.find({
+      status: "Active",
+      hidden: { $ne: true },
+      $or: [{ scope: "common" }, { scope: "company", companyId }],
+    })
+      .select("name code paid carryForward maxDays allocationType quarterlyLimit isUnlimited scope status companyId hidden")
+      .lean(),
+    User.findById(user._id).select("leaves").lean(),
+  ]);
+  const lines = (employee?.leaves || []).filter((row) => row.year === year);
+  const visible = typesForCompany(rows, companyId).filter((row) => row.status === "Active" && !row.hidden);
+  for (const type of visible) {
+    const line = lines.find((row) => String(row.leaveType) === String(type._id));
+    if (line) await rebuildQuarterLine(employee, type, line, monthStartDay);
+  }
+  const data = visible
+    .map((type) => {
+      const line = lines.find((row) => String(row.leaveType) === String(type._id));
+      const balance = line ? presentItem(line, type, user.official?.dateOfJoining, monthStartDay) : null;
+      return {
+        ...mapType(type),
+        used: balance?.used || 0,
+        pending: balance?.pending || 0,
+        remaining: balance?.remaining ?? 0,
+        earned: balance?.earned || 0,
+        display: balance?.display || "",
+        quarter: balance?.quarter || null,
+      };
+    })
+    .sort((a, b) => {
+      const ia = TYPE_ORDER.indexOf(a.code);
+      const ib = TYPE_ORDER.indexOf(b.code);
+      if (ia === -1 && ib === -1) return a.name.localeCompare(b.name);
+      if (ia === -1) return 1;
+      if (ib === -1) return -1;
+      return ia - ib;
+    });
+  return { year: yearLabel(year), data };
+};
+
+/** GET /api/leave/me/types — dropdown for Apply Leave. */
+const myLeaveTypes = async (req, res) => {
+  try {
+    const listed = await leaveTypesForEmployee(req.user);
+    if (listed.error) return res.status(400).json({ message: listed.error });
+    return res.json({
+      year: listed.year,
+      count: listed.data.length,
+      data: listed.data,
+    });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+/** Employee dashboard: leave request history for this leave year. */
 const myLeave = async (req, res) => {
   try {
-    const year = leaveYear();
-    await ensureCompanyBalances([companyOf(req.user)].filter(Boolean));
-    const [employee, applied, approved] = await Promise.all([
-      User.findById(req.user._id).select("leaves leaveAdjustments").lean(),
-      LeaveRequest.find({
-        employee: req.user._id,
-        status: { $in: ["Pending", "Rejected"] },
-      })
-        .sort({ createdAt: -1 })
-        .limit(50)
-        .lean(),
-      LeaveRequest.find({ employee: req.user._id, status: "Approved" })
-        .sort({ from: -1 })
-        .limit(50)
-        .lean(),
-    ]);
-    const yearLeaves = (employee?.leaves || []).filter((row) => row.year === year);
+    const monthStartDay = await monthStartForUser(req.user);
+    const year = leaveYear(todayYmd(), monthStartDay);
+    await releaseExpiredQuarterly(req.user._id);
+    const listed = await employeeLeavePage(req.user._id, req.query);
+    const employee = await User.findById(req.user._id).select("leaveAdjustments").lean();
     const yearNotes = (employee?.leaveAdjustments || []).filter((row) => !row.year || row.year === year);
-    const typeIds = [
-      ...yearLeaves.map((item) => item.leaveType),
-      ...yearNotes.map((row) => row.leaveType),
-    ];
+    const typeIds = yearNotes.map((row) => row.leaveType);
     const types = typeIds.length
-      ? await LeaveType.find({ _id: { $in: typeIds } })
-          .select("name code paid carryForward maxDays scope")
-          .lean()
+      ? await LeaveType.find({ _id: { $in: typeIds } }).select("name code").lean()
       : [];
     const typeMap = new Map(types.map((type) => [String(type._id), type]));
-    const [appliedRows, approvedRows] = await Promise.all([
-      asRequests(applied),
-      asRequests(approved),
-    ]);
     return res.json({
       year: yearLabel(year),
-      balances: yearLeaves
-        .map((item) => presentItem(item, typeMap.get(String(item.leaveType))))
-        .filter(Boolean),
+      summary: listed.summary,
+      history: listed.history,
+      count: listed.count,
+      total: listed.total,
+      page: listed.page,
+      pages: listed.pages,
       adjustments: yearNotes.map((row) => ({
         leaveType: row.leaveType,
         name: typeMap.get(String(row.leaveType))?.name || "",
@@ -1088,8 +1319,6 @@ const myLeave = async (req, res) => {
         by: row.by,
         at: row.at,
       })),
-      applied: appliedRows,
-      approved: approvedRows,
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -1116,4 +1345,5 @@ module.exports = {
   deletePolicy,
   history,
   myLeave,
+  myLeaveTypes,
 };

@@ -1,9 +1,11 @@
 /**
- * Add the default leave types and leave policies.
- * Skips rows that are already there. Does not delete anything.
+ * Apply the finalized leave policy and remove the previous leave types.
+ *
+ * Adds: Casual Leave (CL), Earned Leave (EL), Comp Off (CO), Unpaid Leave (UL).
+ * Removes: the old Quarterly Leave code (QL) by renaming it to CL, plus Sick, Annual, Maternity, Paternity, Bereavement.
  *
  * Run: npm run seed:leave
- * The API also runs this once when the server starts.
+ * The API also runs this when the server starts.
  */
 require("dotenv").config();
 const connectDB = require("../config/db");
@@ -13,7 +15,7 @@ const { seedLeaveDefaults } = require("../utils/seedLeave");
   await connectDB();
   const result = await seedLeaveDefaults();
   console.log(
-    `Leave defaults: ${result.typesAdded} common types added, ${result.policiesAdded} common policies added.`
+    `Leave policy applied: ${result.typesAdded} types added, ${result.typesUpdated} types updated, ${result.typesRemoved} old types removed, ${result.pendingCancelled} pending requests cancelled, ${result.policiesAdded} policies added, ${result.policiesUpdated} policies updated.`
   );
   process.exit(0);
 })().catch((err) => {

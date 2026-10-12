@@ -28,7 +28,18 @@ const typeBody = Joi.object({
   name: Joi.string().trim().min(2).max(80).required(),
   code: Joi.string().trim().min(1).max(10).required(),
   paid: Joi.boolean().required(),
-  maxDays: Joi.number().min(0).max(366).required(),
+  maxDays: Joi.number().min(0).max(366).allow(null).when("isUnlimited", {
+    is: true,
+    then: Joi.optional().allow(null),
+    otherwise: Joi.required(),
+  }),
+  allocationType: Joi.string().valid("yearly", "quarterly", "earned").default("yearly"),
+  quarterlyLimit: Joi.number().min(0).max(366).allow(null).when("allocationType", {
+    is: "quarterly",
+    then: Joi.required(),
+    otherwise: Joi.optional(),
+  }),
+  isUnlimited: Joi.boolean().default(false),
   carryForward: Joi.boolean().required(),
   status: Joi.string().valid("Active", "Inactive").optional(),
 });
@@ -38,10 +49,23 @@ const typePatch = Joi.object({
   name: Joi.string().trim().min(2).max(80).optional(),
   code: Joi.string().trim().min(1).max(10).optional(),
   paid: Joi.boolean().optional(),
-  maxDays: Joi.number().min(0).max(366).optional(),
+  maxDays: Joi.number().min(0).max(366).allow(null).optional(),
+  allocationType: Joi.string().valid("yearly", "quarterly", "earned").optional(),
+  quarterlyLimit: Joi.number().min(0).max(366).allow(null).optional(),
+  isUnlimited: Joi.boolean().optional(),
   carryForward: Joi.boolean().optional(),
   status: Joi.string().valid("Active", "Inactive").optional(),
-}).or("name", "code", "paid", "maxDays", "carryForward", "status");
+}).or(
+  "name",
+  "code",
+  "paid",
+  "maxDays",
+  "allocationType",
+  "quarterlyLimit",
+  "isUnlimited",
+  "carryForward",
+  "status"
+);
 
 const defaultsBody = Joi.object({
   scope: Joi.string().valid("common", "company").optional(),
@@ -49,7 +73,6 @@ const defaultsBody = Joi.object({
 });
 
 const applyBody = Joi.object({
-  employeeId: objectId.optional(),
   leaveTypeId: objectId.required(),
   from: ymd.required(),
   to: ymd.required(),
@@ -100,7 +123,19 @@ module.exports = {
   applyBody,
   reviewBody,
   adjustBody,
-  requestQuery: Joi.object(listQuery),
+  requestQuery: Joi.object({
+    ...listQuery,
+    from: ymd.optional(),
+    to: ymd.optional(),
+  }),
+  meQuery: Joi.object({
+    search: Joi.string().trim().allow("").optional(),
+    status: Joi.string().trim().allow("").optional(),
+    from: ymd.optional(),
+    to: ymd.optional(),
+    page: Joi.number().integer().min(1).optional(),
+    limit: Joi.number().integer().min(1).max(100).optional(),
+  }),
   calendarQuery,
   policyQuery: Joi.object({ companyId: objectId.optional(), search: Joi.string().trim().allow("").optional() }),
   policyBody,

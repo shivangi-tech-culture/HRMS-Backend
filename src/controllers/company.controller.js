@@ -33,6 +33,23 @@ const normalizeBranches = (branches) =>
   }));
 const okId = (id) => mongoose.Types.ObjectId.isValid(id);
 
+/** Default month is day 1 through the last day (stored as 31). A shifted month is 24 through 23. */
+const pairMonthDays = (startRaw, endRaw) => {
+  const monthStartDay = Math.min(28, Math.max(1, Math.floor(Number(startRaw)) || 1));
+  const sent = endRaw === undefined || endRaw === null || endRaw === "" ? null : Math.floor(Number(endRaw));
+  const monthEndDay = sent == null || Number.isNaN(sent) ? (monthStartDay === 1 ? 31 : monthStartDay - 1) : sent;
+  if (monthStartDay === 1) {
+    if (monthEndDay < 28 || monthEndDay > 31) {
+      return { error: "Calendar month end day must be 30 or 31" };
+    }
+    return { monthStartDay, monthEndDay };
+  }
+  if (monthEndDay !== monthStartDay - 1) {
+    return { error: `A month that starts on ${monthStartDay} ends on ${monthStartDay - 1}` };
+  }
+  return { monthStartDay, monthEndDay };
+};
+
 /** 400 message when a branchId / shiftId is not an existing master, else "" */
 const missingMasters = async (branches = []) => {
   const branchIds = [...new Set(branches.map((b) => String(b.branchId)))];
@@ -97,7 +114,7 @@ const listCompanies = async (req, res) => {
       Company.countDocuments(filter),
       Company.find(filter)
         .select(
-          "companyName companyCode isActive branches.branchId branches.isActive branches.shifts.shiftId branches.shifts.isActive"
+          "companyName companyCode isActive monthStartDay monthEndDay branches.branchId branches.isActive branches.shifts.shiftId branches.shifts.isActive"
         )
         .sort({ companyName: 1 })
         .skip(skip)
@@ -171,11 +188,15 @@ const createCompany = async (req, res) => {
     }
     const missing = await missingMasters(req.body.branches);
     if (missing) return res.status(400).json({ message: missing });
+    const month = pairMonthDays(req.body.monthStartDay, req.body.monthEndDay);
+    if (month.error) return res.status(400).json({ message: month.error });
 
     const row = await Company.create({
       companyName,
       companyCode,
       isActive: req.body.isActive !== false,
+      monthStartDay: month.monthStartDay,
+      monthEndDay: month.monthEndDay,
       branches: normalizeBranches(req.body.branches || []),
     });
     await row.populate(MASTER_POPULATE);
@@ -213,6 +234,20 @@ const updateCompany = async (req, res) => {
     }
 
     if (req.body.isActive !== undefined) row.isActive = req.body.isActive;
+    if (req.body.monthStartDay !== undefined || req.body.monthEndDay !== undefined) {
+      const start = req.body.monthStartDay !== undefined ? req.body.monthStartDay : row.monthStartDay;
+      const endWasDefault = row.monthEndDay == null || row.monthEndDay >= 28;
+      const end =
+        req.body.monthEndDay !== undefined
+          ? req.body.monthEndDay
+          : start > 1 && endWasDefault
+            ? start - 1
+            : row.monthEndDay;
+      const month = pairMonthDays(start, end);
+      if (month.error) return res.status(400).json({ message: month.error });
+      row.monthStartDay = month.monthStartDay;
+      row.monthEndDay = month.monthEndDay;
+    }
     if (req.body.branches !== undefined) {
       const missing = await missingMasters(req.body.branches);
       if (missing) return res.status(400).json({ message: missing });
