@@ -3,7 +3,12 @@ const Mailbox = require("../models/Mailbox");
 const MailMessage = require("../models/MailMessage");
 const User = require("../models/User");
 const { storeInboxFiles, removeChatFiles, readChatFile } = require("../utils/chatFiles");
-const { loadMailboxCreds, sendAsUser, syncUserMailbox } = require("../utils/userMailbox");
+const {
+  loadMailboxCreds,
+  sendAsUser,
+  syncUserMailbox,
+  checkMailboxLogin,
+} = require("../utils/userMailbox");
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -595,20 +600,23 @@ async function saveAppPassword(user, value) {
       },
     },
   );
-  if (!sealed.emailAppPasswordSet) return { ok: true, appPasswordSet: false, imported: 0 };
+  if (!sealed.emailAppPasswordSet) return { ok: true, appPasswordSet: false, importing: false };
   try {
-    const result = await syncUserMailbox(actor.employeeId, { force: true });
-    return { ok: true, appPasswordSet: true, imported: result.imported || 0 };
+    await checkMailboxLogin(actor.employeeId);
   } catch (err) {
     return {
       ok: true,
       appPasswordSet: true,
-      imported: 0,
+      importing: false,
       importError: err.authenticationFailed || /auth|invalid credentials|login/i.test(String(err.message))
         ? "Gmail rejected this app password. Check the official email and app password."
-        : err.message || "Mailbox import failed",
+        : err.message || "Could not reach the mailbox",
     };
   }
+  syncUserMailbox(actor.employeeId, { force: true }).catch((err) => {
+    console.error("Mailbox import failed:", err.message);
+  });
+  return { ok: true, appPasswordSet: true, importing: true };
 }
 
 module.exports = {
