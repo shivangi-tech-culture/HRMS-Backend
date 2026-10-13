@@ -44,17 +44,9 @@ function openAppPassword(stored) {
   ]).toString("utf8");
 }
 
-function googleMailDomains() {
-  const extra = String(process.env.GOOGLE_MAIL_DOMAINS || "techculture.ai")
-    .split(",")
-    .map((item) => item.trim().toLowerCase())
-    .filter(Boolean);
-  return new Set(["gmail.com", "googlemail.com", ...extra]);
-}
-
 function serversFor(email) {
   const domain = String(email.split("@")[1] || "").toLowerCase();
-  if (googleMailDomains().has(domain)) {
+  if (domain === "gmail.com" || domain === "googlemail.com") {
     return { smtp: "smtp.gmail.com", imap: "imap.gmail.com" };
   }
   return {
@@ -68,16 +60,14 @@ async function loadMailboxCreds(userId) {
     "name official.officialEmail official.emailAppPassword official.emailAppPasswordSet",
   );
   const email = String(row?.official?.officialEmail || "").trim().toLowerCase();
-  const servers = serversFor(email);
-  const opened = openAppPassword(row?.official?.emailAppPassword);
-  const password = servers.smtp === "smtp.gmail.com" ? opened.replace(/\s+/g, "") : opened;
+  const password = openAppPassword(row?.official?.emailAppPassword);
   if (!row || !email || !password) return null;
   return {
     userId: String(row._id),
     name: row.name || email,
     email,
     password,
-    ...servers,
+    ...serversFor(email),
   };
 }
 
@@ -87,8 +77,9 @@ async function sendAsUser(creds, { to, subject, text, attachments }) {
     port: Number(process.env.SMTP_PORT_EZ) || 465,
     secure: true,
     auth: { user: creds.email, pass: creds.password },
-    connectionTimeout: 20000,
-    socketTimeout: 20000,
+    connectionTimeout: 8000,
+    greetingTimeout: 8000,
+    socketTimeout: 12000,
   });
   return transporter.sendMail({
     from: `"${creds.name}" <${creds.email}>`,
@@ -183,6 +174,7 @@ async function readFolder(client, mailbox, ownerId, folder) {
 }
 
 async function syncUserMailbox(userId) {
+  if (process.env.RENDER === "true") return { ok: false, skipped: true };
   const last = syncedAt.get(String(userId)) || 0;
   if (Date.now() - last < 45_000) return { ok: true, skipped: true };
   const creds = await loadMailboxCreds(userId);
