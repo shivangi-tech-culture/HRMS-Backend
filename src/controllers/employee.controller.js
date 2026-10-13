@@ -666,7 +666,6 @@ const updateEmployee = async (req, res) => {
       delete profile.official.companies;
       delete profile.official.companyIds;
 
-
       if (emailAttempt !== undefined) {
         const next = String(emailAttempt || "")
           .trim()
@@ -675,9 +674,12 @@ const updateEmployee = async (req, res) => {
           .trim()
           .toLowerCase();
         if (next && next !== cur) {
-          return res.status(400).json({
-            message: "official.officialEmail cannot be changed",
-          });
+          if (!isAdmin) {
+            return res.status(400).json({
+              message: "official.officialEmail cannot be changed",
+            });
+          }
+          profile.official.officialEmail = next;
         }
       }
 
@@ -714,6 +716,11 @@ const updateEmployee = async (req, res) => {
         "official.employeeCode",
         profile.official.employeeCode,
         employee.official?.employeeCode
+      );
+      addIfChanged(
+        "official.officialEmail",
+        profile.official.officialEmail,
+        employee.official?.officialEmail
       );
     }
     if (profile.personal) {

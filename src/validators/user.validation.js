@@ -286,10 +286,11 @@ const listOrOne = (item) =>
 
 /**
  * UPDATE EMPLOYEE / profile — PUT /api/employees/:id
- * official.officialEmail and official.companyIds are immutable (forbidden here).
+ * companyIds stay immutable. Super Admin / Admin / HR may change officialEmail
+ * (controller enforces who, and that the new address is unused).
  */
 const officialUpdateItem = officialItem.fork(
-  ["officialEmail", "companyIds"],
+  ["companyIds"],
   (schema) => schema.forbidden()
 );
 
