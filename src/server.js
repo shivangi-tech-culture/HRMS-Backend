@@ -30,6 +30,7 @@ const employeeRoutes = require("./routes/employee.routes");
 const accessControlRoutes = require("./routes/accessControl.routes");
 const attendanceRoutes = require("./routes/attendance.routes");
 const mailRoutes = require("./routes/mail.routes");
+const inboxRoutes = require("./routes/inbox.routes");
 const masterRoutes = require("./routes/master.routes");
 const companyRoutes = require("./routes/company.routes");
 const chatRoutes = require("./routes/chat.routes");
@@ -168,6 +169,7 @@ app.use("/api/permissions", permissionRoutes); // catalogs + my permissions
 app.use("/api/employees", employeeRoutes); // employees only (role = Employee)
 app.use("/api/users", accessControlRoutes); // Access & Control (any role)
 app.use("/api/attendance", attendanceRoutes); // punch · daily · calendar · timesheet · regularization
+app.use("/api/mail", inboxRoutes); // Inbox, drafts, attachments (same API as chat)
 app.use("/api/mail", mailRoutes); // Organization → Mail send
 app.use("/api/masters", masterRoutes); // SaaS masters (typed collections, including Branch + Shift)
 app.use("/api/companies", companyRoutes); // Company CRUD
