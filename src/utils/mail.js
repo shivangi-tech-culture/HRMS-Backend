@@ -90,6 +90,12 @@ async function sendViaBrevo(mailOptions) {
   if (mailOptions.replyTo) {
     payload.replyTo = { email: String(mailOptions.replyTo) };
   }
+  if (Array.isArray(mailOptions.attachments) && mailOptions.attachments.length) {
+    payload.attachment = mailOptions.attachments.map((file) => ({
+      name: file.filename,
+      content: Buffer.isBuffer(file.content) ? file.content.toString("base64") : String(file.content || ""),
+    }));
+  }
 
   const res = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
@@ -138,6 +144,12 @@ async function sendViaResend(mailOptions) {
   if (cc.length) payload.cc = cc;
   if (bcc.length) payload.bcc = bcc;
   if (mailOptions.replyTo) payload.reply_to = String(mailOptions.replyTo);
+  if (Array.isArray(mailOptions.attachments) && mailOptions.attachments.length) {
+    payload.attachments = mailOptions.attachments.map((file) => ({
+      filename: file.filename,
+      content: Buffer.isBuffer(file.content) ? file.content.toString("base64") : String(file.content || ""),
+    }));
+  }
 
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -444,7 +456,7 @@ const sendWelcomeEmailSafe = async (payload) => {
 };
 
 /** Generic send used by POST /api/mail/send */
-const sendEmail = async ({ to, subject, body, cc, bcc, isHtml = false }) => {
+const sendEmail = async ({ to, subject, body, cc, bcc, isHtml = false, replyTo, attachments }) => {
   const { fromName, from } = fromAddress();
 
   const text = isHtml
@@ -464,6 +476,8 @@ const sendEmail = async ({ to, subject, body, cc, bcc, isHtml = false }) => {
     to,
     cc: cc || undefined,
     bcc: bcc || undefined,
+    replyTo: replyTo || undefined,
+    attachments: attachments?.length ? attachments : undefined,
     subject,
     text: text || subject,
     html,
