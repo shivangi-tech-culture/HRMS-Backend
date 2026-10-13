@@ -595,7 +595,20 @@ async function saveAppPassword(user, value) {
       },
     },
   );
-  return { ok: true, appPasswordSet: sealed.emailAppPasswordSet };
+  if (!sealed.emailAppPasswordSet) return { ok: true, appPasswordSet: false, imported: 0 };
+  try {
+    const result = await syncUserMailbox(actor.employeeId, { force: true });
+    return { ok: true, appPasswordSet: true, imported: result.imported || 0 };
+  } catch (err) {
+    return {
+      ok: true,
+      appPasswordSet: true,
+      imported: 0,
+      importError: err.authenticationFailed || /auth|invalid credentials|login/i.test(String(err.message))
+        ? "Gmail rejected this app password. Check the official email and app password."
+        : err.message || "Mailbox import failed",
+    };
+  }
 }
 
 module.exports = {
