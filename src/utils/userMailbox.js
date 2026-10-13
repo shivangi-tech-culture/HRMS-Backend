@@ -145,7 +145,7 @@ async function importParsed(ownerId, folder, parsed) {
   }
 
   const existing = await Mailbox.findOne({ ownerId, messageId: message._id });
-  if (existing) return;
+  if (existing) return false;
   await Mailbox.create({
     ownerId,
     messageId: message._id,
@@ -153,32 +153,35 @@ async function importParsed(ownerId, folder, parsed) {
     unread: folder === "inbox",
     starred: false,
   });
+  return true;
 }
 
-async function readFolder(client, mailbox, ownerId, folder) {
+async function readFolder(client, mailbox, ownerId, folder, limit) {
   const { simpleParser } = require("mailparser");
   const lock = await client.getMailboxLock(mailbox);
+  let imported = 0;
   try {
     const status = await client.status(mailbox, { messages: true });
     const total = Number(status.messages) || 0;
-    if (!total) return;
-    const start = Math.max(1, total - 19);
+    if (!total) return 0;
+    const start = Math.max(1, total - limit + 1);
     for await (const msg of client.fetch(`${start}:*`, { source: true, uid: true })) {
       if (!msg.source) continue;
       const parsed = await simpleParser(msg.source);
-      await importParsed(ownerId, folder, parsed);
+      if (await importParsed(ownerId, folder, parsed)) imported += 1;
     }
   } finally {
     lock.release();
   }
+  return imported;
 }
 
-async function syncUserMailbox(userId) {
-  if (process.env.RENDER === "true") return { ok: false, skipped: true };
+async function syncUserMailbox(userId, { force = false } = {}) {
   const last = syncedAt.get(String(userId)) || 0;
-  if (Date.now() - last < 45_000) return { ok: true, skipped: true };
+  if (!force && Date.now() - last < 45_000) return { ok: true, skipped: true, imported: 0 };
+  const limit = force ? 50 : 20;
   const creds = await loadMailboxCreds(userId);
-  if (!creds) return { ok: false, skipped: true };
+  if (!creds) return { ok: false, skipped: true, imported: 0 };
   syncedAt.set(String(userId), Date.now());
   const { ImapFlow } = await import("imapflow");
   const client = new ImapFlow({
@@ -191,17 +194,18 @@ async function syncUserMailbox(userId) {
     greetingTimeout: 15000,
   });
   await client.connect();
+  let imported = 0;
   try {
-    await readFolder(client, "INBOX", creds.userId, "inbox");
+    imported += await readFolder(client, "INBOX", creds.userId, "inbox", limit);
     const boxes = await client.list();
     const sent = boxes.find((box) =>
       /\\sent/i.test(String(box.specialUse || "")) || /sent/i.test(box.path),
     );
-    if (sent?.path) await readFolder(client, sent.path, creds.userId, "sent");
+    if (sent?.path) imported += await readFolder(client, sent.path, creds.userId, "sent", limit);
   } finally {
     await client.logout().catch(() => {});
   }
-  return { ok: true };
+  return { ok: true, imported };
 }
 
 module.exports = {
