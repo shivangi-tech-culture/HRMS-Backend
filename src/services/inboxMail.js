@@ -2,8 +2,8 @@ const crypto = require("crypto");
 const Mailbox = require("../models/Mailbox");
 const MailMessage = require("../models/MailMessage");
 const User = require("../models/User");
-const { sendEmail } = require("../utils/mail");
 const { storeInboxFiles, removeChatFiles, readChatFile } = require("../utils/chatFiles");
+const { loadMailboxCreds, sendAsUser, syncUserMailbox } = require("../utils/userMailbox");
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -158,6 +158,11 @@ async function loadOwned(user, mailboxId) {
 }
 
 async function listMessages(user, { folder = "inbox", q = "" } = {}) {
+  try {
+    await syncUserMailbox(user.employeeId);
+  } catch (err) {
+    console.error("Mailbox sync failed:", err.message);
+  }
   const filter = { ownerId: user.employeeId };
   if (folder === "starred") {
     filter.starred = true;
@@ -204,13 +209,22 @@ async function folderCounts(user) {
   return counts;
 }
 
-async function deliverExternal(message, addresses, replyTo) {
-  const outside = addresses.filter((item) => item.kind === "external").map((item) => item.email);
-  if (!outside.length) {
+async function deliverExternal(message, user) {
+  const recipients = (message.to || [])
+    .map((item) => item.email)
+    .filter((email) => email && email !== user.email);
+  if (!recipients.length) {
     message.externalStatus = "none";
     message.externalError = "";
     await message.save();
     return "";
+  }
+  const creds = await loadMailboxCreds(user.employeeId);
+  if (!creds) {
+    message.externalStatus = "failed";
+    message.externalError = "Save your email app password in General Info before sending mail";
+    await message.save();
+    return message.externalError;
   }
   try {
     const attachments = [];
@@ -218,20 +232,20 @@ async function deliverExternal(message, addresses, replyTo) {
       const content = await readChatFile(file.storageKey);
       attachments.push({ filename: file.name, content, contentType: file.mimeType });
     }
-    await sendEmail({
-      to: outside.join(", "),
+    const info = await sendAsUser(creds, {
+      to: recipients,
       subject: message.subject || "(no subject)",
-      body: message.body || "",
-      replyTo,
+      text: message.body || "",
       attachments,
     });
+    message.rfcMessageId = String(info.messageId || "");
     message.externalStatus = "sent";
     message.externalError = "";
     await message.save();
     return "";
   } catch (err) {
     message.externalStatus = "failed";
-    message.externalError = err.message || "Outside mail failed";
+    message.externalError = err.message || "Mailbox send failed";
     await message.save();
     return message.externalError;
   }
@@ -307,7 +321,7 @@ async function sendMail(user, input, req) {
     });
   }
 
-  const externalError = await deliverExternal(message, addresses, user.email);
+  const externalError = await deliverExternal(message, user);
   if (draftBox && draftMessage) {
     await Mailbox.deleteOne({ _id: draftBox._id, ownerId: user.employeeId });
     await MailMessage.deleteOne({ _id: draftMessage._id });
@@ -546,8 +560,32 @@ async function searchPeople(q) {
     }));
 }
 
+async function mailAccount(user) {
+  const actor = mailActor(user);
+  const row = await User.findById(actor.employeeId).select("official.emailAppPasswordSet").lean();
+  return { ...actor, appPasswordSet: row?.official?.emailAppPasswordSet === true };
+}
+
+async function saveAppPassword(user, value) {
+  const { sealAppPassword } = require("../utils/userMailbox");
+  const actor = mailActor(user);
+  const sealed = sealAppPassword(value);
+  await User.updateOne(
+    { _id: actor.employeeId },
+    {
+      $set: {
+        "official.emailAppPassword": sealed.emailAppPassword,
+        "official.emailAppPasswordSet": sealed.emailAppPasswordSet,
+      },
+    },
+  );
+  return { ok: true, appPasswordSet: sealed.emailAppPasswordSet };
+}
+
 module.exports = {
   mailActor,
+  mailAccount,
+  saveAppPassword,
   listMessages,
   folderCounts,
   sendMail,

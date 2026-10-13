@@ -641,10 +641,17 @@ const updateEmployee = async (req, res) => {
     const profile = pickProfile(req.body);
 
     if (profile.official !== undefined && !isAdmin) {
-      return res.status(403).json({
-        message:
-          "Employee cannot edit official details or employee code. Contact HR / Admin.",
-      });
+      const officialKeys = Object.keys(profile.official).filter(
+        (key) => profile.official[key] !== undefined
+      );
+      const onlyAppPassword =
+        officialKeys.length > 0 && officialKeys.every((key) => key === "emailAppPassword");
+      if (!onlyAppPassword) {
+        return res.status(403).json({
+          message:
+            "Employee cannot edit official details or employee code. Contact HR / Admin.",
+        });
+      }
     }
 
     // payroll{} — ADMIN ONLY (check early; Employee never)
@@ -660,6 +667,16 @@ const updateEmployee = async (req, res) => {
       profile.personal = normalizeSectionUniques("personal", profile.personal);
     }
     if (profile.official) {
+      const { sealAppPassword } = require("../utils/userMailbox");
+      if (profile.official.emailAppPassword !== undefined) {
+        const sealed = sealAppPassword(profile.official.emailAppPassword);
+        profile.official.emailAppPassword = sealed.emailAppPassword;
+        profile.official.emailAppPasswordSet = sealed.emailAppPasswordSet;
+      } else {
+        const hidden = await User.findById(employee._id).select("official.emailAppPassword");
+        const current = hidden?.official?.emailAppPassword;
+        if (current) profile.official.emailAppPassword = current;
+      }
       const emailAttempt = profile.official.officialEmail;
       delete profile.official.officialEmail;
       delete profile.official.company;

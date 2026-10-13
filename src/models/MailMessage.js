@@ -31,6 +31,7 @@ const messageSchema = new mongoose.Schema(
     preview: { type: String, default: "" },
     companyName: { type: String, default: "" },
     attachments: { type: [attachmentSchema], default: [] },
+    rfcMessageId: { type: String, default: "", index: true },
     externalStatus: { type: String, enum: ["none", "sent", "failed"], default: "none" },
     externalError: { type: String, default: "" },
   },

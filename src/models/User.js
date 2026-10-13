@@ -104,6 +104,13 @@ const userSchema = new mongoose.Schema(
         trim: true,
       },
       /**
+       * Mailbox app password for officialEmail (Zoho / Gmail).
+       * Stored encrypted. Never returned by the API.
+       */
+      emailAppPassword: { type: String, default: "", select: false },
+      /** True once an app password is saved. The secret itself stays hidden. */
+      emailAppPasswordSet: { type: Boolean, default: false },
+      /**
        * Company _ids (Employee / RM: one. HR: one or more).
        * Index 0 is this person's own workplace (branchId + shiftId sit on it).
        * Later ids are assigned to an HR Manager for access only:
