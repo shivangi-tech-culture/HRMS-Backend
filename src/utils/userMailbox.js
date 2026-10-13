@@ -3,6 +3,7 @@ const nodemailer = require("nodemailer");
 const User = require("../models/User");
 
 const syncedAt = new Map();
+const running = new Set();
 
 function secretKey() {
   const secret = process.env.JWT_SECRET || "";
@@ -179,10 +180,33 @@ async function readFolder(client, mailbox, ownerId, folder, limit) {
 async function syncUserMailbox(userId, { force = false } = {}) {
   const last = syncedAt.get(String(userId)) || 0;
   if (!force && Date.now() - last < 45_000) return { ok: true, skipped: true, imported: 0 };
+  const key = String(userId);
+  if (running.has(key)) return { ok: true, skipped: true, imported: 0 };
   const limit = force ? 50 : 20;
   const creds = await loadMailboxCreds(userId);
   if (!creds) return { ok: false, skipped: true, imported: 0 };
-  syncedAt.set(String(userId), Date.now());
+  syncedAt.set(key, Date.now());
+  running.add(key);
+  try {
+    const client = await openImap(creds);
+    let imported = 0;
+    try {
+      imported += await readFolder(client, "INBOX", creds.userId, "inbox", limit);
+      const boxes = await client.list();
+      const sent = boxes.find((box) =>
+        /\\sent/i.test(String(box.specialUse || "")) || /sent/i.test(box.path),
+      );
+      if (sent?.path) imported += await readFolder(client, sent.path, creds.userId, "sent", limit);
+    } finally {
+      await client.logout().catch(() => {});
+    }
+    return { ok: true, imported };
+  } finally {
+    running.delete(key);
+  }
+}
+
+async function openImap(creds) {
   const { ImapFlow } = await import("imapflow");
   const client = new ImapFlow({
     host: creds.imap,
@@ -194,18 +218,16 @@ async function syncUserMailbox(userId, { force = false } = {}) {
     greetingTimeout: 15000,
   });
   await client.connect();
-  let imported = 0;
-  try {
-    imported += await readFolder(client, "INBOX", creds.userId, "inbox", limit);
-    const boxes = await client.list();
-    const sent = boxes.find((box) =>
-      /\\sent/i.test(String(box.specialUse || "")) || /sent/i.test(box.path),
-    );
-    if (sent?.path) imported += await readFolder(client, sent.path, creds.userId, "sent", limit);
-  } finally {
-    await client.logout().catch(() => {});
-  }
-  return { ok: true, imported };
+  return client;
+}
+
+/** Log in to the mailbox and out again, so a wrong app password is reported right away. */
+async function checkMailboxLogin(userId) {
+  const creds = await loadMailboxCreds(userId);
+  if (!creds) return false;
+  const client = await openImap(creds);
+  await client.logout().catch(() => {});
+  return true;
 }
 
 module.exports = {
@@ -213,4 +235,5 @@ module.exports = {
   loadMailboxCreds,
   sendAsUser,
   syncUserMailbox,
+  checkMailboxLogin,
 };
