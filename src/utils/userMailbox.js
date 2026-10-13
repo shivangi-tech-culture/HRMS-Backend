@@ -44,9 +44,17 @@ function openAppPassword(stored) {
   ]).toString("utf8");
 }
 
+function googleMailDomains() {
+  const extra = String(process.env.GOOGLE_MAIL_DOMAINS || "techculture.ai")
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+  return new Set(["gmail.com", "googlemail.com", ...extra]);
+}
+
 function serversFor(email) {
   const domain = String(email.split("@")[1] || "").toLowerCase();
-  if (domain === "gmail.com" || domain === "googlemail.com") {
+  if (googleMailDomains().has(domain)) {
     return { smtp: "smtp.gmail.com", imap: "imap.gmail.com" };
   }
   return {
@@ -60,14 +68,16 @@ async function loadMailboxCreds(userId) {
     "name official.officialEmail official.emailAppPassword official.emailAppPasswordSet",
   );
   const email = String(row?.official?.officialEmail || "").trim().toLowerCase();
-  const password = openAppPassword(row?.official?.emailAppPassword);
+  const servers = serversFor(email);
+  const opened = openAppPassword(row?.official?.emailAppPassword);
+  const password = servers.smtp === "smtp.gmail.com" ? opened.replace(/\s+/g, "") : opened;
   if (!row || !email || !password) return null;
   return {
     userId: String(row._id),
     name: row.name || email,
     email,
     password,
-    ...serversFor(email),
+    ...servers,
   };
 }
 
