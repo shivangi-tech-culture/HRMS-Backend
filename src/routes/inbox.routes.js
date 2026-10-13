@@ -29,9 +29,17 @@ router.post("/inbound", async (req, res, next) => {
 
 router.use(protect);
 
-router.get("/me", (req, res, next) => {
+router.get("/me", async (req, res, next) => {
   try {
-    res.json(actor(req));
+    res.json(await inbox.mailAccount(req.user));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put("/app-password", async (req, res, next) => {
+  try {
+    res.json(await inbox.saveAppPassword(req.user, req.body?.emailAppPassword));
   } catch (err) {
     next(err);
   }
