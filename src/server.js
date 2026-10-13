@@ -158,6 +158,49 @@ app.get("/", (req, res) => {
   });
 });
 
+/**
+ * Local machine only. Render cannot open Gmail SMTP, so outside mail
+ * is handed to this computer when the app password is in the local env.
+ */
+if (NODE_ENV !== "production") {
+  const { sendAsUser } = require("./utils/userMailbox");
+  app.post("/api/mail/local-send", async (req, res) => {
+    const ip = String(req.socket?.remoteAddress || "");
+    if (ip !== "::1" && !ip.endsWith("127.0.0.1")) {
+      return res.status(403).json({ message: "Local send only" });
+    }
+    const fromEmail = String(process.env.LOCAL_MAIL_FROM || "").trim().toLowerCase();
+    const password = String(process.env.LOCAL_MAIL_APP_PASSWORD || "").replace(/\s+/g, "");
+    if (!fromEmail || !password) {
+      return res.status(503).json({ message: "Local mailbox is not configured" });
+    }
+    const claimed = String(req.body?.fromEmail || "").trim().toLowerCase();
+    if (claimed !== fromEmail) {
+      return res.status(403).json({ message: "This computer can only send as its configured mailbox" });
+    }
+    const to = String(req.body?.to || "").trim();
+    if (!to) return res.status(400).json({ message: "To is required" });
+    try {
+      const info = await sendAsUser(
+        {
+          name: String(req.body?.fromName || fromEmail),
+          email: fromEmail,
+          password,
+          smtp: "smtp.gmail.com",
+        },
+        {
+          to,
+          subject: String(req.body?.subject || ""),
+          text: String(req.body?.text || ""),
+        },
+      );
+      return res.json({ ok: true, messageId: info.messageId || "" });
+    } catch (err) {
+      return res.status(502).json({ message: err.message || "Gmail send failed" });
+    }
+  });
+}
+
 /** Mount APIs under /api/* */
 app.use("/api/health", healthRoutes); // public health check (API + MongoDB)
 app.use("/api/auth/login", loginLimiter); // count login attempts (max 20 / window)
