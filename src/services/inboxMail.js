@@ -219,6 +219,22 @@ async function deliverExternal(message, user) {
     await message.save();
     return "";
   }
+  const outside = (message.to || []).filter(
+    (item) => item.kind === "external" && item.email && item.email !== user.email,
+  );
+  if (process.env.RENDER === "true" && !outside.length) {
+    message.externalStatus = "sent";
+    message.externalError = "";
+    await message.save();
+    return "";
+  }
+  if (process.env.RENDER === "true") {
+    message.externalStatus = "failed";
+    message.externalError =
+      "Live server cannot reach Gmail SMTP, so this address did not receive the mail. It is saved in HRMS.";
+    await message.save();
+    return message.externalError;
+  }
   const creds = await loadMailboxCreds(user.employeeId);
   if (!creds) {
     message.externalStatus = "failed";
