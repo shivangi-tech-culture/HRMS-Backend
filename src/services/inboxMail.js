@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const MailComposer = require("nodemailer/lib/mail-composer");
 const Mailbox = require("../models/Mailbox");
 const MailMessage = require("../models/MailMessage");
 const User = require("../models/User");
@@ -181,10 +182,13 @@ async function listMessages(user, { folder = "inbox", q = "" } = {}) {
     throw httpError(400, "Unknown folder");
   }
 
-  const [boxes, mailbox] = await Promise.all([
+  const [boxes, gmail, owned] = await Promise.all([
     Mailbox.find(filter).sort({ createdAt: -1 }).limit(200),
     folder === "drafts" ? [] : live.liveMessages(user.employeeId, folder),
+    Mailbox.find({ ownerId: user.employeeId }).distinct("messageId"),
   ]);
+  const ownedIds = new Set(owned.map(String));
+  const mailbox = gmail.filter((mail) => !mail.hrmsMessageId || !ownedIds.has(mail.hrmsMessageId));
   const messages = await MailMessage.find({ _id: { $in: boxes.map((box) => box.messageId) } });
   const byId = new Map(messages.map((message) => [String(message._id), message]));
   const query = String(q || "").trim().toLowerCase();
@@ -227,60 +231,83 @@ function hrmsOnly(id, action) {
   if (live.isLiveId(id)) throw httpError(400, `${action} works on HRMS mail only, not on Gmail mail`);
 }
 
+async function mailFiles(message) {
+  const attachments = [];
+  for (const file of message.attachments || []) {
+    const content = await readChatFile(file.storageKey);
+    attachments.push({ filename: file.name, content, contentType: file.mimeType });
+  }
+  return attachments;
+}
+
+/** Returns the error shown to the sender, and whether Gmail SMTP really sent the mail. */
 async function deliverExternal(message, user) {
   const recipients = (message.to || [])
     .map((item) => item.email)
     .filter((email) => email && email !== user.email);
-  if (!recipients.length) {
-    message.externalStatus = "none";
-    message.externalError = "";
+  const done = async (status, error, smtp = false) => {
+    message.externalStatus = status;
+    message.externalError = error;
     await message.save();
-    return "";
-  }
+    return { error, smtp };
+  };
+  if (!recipients.length) return done("none", "");
   const outside = (message.to || []).filter(
     (item) => item.kind === "external" && item.email && item.email !== user.email,
   );
-  if (process.env.RENDER === "true" && !outside.length) {
-    message.externalStatus = "sent";
-    message.externalError = "";
-    await message.save();
-    return "";
-  }
+  if (process.env.RENDER === "true" && !outside.length) return done("sent", "");
   if (process.env.RENDER === "true") {
-    message.externalStatus = "failed";
-    message.externalError =
-      "Live server cannot reach Gmail SMTP, so this address did not receive the mail. It is saved in HRMS.";
-    await message.save();
-    return message.externalError;
+    return done(
+      "failed",
+      "Live server cannot reach Gmail SMTP, so this address did not receive the mail. It is saved in HRMS.",
+    );
   }
   const creds = await loadMailboxCreds(user.employeeId);
-  if (!creds) {
-    message.externalStatus = "failed";
-    message.externalError = "Save your email app password in General Info before sending mail";
-    await message.save();
-    return message.externalError;
-  }
+  if (!creds) return done("failed", "Save your email app password in General Info before sending mail");
   try {
-    const attachments = [];
-    for (const file of message.attachments || []) {
-      const content = await readChatFile(file.storageKey);
-      attachments.push({ filename: file.name, content, contentType: file.mimeType });
-    }
     await sendAsUser(creds, {
       to: recipients,
       subject: message.subject || "(no subject)",
       text: message.body || "",
-      attachments,
+      attachments: await mailFiles(message),
+      messageId: `<hrms-${message._id}@hrms.mail>`,
     });
-    message.externalStatus = "sent";
-    message.externalError = "";
-    await message.save();
-    return "";
+    return done("sent", "", true);
   } catch (err) {
-    message.externalStatus = "failed";
-    message.externalError = err.message || "Mailbox send failed";
-    await message.save();
-    return message.externalError;
+    return done("failed", err.message || "Mailbox send failed");
+  }
+}
+
+/**
+ * Without SMTP the mail only exists in HRMS. Put a copy straight into the sender's Sent
+ * and each HRMS recipient's Inbox over IMAP, so it shows in their Gmail app too.
+ * Only works for people who saved an app password.
+ */
+async function copyToMailboxes(message, senderId, ownerIds) {
+  try {
+    const raw = await new MailComposer({
+      from: { name: message.fromName, address: message.fromEmail },
+      to: (message.to || []).map((item) => ({ name: item.name || item.email, address: item.email })),
+      subject: message.subject || "(no subject)",
+      text: message.body || "",
+      date: message.createdAt,
+      messageId: `<hrms-${message._id}@hrms.mail>`,
+      attachments: await mailFiles(message),
+    })
+      .compile()
+      .build();
+    const jobs = [
+      live.appendLive(senderId, "sent", raw, { seen: true, date: message.createdAt }),
+      ...ownerIds.map((id) => live.appendLive(id, "inbox", raw, { date: message.createdAt })),
+    ];
+    const results = await Promise.allSettled(jobs);
+    for (const result of results) {
+      if (result.status === "rejected") {
+        console.error("Mailbox copy failed:", result.reason?.responseText || result.reason?.message);
+      }
+    }
+  } catch (err) {
+    console.error("Mailbox copy failed:", err.message);
   }
 }
 
@@ -354,7 +381,8 @@ async function sendMail(user, input, req) {
     });
   }
 
-  const externalError = await deliverExternal(message, user);
+  const { error: externalError, smtp } = await deliverExternal(message, user);
+  if (!smtp) copyToMailboxes(message, user.employeeId, [...internalOwners]);
   if (draftBox && draftMessage) {
     await Mailbox.deleteOne({ _id: draftBox._id, ownerId: user.employeeId });
     await MailMessage.deleteOne({ _id: draftMessage._id });
