@@ -230,6 +230,10 @@ attachChatSocket(io);
 connectDB().then(async () => {
   const { seedLeaveDefaults } = require("./utils/seedLeave");
   await seedLeaveDefaults();
+  const { purgeImportedMail } = require("./utils/userMailbox");
+  purgeImportedMail()
+    .then((count) => count && console.log(`Removed ${count} copied mailbox mails`))
+    .catch((err) => console.error("Mailbox copy cleanup failed:", err.message));
   server.listen(PORT, () => {
     const pad = (s, n = 72) => s.padEnd(n);
     console.log("");
