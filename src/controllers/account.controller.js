@@ -18,7 +18,7 @@ const {
 const { logEmployeeActivity } = require("../utils/activityLog");
 const { forgetProfileImage } = require("../middleware/upload");
 
-const LOCKED_ROLES = new Set(["Super Admin", "Admin"]);
+const LOCKED_ROLES = new Set(["Super Admin", "Admin", "Employee"]);
 
 const permLabel = (roleDoc) => {
   if (!roleDoc) return "0 of 0";
@@ -28,7 +28,7 @@ const permLabel = (roleDoc) => {
   )}`;
 };
 
-/** Refresh Super / Global Admin from live permissions.js catalog */
+/** Refresh Super Admin, Admin, and Employee from the live permissions.js catalog */
 async function refreshLockedRole(roleDoc) {
   if (!roleDoc || !LOCKED_ROLES.has(roleDoc.name)) return roleDoc;
   const full = permissionsForRole(roleDoc.name);
@@ -109,7 +109,7 @@ const updateMyProfile = async (req, res) => {
     if (req.body.name !== undefined) {
       const name = String(req.body.name || "").trim();
       if (!name || name.length < 2) {
-        return res.status(400).json({ message: "name must be at least 2 characters" });
+        return res.status(400).json({ message: "Name must be at least 2 characters" });
       }
       user.name = name;
     }

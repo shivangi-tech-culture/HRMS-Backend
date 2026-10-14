@@ -213,7 +213,7 @@ const asPlainRows = (value) => {
 const applyArraySection = (employee, key, incoming) => {
   if (Array.isArray(incoming)) {
     if (hasDuplicateWithin(key, incoming)) {
-      return `${key} already exists`;
+      return `This ${key} record is already added`;
     }
     employee[key] = incoming;
     employee.markModified(key);
@@ -227,7 +227,7 @@ const applyArraySection = (employee, key, incoming) => {
   if (!id) {
     delete row._id;
     if (hasDuplicateRow(key, current, row)) {
-      return `${key} already exists`;
+      return `This ${key} record is already added`;
     }
     current.push(row);
     employee[key] = current;
@@ -237,11 +237,11 @@ const applyArraySection = (employee, key, incoming) => {
 
   const index = current.findIndex((item) => String(item._id) === id);
   if (index === -1) {
-    return `${key} item not found`;
+    return `This ${key} record was not found`;
   }
   const merged = { ...current[index], ...row, _id: current[index]._id };
   if (hasDuplicateRow(key, current, merged, id)) {
-    return `${key} already exists`;
+    return `This ${key} record is already added`;
   }
   current[index] = merged;
   employee[key] = current;
@@ -373,7 +373,7 @@ const createEmployee = async (req, res) => {
         ? req.body[key]
         : [req.body[key]];
       if (hasDuplicateWithin(key, rows)) {
-        return res.status(400).json({ message: `${key} already exists` });
+        return res.status(400).json({ message: `This ${key} record is already added` });
       }
       createDoc[key] = withoutIds(req.body[key]);
     }
@@ -693,7 +693,7 @@ const updateEmployee = async (req, res) => {
         if (next && next !== cur) {
           if (!isAdmin) {
             return res.status(400).json({
-              message: "official.officialEmail cannot be changed",
+              message: "Official email cannot be changed",
             });
           }
           profile.official.officialEmail = next;
@@ -713,7 +713,7 @@ const updateEmployee = async (req, res) => {
         headId(nextHead("reportingHead1")) === headId(nextHead("reportingHead2"))
       ) {
         return res.status(400).json({
-          message: "reportingHead1 and reportingHead2 cannot be the same manager",
+          message: "The two reporting managers cannot be the same person",
         });
       }
     }
@@ -860,7 +860,7 @@ const updateEmployee = async (req, res) => {
 /** Same access rules as profile update: own record, company, approved lock. */
 const loadEditableEmployee = async (req) => {
   if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-    return { status: 400, message: "Invalid employee id" };
+    return { status: 400, message: "Employee is not valid" };
   }
   if (!hasAllAccess(req.user) && !isOwnRecord(req, req.params.id)) {
     return { status: 403, message: "You can only update your own profile" };
@@ -883,7 +883,7 @@ const rejectIfBadSection = (section, res) => {
   if (ARRAY_SECTIONS.has(section)) return false;
   res.status(400).json({
     message:
-      "section must be education, accounts, family, nominees, experience, or visas",
+      "Section must be education, accounts, family, nominees, experience, or visas",
   });
   return true;
 };
@@ -911,7 +911,7 @@ const deleteArrayItem = async (req, res) => {
     const ids = collectDeleteIds(req.body);
     for (const id of ids) {
       if (!mongoose.Types.ObjectId.isValid(id)) {
-        return res.status(400).json({ message: "Invalid item id" });
+        return res.status(400).json({ message: "This record is not valid" });
       }
     }
 
@@ -927,7 +927,7 @@ const deleteArrayItem = async (req, res) => {
     for (const id of idSet) {
       const found = current.some((item) => String(item._id) === id);
       if (!found) {
-        return res.status(404).json({ message: `${section} item not found` });
+        return res.status(404).json({ message: `This ${section} record was not found` });
       }
     }
 
@@ -963,7 +963,7 @@ const loadAdminSection = async (req) => {
     };
   }
   if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-    return { status: 400, message: "Invalid employee id" };
+    return { status: 400, message: "Employee is not valid" };
   }
 
   const employee = await User.findById(req.params.id);
@@ -1030,7 +1030,7 @@ const deleteObjectSection = async (req, res) => {
       });
     }
     if (section !== "payroll") {
-      return res.status(400).json({ message: "section must be payroll" });
+      return res.status(400).json({ message: "Only payroll can be cleared here" });
     }
 
     const loaded = await loadAdminSection(req);
@@ -1100,7 +1100,7 @@ const deleteEmployee = async (req, res) => {
 
 /**
  * UPLOAD — POST /api/employees/upload
- * Form-data: document + type (education|account|leave|profile). Returns url only.
+ * Form-data: document + type (education|account|leave|profile|regularization). Returns url only.
  * profile → Cloudinary folder hrms/profile (images only). Put url on profileUrl.
  */
 const uploadAttachment = async (req, res) => {
@@ -1110,7 +1110,7 @@ const uploadAttachment = async (req, res) => {
       .toLowerCase();
     if (!UPLOAD_TYPES.includes(type)) {
       return res.status(400).json({
-        message: "type is required: education, account, leave, or profile",
+        message: `File type must be ${UPLOAD_TYPES.join(", ").replace(/, ([^,]+)$/, ", or $1")}`,
       });
     }
 
@@ -1148,7 +1148,7 @@ const deleteAttachment = async (req, res) => {
   try {
     const url = String(req.body.url || "").trim();
     if (!url) {
-      return res.status(400).json({ message: "url is required" });
+      return res.status(400).json({ message: "File url is required" });
     }
 
     await deleteProfileImage(url);
@@ -1265,7 +1265,7 @@ const listActivity = async (req, res) => {
     const employeeId = isAdmin ? filterValue(req, "employeeId") : String(req.user._id);
     if (employeeId) {
       if (!mongoose.Types.ObjectId.isValid(employeeId)) {
-        return res.status(400).json({ message: "Invalid employeeId" });
+        return res.status(400).json({ message: "Employee is not valid" });
       }
       employee = await User.findById(employeeId)
         .select("name official.employeeCode official.officialEmail")
@@ -1283,7 +1283,7 @@ const listActivity = async (req, res) => {
       if (from) range.$gte = new Date(`${from}T00:00:00.000Z`);
       if (to) range.$lte = new Date(`${to}T23:59:59.999Z`);
       if (Object.values(range).some((d) => Number.isNaN(d.getTime()))) {
-        return res.status(400).json({ message: "from / to must be YYYY-MM-DD" });
+        return res.status(400).json({ message: "From date and to date must look like 2026-10-14" });
       }
       and.push({ createdAt: range });
     }

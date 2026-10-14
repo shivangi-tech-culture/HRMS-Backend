@@ -13,6 +13,8 @@ const attendanceRegularizationSchema = new mongoose.Schema(
     punchOutTime: { type: String, default: "" },
     reason: { type: String, default: "" },
     remarks: { type: String, default: "" },
+    /** Cloudinary URL from POST /api/employees/upload with type=regularization */
+    document: { type: String, default: "" },
     status: {
       type: String,
       enum: ["Pending", "Approved", "Rejected", "Cancelled"],

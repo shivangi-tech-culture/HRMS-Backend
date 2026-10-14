@@ -216,13 +216,13 @@ const checkMasterPermission = (action) => {
       if (!type) {
         const { TYPES } = require("../models/Master");
         return res.status(400).json({
-          message: `type is required: ${TYPES.join(", ")}`,
+          message: `Type is required. Use one of: ${TYPES.join(", ")}`,
         });
       }
 
       const subName = MASTER_TYPE_PERM[type];
       if (!subName) {
-        return res.status(400).json({ message: `Invalid master type: ${type}` });
+        return res.status(400).json({ message: `Master type "${type}" is not valid` });
       }
 
       return checkPermission("Masters", subName, action)(req, res, next);

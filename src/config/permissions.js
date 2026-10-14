@@ -215,7 +215,6 @@ const ADMIN_TREE = [
     heading: "Work Schedule",
     subModules: [
       { name: "Weekly Off", actions: ["view", "create", "edit", "delete"] },
-      { name: "Holiday Calendar", actions: ["view", "create", "edit", "delete"] },
     ],
   },
 
@@ -268,6 +267,7 @@ const ADMIN_TREE = [
       // Org hierarchy (GET /api/hierarchy) — Super Admin / Admin / HR → full org;
       // Reporting Manager → own team. Assigning managers uses Employee / Access & Control → assign.
       { name: "Hierarchy", actions: ["view"] },
+      { name: "Holiday", actions: ["view", "create", "edit", "delete"] },
     ],
   },
 ];
@@ -325,6 +325,7 @@ const ESS_TREE = [
       { name: "Time Sheet", actions: VC },
       { name: "Regularize Attendance", actions: VCC },
       { name: "Leave", actions: VCC }, // Self Service → Leave (UI)
+      { name: "Holiday", actions: V }, // Self → holidays assigned to the employee's company
       { name: "My Web Punches", actions: V },
       { name: "On Tour/On Duty Entries", actions: VC },
       { name: "Additional Request", actions: VCC },

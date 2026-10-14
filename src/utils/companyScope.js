@@ -283,7 +283,7 @@ const attachCompany = async (actor, roleName, officialIn = {}) => {
     return {
       ok: false,
       status: 400,
-      message: "official.companyIds is required",
+      message: "Company is required",
     };
   }
   if (!multi && ids.length > 1) {

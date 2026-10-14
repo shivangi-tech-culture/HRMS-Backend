@@ -3,7 +3,7 @@
  *
  * Employee
  *   GET  /api/attendance/timesheet?month=YYYY-MM
- *   POST /api/attendance/regularize          { date, punchInTime?, punchOutTime?, reason, remarks? }
+ *   POST /api/attendance/regularize          { date, punchInTime?, punchOutTime?, reason, remarks?, document? }
  *   GET  /api/attendance/regularize
  *   POST /api/attendance/regularize/:id/cancel
  *
@@ -55,9 +55,9 @@ const attendanceLists = () => require("./attendance.controller");
 
 const clockOnDate = (dateStr, hm, label) => {
   const norm = normalizeHm(hm);
-  if (!norm) return { error: `${label} must be HH:mm` };
+  if (!norm) return { error: `${label} must look like 9:30 AM` };
   const at = new Date(`${dateStr}T${norm}:00+05:30`);
-  if (Number.isNaN(at.getTime())) return { error: `${label} must be HH:mm` };
+  if (Number.isNaN(at.getTime())) return { error: `${label} must look like 9:30 AM` };
   if (at.getTime() > Date.now()) return { error: `${label} cannot be in the future` };
   return { at, hm: norm };
 };
@@ -81,6 +81,7 @@ const toRow = (row) => ({
   punchOutTime: row.punchOutTime || "",
   reason: row.reason || "",
   remarks: row.remarks || "",
+  document: row.document || "",
   status: row.status,
   reviewReason: row.reviewReason || "",
   reviewedAt: row.reviewedAt || null,
@@ -274,7 +275,7 @@ const saveApprovedDay = async (request, actorId) => {
   if (!record) record = new Attendance({ employee: employeeId, date });
 
   if (!times.hasTimes && !isOpenIssueDay(record)) {
-    return { error: "punchInTime or punchOutTime is required" };
+    return { error: "Enter a punch in time, a punch out time, or both" };
   }
 
   if (times.punchIn && !record.punchIn) {
@@ -364,7 +365,7 @@ const myTimesheet = async (req, res) => {
 
     const range = await timesheetRange(employee, req.query);
     const { month, label, from, to } = range;
-    if (from > to) return res.status(400).json({ message: "from cannot be after to" });
+    if (from > to) return res.status(400).json({ message: "From date cannot be after to date" });
     if (addDays(from, 61) < to) {
       return res.status(400).json({ message: "Date range cannot be longer than 62 days" });
     }
@@ -602,7 +603,7 @@ const requestRegularization = async (req, res) => {
     const times = readTimes(date, req.body);
     if (times.error) return res.status(400).json({ message: times.error });
     if (!times.hasTimes && !lateDay) {
-      return res.status(400).json({ message: "punchInTime or punchOutTime is required" });
+      return res.status(400).json({ message: "Enter a punch in time, a punch out time, or both" });
     }
 
     if (!lateDay) {
@@ -628,6 +629,7 @@ const requestRegularization = async (req, res) => {
       punchOutTime: lateDay ? "" : times.punchOut ? times.punchOut.hm : "",
       reason: String(req.body.reason || "").trim(),
       remarks: String(req.body.remarks || "").trim(),
+      document: String(req.body.document || "").trim(),
       status: "Pending",
     });
 
@@ -655,7 +657,7 @@ const myRegularizations = (req, res) =>
 const cancelRegularization = async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ message: "Invalid request id" });
+      return res.status(400).json({ message: "Request is not valid" });
     }
     const doc = await AttendanceRegularization.findById(req.params.id).populate("employee", CARD);
     if (!doc) return res.status(404).json({ message: "Request not found" });
@@ -710,14 +712,14 @@ const listRegularizations = async (req, res) => {
 const reviewRegularization = async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ message: "Invalid request id" });
+      return res.status(400).json({ message: "Request is not valid" });
     }
     const decision = String(req.body.decision || "").toLowerCase();
     const reason = String(req.body.reason || "").trim();
     if (!["approve", "reject"].includes(decision)) {
-      return res.status(400).json({ message: 'decision must be "approve" or "reject"' });
+      return res.status(400).json({ message: "Decision must be approve or reject" });
     }
-    if (!reason) return res.status(400).json({ message: "reason is required" });
+    if (!reason) return res.status(400).json({ message: "Reason is required" });
 
     const request = await AttendanceRegularization.findById(req.params.id).populate("employee", CARD);
     if (!request) return res.status(404).json({ message: "Request not found" });

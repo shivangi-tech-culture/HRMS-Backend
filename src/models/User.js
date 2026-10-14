@@ -317,6 +317,9 @@ const userSchema = new mongoose.Schema(
           q3: { type: Number, default: 0 },
           q4: { type: Number, default: 0 },
         },
+        /** Adjusted days already applied. Separate from each quarter's own limit. */
+        adjustedUsed: { type: Number, default: 0 },
+        adjustedPending: { type: Number, default: 0 },
       },
     ],
     /** Comp Off and other extra-day notes for this employee. */
@@ -325,6 +328,10 @@ const userSchema = new mongoose.Schema(
         leaveType: { type: mongoose.Schema.Types.ObjectId, ref: "LeaveType" },
         year: { type: Number, default: 0 },
         days: { type: Number, required: true },
+        /** Casual Leave only: company month this credit belongs to, YYYY-MM. */
+        month: { type: String, default: "" },
+        /** Casual Leave only: 1–4, taken from that month. */
+        quarter: { type: Number, default: 0 },
         reason: { type: String, default: "" },
         by: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
         at: { type: Date, default: Date.now },

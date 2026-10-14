@@ -12,6 +12,8 @@ const leaveRequestSchema = new mongoose.Schema(
     from: { type: String, required: true },
     to: { type: String, required: true },
     days: { type: Number, required: true },
+    /** Days of this request taken from an adjustment, usable in any quarter. */
+    adjustmentDays: { type: Number, default: 0 },
     dayType: { type: String, enum: ["Full Day", "Half Day"], default: "Full Day" },
     reason: { type: String, default: "" },
     document: { type: String, default: "" },

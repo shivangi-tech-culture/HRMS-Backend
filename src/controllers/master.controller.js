@@ -95,7 +95,7 @@ const listMasters = async (req, res) => {
 const getMaster = async (req, res) => {
   try {
     if (!okId(req.params.id)) {
-      return res.status(400).json({ message: "Invalid id" });
+      return res.status(400).json({ message: "This record is not valid" });
     }
     const found = await findMasterByIdLean(req.params.id);
     if (!found) return res.status(404).json({ message: "Not found" });
@@ -181,7 +181,7 @@ const createMaster = async (req, res) => {
 const updateMaster = async (req, res) => {
   try {
     if (!okId(req.params.id)) {
-      return res.status(400).json({ message: "Invalid id" });
+      return res.status(400).json({ message: "This record is not valid" });
     }
     const found = await findMasterById(req.params.id);
     if (!found) return res.status(404).json({ message: "Not found" });
@@ -191,7 +191,7 @@ const updateMaster = async (req, res) => {
     if (req.body.name !== undefined) {
       const nextName = String(req.body.name).trim();
       if (!nextName) {
-        return res.status(400).json({ message: "name is required" });
+        return res.status(400).json({ message: "Name is required" });
       }
       row.name = nextName;
     }
@@ -229,7 +229,7 @@ const updateMaster = async (req, res) => {
 const deleteMaster = async (req, res) => {
   try {
     if (!okId(req.params.id)) {
-      return res.status(400).json({ message: "Invalid id" });
+      return res.status(400).json({ message: "This record is not valid" });
     }
     const found = await findMasterById(req.params.id);
     if (!found) return res.status(404).json({ message: "Not found" });

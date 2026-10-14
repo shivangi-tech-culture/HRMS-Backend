@@ -17,7 +17,7 @@
  *
  * ─── EMPLOYEE TIMESHEET + REGULARIZATION ─────────────────────
  * GET    /timesheet            ?month=YYYY-MM | from=&to=  optional employeeId
- * POST   /regularize           self only. Missed punch times, or a Late day reason.
+ * POST   /regularize           self only. Missed punch times, or a Late day reason. document is optional (upload type regularization).
  * GET    /regularize           own requests
  * POST   /regularize/:id/cancel
  * GET    /regularizations      HR / manager / admin / super admin queue

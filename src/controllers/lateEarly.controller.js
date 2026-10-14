@@ -268,7 +268,7 @@ const listLateEarly = async (req, res) => {
   try {
     const type = String(req.query.type || "all").toLowerCase();
     if (!["late", "early", "all"].includes(type)) {
-      return res.status(400).json({ message: 'type must be "late", "early", or "all"' });
+      return res.status(400).json({ message: "Type must be late, early, or all" });
     }
 
     let from = req.query.from;

@@ -343,7 +343,7 @@ const ARRAY_ITEM_SCHEMAS = {
 const badSection = (res) =>
   res.status(400).json({
     message:
-      "section must be education, accounts, family, nominees, experience, visas, or payroll",
+      "Section must be education, accounts, family, nominees, experience, visas, or payroll",
   });
 
 /**

@@ -68,6 +68,7 @@ const branchSchema = new mongoose.Schema(
     address: { type: String, default: "" },
     city: { type: String, default: "" },
     state: { type: String, default: "" },
+    pincode: { type: String, default: "", trim: true },
     isActive: { type: Boolean, default: true },
     shifts: { type: [shiftSchema], default: [] },
   },
