@@ -35,6 +35,13 @@ const punchSchema = Joi.object({
   remarks: Joi.string().trim().allow("").max(500).optional(),
 }).unknown(false);
 
+/** GET /api/attendance/punch-status — logged-in employee, their company, one date */
+const punchStatusQuerySchema = Joi.object({
+  date: dateStr.required().messages({
+    "any.required": "date is required",
+  }),
+}).unknown(false);
+
 /** GET /api/attendance/web-punches — own punches */
 const webPunchQuerySchema = Joi.object({
   date: dateStr.optional(),
@@ -135,6 +142,17 @@ const lateEarlyQuerySchema = Joi.object({
 
 const REQUEST_STATUSES = ["Pending", "Approved", "Rejected", "Cancelled", "ALL"];
 
+/** pending / ALL / blank all map to the stored status. Blank means every status. */
+const requestStatus = Joi.string()
+  .trim()
+  .empty("")
+  .custom((value, helpers) => {
+    const match = REQUEST_STATUSES.find((status) => status.toLowerCase() === String(value).toLowerCase());
+    if (!match) return helpers.error("any.only", { valids: REQUEST_STATUSES });
+    return match;
+  })
+  .default("ALL");
+
 /** GET /api/attendance/timesheet */
 const timesheetQuerySchema = Joi.object({
   month: Joi.string()
@@ -162,9 +180,7 @@ const regularizeSchema = Joi.object({
 
 /** GET /api/attendance/regularize — own requests */
 const myRegularizeQuerySchema = Joi.object({
-  status: Joi.string()
-    .valid(...REQUEST_STATUSES)
-    .default("ALL"),
+  status: requestStatus,
   from: dateStr.optional(),
   to: dateStr.optional(),
   page: Joi.number().integer().min(1).default(1),
@@ -173,9 +189,7 @@ const myRegularizeQuerySchema = Joi.object({
 
 /** GET /api/attendance/regularizations — HR / manager / admin queue */
 const regularizationListQuerySchema = Joi.object({
-  status: Joi.string()
-    .valid(...REQUEST_STATUSES)
-    .default("Pending"),
+  status: requestStatus,
   search: Joi.string().trim().allow("").max(100).optional(),
   companyId: Joi.alternatives().try(objectId, Joi.string().valid("ALL", "")).optional(),
   from: dateStr.optional(),
@@ -186,6 +200,7 @@ const regularizationListQuerySchema = Joi.object({
 
 module.exports = {
   punchSchema,
+  punchStatusQuerySchema,
   webPunchQuerySchema,
   dailyQuerySchema,
   calendarQuerySchema,

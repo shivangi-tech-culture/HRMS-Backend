@@ -73,7 +73,7 @@ const defaultsBody = Joi.object({
 });
 
 const applyBody = Joi.object({
-  leaveTypeId: objectId.required(),
+  leaveTypeId: objectId.optional(),
   from: ymd.required(),
   to: ymd.required(),
   dayType: Joi.string().valid("Full Day", "Half Day").default("Full Day"),

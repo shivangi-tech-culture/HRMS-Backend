@@ -322,6 +322,27 @@ const userSchema = new mongoose.Schema(
         adjustedPending: { type: Number, default: 0 },
       },
     ],
+    /**
+     * Unpaid days created when a leave request ran past the paid balance.
+     * dates are the unpaid days only. deduction is the salary days to cut.
+     */
+    unpaidLeaves: [
+      {
+        request: { type: mongoose.Schema.Types.ObjectId, ref: "LeaveRequest" },
+        leaveType: { type: mongoose.Schema.Types.ObjectId, ref: "LeaveType" },
+        year: { type: Number, default: 0 },
+        from: { type: String, default: "" },
+        to: { type: String, default: "" },
+        dates: [{ type: String }],
+        days: { type: Number, default: 0 },
+        deduction: { type: Number, default: 0 },
+        status: {
+          type: String,
+          enum: ["Pending", "Approved", "Rejected", "Cancelled"],
+          default: "Pending",
+        },
+      },
+    ],
     /** Comp Off and other extra-day notes for this employee. */
     leaveAdjustments: [
       {

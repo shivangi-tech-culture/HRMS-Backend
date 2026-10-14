@@ -606,10 +606,16 @@ const presentItem = (item, type, doj, monthStartDay = 1) => {
   };
 };
 
+const isUnpaidBalance = (row) => row?.paid === false || String(row?.code || "").toUpperCase() === "UL";
+
 /** Casual Leave 12 + Earned Leave 6 = paid annual 18. Comp Off stays outside that number. */
 const summarizeBalances = (balances) => {
-  const paid = (balances || []).filter((row) => row.paid && row.allocationType !== "earned");
-  const comp = (balances || []).find((row) => row.allocationType === "earned");
+  const rows = balances || [];
+  const paid = rows.filter((row) => row.paid && row.allocationType !== "earned" && !isUnpaidBalance(row));
+  const comp = rows.find((row) => row.allocationType === "earned");
+  const unpaidRows = rows.filter(isUnpaidBalance);
+  const unpaidUsed = round(unpaidRows.reduce((sum, row) => sum + (row.used || 0), 0));
+  const unpaidPending = round(unpaidRows.reduce((sum, row) => sum + (row.pending || 0), 0));
   return {
     paidAnnual: round(paid.reduce((sum, row) => sum + (Number(row.maxDays) || 0), 0)),
     paidUsed: round(paid.reduce((sum, row) => sum + (row.used || 0), 0)),
@@ -621,7 +627,36 @@ const summarizeBalances = (balances) => {
       pending: comp?.pending || 0,
       remaining: comp?.remaining || 0,
     },
+    unpaid: {
+      allotted: round(unpaidRows.reduce((sum, row) => sum + (Number(row.maxDays) || row.available || 0), 0)),
+      used: unpaidUsed,
+      pending: unpaidPending,
+      remaining: round(unpaidRows.reduce((sum, row) => sum + (row.remaining || 0), 0)),
+    },
+    /** Approved unpaid days are the salary deduction. Pending days are not deducted yet. */
+    deduction: {
+      days: unpaidUsed,
+      pendingDays: unpaidPending,
+    },
   };
+};
+
+/** True when this date of a request is salary-deducted unpaid leave. Paid days come first. */
+const leaveDayUnpaid = (leave, date) => {
+  if (!leave || !date) return false;
+  const hasSplit = leave.paidDays != null || leave.unpaidDays != null;
+  if (!hasSplit) {
+    const code = String(leave.leaveType?.code || leave.code || "").toUpperCase();
+    return leave.leaveType?.paid === false || leave.paid === false || code === "UL";
+  }
+  const unpaid = round(leave.unpaidDays || 0);
+  const paidDays = round(leave.paidDays || 0);
+  if (unpaid <= 0) return false;
+  if (leave.dayType === "Half Day") return paidDays <= 0;
+  const dates = eachYmd(leave.from, leave.to);
+  const index = dates.indexOf(date);
+  if (index < 0) return false;
+  return index >= paidDays;
 };
 
 const findItem = (balance, leaveTypeId) =>
@@ -935,6 +970,8 @@ module.exports = {
   companyMonthOf,
   presentItem,
   summarizeBalances,
+  leaveDayUnpaid,
+  eachYmd,
   stampLine,
   findItem,
   grantLeaveBalance,
