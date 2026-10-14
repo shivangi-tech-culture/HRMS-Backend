@@ -641,12 +641,11 @@ const updateEmployee = async (req, res) => {
     const profile = pickProfile(req.body);
 
     if (profile.official !== undefined && !isAdmin) {
-      const officialKeys = Object.keys(profile.official).filter(
-        (key) => profile.official[key] !== undefined
+      const allowed = new Set(["emailAppPassword", "officialEmail"]);
+      const blocked = Object.keys(profile.official).filter(
+        (key) => profile.official[key] !== undefined && !allowed.has(key)
       );
-      const onlyAppPassword =
-        officialKeys.length > 0 && officialKeys.every((key) => key === "emailAppPassword");
-      if (!onlyAppPassword) {
+      if (blocked.length) {
         return res.status(403).json({
           message:
             "Employee cannot edit official details or employee code. Contact HR / Admin.",
@@ -690,12 +689,7 @@ const updateEmployee = async (req, res) => {
         const cur = String(employee.official?.officialEmail || "")
           .trim()
           .toLowerCase();
-        if (next && next !== cur) {
-          if (!isAdmin) {
-            return res.status(400).json({
-              message: "Official email cannot be changed",
-            });
-          }
+        if (isAdmin && next && next !== cur) {
           profile.official.officialEmail = next;
         }
       }
