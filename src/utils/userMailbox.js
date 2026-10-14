@@ -2,9 +2,6 @@ const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 const User = require("../models/User");
 
-const syncedAt = new Map();
-const running = new Set();
-
 function secretKey() {
   const secret = process.env.JWT_SECRET || "";
   if (!secret) {
@@ -104,121 +101,6 @@ async function sendAsUser(creds, { to, subject, text, attachments }) {
   });
 }
 
-function textOf(parsed) {
-  const text = String(parsed?.text || "").trim();
-  if (text) return text.slice(0, 20000);
-  return String(parsed?.html || "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 20000);
-}
-
-function addressList(list) {
-  return (list || [])
-    .map((item) => ({
-      name: item.name || item.address || "",
-      email: String(item.address || "").trim().toLowerCase(),
-    }))
-    .filter((item) => item.email);
-}
-
-async function importParsed(ownerId, folder, parsed) {
-  const MailMessage = require("../models/MailMessage");
-  const Mailbox = require("../models/Mailbox");
-  const rfcMessageId = String(parsed.messageId || "").trim();
-  if (!rfcMessageId) return;
-  const from = addressList(parsed.from?.value)[0] || { name: "", email: "" };
-  if (!from.email) return;
-  const to = addressList(parsed.to?.value);
-  const body = textOf(parsed);
-  const names = (parsed.attachments || []).map((file) => file.filename).filter(Boolean);
-  const bodyWithFiles = names.length ? `${body}\n\nAttachments: ${names.join(", ")}`.trim() : body;
-
-  let message = await MailMessage.findOne({ rfcMessageId });
-  if (!message) {
-    const person = from.email
-      ? await User.findOne({ "official.officialEmail": from.email }).select("_id name").lean()
-      : null;
-    message = await MailMessage.create({
-      rfcMessageId,
-      fromEmployeeId: person ? String(person._id) : "",
-      fromName: from.name || person?.name || from.email,
-      fromEmail: from.email,
-      to: to.map((item) => ({
-        employeeId: "",
-        name: item.name,
-        email: item.email,
-        kind: "external",
-      })),
-      subject: String(parsed.subject || "").trim() || "(no subject)",
-      body: bodyWithFiles,
-      preview: bodyWithFiles.replace(/\s+/g, " ").trim().slice(0, 140) || "(no subject)",
-      externalStatus: "sent",
-    });
-  }
-
-  const existing = await Mailbox.findOne({ ownerId, messageId: message._id });
-  if (existing) return false;
-  await Mailbox.create({
-    ownerId,
-    messageId: message._id,
-    folder,
-    unread: folder === "inbox",
-    starred: false,
-  });
-  return true;
-}
-
-async function readFolder(client, mailbox, ownerId, folder, limit) {
-  const { simpleParser } = require("mailparser");
-  const lock = await client.getMailboxLock(mailbox);
-  let imported = 0;
-  try {
-    const status = await client.status(mailbox, { messages: true });
-    const total = Number(status.messages) || 0;
-    if (!total) return 0;
-    const start = Math.max(1, total - limit + 1);
-    for await (const msg of client.fetch(`${start}:*`, { source: true, uid: true })) {
-      if (!msg.source) continue;
-      const parsed = await simpleParser(msg.source);
-      if (await importParsed(ownerId, folder, parsed)) imported += 1;
-    }
-  } finally {
-    lock.release();
-  }
-  return imported;
-}
-
-async function syncUserMailbox(userId, { force = false } = {}) {
-  const last = syncedAt.get(String(userId)) || 0;
-  if (!force && Date.now() - last < 45_000) return { ok: true, skipped: true, imported: 0 };
-  const key = String(userId);
-  if (running.has(key)) return { ok: true, skipped: true, imported: 0 };
-  const limit = force ? 50 : 20;
-  const creds = await loadMailboxCreds(userId);
-  if (!creds) return { ok: false, skipped: true, imported: 0 };
-  syncedAt.set(key, Date.now());
-  running.add(key);
-  try {
-    const client = await openImap(creds);
-    let imported = 0;
-    try {
-      imported += await readFolder(client, "INBOX", creds.userId, "inbox", limit);
-      const boxes = await client.list();
-      const sent = boxes.find((box) =>
-        /\\sent/i.test(String(box.specialUse || "")) || /sent/i.test(box.path),
-      );
-      if (sent?.path) imported += await readFolder(client, sent.path, creds.userId, "sent", limit);
-    } finally {
-      await client.logout().catch(() => {});
-    }
-    return { ok: true, imported };
-  } finally {
-    running.delete(key);
-  }
-}
-
 async function openImap(creds) {
   const { ImapFlow } = await import("imapflow");
   const client = new ImapFlow({
@@ -243,10 +125,25 @@ async function checkMailboxLogin(userId) {
   return true;
 }
 
+/**
+ * Mailbox mail used to be copied into MongoDB (rfcMessageId was only set by that copy).
+ * Mail is now read live from the mailbox, so those copies are removed.
+ */
+async function purgeImportedMail() {
+  const MailMessage = require("../models/MailMessage");
+  const Mailbox = require("../models/Mailbox");
+  const ids = await MailMessage.find({ rfcMessageId: { $nin: ["", null] } }).distinct("_id");
+  if (!ids.length) return 0;
+  await Mailbox.deleteMany({ messageId: { $in: ids } });
+  await MailMessage.deleteMany({ _id: { $in: ids } });
+  return ids.length;
+}
+
 module.exports = {
   sealAppPassword,
   loadMailboxCreds,
   sendAsUser,
-  syncUserMailbox,
+  openImap,
   checkMailboxLogin,
+  purgeImportedMail,
 };

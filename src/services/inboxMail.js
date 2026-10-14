@@ -3,12 +3,8 @@ const Mailbox = require("../models/Mailbox");
 const MailMessage = require("../models/MailMessage");
 const User = require("../models/User");
 const { storeInboxFiles, removeChatFiles, readChatFile } = require("../utils/chatFiles");
-const {
-  loadMailboxCreds,
-  sendAsUser,
-  syncUserMailbox,
-  checkMailboxLogin,
-} = require("../utils/userMailbox");
+const { loadMailboxCreds, sendAsUser, checkMailboxLogin } = require("../utils/userMailbox");
+const live = require("../utils/liveMailbox");
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -162,12 +158,14 @@ async function loadOwned(user, mailboxId) {
   return { box, message };
 }
 
+/** HRMS mail belongs to the address it was sent from or to, so an old official email's mail stays hidden. */
+function forCurrentAddress(box, message, email) {
+  if (box.folder === "drafts") return true;
+  if (String(message.fromEmail || "").toLowerCase() === email) return true;
+  return (message.to || []).some((item) => String(item.email || "").toLowerCase() === email);
+}
+
 async function listMessages(user, { folder = "inbox", q = "" } = {}) {
-  try {
-    await syncUserMailbox(user.employeeId);
-  } catch (err) {
-    console.error("Mailbox sync failed:", err.message);
-  }
   const filter = { ownerId: user.employeeId };
   if (folder === "starred") {
     filter.starred = true;
@@ -183,17 +181,24 @@ async function listMessages(user, { folder = "inbox", q = "" } = {}) {
     throw httpError(400, "Unknown folder");
   }
 
-  const boxes = await Mailbox.find(filter).sort({ createdAt: -1 }).limit(200);
+  const [boxes, mailbox] = await Promise.all([
+    Mailbox.find(filter).sort({ createdAt: -1 }).limit(200),
+    folder === "drafts" ? [] : live.liveMessages(user.employeeId, folder),
+  ]);
   const messages = await MailMessage.find({ _id: { $in: boxes.map((box) => box.messageId) } });
   const byId = new Map(messages.map((message) => [String(message._id), message]));
   const query = String(q || "").trim().toLowerCase();
 
-  return boxes
+  const hrms = boxes
     .map((box) => {
       const message = byId.get(String(box.messageId));
-      return message ? toMailDto(box, message) : null;
+      if (!message || !forCurrentAddress(box, message, user.email)) return null;
+      return toMailDto(box, message);
     })
-    .filter(Boolean)
+    .filter(Boolean);
+
+  return [...hrms, ...mailbox]
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     .filter((mail) => {
       if (!query) return true;
       return [mail.subject, mail.fromName, mail.toName, mail.preview, mail.fromEmail, mail.toEmail]
@@ -204,14 +209,22 @@ async function listMessages(user, { folder = "inbox", q = "" } = {}) {
 }
 
 async function folderCounts(user) {
-  const boxes = await Mailbox.find({ ownerId: user.employeeId }).select("folder starred unread");
+  const rows = [
+    ...(await listMessages(user, { folder: "all" })),
+    ...(await listMessages(user, { folder: "trash" })),
+    ...(await listMessages(user, { folder: "drafts" })),
+  ];
   const counts = { inbox: 0, drafts: 0, sent: 0, starred: 0, trash: 0, unread: 0 };
-  for (const box of boxes) {
-    if (counts[box.folder] !== undefined) counts[box.folder] += 1;
-    if (box.starred && box.folder !== "trash") counts.starred += 1;
-    if (box.unread && box.folder === "inbox") counts.unread += 1;
+  for (const mail of rows) {
+    if (counts[mail.folder] !== undefined) counts[mail.folder] += 1;
+    if (mail.starred && mail.folder !== "trash") counts.starred += 1;
+    if (mail.unread && mail.folder === "inbox") counts.unread += 1;
   }
   return counts;
+}
+
+function hrmsOnly(id, action) {
+  if (live.isLiveId(id)) throw httpError(400, `${action} works on HRMS mail only, not on Gmail mail`);
 }
 
 async function deliverExternal(message, user) {
@@ -253,13 +266,12 @@ async function deliverExternal(message, user) {
       const content = await readChatFile(file.storageKey);
       attachments.push({ filename: file.name, content, contentType: file.mimeType });
     }
-    const info = await sendAsUser(creds, {
+    await sendAsUser(creds, {
       to: recipients,
       subject: message.subject || "(no subject)",
       text: message.body || "",
       attachments,
     });
-    message.rfcMessageId = String(info.messageId || "");
     message.externalStatus = "sent";
     message.externalError = "";
     await message.save();
@@ -356,9 +368,17 @@ async function sendMail(user, input, req) {
 }
 
 async function replyMail(user, mailboxId, bodyText, req) {
-  const { message } = await loadOwned(user, mailboxId);
   const body = String(bodyText || "").trim();
   if (!body) throw httpError(400, "Message is required");
+  if (live.isLiveId(mailboxId)) {
+    const { row } = await live.liveRow(user.employeeId, mailboxId);
+    const mail = row.dto;
+    const target = mail.folder === "sent" ? mail.toEmail.split(",")[0].trim() : mail.fromEmail;
+    if (!target) throw httpError(400, "This mail has no address to reply to");
+    const subject = mail.subject.toLowerCase().startsWith("re:") ? mail.subject : `Re: ${mail.subject}`;
+    return sendMail(user, { to: target, subject, body }, req);
+  }
+  const { message } = await loadOwned(user, mailboxId);
   const iSentIt = message.fromEmployeeId === user.employeeId;
   const target = iSentIt ? message.to[0] : { email: message.fromEmail, name: message.fromName };
   if (!target?.email) throw httpError(400, "This mail has no address to reply to");
@@ -425,6 +445,7 @@ async function saveDraft(user, input, req) {
 }
 
 async function openMail(user, mailboxId) {
+  if (live.isLiveId(mailboxId)) return live.openLive(user.employeeId, mailboxId);
   const { box, message } = await loadOwned(user, mailboxId);
   if (box.unread) {
     box.unread = false;
@@ -434,6 +455,7 @@ async function openMail(user, mailboxId) {
 }
 
 async function toggleStar(user, mailboxId) {
+  if (live.isLiveId(mailboxId)) return live.starLive(user.employeeId, mailboxId);
   const { box, message } = await loadOwned(user, mailboxId);
   box.starred = !box.starred;
   await box.save();
@@ -453,6 +475,7 @@ function futureDate(value, label) {
 }
 
 async function snoozeMail(user, mailboxId, until, req) {
+  hrmsOnly(mailboxId, "Snooze");
   const { box, message } = await loadOwned(user, mailboxId);
   box.snoozedUntil = until ? futureDate(until, "Snooze") : null;
   await box.save();
@@ -462,6 +485,7 @@ async function snoozeMail(user, mailboxId, until, req) {
 }
 
 async function remindMail(user, mailboxId, at, req) {
+  hrmsOnly(mailboxId, "Reminder");
   const { box, message } = await loadOwned(user, mailboxId);
   box.reminderAt = at ? futureDate(at, "Reminder") : null;
   await box.save();
@@ -471,6 +495,7 @@ async function remindMail(user, mailboxId, at, req) {
 }
 
 async function setMailTask(user, mailboxId, input, req) {
+  hrmsOnly(mailboxId, "Add task");
   const { box, message } = await loadOwned(user, mailboxId);
   const title = String(input?.title || "").trim();
   if (!title) {
@@ -491,15 +516,20 @@ async function setMailTask(user, mailboxId, input, req) {
 async function trashMails(user, ids) {
   const unique = [...new Set((Array.isArray(ids) ? ids : []).map((id) => String(id)))];
   if (!unique.length) throw httpError(400, "Choose a mail");
-  await Mailbox.updateMany(
-    { _id: { $in: unique }, ownerId: user.employeeId, folder: { $ne: "trash" } },
-    { $set: { folder: "trash", unread: false } },
-  );
+  await live.trashLive(user.employeeId, unique);
+  const hrms = unique.filter((id) => !live.isLiveId(id));
+  if (hrms.length) {
+    await Mailbox.updateMany(
+      { _id: { $in: hrms }, ownerId: user.employeeId, folder: { $ne: "trash" } },
+      { $set: { folder: "trash", unread: false } },
+    );
+  }
   return { ok: true };
 }
 
 async function loadAttachment(user, attachmentId) {
   if (!attachmentId) throw httpError(404, "File not found");
+  if (live.isLiveFileId(attachmentId)) return live.liveAttachment(user.employeeId, attachmentId);
   const message = await MailMessage.findOne({ "attachments._id": attachmentId });
   if (!message) throw httpError(404, "File not found");
   const box = await Mailbox.findOne({ ownerId: user.employeeId, messageId: message._id });
@@ -600,6 +630,7 @@ async function saveAppPassword(user, value) {
       },
     },
   );
+  live.forget(actor.employeeId);
   if (!sealed.emailAppPasswordSet) return { ok: true, appPasswordSet: false, importing: false };
   try {
     await checkMailboxLogin(actor.employeeId);
@@ -614,10 +645,7 @@ async function saveAppPassword(user, value) {
     }
     return { ok: true, appPasswordSet: true, importing: false, importError };
   }
-  syncUserMailbox(actor.employeeId, { force: true }).catch((err) => {
-    console.error("Mailbox import failed:", err.message);
-  });
-  return { ok: true, appPasswordSet: true, importing: true };
+  return { ok: true, appPasswordSet: true, importing: false };
 }
 
 module.exports = {
