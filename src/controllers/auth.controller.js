@@ -69,6 +69,7 @@ const login = async (req, res) => {
     roleDoc = await refreshLockedRole(roleDoc);
     const token = signToken(user._id);
     setAuthCookie(res, token);
+    if (user.official?.emailAppPasswordSet) require("../utils/liveMailbox").warm(String(user._id));
 
     const companies = (await companyListForUser(user)).map((row) => ({
       _id: row.companyId,
