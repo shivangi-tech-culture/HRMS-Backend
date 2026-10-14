@@ -82,7 +82,7 @@ async function loadMailboxCreds(userId) {
   };
 }
 
-async function sendAsUser(creds, { to, subject, text, attachments }) {
+async function sendAsUser(creds, { to, subject, text, attachments, messageId }) {
   const transporter = nodemailer.createTransport({
     host: creds.smtp,
     port: Number(process.env.SMTP_PORT_EZ) || 465,
@@ -98,6 +98,7 @@ async function sendAsUser(creds, { to, subject, text, attachments }) {
     subject: subject || "(no subject)",
     text: text || "",
     attachments: attachments?.length ? attachments : undefined,
+    messageId,
   });
 }
 

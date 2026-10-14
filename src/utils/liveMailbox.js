@@ -52,6 +52,10 @@ function addresses(list) {
     .filter((item) => item.email);
 }
 
+function hrmsIdOf(parsed) {
+  return /^<?hrms-([a-f0-9]{24})@/i.exec(String(parsed.messageId || ""))?.[1] || "";
+}
+
 function toDto(key, uid, flags, parsed) {
   const from = addresses(parsed.from)[0] || { name: "", email: "" };
   const to = addresses(parsed.to);
@@ -60,6 +64,7 @@ function toDto(key, uid, flags, parsed) {
   return {
     id,
     messageId: id,
+    hrmsMessageId: hrmsIdOf(parsed),
     source: "gmail",
     folder: key,
     fromName: from.name || from.email,
@@ -240,6 +245,19 @@ async function trashLive(userId, ids) {
   forget(userId);
 }
 
+/** Puts a raw mail into the user's real Inbox or Sent folder, so it also shows in their mail app. */
+async function appendLive(userId, folder, raw, { seen = false, date } = {}) {
+  const creds = await loadMailboxCreds(userId);
+  if (!creds) return false;
+  await withMailbox(creds, async (client) => {
+    const path = folder === "inbox" ? "INBOX" : (await folderPaths(client))[folder];
+    if (!path) throw liveError(400, `This mailbox has no ${folder} folder`);
+    await client.append(path, raw, seen ? ["\\Seen"] : [], date);
+  });
+  forget(userId);
+  return true;
+}
+
 async function liveAttachment(userId, fileId) {
   const [, folder, uid, index] = FILE_RE.exec(fileId);
   const { row } = await liveRow(userId, `g-${folder}-${uid}`);
@@ -259,6 +277,7 @@ module.exports = {
   openLive,
   starLive,
   trashLive,
+  appendLive,
   liveAttachment,
   forget,
 };
