@@ -604,14 +604,15 @@ async function saveAppPassword(user, value) {
   try {
     await checkMailboxLogin(actor.employeeId);
   } catch (err) {
-    return {
-      ok: true,
-      appPasswordSet: true,
-      importing: false,
-      importError: err.authenticationFailed || /auth|invalid credentials|login/i.test(String(err.message))
-        ? "Gmail rejected this app password. Check the official email and app password."
-        : err.message || "Could not reach the mailbox",
-    };
+    const detail = String(err.responseText || err.response || err.message || "").trim();
+    console.error("Mailbox login failed:", detail);
+    let importError = detail || "Could not reach the mailbox";
+    if (/web ?browser|WEBALERT|ALERT/i.test(detail)) {
+      importError = `Google blocked this sign-in from the server. Open Gmail, approve the "Was this you?" security alert, then save again. (${detail})`;
+    } else if (err.authenticationFailed || /AUTHENTICATIONFAILED|invalid credentials/i.test(detail)) {
+      importError = `Gmail rejected this app password for ${actor.email}. Create the app password while signed in to that exact Google account. (${detail})`;
+    }
+    return { ok: true, appPasswordSet: true, importing: false, importError };
   }
   syncUserMailbox(actor.employeeId, { force: true }).catch((err) => {
     console.error("Mailbox import failed:", err.message);
