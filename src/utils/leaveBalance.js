@@ -228,6 +228,53 @@ const quarterAllowanceNow = (type, doj, ymd = todayYmd(), monthStartDay = 1) => 
   return quarterAllowanceFor(type, doj, period.year, period.quarter, monthStartDay);
 };
 
+/** Q2–Q4 sit in the leave year. Q1 is Jan–Mar of the next calendar year. */
+const calendarYearForQuarter = (leaveYearNum, quarter) =>
+  quarter === 1 ? Number(leaveYearNum) + 1 : Number(leaveYearNum);
+
+/**
+ * Adjusted days are extra Casual Leave (for example a month that was carried in).
+ * They can be used once, on top of a quarter's own limit, not once in every quarter.
+ */
+const spareAdjustment = (line, type, doj, monthStartDay) => {
+  const extra = round(line?.adjusted || 0);
+  if (extra <= 0) return 0;
+  const year = Number(line?.year) || leaveYear();
+  let consumed = 0;
+  for (let quarter = 1; quarter <= 4; quarter += 1) {
+    const key = quarterKey(quarter);
+    const limit = quarterAllowanceFor(
+      type,
+      doj,
+      calendarYearForQuarter(year, quarter),
+      quarter,
+      monthStartDay
+    );
+    const taken = round((line?.quarterUsed?.[key] || 0) + (line?.quarterPending?.[key] || 0));
+    consumed = round(consumed + Math.max(0, taken - limit));
+  }
+  return round(Math.max(0, extra - consumed));
+};
+
+/** Days still applyable in one quarter, including an unused adjustment. */
+const quarterRoom = (line, type, doj, monthStartDay, calendarYear, quarter) => {
+  const key = quarterKey(quarter);
+  const limit = quarterAllowanceFor(type, doj, calendarYear, quarter, monthStartDay);
+  const used = round(line?.quarterUsed?.[key] || 0);
+  const pending = round(line?.quarterPending?.[key] || 0);
+  const taken = round(used + pending);
+  const spare = spareAdjustment(line, type, doj, monthStartDay);
+  const over = round(Math.max(0, taken - limit));
+  return {
+    limit,
+    used,
+    pending,
+    spare,
+    ceiling: round(limit + spare + over),
+    left: round(Math.max(0, limit - taken) + spare),
+  };
+};
+
 /** null when the date is on or after probation ends. */
 const probationBlock = (doj, from, cycle = 1) => {
   const end = probationEndYmd(doj, cycle);
@@ -299,10 +346,10 @@ const stampLine = (line, type, doj, monthStartDay = 1) => {
   if (isQuarterlyType(type)) {
     ensureQuarters(line);
     const today = todayYmd();
-    const key = quarterKey(quarterIndex(today, monthStartDay));
-    const limit = quarterAllowanceNow(type, doj, today, monthStartDay);
-    line.available = limit;
-    line.remaining = round(limit - (line.quarterUsed[key] || 0) - (line.quarterPending[key] || 0));
+    const period = companyMonthOf(today, monthStartDay);
+    const room = quarterRoom(line, type, doj, monthStartDay, period.year, period.quarter);
+    line.available = room.ceiling;
+    line.remaining = room.left;
     return line;
   }
   line.available = poolOf(type, line);
@@ -371,9 +418,10 @@ const presentItem = (item, type, doj, monthStartDay = 1) => {
   let remaining;
   let quarter = null;
   if (quarterly) {
-    const limit = quarterAllowanceNow(type, doj, today, monthStartDay);
-    available = limit;
-    remaining = round(limit - quarterUsed[key] - quarterPending[key]);
+    const room = quarterRoom(item, type, doj, monthStartDay, period.year, now);
+    const limit = room.limit;
+    available = room.ceiling;
+    remaining = room.left;
     quarter = {
       code: `Q${now}`,
       label: open.label,
@@ -382,6 +430,7 @@ const presentItem = (item, type, doj, monthStartDay = 1) => {
       monthStartDay: cycleOf(monthStartDay).monthStartDay,
       monthEndDay: cycleOf(monthStartDay).monthEndDay,
       limit,
+      adjusted: round(item.adjusted || 0),
       used: quarterUsed[key],
       pending: quarterPending[key],
       remaining,
@@ -542,18 +591,17 @@ const moveLeave = async (employeeId, type, days, direction, slices = []) => {
     ensureQuarters(line);
     if (direction === "hold") {
       for (const slice of slices) {
-        const key = quarterKey(slice.quarter);
-        const limit = quarterAllowanceFor(type, doj, slice.year, slice.quarter, monthStartDay);
-        if (!limit) {
+        const room = quarterRoom(line, type, doj, monthStartDay, slice.year, slice.quarter);
+        if (!room.limit && !room.spare) {
           return {
             error: `No ${type.name} in Q${slice.quarter}. Months inside the 3-month probation are not counted.`,
           };
         }
-        const left = round(limit - line.quarterUsed[key] - line.quarterPending[key]);
-        if (slice.days > left) {
+        if (slice.days > room.left) {
           const window = quarterWindow(`${slice.year}-${String((slice.quarter - 1) * 3 + 1).padStart(2, "0")}-01`);
+          const extra = room.spare ? `, plus ${room.spare} adjusted` : "";
           return {
-            error: `Only ${left} ${type.name} left in ${window.code} (${window.label}). These ${limit} days can be taken in any month of this quarter.`,
+            error: `Only ${room.left} ${type.name} left in ${window.code} (${window.label}). This quarter allows ${room.limit} days${extra}.`,
           };
         }
       }
@@ -674,8 +722,9 @@ const syncTypeOnBalances = async (type) => {
     if (isQuarterlyType(type)) {
       ensureQuarters(line);
       const limit = round(type.quarterlyLimit || 0);
+      const extra = round(Math.max(0, line.adjusted || 0));
       for (const key of QUARTER_KEYS) {
-        if (round(line.quarterUsed[key] + line.quarterPending[key]) > limit) {
+        if (round(line.quarterUsed[key] + line.quarterPending[key]) > round(limit + extra)) {
           return {
             ok: false,
             message: `${type.name} is already used more than ${limit} days in a quarter`,

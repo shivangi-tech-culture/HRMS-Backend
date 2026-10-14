@@ -687,7 +687,8 @@ const adjustBalance = async (req, res) => {
       return res.status(404).json({ message: "Leave balance not found for this type" });
     }
     item.adjusted = round(item.adjusted + days);
-    stampLine(item, type);
+    const monthStartDay = await monthStartForUser(employee);
+    stampLine(item, type, employee.official?.dateOfJoining, monthStartDay);
     balance.leaveAdjustments.push({
       leaveType: type._id,
       year,
@@ -698,7 +699,6 @@ const adjustBalance = async (req, res) => {
     });
     balance.markModified("leaves");
     await balance.save();
-    const monthStartDay = await monthStartForUser(employee);
     const shown = presentItem(item, type, employee.official?.dateOfJoining, monthStartDay);
     const earned = isEarnedType(type);
     return res.json({
