@@ -32,7 +32,7 @@ const CACHE_TTL_MS = 60 * 1000;
 const directoryCache = new Map();
 
 const PERSON_SELECT =
-  "name role official.officialEmail official.employeeCode official.designation official.department official.reportingHead1 official.reportingHead2";
+  "name role profileUrl official.officialEmail official.employeeCode official.designation official.department official.reportingHead1 official.reportingHead2";
 
 /** Error with an HTTP status for the chat error handler / socket ack */
 const chatError = (status, message) => {
@@ -106,6 +106,7 @@ const toPerson = (row, relation) => ({
   designation: row.official?.designation || "",
   department: row.official?.department || "",
   relation,
+  profileUrl: row.profileUrl || "",
 });
 
 /**
@@ -116,7 +117,7 @@ const peopleCards = async (ids) => {
   const unique = [...new Set(ids.map(String).filter(Boolean))];
   if (unique.length === 0) return new Map();
   const rows = await User.find({ _id: { $in: unique } })
-    .select("name role official.designation official.department")
+    .select("name role profileUrl official.designation official.department")
     .lean();
   return new Map(
     rows.map((row) => [
@@ -127,6 +128,7 @@ const peopleCards = async (ids) => {
         role: normalizeRoleName(row.role),
         designation: row.official?.designation || "",
         department: row.official?.department || "",
+        profileUrl: row.profileUrl || "",
       },
     ])
   );

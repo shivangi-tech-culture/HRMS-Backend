@@ -106,10 +106,17 @@ const removeChatFiles = async (attachments) => {
 };
 
 /** Upload message files; returns attachment rows for ChatMessage */
-const storeChatFiles = async (companyId, files) => {
+const storeChatFiles = async (companyId, files) => storeTypedFiles("chat", companyId, files);
+
+/** Inbox attachments, same Cloudinary rules, folder hrms/mail */
+const storeInboxFiles = async (ownerId, files) => storeTypedFiles("mail", ownerId, files);
+
+const storeTypedFiles = async (type, ownerId, files) => {
+  const list = Array.isArray(files) ? files : [];
+  if (!list.length) return [];
   assertCloudinary();
-  const folder = `${folderFor("chat")}/${String(companyId).replace(/[^a-zA-Z0-9_-]/g, "_")}`;
-  const results = await Promise.allSettled(files.map((file) => uploadOne(file, folder)));
+  const folder = `${folderFor(type)}/${String(ownerId).replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+  const results = await Promise.allSettled(list.map((file) => uploadOne(file, folder)));
   const stored = results.filter((r) => r.status === "fulfilled").map((r) => r.value);
   const failed = results.find((r) => r.status === "rejected");
   if (failed) {
@@ -131,6 +138,7 @@ module.exports = {
   uploadChatFiles,
   chatUploadError,
   storeChatFiles,
+  storeInboxFiles,
   removeChatFiles,
   readChatFile,
 };

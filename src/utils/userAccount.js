@@ -53,6 +53,7 @@ const safeUser = async (doc) => {
   delete obj.password;
   delete obj.contact;
   if (obj.official) {
+    delete obj.official.emailAppPassword;
     obj.official.reportingHead1 = headRef(obj.official.reportingHead1);
     obj.official.reportingHead2 = headRef(obj.official.reportingHead2);
     if (Array.isArray(obj.official.companyIds)) {

@@ -30,6 +30,7 @@ const employeeRoutes = require("./routes/employee.routes");
 const accessControlRoutes = require("./routes/accessControl.routes");
 const attendanceRoutes = require("./routes/attendance.routes");
 const mailRoutes = require("./routes/mail.routes");
+const inboxRoutes = require("./routes/inbox.routes");
 const masterRoutes = require("./routes/master.routes");
 const companyRoutes = require("./routes/company.routes");
 const chatRoutes = require("./routes/chat.routes");
@@ -158,6 +159,49 @@ app.get("/", (req, res) => {
   });
 });
 
+/**
+ * Local machine only. Render cannot open Gmail SMTP, so outside mail
+ * is handed to this computer when the app password is in the local env.
+ */
+if (NODE_ENV !== "production") {
+  const { sendAsUser } = require("./utils/userMailbox");
+  app.post("/api/mail/local-send", async (req, res) => {
+    const ip = String(req.socket?.remoteAddress || "");
+    if (ip !== "::1" && !ip.endsWith("127.0.0.1")) {
+      return res.status(403).json({ message: "Local send only" });
+    }
+    const fromEmail = String(process.env.LOCAL_MAIL_FROM || "").trim().toLowerCase();
+    const password = String(process.env.LOCAL_MAIL_APP_PASSWORD || "").replace(/\s+/g, "");
+    if (!fromEmail || !password) {
+      return res.status(503).json({ message: "Local mailbox is not configured" });
+    }
+    const claimed = String(req.body?.fromEmail || "").trim().toLowerCase();
+    if (claimed !== fromEmail) {
+      return res.status(403).json({ message: "This computer can only send as its configured mailbox" });
+    }
+    const to = String(req.body?.to || "").trim();
+    if (!to) return res.status(400).json({ message: "To is required" });
+    try {
+      const info = await sendAsUser(
+        {
+          name: String(req.body?.fromName || fromEmail),
+          email: fromEmail,
+          password,
+          smtp: "smtp.gmail.com",
+        },
+        {
+          to,
+          subject: String(req.body?.subject || ""),
+          text: String(req.body?.text || ""),
+        },
+      );
+      return res.json({ ok: true, messageId: info.messageId || "" });
+    } catch (err) {
+      return res.status(502).json({ message: err.message || "Gmail send failed" });
+    }
+  });
+}
+
 /** Mount APIs under /api/* */
 app.use("/api/health", healthRoutes); // public health check (API + MongoDB)
 app.use("/api/auth/login", loginLimiter); // count login attempts (max 20 / window)
@@ -169,6 +213,7 @@ app.use("/api/permissions", permissionRoutes); // catalogs + my permissions
 app.use("/api/employees", employeeRoutes); // employees only (role = Employee)
 app.use("/api/users", accessControlRoutes); // Access & Control (any role)
 app.use("/api/attendance", attendanceRoutes); // punch · daily · calendar · timesheet · regularization
+app.use("/api/mail", inboxRoutes); // Inbox, drafts, attachments (same API as chat)
 app.use("/api/mail", mailRoutes); // Organization → Mail send
 app.use("/api/masters", masterRoutes); // SaaS masters (typed collections, including Branch + Shift)
 app.use("/api/companies", companyRoutes); // Company CRUD
@@ -187,6 +232,10 @@ attachChatSocket(io);
 connectDB().then(async () => {
   const { seedLeaveDefaults } = require("./utils/seedLeave");
   await seedLeaveDefaults();
+  const { purgeImportedMail } = require("./utils/userMailbox");
+  purgeImportedMail()
+    .then((count) => count && console.log(`Removed ${count} copied mailbox mails`))
+    .catch((err) => console.error("Mailbox copy cleanup failed:", err.message));
   server.listen(PORT, () => {
     const pad = (s, n = 72) => s.padEnd(n);
     console.log("");

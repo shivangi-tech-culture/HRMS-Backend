@@ -98,6 +98,8 @@ const companyObjectId = Joi.string().hex().length(24);
 const officialItem = only({
   employeeCode: Joi.string().trim().uppercase().allow("").optional(),
   officialEmail: emailOpt(),
+  /** Mailbox app password. Empty clears it. Never echoed back. */
+  emailAppPassword: Joi.string().trim().max(128).allow("").optional(),
   /** One id for Employee / Reporting Manager. One or more for HR. */
   companyIds: Joi.array().items(companyObjectId).min(1).max(50).optional(),
   department: str(),
@@ -286,10 +288,11 @@ const listOrOne = (item) =>
 
 /**
  * UPDATE EMPLOYEE / profile — PUT /api/employees/:id
- * official.officialEmail and official.companyIds are immutable (forbidden here).
+ * companyIds stay immutable. Super Admin / Admin / HR may change officialEmail
+ * (controller enforces who, and that the new address is unused).
  */
 const officialUpdateItem = officialItem.fork(
-  ["officialEmail", "companyIds"],
+  ["companyIds"],
   (schema) => schema.forbidden()
 );
 
