@@ -673,6 +673,7 @@ async function saveAppPassword(user, value) {
     }
     return { ok: true, appPasswordSet: true, importing: false, importError };
   }
+  live.warm(actor.employeeId);
   return { ok: true, appPasswordSet: true, importing: false };
 }
 
