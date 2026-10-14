@@ -15,8 +15,13 @@ function secretKey() {
   return crypto.createHash("sha256").update(String(secret)).digest();
 }
 
+/** Google shows app passwords in groups of four; the spaces are not part of the password. */
+function cleanAppPassword(value) {
+  return String(value || "").replace(/\s+/g, "");
+}
+
 function sealAppPassword(value) {
-  const plain = String(value || "").trim();
+  const plain = cleanAppPassword(value);
   if (!plain) return { emailAppPassword: "", emailAppPasswordSet: false };
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv("aes-256-gcm", secretKey(), iv);
@@ -45,9 +50,17 @@ function openAppPassword(stored) {
   ]).toString("utf8");
 }
 
+function googleMailDomains() {
+  const extra = String(process.env.GOOGLE_MAIL_DOMAINS || "techculture.ai")
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+  return new Set(["gmail.com", "googlemail.com", ...extra]);
+}
+
 function serversFor(email) {
   const domain = String(email.split("@")[1] || "").toLowerCase();
-  if (domain === "gmail.com" || domain === "googlemail.com") {
+  if (googleMailDomains().has(domain)) {
     return { smtp: "smtp.gmail.com", imap: "imap.gmail.com" };
   }
   return {
@@ -61,7 +74,7 @@ async function loadMailboxCreds(userId) {
     "name official.officialEmail official.emailAppPassword official.emailAppPasswordSet",
   );
   const email = String(row?.official?.officialEmail || "").trim().toLowerCase();
-  const password = openAppPassword(row?.official?.emailAppPassword);
+  const password = cleanAppPassword(openAppPassword(row?.official?.emailAppPassword));
   if (!row || !email || !password) return null;
   return {
     userId: String(row._id),
