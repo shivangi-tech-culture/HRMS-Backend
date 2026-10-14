@@ -89,6 +89,20 @@ const adjustBody = Joi.object({
   employeeId: objectId.required(),
   leaveTypeId: objectId.required(),
   days: Joi.number().positive().max(30).required(),
+  quarter: Joi.alternatives()
+    .try(Joi.string().trim().pattern(/^Q?[1-4]$/i), Joi.number().integer().min(1).max(4))
+    .optional(),
+  month: Joi.array()
+    .items(
+      Joi.alternatives().try(
+        Joi.string().trim().max(20),
+        Joi.number().integer().min(1).max(12)
+      )
+    )
+    .min(1)
+    .max(12)
+    .optional()
+    .messages({ "array.base": "month must be an array. Each month carries 1 day." }),
   reason: Joi.string().trim().min(1).max(300).required(),
 });
 

@@ -106,6 +106,7 @@ const canView = [
  *                     address: { type: string, example: Sector 62 }
  *                     city: { type: string, example: Noida }
  *                     state: { type: string, example: Uttar Pradesh }
+ *                     pincode: { type: string, example: "201301" }
  *                     isActive: { type: boolean, example: true }
  *                     shifts:
  *                       type: array
@@ -142,7 +143,7 @@ router.post(
  *     summary: Get one company — all details
  *     description: |
  *       Everything about the company in one call: companyName, companyCode, isActive,
- *       branches[] (branchId { _id, name, code }, address, city, state, isActive,
+ *       branches[] (branchId { _id, name, code }, address, city, state, pincode, isActive,
  *       shifts[] (shiftId { _id, name, code }, isActive, monthlySchedule)) and
  *       reportingManagers[] { _id, name, employeeCode, email } (active managers of this company).
  *       Create-employee form: companyIds ← _id, branchId ← branches[].branchId._id,

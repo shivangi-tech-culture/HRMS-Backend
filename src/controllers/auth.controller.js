@@ -18,7 +18,7 @@ const {
 } = require("../utils/companyScope");
 const { signToken } = require("../utils/jwt");
 
-const LOCKED_ROLES = new Set(["Super Admin", "Admin"]);
+const LOCKED_ROLES = new Set(["Super Admin", "Admin", "Employee"]);
 
 /** Build a short label like "42 of 120" for the UI */
 const permLabel = (roleDoc) => {
@@ -26,7 +26,7 @@ const permLabel = (roleDoc) => {
   return `${countPermissions(roleDoc.permissions)} of ${totalForRole(roleDoc.name)}`;
 };
 
-/** Keep Super Admin / Admin matrix in sync with permissions.js catalog */
+/** Keep Super Admin, Admin, and Employee matrices in sync with permissions.js */
 async function refreshLockedRole(roleDoc) {
   if (!roleDoc || !LOCKED_ROLES.has(roleDoc.name)) return roleDoc;
   const full = permissionsForRole(roleDoc.name);

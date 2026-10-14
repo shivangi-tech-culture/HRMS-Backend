@@ -26,6 +26,8 @@ const {
   quarterlyDateError,
   probationBlock,
   casualDatesError,
+  adjustmentView,
+  casualAdjustCredit,
   isEarnedType,
   isQuarterlyType,
   poolOf,
@@ -90,7 +92,7 @@ const pickCompany = (actor, requested) => {
   if (scope.error) return scope;
   if (requested) return { companyId: requested };
   if (scope.ids?.length) return { companyId: scope.ids[0] };
-  return { error: "companyId is required" };
+  return { error: "Company is required" };
 };
 
 const isEmployee = (user) => normalizeRoleName(user.role) === EMPLOYEE;
@@ -252,8 +254,8 @@ const loadEmployee = async (id) => {
   return employee;
 };
 
-const holdDays = (employeeId, type, days, direction, slices) =>
-  moveLeave(employeeId, type, days, direction, slices);
+const holdDays = (employeeId, type, days, direction, slices, adjustmentDays) =>
+  moveLeave(employeeId, type, days, direction, slices, adjustmentDays);
 
 /** Closed-quarter Quarterly Leave is not stored. Release the hold, then delete the row. */
 const releaseExpiredQuarterly = async (employeeId) => {
@@ -271,11 +273,12 @@ const releaseExpiredQuarterly = async (employeeId) => {
   });
   for (const request of pending) {
     const monthStartDay = await monthStartForCompany(request.companyId);
+    if (round(request.adjustmentDays || 0) >= round(request.days)) continue;
     if (!quarterlyDateError(request.from, request.to, today, monthStartDay)) continue;
     const type = await LeaveType.findById(request.leaveType).lean();
     if (!type || !isQuarterlyType(type)) continue;
     const slices = slicesFor(request.from, request.to, request.dayType, monthStartDay);
-    await holdDays(request.employee, type, request.days, "release", slices);
+    await holdDays(request.employee, type, request.days, "release", slices, request.adjustmentDays || 0);
     await request.deleteOne();
   }
 };
@@ -686,27 +689,63 @@ const adjustBalance = async (req, res) => {
     if (!balance || !item || !type) {
       return res.status(404).json({ message: "Leave balance not found for this type" });
     }
-    item.adjusted = round(item.adjusted + days);
     const monthStartDay = await monthStartForUser(employee);
+    let credits = [];
+    if (isQuarterlyType(type)) {
+      const picked = casualAdjustCredit(req.body, year, monthStartDay);
+      if (picked.error) return res.status(400).json({ message: picked.error });
+      credits = picked.credits;
+      if (round(days) !== credits.length) {
+        return res.status(400).json({
+          message: `Days must match the selected months. ${credits.length} month(s) means ${credits.length} day(s).`,
+        });
+      }
+    }
+    item.adjusted = round(item.adjusted + days);
     stampLine(item, type, employee.official?.dateOfJoining, monthStartDay);
-    balance.leaveAdjustments.push({
-      leaveType: type._id,
-      year,
-      days,
-      reason: req.body.reason.trim(),
-      by: req.user._id,
-      at: new Date(),
-    });
+    const reason = req.body.reason.trim();
+    const at = new Date();
+    if (credits.length) {
+      for (const credit of credits) {
+        balance.leaveAdjustments.push({
+          leaveType: type._id,
+          year,
+          days: 1,
+          month: credit.month,
+          quarter: credit.quarter,
+          reason,
+          by: req.user._id,
+          at,
+        });
+      }
+    } else {
+      balance.leaveAdjustments.push({
+        leaveType: type._id,
+        year,
+        days,
+        month: "",
+        quarter: 0,
+        reason,
+        by: req.user._id,
+        at,
+      });
+    }
     balance.markModified("leaves");
     await balance.save();
     const shown = presentItem(item, type, employee.official?.dateOfJoining, monthStartDay);
     const earned = isEarnedType(type);
-    return res.json({
-      message: earned
+    const adjustments = credits.map((credit) => ({
+      ...adjustmentView({ month: credit.month, quarter: credit.quarter }, monthStartDay),
+      days: 1,
+      reason,
+    }));
+    const monthList = credits.map((credit) => credit.monthName).join(", ");
+    const message = credits.length
+      ? `${shown.name} increased by ${days} for ${monthList} (${credits[0].quarterCode}). The employee can use these days in any quarter.`
+      : earned
         ? `${shown.name} earned increased by ${days}`
-        : `${shown.name} remaining increased by ${days}`,
-      data: shown,
-    });
+        : `${shown.name} remaining increased by ${days}`;
+    return res.json({ message, data: shown, adjustments });
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
@@ -839,8 +878,6 @@ const applyLeave = async (req, res) => {
       return res.status(400).json({ message: "Leave dates must stay inside the current leave year (April–March)" });
     }
     if (isQuarterlyType(type)) {
-      const blocked = quarterlyDateError(from, to, todayYmd(), monthStartDay);
-      if (blocked) return res.status(400).json({ message: blocked });
       const collapsed = casualDatesError(employee.official?.dateOfJoining, from, to, monthStartDay);
       if (collapsed) return res.status(400).json({ message: collapsed });
     }
@@ -856,6 +893,7 @@ const applyLeave = async (req, res) => {
       from,
       to,
       days,
+      adjustmentDays: held.adjustmentDays || 0,
       dayType,
       reason: req.body.reason.trim(),
       document: req.body.document || "",
@@ -890,13 +928,15 @@ const decide = async (req, res, nextStatus) => {
     if (!type) return res.status(400).json({ message: "Leave type not found" });
     const monthStartDay = await monthStartForCompany(request.companyId);
     const slices = slicesFor(request.from, request.to, request.dayType, monthStartDay);
-    if (nextStatus === "Approved" && isQuarterlyType(type) && quarterlyDateError(request.from, request.to, todayYmd(), monthStartDay)) {
-      await holdDays(request.employee, type, request.days, "release", slices);
+    const openQuarterMiss = quarterlyDateError(request.from, request.to, todayYmd(), monthStartDay);
+    const coveredByAdjust = round(request.adjustmentDays || 0) >= round(request.days);
+    if (nextStatus === "Approved" && isQuarterlyType(type) && openQuarterMiss && !coveredByAdjust) {
+      await holdDays(request.employee, type, request.days, "release", slices, request.adjustmentDays || 0);
       await request.deleteOne();
-      return res.status(400).json({ message: quarterlyDateError(request.from, request.to, todayYmd(), monthStartDay) });
+      return res.status(400).json({ message: openQuarterMiss });
     }
     const direction = nextStatus === "Approved" ? "approve" : "release";
-    const moved = await holdDays(request.employee, type, request.days, direction, slices);
+    const moved = await holdDays(request.employee, type, request.days, direction, slices, request.adjustmentDays || 0);
     if (moved.error) return res.status(400).json({ message: moved.error });
 
     request.status = nextStatus;
@@ -939,7 +979,7 @@ const cancelRequest = async (req, res) => {
       request.dayType,
       await monthStartForCompany(request.companyId)
     );
-    const moved = await holdDays(request.employee, type, request.days, "release", slices);
+    const moved = await holdDays(request.employee, type, request.days, "release", slices, request.adjustmentDays || 0);
     if (moved.error) return res.status(400).json({ message: moved.error });
     request.status = "Cancelled";
     request.reviewedBy = req.user._id;
@@ -1315,6 +1355,7 @@ const myLeave = async (req, res) => {
         name: typeMap.get(String(row.leaveType))?.name || "",
         code: typeMap.get(String(row.leaveType))?.code || "",
         days: row.days,
+        ...adjustmentView(row, monthStartDay),
         reason: row.reason,
         by: row.by,
         at: row.at,

@@ -6581,6 +6581,317 @@
               }
             }
           ]
+        },
+        {
+          "name": "1.9 Holiday",
+          "description": "Holiday catalog, then assign companies on the same holiday (`companyIds`).\nPermission: Administration → Holiday (view / create / edit / delete). Assign uses edit.\nCreate does not take a company. POST /assign links holidays to companies (`mode` add | remove | replace).\nSuper Admin and Admin see every holiday. Other roles see holidays assigned to their companies.\nRun Create first — it saves {{holidayId}}. {{companyId}} and {{companyId2}} fill automatically.",
+          "item": [
+            {
+              "name": "1. Create Holiday",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/holidays",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "holidays"
+                  ]
+                },
+                "description": "POST /api/holidays. Saves {{holidayId}}. `date` is a fresh 2026 day from {{holidayDate}} so a repeat create does not hit the unique date. Company is not sent here — assign next.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `name` — string | required | holiday name (min 2)\n- `date` — string (YYYY-MM-DD) | required | unique in the catalog\n- `description` — string | optional | default empty\n- `isActive` — boolean | optional | default `true`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Republic Day {{rndNo}}\",\n  \"date\": \"{{holidayDate}}\",\n  \"description\": \"\",\n  \"isActive\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const n = Number(pm.variables.get('rndNo') || '1');",
+                      "const day = (n % 27) + 1;",
+                      "const month = (Math.floor(n / 27) % 12) + 1;",
+                      "const pad = (v) => String(v).padStart(2, '0');",
+                      "pm.variables.set('holidayDate', '2026-' + pad(month) + '-' + pad(day));"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const j = pm.response.json();",
+                      "const id = (j.data || {})._id;",
+                      "if (id) pm.collectionVariables.set('holidayId', id);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "2. List Holidays",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/holidays?page={{page}}&limit={{limit}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "holidays"
+                  ],
+                  "query": [
+                    {
+                      "key": "companyId",
+                      "value": "{{companyId}}",
+                      "disabled": true,
+                      "description": "string (MongoId) | optional | holidays assigned to this company"
+                    },
+                    {
+                      "key": "year",
+                      "value": "2026",
+                      "disabled": true,
+                      "description": "number | optional | calendar year e.g. 2026"
+                    },
+                    {
+                      "key": "from",
+                      "value": "2026-01-01",
+                      "disabled": true,
+                      "description": "string (YYYY-MM-DD) | optional | range start"
+                    },
+                    {
+                      "key": "to",
+                      "value": "2026-12-31",
+                      "disabled": true,
+                      "description": "string (YYYY-MM-DD) | optional | range end"
+                    },
+                    {
+                      "key": "isActive",
+                      "value": "true",
+                      "disabled": true,
+                      "description": "boolean | optional | true or false"
+                    },
+                    {
+                      "key": "search",
+                      "value": "",
+                      "disabled": true,
+                      "description": "string | optional | holiday name"
+                    },
+                    {
+                      "key": "page",
+                      "value": "{{page}}",
+                      "description": "number | optional | page number, default 1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "{{limit}}",
+                      "description": "number | optional | rows per page (1–100)"
+                    }
+                  ]
+                },
+                "description": "GET /api/holidays.\nSuper Admin and Admin see every holiday. Other roles see holidays assigned to their companies. Tick `companyId` to list one company.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `companyId` — string (MongoId) | optional | holidays assigned to this company\n- `year` — number | optional | calendar year e.g. `2026`\n- `from` — string (YYYY-MM-DD) | optional | range start\n- `to` — string (YYYY-MM-DD) | optional | range end\n- `isActive` — boolean | optional | `true` or `false`\n- `search` — string | optional | holiday name\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (1–100)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+              }
+            },
+            {
+              "name": "3. Get Holiday",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/holidays/{{holidayId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "holidays",
+                    "{{holidayId}}"
+                  ]
+                },
+                "description": "GET /api/holidays/{{holidayId}}. Response includes `companyIds` (company name and code).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `holidayId` → {{holidayId}} — string (MongoId) | saved by Create Holiday\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+              }
+            },
+            {
+              "name": "4. Update Holiday",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/holidays/{{holidayId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "holidays",
+                    "{{holidayId}}"
+                  ]
+                },
+                "description": "PUT /api/holidays/{{holidayId}} — name, date, description, isActive only. Does not change companies. Use Assign for companyIds.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `holidayId` → {{holidayId}} — string (MongoId) | saved by Create Holiday\n\n**Body (JSON raw)** — send only fields to change\n- `name` — string | optional\n- `date` — string (YYYY-MM-DD) | optional | still unique\n- `description` — string | optional\n- `isActive` — boolean | optional\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Republic Day\",\n  \"description\": \"National holiday\",\n  \"isActive\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "5. Assign Holidays",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/holidays/assign",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "holidays",
+                    "assign"
+                  ]
+                },
+                "description": "POST /api/holidays/assign. `mode: add` puts these companies on these holidays. {{companyId}} and {{companyId2}} fill from GET /api/companies when empty.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)**\n- `holidayIds` — string[] (MongoId) | required | holiday `_id`s\n- `companyIds` — string[] (MongoId) | required | company `_id`s\n- `mode` — string | optional | `add` (default) | `remove` | `replace`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"holidayIds\": [\"{{holidayId}}\"],\n  \"companyIds\": [\"{{companyId}}\", \"{{companyId2}}\"],\n  \"mode\": \"add\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "6. Remove Holiday Companies",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/holidays/assign",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "holidays",
+                    "assign"
+                  ]
+                },
+                "description": "Same API with `mode: remove`. Takes these companies off these holidays.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)**\n- `holidayIds` — string[] (MongoId) | required\n- `companyIds` — string[] (MongoId) | required\n- `mode` — `remove`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"holidayIds\": [\"{{holidayId}}\"],\n  \"companyIds\": [\"{{companyId2}}\"],\n  \"mode\": \"remove\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "7. Replace Holiday Companies",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/holidays/assign",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "holidays",
+                    "assign"
+                  ]
+                },
+                "description": "Same API with `mode: replace`. Sets `companyIds` to exactly this list.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)**\n- `holidayIds` — string[] (MongoId) | required\n- `companyIds` — string[] (MongoId) | required\n- `mode` — `replace`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"holidayIds\": [\"{{holidayId}}\"],\n  \"companyIds\": [\"{{companyId}}\"],\n  \"mode\": \"replace\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "8. Delete Holiday",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/holidays/{{holidayId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "holidays",
+                    "{{holidayId}}"
+                  ]
+                },
+                "description": "DELETE /api/holidays/{{holidayId}}. Clears {{holidayId}}.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `holidayId` → {{holidayId}} — string (MongoId)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code < 300) pm.collectionVariables.set('holidayId', '');"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
         }
       ]
     },
@@ -7445,6 +7756,67 @@
               }
             }
           ]
+        },
+        {
+          "name": "2.5 Holiday",
+          "description": "Employee self holiday list. Login as Employee first (2.1 → 1).\nPermission: Self → Holiday → view.\nShows holidays assigned to that employee's company. Inactive rows stay hidden unless isActive is ticked.",
+          "item": [
+            {
+              "name": "1. My Holidays",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/holidays/me?page={{page}}&limit={{limit}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "holidays", "me"],
+                  "query": [
+                    {
+                      "key": "year",
+                      "value": "2026",
+                      "disabled": true,
+                      "description": "number | optional | calendar year"
+                    },
+                    {
+                      "key": "from",
+                      "value": "2026-01-01",
+                      "disabled": true,
+                      "description": "string (YYYY-MM-DD) | optional | range start"
+                    },
+                    {
+                      "key": "to",
+                      "value": "2026-12-31",
+                      "disabled": true,
+                      "description": "string (YYYY-MM-DD) | optional | range end"
+                    },
+                    {
+                      "key": "search",
+                      "value": "",
+                      "disabled": true,
+                      "description": "string | optional | holiday name"
+                    },
+                    {
+                      "key": "isActive",
+                      "value": "false",
+                      "disabled": true,
+                      "description": "boolean | optional | omit to list active holidays only"
+                    },
+                    {
+                      "key": "page",
+                      "value": "{{page}}",
+                      "description": "number | optional | page number, default 1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "{{limit}}",
+                      "description": "number | optional | rows per page (1–100)"
+                    }
+                  ]
+                },
+                "description": "GET /api/holidays/me. Employee only. Permission Self → Holiday → view.\nReturns name, date, description, isActive for holidays assigned to the employee's company.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login as Employee)*\n\n**Query params**\n- `year` — number | optional\n- `from` / `to` — string (YYYY-MM-DD) | optional\n- `search` — string | optional | holiday name\n- `isActive` — boolean | optional | default active only\n- `page` — number | optional\n- `limit` — number | optional\n"
+              }
+            }
+          ]
         }
       ]
     }
@@ -7484,6 +7856,10 @@
     },
     {
       "key": "companyId2",
+      "value": ""
+    },
+    {
+      "key": "holidayId",
       "value": ""
     },
     {

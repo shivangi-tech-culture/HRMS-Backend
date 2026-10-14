@@ -99,7 +99,7 @@ const assignReportingManager = async (req, res) => {
         .lean();
       // Must exist and have the Reporting Manager role
       if (!manager || !MANAGER_ROLES.includes(normalizeRoleName(manager.role))) {
-        return res.status(400).json({ message: "managerId must be a Reporting Manager" });
+        return res.status(400).json({ message: "Selected person must be a reporting manager" });
       }
       // Inactive managers cannot get new team members
       if (manager.status !== "Active") {

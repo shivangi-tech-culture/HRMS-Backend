@@ -96,7 +96,7 @@ const formatAttendanceRecord = (record, extras = {}) => {
       : null;
   const lateBy = window ? window.lateByMinutes : Number(r.lateByMinutes) || 0;
   const earlyBy = Number(r.earlyByMinutes) || 0;
-  const isLate = Boolean(r.punchOut) && r.status === "Late";
+  const isLate = r.punchOut ? r.status === "Late" : lateBy > 0;
   const isEarly = Boolean(r.punchOut) && r.status === "EarlyLeave";
   let attendanceStatus = r.attendanceStatus || null;
   if (attendanceStatus !== "Approved" && attendanceStatus !== "Rejected") {

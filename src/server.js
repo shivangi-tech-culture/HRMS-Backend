@@ -34,6 +34,7 @@ const masterRoutes = require("./routes/master.routes");
 const companyRoutes = require("./routes/company.routes");
 const chatRoutes = require("./routes/chat.routes");
 const leaveRoutes = require("./routes/leave.routes");
+const holidayRoutes = require("./routes/holiday.routes");
 const { attachChatSocket } = require("./utils/chatSocket");
 
 const app = express();
@@ -173,6 +174,7 @@ app.use("/api/masters", masterRoutes); // SaaS masters (typed collections, inclu
 app.use("/api/companies", companyRoutes); // Company CRUD
 app.use("/api/chat", chatRoutes); // team chat (REST) — live updates on Socket.IO below
 app.use("/api/leave", leaveRoutes); // types · balance · requests · calendar · policies · history
+app.use("/api/holidays", holidayRoutes); // catalog + company assignment
 
 /** One HTTP server for the API and Socket.IO (chat) */
 const server = http.createServer(app);

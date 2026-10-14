@@ -65,8 +65,8 @@ const missingMasters = async (branches = []) => {
   const okS = has(foundShifts);
   const badB = branchIds.filter((id) => !okB.has(id));
   const badS = shiftIds.filter((id) => !okS.has(id));
-  if (badB.length) return `Branch master not found: ${badB.join(", ")}`;
-  if (badS.length) return `Shift master not found: ${badS.join(", ")}`;
+  if (badB.length) return "Selected branch was not found. Choose a branch from the list";
+  if (badS.length) return "Selected shift was not found. Choose a shift from the list";
   return "";
 };
 
@@ -114,7 +114,7 @@ const listCompanies = async (req, res) => {
       Company.countDocuments(filter),
       Company.find(filter)
         .select(
-          "companyName companyCode isActive monthStartDay monthEndDay branches.branchId branches.isActive branches.shifts.shiftId branches.shifts.isActive"
+          "companyName companyCode isActive monthStartDay monthEndDay branches.branchId branches.address branches.city branches.state branches.pincode branches.isActive branches.shifts.shiftId branches.shifts.isActive"
         )
         .sort({ companyName: 1 })
         .skip(skip)
@@ -140,7 +140,7 @@ const listCompanies = async (req, res) => {
 const getCompany = async (req, res) => {
   try {
     if (!okId(req.params.id)) {
-      return res.status(400).json({ message: "Invalid company id" });
+      return res.status(400).json({ message: "Company is not valid" });
     }
     const row = await Company.findById(req.params.id)
       .populate(MASTER_POPULATE)
@@ -212,7 +212,7 @@ const createCompany = async (req, res) => {
 const updateCompany = async (req, res) => {
   try {
     if (!okId(req.params.id)) {
-      return res.status(400).json({ message: "Invalid company id" });
+      return res.status(400).json({ message: "Company is not valid" });
     }
     const row = await Company.findById(req.params.id);
     if (!row) return res.status(404).json({ message: "Company not found" });
@@ -267,7 +267,7 @@ const updateCompany = async (req, res) => {
 const deleteCompany = async (req, res) => {
   try {
     if (!okId(req.params.id)) {
-      return res.status(400).json({ message: "Invalid company id" });
+      return res.status(400).json({ message: "Company is not valid" });
     }
     const row = await Company.findById(req.params.id);
     if (!row) return res.status(404).json({ message: "Company not found" });

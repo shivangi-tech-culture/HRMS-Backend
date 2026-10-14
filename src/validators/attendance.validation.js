@@ -157,6 +157,7 @@ const regularizeSchema = Joi.object({
     "string.empty": "reason is required",
   }),
   remarks: Joi.string().trim().allow("").max(500).optional(),
+  document: Joi.string().trim().allow("").max(500).optional(),
 }).unknown(false);
 
 /** GET /api/attendance/regularize — own requests */

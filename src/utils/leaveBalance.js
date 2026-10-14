@@ -240,7 +240,8 @@ const spareAdjustment = (line, type, doj, monthStartDay) => {
   const extra = round(line?.adjusted || 0);
   if (extra <= 0) return 0;
   const year = Number(line?.year) || leaveYear();
-  let consumed = 0;
+  const tagged = round((line?.adjustedUsed || 0) + (line?.adjustedPending || 0));
+  let implicit = 0;
   for (let quarter = 1; quarter <= 4; quarter += 1) {
     const key = quarterKey(quarter);
     const limit = quarterAllowanceFor(
@@ -251,13 +252,13 @@ const spareAdjustment = (line, type, doj, monthStartDay) => {
       monthStartDay
     );
     const taken = round((line?.quarterUsed?.[key] || 0) + (line?.quarterPending?.[key] || 0));
-    consumed = round(consumed + Math.max(0, taken - limit));
+    implicit = round(implicit + Math.max(0, taken - limit));
   }
-  return round(Math.max(0, extra - consumed));
+  return round(Math.max(0, extra - tagged - implicit));
 };
 
-/** Days still applyable in one quarter, including an unused adjustment. */
-const quarterRoom = (line, type, doj, monthStartDay, calendarYear, quarter) => {
+/** Days still applyable in one quarter. Adjusted days sit on top and can be used in any quarter. */
+const quarterRoom = (line, type, doj, monthStartDay, calendarYear, quarter, creditQuarter = true) => {
   const key = quarterKey(quarter);
   const limit = quarterAllowanceFor(type, doj, calendarYear, quarter, monthStartDay);
   const used = round(line?.quarterUsed?.[key] || 0);
@@ -265,14 +266,136 @@ const quarterRoom = (line, type, doj, monthStartDay, calendarYear, quarter) => {
   const taken = round(used + pending);
   const spare = spareAdjustment(line, type, doj, monthStartDay);
   const over = round(Math.max(0, taken - limit));
+  const own = creditQuarter ? round(Math.max(0, limit - taken)) : 0;
   return {
     limit,
     used,
     pending,
     spare,
-    ceiling: round(limit + spare + over),
-    left: round(Math.max(0, limit - taken) + spare),
+    ceiling: round((creditQuarter ? limit : 0) + spare + (creditQuarter ? over : 0)),
+    left: round(own + spare),
   };
+};
+
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+/** Company month YYYY-MM, and the quarter that month belongs to. */
+const monthPeriod = (monthKey, monthStartDay = 1) => {
+  const match = /^(\d{4})-(\d{2})$/.exec(String(monthKey || ""));
+  if (!match) return null;
+  const y = Number(match[1]);
+  const m = Number(match[2]);
+  if (m < 1 || m > 12) return null;
+  const { monthStartDay: startDay } = cycleOf(monthStartDay);
+  const period = companyMonthOf(ymdFromParts(y, m, startDay), monthStartDay);
+  const window = quarterWindow(period.start, monthStartDay);
+  return {
+    month: `${period.year}-${pad2(period.month)}`,
+    monthName: `${MONTH_NAMES[period.month - 1]} ${period.year}`,
+    quarter: period.quarter,
+    quarterCode: `Q${period.quarter}`,
+    quarterLabel: window.label,
+    start: period.start,
+    end: period.end,
+  };
+};
+
+const parseQuarterCode = (value) => {
+  const match = String(value ?? "").trim().toUpperCase().match(/^Q?([1-4])$/);
+  return match ? Number(match[1]) : 0;
+};
+
+const monthNumberFrom = (value) => {
+  const text = String(value ?? "").trim();
+  const stamped = /^(\d{4})-(\d{2})$/.exec(text);
+  if (stamped) return { year: Number(stamped[1]), month: Number(stamped[2]), explicitYear: true };
+  if (/^\d{1,2}$/.test(text)) {
+    const month = Number(text);
+    return month >= 1 && month <= 12 ? { month, explicitYear: false } : null;
+  }
+  const lower = text.toLowerCase();
+  const exact = MONTH_NAMES.findIndex((name) => name.toLowerCase() === lower);
+  if (exact >= 0) return { month: exact + 1, explicitYear: false };
+  const short = MONTH_NAMES.findIndex((name) => name.toLowerCase().slice(0, 3) === lower);
+  if (short >= 0) return { month: short + 1, explicitYear: false };
+  return null;
+};
+
+const quarterMonthNames = (leaveYearNum, quarter, monthStartDay) =>
+  periodsInQuarter(calendarYearForQuarter(leaveYearNum, quarter), quarter, monthStartDay)
+    .map((period) => `${MONTH_NAMES[period.month - 1]} ${period.year}`);
+
+const creditOneMonth = (value, quarter, leaveYearNum, monthStartDay) => {
+  const code = `Q${quarter}`;
+  const names = quarterMonthNames(leaveYearNum, quarter, monthStartDay);
+  const picked = monthNumberFrom(value);
+  if (!picked) return { error: `${code} needs one of its months: ${names.join(", ")}` };
+  const year = picked.explicitYear ? picked.year : calendarYearForQuarter(leaveYearNum, quarter);
+  const credit = monthPeriod(`${year}-${pad2(picked.month)}`, monthStartDay);
+  if (!credit || credit.quarter !== quarter || leaveYear(credit.start, monthStartDay) !== Number(leaveYearNum)) {
+    const found = credit ? `${credit.monthName} is ${credit.quarterCode}` : "That month is not valid";
+    return { error: `${found}. ${code} months are ${names.join(", ")}.` };
+  }
+  return { credit };
+};
+
+/**
+ * Casual Leave adjust: quarter Q1–Q4, then month as an array.
+ * Each month carries 1 day. Three days means three months, for example July, August, September.
+ */
+const casualAdjustCredit = (body, leaveYearNum, monthStartDay = 1) => {
+  const quarter = parseQuarterCode(body?.quarter);
+  if (!quarter) return { error: "Casual Leave adjust needs quarter: Q1, Q2, Q3 or Q4" };
+  const raw = body?.month;
+  if (!Array.isArray(raw) || !raw.length) {
+    return { error: "Casual Leave adjust needs month as an array. Each month carries 1 day." };
+  }
+  const credits = [];
+  const seen = new Set();
+  for (const value of raw) {
+    const one = creditOneMonth(value, quarter, leaveYearNum, monthStartDay);
+    if (one.error) return one;
+    if (seen.has(one.credit.month)) {
+      return { error: `${one.credit.monthName} is repeated. Each month carries 1 day.` };
+    }
+    seen.add(one.credit.month);
+    credits.push(one.credit);
+  }
+  return { credits };
+};
+
+const adjustmentView = (row, monthStartDay = 1) => {
+  const period = monthPeriod(row?.month, monthStartDay);
+  return {
+    month: period?.month || row?.month || "",
+    monthName: period?.monthName || "",
+    quarter: period?.quarterCode || (row?.quarter ? `Q${row.quarter}` : ""),
+    quarterLabel: period?.quarterLabel || "",
+    start: period?.start || "",
+    end: period?.end || "",
+  };
+};
+
+const sliceInOpenQuarter = (slice, open) => slice.quarter === open.quarter && slice.year === open.year;
+
+/** Mark how many days of each slice come from the adjustment pool. */
+const tagSlices = (slices, adjustmentDays, monthStartDay = 1) => {
+  const open = quarterWindow(todayYmd(), monthStartDay);
+  let left = round(adjustmentDays);
+  const tagged = slices.map((slice) => ({ ...slice, adjustmentDays: 0 }));
+  const order = [
+    ...tagged.filter((slice) => !sliceInOpenQuarter(slice, open)),
+    ...tagged.filter((slice) => sliceInOpenQuarter(slice, open)),
+  ];
+  for (const slice of order) {
+    const take = round(Math.min(slice.days, Math.max(0, left)));
+    slice.adjustmentDays = take;
+    left = round(left - take);
+  }
+  return tagged.map((slice) => ({ ...slice, regularDays: round(slice.days - slice.adjustmentDays) }));
 };
 
 /** null when the date is on or after probation ends. */
@@ -375,22 +498,31 @@ const rebuildQuarterLine = async (user, type, line, monthStartDay = 1) => {
     to: { $gte: start },
     from: { $lte: end },
   })
-    .select("from to dayType status")
+    .select("from to dayType status days adjustmentDays")
     .lean();
   const quarterUsed = emptyQuarters();
   const quarterPending = emptyQuarters();
   let used = 0;
   let pending = 0;
+  let adjustedUsed = 0;
+  let adjustedPending = 0;
   for (const row of rows) {
-    for (const slice of slicesFor(row.from, row.to, row.dayType, monthStartDay)) {
+    const tagged = tagSlices(
+      slicesFor(row.from, row.to, row.dayType, monthStartDay),
+      row.adjustmentDays || 0,
+      monthStartDay
+    );
+    for (const slice of tagged) {
       const key = quarterKey(slice.quarter);
       if (!QUARTER_KEYS.includes(key)) continue;
       if (row.status === "Approved") {
-        quarterUsed[key] = round(quarterUsed[key] + slice.days);
+        quarterUsed[key] = round(quarterUsed[key] + slice.regularDays);
         used = round(used + slice.days);
+        adjustedUsed = round(adjustedUsed + slice.adjustmentDays);
       } else {
-        quarterPending[key] = round(quarterPending[key] + slice.days);
+        quarterPending[key] = round(quarterPending[key] + slice.regularDays);
         pending = round(pending + slice.days);
+        adjustedPending = round(adjustedPending + slice.adjustmentDays);
       }
     }
   }
@@ -398,6 +530,8 @@ const rebuildQuarterLine = async (user, type, line, monthStartDay = 1) => {
   line.quarterPending = quarterPending;
   line.used = used;
   line.pending = pending;
+  line.adjustedUsed = adjustedUsed;
+  line.adjustedPending = adjustedPending;
   return line;
 };
 
@@ -431,6 +565,7 @@ const presentItem = (item, type, doj, monthStartDay = 1) => {
       monthEndDay: cycleOf(monthStartDay).monthEndDay,
       limit,
       adjusted: round(item.adjusted || 0),
+      adjustedRemaining: room.spare,
       used: quarterUsed[key],
       pending: quarterPending[key],
       remaining,
@@ -461,6 +596,7 @@ const presentItem = (item, type, doj, monthStartDay = 1) => {
     total: earned ? available : annualMax,
     available,
     adjusted: item.adjusted,
+    adjustedRemaining: quarterly ? quarter?.adjustedRemaining || 0 : 0,
     earned: earned ? available : 0,
     used: item.used,
     pending: quarterly ? quarterPending[key] : item.pending,
@@ -561,14 +697,26 @@ const shiftQuarter = (line, slices, direction) => {
   ensureQuarters(line);
   for (const slice of slices) {
     const key = quarterKey(slice.quarter);
-    if (!QUARTER_KEYS.includes(key)) continue;
+    const regular = round(slice.regularDays != null ? slice.regularDays : slice.days);
+    const adjusted = round(slice.adjustmentDays || 0);
+    if (QUARTER_KEYS.includes(key) && regular) {
+      if (direction === "hold") {
+        line.quarterPending[key] = round(line.quarterPending[key] + regular);
+      } else if (direction === "approve") {
+        line.quarterPending[key] = round(Math.max(0, line.quarterPending[key] - regular));
+        line.quarterUsed[key] = round(line.quarterUsed[key] + regular);
+      } else {
+        line.quarterPending[key] = round(Math.max(0, line.quarterPending[key] - regular));
+      }
+    }
+    if (!adjusted) continue;
     if (direction === "hold") {
-      line.quarterPending[key] = round(line.quarterPending[key] + slice.days);
+      line.adjustedPending = round((line.adjustedPending || 0) + adjusted);
     } else if (direction === "approve") {
-      line.quarterPending[key] = round(Math.max(0, line.quarterPending[key] - slice.days));
-      line.quarterUsed[key] = round(line.quarterUsed[key] + slice.days);
+      line.adjustedPending = round(Math.max(0, (line.adjustedPending || 0) - adjusted));
+      line.adjustedUsed = round((line.adjustedUsed || 0) + adjusted);
     } else {
-      line.quarterPending[key] = round(Math.max(0, line.quarterPending[key] - slice.days));
+      line.adjustedPending = round(Math.max(0, (line.adjustedPending || 0) - adjusted));
     }
   }
 };
@@ -577,7 +725,7 @@ const shiftQuarter = (line, slices, direction) => {
  * Apply, approve, reject, or cancel.
  * `slices` is required for Quarterly Leave so each calendar quarter is capped on its own.
  */
-const moveLeave = async (employeeId, type, days, direction, slices = []) => {
+const moveLeave = async (employeeId, type, days, direction, slices = [], knownAdjustment = null) => {
   const user = await User.findById(employeeId).select("leaves official.dateOfJoining official.companyIds");
   if (!user) return { error: "Leave balance not found for this type" };
   const monthStartDay = await monthStartForUser(user);
@@ -585,30 +733,60 @@ const moveLeave = async (employeeId, type, days, direction, slices = []) => {
   const line = leaveLine(user, type._id, year);
   if (!line) return { error: "Leave balance not found for this type" };
   const doj = user.official?.dateOfJoining;
+  let adjustmentDays = round(knownAdjustment || 0);
 
   if (isQuarterlyType(type)) {
     await rebuildQuarterLine(user, type, line, monthStartDay);
     ensureQuarters(line);
+    const open = quarterWindow(todayYmd(), monthStartDay);
+    let tagged = slices;
     if (direction === "hold") {
+      let spareLeft = spareAdjustment(line, type, doj, monthStartDay);
+      const planned = [];
       for (const slice of slices) {
-        const room = quarterRoom(line, type, doj, monthStartDay, slice.year, slice.quarter);
-        if (!room.limit && !room.spare) {
+        const inOpen = sliceInOpenQuarter(slice, open);
+        const room = quarterRoom(line, type, doj, monthStartDay, slice.year, slice.quarter, inOpen);
+        const own = inOpen ? round(Math.max(0, room.limit - room.used - room.pending)) : 0;
+        const fromQuarter = round(Math.min(slice.days, own));
+        const fromAdjust = round(slice.days - fromQuarter);
+        if (fromAdjust > spareLeft) {
+          if (!inOpen) {
+            return {
+              error: `Only ${spareLeft} adjusted ${type.name} left. Adjusted days can be used in any quarter. ${open.code} (${open.label}) is the open quarter.`,
+            };
+          }
+          const window = quarterWindow(`${slice.year}-${pad2((slice.quarter - 1) * 3 + 1)}-01`, monthStartDay);
+          const extra = spareLeft ? `, plus ${spareLeft} adjusted (usable in any quarter)` : "";
+          return {
+            error: `Only ${round(own + spareLeft)} ${type.name} left in ${window.code} (${window.label}). This quarter allows ${room.limit} days${extra}.`,
+          };
+        }
+        if (inOpen && !fromQuarter && !fromAdjust) {
           return {
             error: `No ${type.name} in Q${slice.quarter}. Months inside the 3-month probation are not counted.`,
           };
         }
-        if (slice.days > room.left) {
-          const window = quarterWindow(`${slice.year}-${String((slice.quarter - 1) * 3 + 1).padStart(2, "0")}-01`);
-          const extra = room.spare ? `, plus ${room.spare} adjusted` : "";
-          return {
-            error: `Only ${room.left} ${type.name} left in ${window.code} (${window.label}). This quarter allows ${room.limit} days${extra}.`,
-          };
+        spareLeft = round(spareLeft - fromAdjust);
+        if (inOpen) {
+          const key = quarterKey(slice.quarter);
+          line.quarterPending[key] = round((line.quarterPending[key] || 0) + fromQuarter);
+        }
+        planned.push({ ...slice, adjustmentDays: fromAdjust, regularDays: fromQuarter });
+      }
+      for (const slice of planned) {
+        if (sliceInOpenQuarter(slice, open)) {
+          const key = quarterKey(slice.quarter);
+          line.quarterPending[key] = round(Math.max(0, (line.quarterPending[key] || 0) - slice.regularDays));
         }
       }
+      adjustmentDays = round(planned.reduce((sum, slice) => sum + slice.adjustmentDays, 0));
+      tagged = planned;
       const yearLeft = round((Number(type.maxDays) || 0) + (line.adjusted || 0) - line.used - line.pending);
       if (days > yearLeft) return { error: `Only ${yearLeft} ${type.name} remaining this leave year` };
+    } else {
+      tagged = tagSlices(slices, adjustmentDays, monthStartDay);
     }
-    shiftQuarter(line, slices, direction);
+    shiftQuarter(line, tagged, direction);
   }
 
   const remaining = isQuarterlyType(type)
@@ -632,7 +810,7 @@ const moveLeave = async (employeeId, type, days, direction, slices = []) => {
   stampLine(line, type, doj, monthStartDay);
   user.markModified("leaves");
   await user.save();
-  return { item: presentItem(line, type, doj, monthStartDay) };
+  return { item: presentItem(line, type, doj, monthStartDay), adjustmentDays: round(adjustmentDays) };
 };
 
 /**
@@ -770,6 +948,9 @@ module.exports = {
   probationBlock,
   casualDatesError,
   quarterAllowanceFor,
+  monthPeriod,
+  adjustmentView,
+  casualAdjustCredit,
   isEarnedType,
   isQuarterlyType,
   poolOf,

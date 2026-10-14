@@ -213,7 +213,7 @@ const buildListQuery = async (req, { forceRole, roleScope } = {}) => {
       return {
         error: {
           status: 400,
-          message: "Company not found — use a valid company _id or exact name",
+          message: "Company was not found. Select a company from the list",
         },
       };
     }
@@ -239,7 +239,7 @@ const buildListQuery = async (req, { forceRole, roleScope } = {}) => {
   const managerId = filterValue(req, "managerId", "reportingHead");
   if (managerId) {
     if (!/^[a-fA-F0-9]{24}$/.test(managerId)) {
-      return { error: { status: 400, message: "Invalid managerId" } };
+      return { error: { status: 400, message: "Reporting manager is not valid" } };
     }
     and.push({
       $or: [

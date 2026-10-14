@@ -37,7 +37,7 @@ const resolvePlacement = (companies, { branchId, shiftId }) => {
   const sId = oid(shiftId);
   if (!bId && !sId) return { ok: true, company: null, branch: null, shift: null };
   if (!bId) {
-    return { ok: false, status: 400, message: "official.branchId is required when shiftId is set" };
+    return { ok: false, status: 400, message: "Select a branch before choosing a shift" };
   }
   if (!companies.length) {
     return { ok: false, status: 400, message: "Company is required before branch / shift" };

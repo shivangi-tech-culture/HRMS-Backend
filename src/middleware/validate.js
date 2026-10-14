@@ -1,7 +1,12 @@
 /**
  * VALIDATE MIDDLEWARE — Joi against body or query
  * Usage: validate(schema) | validateQuery(schema)
+ *
+ * 400 body: { message, errors: string[], fields: [{ path, message, weeks? }] }
+ * Show `message` in a toast. Use `fields[].path` to mark the input.
  */
+const { formatValidationErrors } = require("../utils/validationMessage");
+
 const run = (schema, source, opts = {}) => {
   return (req, res, next) => {
     const { error, value } = schema.validate(req[source], {
@@ -12,11 +17,7 @@ const run = (schema, source, opts = {}) => {
     });
 
     if (error) {
-      const errors = error.details.map((d) => d.message.replace(/"/g, ""));
-      return res.status(400).json({
-        message: "Validation failed — unknown or invalid fields",
-        errors,
-      });
+      return res.status(400).json(formatValidationErrors(error.details));
     }
 
     req[source] = value;
