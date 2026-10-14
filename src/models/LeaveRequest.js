@@ -12,6 +12,14 @@ const leaveRequestSchema = new mongoose.Schema(
     from: { type: String, required: true },
     to: { type: String, required: true },
     days: { type: Number, required: true },
+    /** Days covered by the selected paid type. Missing on older requests. */
+    paidDays: { type: Number },
+    /** Days moved to Unpaid Leave because the paid balance was finished. */
+    unpaidDays: { type: Number },
+    /** Salary days to deduct. Same as unpaidDays. */
+    deduction: { type: Number },
+    /** Unpaid Leave type that holds the deducted days. */
+    unpaidLeaveType: { type: mongoose.Schema.Types.ObjectId, ref: "LeaveType", default: null },
     /** Days of this request taken from an adjustment, usable in any quarter. */
     adjustmentDays: { type: Number, default: 0 },
     dayType: { type: String, enum: ["Full Day", "Half Day"], default: "Full Day" },

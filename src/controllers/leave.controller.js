@@ -36,6 +36,7 @@ const {
   grantLeaveBalance,
   syncTypeOnBalances,
   typesForCompany,
+  eachYmd,
 } = require("../utils/leaveBalance");
 const {
   hasGlobalCompanyAccess,
@@ -43,7 +44,7 @@ const {
   escapeRegex,
 } = require("../utils/companyScope");
 const { assertTeamOrCompanyEmployee, getTeamMemberIds } = require("../utils/teamScope");
-const { EMPLOYEE, normalizeRoleName, isTeamScopedRole } = require("../config/roles");
+const { EMPLOYEE, SUPER_ADMIN, HR, REPORTING_MANAGER, normalizeRoleName, isTeamScopedRole } = require("../config/roles");
 const { DEFAULT_TYPES } = require("../utils/seedLeave");
 
 const leaveStatus = (value) => {
@@ -128,6 +129,10 @@ const mapRequest = (row, refs) => {
   const type = refs.types.get(String(row.leaveType)) || {};
   const reviewer = row.reviewedBy ? refs.users.get(String(row.reviewedBy)) : null;
   const paid = !!type.paid;
+  const split = row.paidDays != null || row.unpaidDays != null;
+  const paidDays = split ? round(row.paidDays || 0) : paid ? row.days : 0;
+  const unpaidDays = split ? round(row.unpaidDays || 0) : paid ? 0 : row.days;
+  const deduction = row.deduction != null ? round(row.deduction) : unpaidDays;
   return {
     _id: row._id,
     employee: {
@@ -149,8 +154,9 @@ const mapRequest = (row, refs) => {
     dayType: row.dayType,
     reason: row.reason,
     document: row.document || "",
-    paidDays: paid ? row.days : 0,
-    unpaidDays: paid ? 0 : row.days,
+    paidDays,
+    unpaidDays,
+    deduction,
     status: row.status,
     applyBy: String(row.appliedBy || row.employee) === String(row.employee) ? "Self" : "Admin",
     reviewedBy: reviewer?.name || "",
@@ -257,6 +263,109 @@ const loadEmployee = async (id) => {
 const holdDays = (employeeId, type, days, direction, slices, adjustmentDays) =>
   moveLeave(employeeId, type, days, direction, slices, adjustmentDays);
 
+const isUnpaidType = (type) =>
+  !!type && (type.paid === false || String(type.code || "").toUpperCase() === "UL");
+
+/** First `days` of the request slices. The rest become unpaid. */
+const takeSlices = (slices, days) => {
+  let left = round(days);
+  const out = [];
+  for (const slice of slices || []) {
+    if (left <= 0) break;
+    const use = round(Math.min(slice.days, left));
+    if (use <= 0) continue;
+    out.push({ ...slice, days: use });
+    left = round(left - use);
+  }
+  return out;
+};
+
+const unpaidTypeFor = async (companyId) => {
+  const rows = await LeaveType.find({
+    status: "Active",
+    hidden: { $ne: true },
+    code: "UL",
+    $or: [{ scope: "common" }, { scope: "company", companyId }],
+  }).lean();
+  return typesForCompany(rows, companyId).find((row) => isUnpaidType(row)) || null;
+};
+
+/** Hold, approve, or release the paid part and the automatic unpaid part. */
+const settleRequestDays = async (request, direction, monthStartDay) => {
+  const type = await LeaveType.findById(request.leaveType).lean();
+  if (!type) return { error: "Leave type not found" };
+  const slices = slicesFor(request.from, request.to, request.dayType, monthStartDay);
+  const split = request.paidDays != null || request.unpaidDays != null;
+  const paidDays = split ? round(request.paidDays || 0) : request.days;
+  const unpaidDays = split ? round(request.unpaidDays || 0) : 0;
+  if (paidDays > 0) {
+    const moved = await holdDays(
+      request.employee,
+      type,
+      paidDays,
+      direction,
+      takeSlices(slices, paidDays),
+      request.adjustmentDays || 0
+    );
+    if (moved.error) return moved;
+  }
+  if (unpaidDays > 0) {
+    let unpaidType = request.unpaidLeaveType
+      ? await LeaveType.findById(request.unpaidLeaveType).lean()
+      : null;
+    if (!unpaidType) unpaidType = await unpaidTypeFor(request.companyId);
+    if (!unpaidType) return { error: "Unpaid leave type not found" };
+    const moved = await holdDays(request.employee, unpaidType, unpaidDays, direction, []);
+    if (moved.error) return moved;
+  }
+  return { ok: true, type };
+};
+
+/** Unpaid dates are the days after the paid balance is used. */
+const unpaidDatesOf = (from, to, dayType, paidDays, unpaidDays) => {
+  if (round(unpaidDays) <= 0) return [];
+  if (dayType === "Half Day") return [from];
+  return eachYmd(from, to).slice(Math.floor(round(paidDays)));
+};
+
+const saveUnpaidOnUser = async (request, year) => {
+  const days = round(request.unpaidDays || 0);
+  if (days <= 0) return;
+  const dates = unpaidDatesOf(request.from, request.to, request.dayType, request.paidDays, days);
+  await User.updateOne(
+    { _id: request.employee },
+    {
+      $push: {
+        unpaidLeaves: {
+          request: request._id,
+          leaveType: request.unpaidLeaveType || request.leaveType,
+          year,
+          from: dates[0] || request.from,
+          to: dates[dates.length - 1] || request.to,
+          dates,
+          days,
+          deduction: round(request.deduction != null ? request.deduction : days),
+          status: request.status || "Pending",
+        },
+      },
+    }
+  );
+};
+
+const syncUnpaidOnUser = async (request) => {
+  const days = round(request.unpaidDays || 0);
+  if (days <= 0) return;
+  await User.updateOne(
+    { _id: request.employee, "unpaidLeaves.request": request._id },
+    { $set: { "unpaidLeaves.$.status": request.status } }
+  );
+};
+
+const dropUnpaidOnUser = async (request) => {
+  if (!request?.employee || !request?._id) return;
+  await User.updateOne({ _id: request.employee }, { $pull: { unpaidLeaves: { request: request._id } } });
+};
+
 /** Closed-quarter Quarterly Leave is not stored. Release the hold, then delete the row. */
 const releaseExpiredQuarterly = async (employeeId) => {
   const today = todayYmd();
@@ -273,12 +382,15 @@ const releaseExpiredQuarterly = async (employeeId) => {
   });
   for (const request of pending) {
     const monthStartDay = await monthStartForCompany(request.companyId);
-    if (round(request.adjustmentDays || 0) >= round(request.days)) continue;
+    const paidPart = request.paidDays != null || request.unpaidDays != null ? round(request.paidDays || 0) : request.days;
+    if (paidPart <= 0) continue;
+    if (round(request.adjustmentDays || 0) >= paidPart) continue;
     if (!quarterlyDateError(request.from, request.to, today, monthStartDay)) continue;
     const type = await LeaveType.findById(request.leaveType).lean();
     if (!type || !isQuarterlyType(type)) continue;
-    const slices = slicesFor(request.from, request.to, request.dayType, monthStartDay);
-    await holdDays(request.employee, type, request.days, "release", slices, request.adjustmentDays || 0);
+    const released = await settleRequestDays(request, "release", monthStartDay);
+    if (released.error) continue;
+    await dropUnpaidOnUser(request);
     await request.deleteOne();
   }
 };
@@ -851,16 +963,8 @@ const applyLeave = async (req, res) => {
       return res.status(400).json({ message: "Half day must be a single date" });
     }
     const days = dayType === "Half Day" ? 0.5 : span;
-    const type = await LeaveType.findById(req.body.leaveTypeId).lean();
-    if (!type || type.status !== "Active") {
-      return res.status(400).json({ message: "Leave type is not active" });
-    }
     const companyId = companyOf(employee);
-    const forThisCompany =
-      type.scope === "common" || String(type.companyId) === String(companyId);
-    if (!forThisCompany) {
-      return res.status(400).json({ message: "Leave type is not for this company" });
-    }
+    if (!companyId) return res.status(400).json({ message: "Your profile has no company" });
     await releaseExpiredQuarterly(employee._id);
     const monthStartDay = await monthStartForUser(employee);
     const blockedProbation = probationBlock(employee.official?.dateOfJoining, from, monthStartDay);
@@ -877,31 +981,138 @@ const applyLeave = async (req, res) => {
     if (year !== leaveYear(to, monthStartDay) || year !== leaveYear(todayYmd(), monthStartDay)) {
       return res.status(400).json({ message: "Leave dates must stay inside the current leave year (April–March)" });
     }
-    if (isQuarterlyType(type)) {
+    await grantLeaveBalance(employee);
+    const [wallet, catalog, unpaidType] = await Promise.all([
+      User.findById(employee._id).select("leaves"),
+      LeaveType.find({
+        status: "Active",
+        hidden: { $ne: true },
+        $or: [{ scope: "common" }, { scope: "company", companyId }],
+      }).lean(),
+      unpaidTypeFor(companyId),
+    ]);
+    const paidTypes = typesForCompany(catalog, companyId).filter(
+      (row) => row.status === "Active" && !row.hidden && !isUnpaidType(row)
+    );
+    const remainingOf = new Map();
+    let paidLeft = 0;
+    for (const row of paidTypes) {
+      const line = leaveLine(wallet, row._id, year);
+      const shown = line ? presentItem(line, row, employee.official?.dateOfJoining, monthStartDay) : null;
+      const left = round(Math.max(0, shown?.remaining || 0));
+      remainingOf.set(String(row._id), left);
+      paidLeft = round(paidLeft + left);
+    }
+    const allPaidUsed = paidLeft <= 0;
+
+    let type = null;
+    if (req.body.leaveTypeId && !allPaidUsed) {
+      type = catalog.find((row) => String(row._id) === String(req.body.leaveTypeId)) || null;
+      if (!type || type.status !== "Active") {
+        return res.status(400).json({ message: "Leave type is not active" });
+      }
+      const forThisCompany = type.scope === "common" || String(type.companyId) === String(companyId);
+      if (!forThisCompany) {
+        return res.status(400).json({ message: "Leave type is not for this company" });
+      }
+      if (isUnpaidType(type)) {
+        return res.status(400).json({
+          message: "Unpaid leave is applied automatically when paid leave is finished",
+        });
+      }
+    }
+
+    if (allPaidUsed || !type) {
+      if (!allPaidUsed) {
+        return res.status(400).json({ message: "Select a leave type. Unpaid leave is used when paid leave is finished" });
+      }
+      if (!unpaidType) return res.status(400).json({ message: "Unpaid leave is not configured" });
+      const heldUnpaid = await holdDays(employee._id, unpaidType, days, "hold", []);
+      if (heldUnpaid.error) return res.status(400).json({ message: heldUnpaid.error });
+      const request = await LeaveRequest.create({
+        employee: employee._id,
+        companyId,
+        leaveType: unpaidType._id,
+        unpaidLeaveType: unpaidType._id,
+        from,
+        to,
+        days,
+        paidDays: 0,
+        unpaidDays: days,
+        deduction: days,
+        adjustmentDays: 0,
+        dayType,
+        reason: req.body.reason.trim(),
+        document: req.body.document || "",
+        appliedBy: req.user._id,
+      });
+      await saveUnpaidOnUser(request, year);
+      const [data, history] = await Promise.all([asRequests(request), employeeHistory(employee._id)]);
+      return res.status(201).json({
+        message: `Leave applied as Unpaid Leave. Salary deduction: ${days} day(s).`,
+        data: data[0],
+        history,
+      });
+    }
+
+    const remaining = remainingOf.get(String(type._id)) || 0;
+    if (remaining <= 0) {
+      return res.status(400).json({
+        message: `${type.name} is finished. Paid leave is still available on another type`,
+      });
+    }
+    const paidDays = round(Math.min(days, remaining));
+    const unpaidDays = round(days - paidDays);
+    const slices = slicesFor(from, to, dayType, monthStartDay);
+    const paidSlices = takeSlices(slices, paidDays);
+    if (paidDays > 0 && isQuarterlyType(type)) {
       const collapsed = casualDatesError(employee.official?.dateOfJoining, from, to, monthStartDay);
       if (collapsed) return res.status(400).json({ message: collapsed });
     }
-    await grantLeaveBalance(employee);
-    const slices = slicesFor(from, to, dayType, monthStartDay);
-    const held = await holdDays(employee._id, type, days, "hold", slices);
-    if (held.error) return res.status(400).json({ message: held.error });
+    if (unpaidDays > 0 && !unpaidType) {
+      return res.status(400).json({ message: "Unpaid leave is not configured" });
+    }
+
+    let heldPaid = null;
+    if (paidDays > 0) {
+      heldPaid = await holdDays(employee._id, type, paidDays, "hold", paidSlices);
+      if (heldPaid.error) return res.status(400).json({ message: heldPaid.error });
+    }
+    if (unpaidDays > 0) {
+      const heldUnpaid = await holdDays(employee._id, unpaidType, unpaidDays, "hold", []);
+      if (heldUnpaid.error) {
+        if (paidDays > 0) {
+          await holdDays(employee._id, type, paidDays, "release", paidSlices, heldPaid?.adjustmentDays || 0);
+        }
+        return res.status(400).json({ message: heldUnpaid.error });
+      }
+    }
 
     const request = await LeaveRequest.create({
       employee: employee._id,
       companyId,
       leaveType: type._id,
+      unpaidLeaveType: unpaidDays > 0 ? unpaidType._id : null,
       from,
       to,
       days,
-      adjustmentDays: held.adjustmentDays || 0,
+      paidDays,
+      unpaidDays,
+      deduction: unpaidDays,
+      adjustmentDays: heldPaid?.adjustmentDays || 0,
       dayType,
       reason: req.body.reason.trim(),
       document: req.body.document || "",
       appliedBy: req.user._id,
     });
+    await saveUnpaidOnUser(request, year);
     const [data, history] = await Promise.all([asRequests(request), employeeHistory(employee._id)]);
+    const message =
+      unpaidDays > 0
+        ? `Leave applied. ${unpaidDays} day(s) are unpaid because paid leave is finished. Salary deduction: ${unpaidDays} day(s).`
+        : "Leave applied";
     return res.status(201).json({
-      message: "Leave applied",
+      message,
       data: data[0],
       history,
     });
@@ -926,17 +1137,28 @@ const decide = async (req, res, nextStatus) => {
 
     const type = await LeaveType.findById(request.leaveType).lean();
     if (!type) return res.status(400).json({ message: "Leave type not found" });
+    const unpaidRequest = round(request.unpaidDays || 0) > 0 || isUnpaidType(type);
+    if (unpaidRequest) {
+      const role = normalizeRoleName(req.user.role);
+      const canReviewUnpaid = role === SUPER_ADMIN || role === HR || role === REPORTING_MANAGER;
+      if (!canReviewUnpaid) {
+        return res.status(403).json({
+          message: "Unpaid leave can be approved only by Reporting Manager, HR, or Super Admin",
+        });
+      }
+    }
     const monthStartDay = await monthStartForCompany(request.companyId);
-    const slices = slicesFor(request.from, request.to, request.dayType, monthStartDay);
+    const paidPart = request.paidDays != null || request.unpaidDays != null ? round(request.paidDays || 0) : request.days;
     const openQuarterMiss = quarterlyDateError(request.from, request.to, todayYmd(), monthStartDay);
-    const coveredByAdjust = round(request.adjustmentDays || 0) >= round(request.days);
-    if (nextStatus === "Approved" && isQuarterlyType(type) && openQuarterMiss && !coveredByAdjust) {
-      await holdDays(request.employee, type, request.days, "release", slices, request.adjustmentDays || 0);
+    const coveredByAdjust = round(request.adjustmentDays || 0) >= round(paidPart);
+    if (nextStatus === "Approved" && paidPart > 0 && isQuarterlyType(type) && openQuarterMiss && !coveredByAdjust) {
+      await settleRequestDays(request, "release", monthStartDay);
+      await dropUnpaidOnUser(request);
       await request.deleteOne();
       return res.status(400).json({ message: openQuarterMiss });
     }
     const direction = nextStatus === "Approved" ? "approve" : "release";
-    const moved = await holdDays(request.employee, type, request.days, direction, slices, request.adjustmentDays || 0);
+    const moved = await settleRequestDays(request, direction, monthStartDay);
     if (moved.error) return res.status(400).json({ message: moved.error });
 
     request.status = nextStatus;
@@ -944,6 +1166,7 @@ const decide = async (req, res, nextStatus) => {
     request.reviewedAt = new Date();
     request.reviewReason = (req.body.reason || "").trim();
     await request.save();
+    await syncUnpaidOnUser(request);
     const [data, history] = await Promise.all([asRequests(request), employeeHistory(request.employee)]);
     return res.json({
       message: nextStatus === "Approved" ? "Leave approved" : "Leave rejected",
@@ -971,20 +1194,14 @@ const cancelRequest = async (req, res) => {
       const denied = assertTeamOrCompanyEmployee(req.user, employee);
       if (denied) return res.status(403).json({ message: denied });
     }
-    const type = await LeaveType.findById(request.leaveType).lean();
-    if (!type) return res.status(400).json({ message: "Leave type not found" });
-    const slices = slicesFor(
-      request.from,
-      request.to,
-      request.dayType,
-      await monthStartForCompany(request.companyId)
-    );
-    const moved = await holdDays(request.employee, type, request.days, "release", slices, request.adjustmentDays || 0);
+    const monthStartDay = await monthStartForCompany(request.companyId);
+    const moved = await settleRequestDays(request, "release", monthStartDay);
     if (moved.error) return res.status(400).json({ message: moved.error });
     request.status = "Cancelled";
     request.reviewedBy = req.user._id;
     request.reviewedAt = new Date();
     await request.save();
+    await syncUnpaidOnUser(request);
     const [data, history] = await Promise.all([asRequests(request), employeeHistory(request.employee)]);
     return res.json({ message: "Leave cancelled", data: data[0], history });
   } catch (err) {
@@ -1283,7 +1500,9 @@ const leaveTypesForEmployee = async (user) => {
     User.findById(user._id).select("leaves").lean(),
   ]);
   const lines = (employee?.leaves || []).filter((row) => row.year === year);
-  const visible = typesForCompany(rows, companyId).filter((row) => row.status === "Active" && !row.hidden);
+  const visible = typesForCompany(rows, companyId).filter(
+    (row) => row.status === "Active" && !row.hidden && !isUnpaidType(row)
+  );
   for (const type of visible) {
     const line = lines.find((row) => String(row.leaveType) === String(type._id));
     if (line) await rebuildQuarterLine(employee, type, line, monthStartDay);
@@ -1313,7 +1532,96 @@ const leaveTypesForEmployee = async (user) => {
   return { year: yearLabel(year), data };
 };
 
-/** GET /api/leave/me/types — dropdown for Apply Leave. */
+/** Wallet plus which leave was used. Unpaid stays visible here; the apply dropdown hides it. */
+const leaveBalanceSnapshot = async (user) => {
+  const companyId = companyOf(user);
+  if (!companyId) return { error: "Your profile has no company" };
+  await releaseExpiredQuarterly(user._id);
+  await grantLeaveBalance(user);
+  const monthStartDay = await monthStartForUser(user);
+  const year = leaveYear(todayYmd(), monthStartDay);
+  const [rows, employee, requests] = await Promise.all([
+    LeaveType.find({
+      status: "Active",
+      hidden: { $ne: true },
+      $or: [{ scope: "common" }, { scope: "company", companyId }],
+    })
+      .select("name code paid carryForward maxDays allocationType quarterlyLimit isUnlimited scope status companyId hidden")
+      .lean(),
+    User.findById(user._id)
+      .select("leaves unpaidLeaves official.dateOfJoining name official.employeeCode official.department")
+      .lean(),
+    LeaveRequest.find({
+      employee: user._id,
+      status: { $in: ["Pending", "Approved"] },
+    })
+      .sort({ from: -1 })
+      .limit(200)
+      .lean(),
+  ]);
+  const lines = (employee?.leaves || []).filter((row) => row.year === year);
+  const visible = typesForCompany(rows, companyId).filter((row) => row.status === "Active" && !row.hidden);
+  for (const type of visible) {
+    const line = lines.find((row) => String(row.leaveType) === String(type._id));
+    if (line) await rebuildQuarterLine(employee, type, line, monthStartDay);
+  }
+  const balances = visible
+    .map((type) => {
+      const line = lines.find((row) => String(row.leaveType) === String(type._id));
+      return line ? presentItem(line, type, user.official?.dateOfJoining, monthStartDay) : null;
+    })
+    .filter(Boolean);
+  const typeName = new Map(visible.map((type) => [String(type._id), type]));
+  const used = requests
+    .filter((row) => leaveYear(row.from, monthStartDay) === year)
+    .map((row) => {
+      const type = typeName.get(String(row.leaveType)) || {};
+      const split = row.paidDays != null || row.unpaidDays != null;
+      const paidDays = split ? round(row.paidDays || 0) : type.paid === false ? 0 : row.days;
+      const unpaidDays = split ? round(row.unpaidDays || 0) : type.paid === false ? row.days : 0;
+      return {
+        _id: row._id,
+        leaveType: type.name || "",
+        code: type.code || "",
+        from: row.from,
+        to: row.to,
+        days: row.days,
+        paidDays,
+        unpaidDays,
+        deduction: row.deduction != null ? round(row.deduction) : unpaidDays,
+        status: row.status,
+        dayType: row.dayType,
+      };
+    });
+  return {
+    year: yearLabel(year),
+    employee: {
+      _id: user._id,
+      name: employee?.name || user.name || "",
+      employeeCode: employee?.official?.employeeCode || "",
+      department: employee?.official?.department || "",
+    },
+    balances,
+    summary: summarizeBalances(balances),
+    used,
+    unpaidLeaves: (employee?.unpaidLeaves || [])
+      .filter((row) => !row.year || row.year === year)
+      .map((row) => ({
+        request: row.request,
+        leaveType: row.leaveType,
+        name: typeName.get(String(row.leaveType))?.name || "",
+        code: typeName.get(String(row.leaveType))?.code || "",
+        from: row.from,
+        to: row.to,
+        dates: row.dates || [],
+        days: row.days,
+        deduction: row.deduction,
+        status: row.status,
+      })),
+  };
+};
+
+/** GET /api/leave/me/types — dropdown for Apply Leave. Unpaid is not listed. */
 const myLeaveTypes = async (req, res) => {
   try {
     const listed = await leaveTypesForEmployee(req.user);
@@ -1323,6 +1631,37 @@ const myLeaveTypes = async (req, res) => {
       count: listed.data.length,
       data: listed.data,
     });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+/** GET /api/leave/me/balance — allotted, used, remaining, and salary deduction. */
+const myLeaveBalance = async (req, res) => {
+  try {
+    const snapshot = await leaveBalanceSnapshot(req.user);
+    if (snapshot.error) return res.status(400).json({ message: snapshot.error });
+    return res.json(snapshot);
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+/** GET /api/leave/employees/:employeeId/balance — same check for one employee. */
+const employeeLeaveBalance = async (req, res) => {
+  try {
+    if (!/^[a-fA-F0-9]{24}$/.test(String(req.params.employeeId || ""))) {
+      return res.status(400).json({ message: "Invalid employee id" });
+    }
+    const employee = await loadEmployee(req.params.employeeId);
+    if (!employee || !isEmployee(employee)) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+    const denied = assertTeamOrCompanyEmployee(req.user, employee);
+    if (denied) return res.status(403).json({ message: denied });
+    const snapshot = await leaveBalanceSnapshot(employee);
+    if (snapshot.error) return res.status(400).json({ message: snapshot.error });
+    return res.json(snapshot);
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
@@ -1387,4 +1726,6 @@ module.exports = {
   history,
   myLeave,
   myLeaveTypes,
+  myLeaveBalance,
+  employeeLeaveBalance,
 };

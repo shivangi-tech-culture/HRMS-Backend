@@ -4,6 +4,8 @@
  * Employee
  *   GET  /me
  *   GET  /me/types
+ *   GET  /me/balance
+ *   GET  /employees/:employeeId/balance
  *   POST /requests
  *   POST /requests/:id/cancel
  *
@@ -14,8 +16,8 @@
  *   GET             /balances
  *   POST            /balances/adjust          comp off — adds days to that type's remaining
  *   GET             /requests
- *   POST            /requests/:id/approve
- *   POST            /requests/:id/reject
+ *   POST            /requests/:id/approve   unpaid leave: Reporting Manager, HR, or Super Admin
+ *   POST            /requests/:id/reject    unpaid leave: Reporting Manager, HR, or Super Admin
  *   GET             /calendar?month=YYYY-MM&date=YYYY-MM-DD
  *   GET/POST        /policies       shared catalog, companyId not required
  *   PATCH/DELETE    /policies/:id   shared policy. DELETE removes it for every company
@@ -46,6 +48,8 @@ const {
   history,
   myLeave,
   myLeaveTypes,
+  myLeaveBalance,
+  employeeLeaveBalance,
 } = require("../controllers/leave.controller");
 const { protect, authorize } = require("../middleware/auth");
 const { checkPermission } = require("../controllers/permission.controller");
@@ -90,7 +94,14 @@ const employeeOnly = (req, res, next) => {
  */
 
 router.get("/me/types", protect, employeeOnly, myLeaveTypes);
+router.get("/me/balance", protect, employeeOnly, myLeaveBalance);
 router.get("/me", protect, employeeOnly, validateQuery(meQuery), myLeave);
+router.get(
+  "/employees/:employeeId/balance",
+  ...admin,
+  leavePerm("Leave Balances", "view"),
+  employeeLeaveBalance
+);
 
 router.get("/types", ...admin, leavePerm("Leave Types", "view"), validateQuery(typeListQuery), listTypes);
 router.post("/types/defaults", ...admin, leavePerm("Leave Types", "create"), validate(defaultsBody), seedDefaultTypes);

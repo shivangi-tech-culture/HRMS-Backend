@@ -353,6 +353,102 @@ const myToday = async (req, res) => {
   }
 };
 
+const locationCard = (location) => {
+  if (!location) return null;
+  const latitude = location.latitude ?? null;
+  const longitude = location.longitude ?? null;
+  const address = String(location.address || "").trim();
+  if (latitude == null && longitude == null && !address) return null;
+  return { latitude, longitude, address };
+};
+
+/**
+ * GET /api/attendance/punch-status?date=YYYY-MM-DD
+ * Employee and company come from the login token (req.user), not the query.
+ * Read-only: punch in and punch out for that date.
+ */
+const getPunchStatus = async (req, res) => {
+  try {
+    const date = String(req.query.date || "").trim();
+    const employee = req.user;
+    const companyId = userCompanyIds(employee)[0] || "";
+
+    if (date > today()) {
+      return res.status(400).json({ message: "Date cannot be in the future" });
+    }
+    if (!companyId) {
+      return res.status(400).json({ message: "Your profile has no company" });
+    }
+
+    const company = await Company.findOne({ _id: companyId, isActive: { $ne: false } })
+      .select("companyName")
+      .lean();
+    if (!company) {
+      return res.status(404).json({ message: "Company not found" });
+    }
+
+    const record = await Attendance.findOne({ employee: employee._id, date })
+      .select(
+        "date companyId branchId shift punchIn punchOut punchInSource punchOutSource punchInLocation punchOutLocation workMode workedMinutes overtimeMinutes lateByMinutes earlyByMinutes status remarks attendanceStatus reviewReason"
+      )
+      .lean();
+
+    const punchedIn = Boolean(record?.punchIn);
+    const punchedOut = Boolean(record?.punchOut);
+    const punchInTime = formatPunchStamp(record?.punchIn);
+    const punchOutTime = formatPunchStamp(record?.punchOut);
+
+    return res.json({
+      date,
+      company: { _id: company._id, companyName: company.companyName || "" },
+      employee: {
+        _id: employee._id,
+        name: employee.name || "",
+        email: employee.official?.officialEmail || "",
+        employeeCode: employee.official?.employeeCode || "",
+        department: employee.official?.department || "",
+        designation: employee.official?.designation || "",
+        role: employee.role || "",
+      },
+      punchedIn,
+      punchedOut,
+      punchInTime,
+      punchOutTime,
+      punchIn: punchedIn
+        ? {
+            time: punchInTime,
+            at: record.punchIn,
+            source: record.punchInSource || null,
+            location: locationCard(record.punchInLocation),
+          }
+        : null,
+      punchOut: punchedOut
+        ? {
+            time: punchOutTime,
+            at: record.punchOut,
+            source: record.punchOutSource || null,
+            location: locationCard(record.punchOutLocation),
+          }
+        : null,
+      status: !record
+        ? "Absent"
+        : punchedIn && !punchedOut
+          ? "MissedPunch"
+          : record.status || "Absent",
+      attendanceStatus: record?.attendanceStatus || null,
+      workMode: record?.workMode || "WFO",
+      workingHours: formatDurationLabel(record?.workedMinutes),
+      overtime: formatDurationLabel(record?.overtimeMinutes),
+      lateByMinutes: Number(record?.lateByMinutes) || 0,
+      earlyByMinutes: Number(record?.earlyByMinutes) || 0,
+      remarks: String(record?.remarks || "").trim(),
+      attendanceId: record?._id || null,
+    });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
 /** GET /api/attendance/web-punches — own punches flattened */
 const listWebPunches = async (req, res) => {
   try {
@@ -1308,6 +1404,7 @@ module.exports = {
   punchIn,
   punchOut,
   myToday,
+  getPunchStatus,
   listWebPunches,
   listDailyAttendance,
   attendanceCalendar,

@@ -7,6 +7,7 @@
  * POST   /punch-in              { source, latitude, longitude, remarks? }
  * POST   /punch-out             { source, latitude, longitude, remarks? }
  * GET    /today
+ * GET    /punch-status          ?date=   employee + company from login token
  * GET    /web-punches           ?date=&from=&to=&page=&limit=
  *
  * ─── ADMIN / HR / MANAGER ────────────────────────────────────
@@ -32,6 +33,7 @@ const {
   punchIn,
   punchOut,
   myToday,
+  getPunchStatus,
   listWebPunches,
   listDailyAttendance,
   attendanceCalendar,
@@ -55,6 +57,7 @@ const { normalizeRoleName, ALL_ACCESS, EMPLOYEE } = require("../config/roles");
 const { validate, validateQuery } = require("../middleware/validate");
 const {
   punchSchema,
+  punchStatusQuerySchema,
   webPunchQuerySchema,
   dailyQuerySchema,
   calendarQuerySchema,
@@ -112,6 +115,8 @@ const needRegularizationReview = (req, res, next) => {
 router.post("/punch-in", protect, validate(punchSchema), punchIn);
 router.post("/punch-out", protect, validate(punchSchema), punchOut);
 router.get("/today", protect, myToday);
+
+router.get("/punch-status", protect, validateQuery(punchStatusQuerySchema), getPunchStatus);
 
 router.get(
   "/web-punches",

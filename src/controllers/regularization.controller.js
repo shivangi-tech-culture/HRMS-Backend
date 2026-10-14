@@ -8,7 +8,7 @@
  *   POST /api/attendance/regularize/:id/cancel
  *
  * Manager / HR / Admin / Super Admin
- *   GET  /api/attendance/regularizations?status=Pending&companyId=
+ *   GET  /api/attendance/regularizations?companyId=&status=ALL|Pending|Approved|Rejected|Cancelled
  *   POST /api/attendance/regularizations/:id/review?decision=approve|reject   { reason }
  *
  * Pending  → timesheet + daily show Pending
@@ -42,7 +42,7 @@ const {
 } = require("../utils/shiftTiming");
 const { resolveDisplayedStatus } = require("../utils/attendanceDayStatus");
 const { shiftDbId, formatDurationLabel } = require("../utils/attendanceFormat");
-const { companyMonthOf, monthStartForUser } = require("../utils/leaveBalance");
+const { companyMonthOf, monthStartForUser, leaveDayUnpaid } = require("../utils/leaveBalance");
 const { userCompanyIds } = require("../utils/companyScope");
 const { assertTeamOrCompanyEmployee } = require("../utils/teamScope");
 const { normalizeRoleName, EMPLOYEE } = require("../config/roles");
@@ -86,6 +86,35 @@ const toRow = (row) => ({
   reviewReason: row.reviewReason || "",
   reviewedAt: row.reviewedAt || null,
 });
+
+/** Show a punch already saved on attendance when this request did not ask to change it. */
+const fillSavedPunch = (row, attendance) => {
+  const out = toRow(row);
+  if (!out.punchInTime && attendance?.punchIn) out.punchInTime = formatPunchStamp(attendance.punchIn);
+  if (!out.punchOutTime && attendance?.punchOut) out.punchOutTime = formatPunchStamp(attendance.punchOut);
+  return out;
+};
+
+const rowsWithSavedPunches = async (rows) => {
+  const list = Array.isArray(rows) ? rows : [rows];
+  const or = [];
+  const seen = new Set();
+  for (const row of list) {
+    const employee = row.employee?._id || row.employee;
+    if (!employee || !row.date) continue;
+    const key = `${String(employee)}|${row.date}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    or.push({ employee, date: row.date });
+  }
+  const attendance = or.length
+    ? await Attendance.find({ $or: or }).select("employee date punchIn punchOut").lean()
+    : [];
+  const byKey = new Map(attendance.map((a) => [`${String(a.employee)}|${a.date}`, a]));
+  return list.map((row) =>
+    fillSavedPunch(row, byKey.get(`${String(row.employee?._id || row.employee)}|${row.date}`))
+  );
+};
 
 const addDays = (dateStr, n) => {
   const d = new Date(`${dateStr}T12:00:00+05:30`);
@@ -323,28 +352,40 @@ const saveApprovedDay = async (request, actorId) => {
 const sendList = async (res, filter, query) => {
   const page = Math.max(Number(query.page) || 1, 1);
   const limit = Math.min(Math.max(Number(query.limit) || 20, 1), 100);
-  if (query.status && query.status !== "ALL") filter.status = query.status;
   if (query.from || query.to) {
     filter.date = {};
     if (query.from) filter.date.$gte = query.from;
     if (query.to) filter.date.$lte = query.to;
   }
-  const [total, rows] = await Promise.all([
-    AttendanceRegularization.countDocuments(filter),
-    AttendanceRegularization.find(filter)
+  const status = String(query.status || "ALL");
+  const listFilter = status !== "ALL" ? { ...filter, status } : filter;
+  const [total, rows, grouped] = await Promise.all([
+    AttendanceRegularization.countDocuments(listFilter),
+    AttendanceRegularization.find(listFilter)
       .sort({ date: -1, createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
       .populate("employee", CARD)
       .populate("reviewedBy", "name role official.officialEmail")
       .lean(),
+    AttendanceRegularization.aggregate([
+      { $match: filter },
+      { $group: { _id: "$status", n: { $sum: 1 } } },
+    ]),
   ]);
+  const summary = { all: 0, pending: 0, approved: 0, rejected: 0, cancelled: 0 };
+  for (const row of grouped) {
+    const key = String(row._id || "").toLowerCase();
+    if (summary[key] !== undefined) summary[key] = row.n;
+    summary.all += row.n;
+  }
   return res.json({
+    summary,
     total,
     page,
     limit,
     pages: Math.max(1, Math.ceil(total / limit)),
-    data: rows.map(toRow),
+    data: await rowsWithSavedPunches(rows),
   });
 };
 
@@ -409,7 +450,7 @@ const myTimesheet = async (req, res) => {
         totalLeaves: 0,
       },
       absentLate: { absents: 0, lateByMinutes: 0, earlyByMinutes: 0, lateBy: "0h 0m", earlyBy: "0h 0m" },
-      payable: { salaryDays: 0 },
+      payable: { salaryDays: 0, deductionDays: 0 },
     };
     let salaryDays = 0;
 
@@ -511,8 +552,10 @@ const myTimesheet = async (req, res) => {
       else if (onLeave) {
         summary.leaves.totalLeaves += units;
         if (leave?.dayType === "Half Day") summary.leaves.shortLeave += units;
-        if (leave?.leaveType?.paid === false || leaveCode === "UL") summary.leaves.unpaidLeave += units;
-        else salaryDays += units;
+        if (leaveDayUnpaid(leave, date) || leave?.leaveType?.paid === false || leaveCode === "UL") {
+          summary.leaves.unpaidLeave += units;
+          summary.payable.deductionDays = Math.round(((summary.payable.deductionDays || 0) + units) * 10) / 10;
+        } else salaryDays += units;
         if (leaveCode === "CO") summary.presentSummary.compensatoryOff += units;
         if (leaveCode === "LTA") summary.leaves.lta += units;
       }
@@ -637,7 +680,7 @@ const requestRegularization = async (req, res) => {
       message: lateDay
         ? "Attendance request sent. Reporting Manager, HR, or Super Admin can approve it. Daily attendance updates after review."
         : "Request sent. It stays Pending until approved. Punch out is still Missed Punch until then.",
-      request: toRow({ ...doc.toObject(), employee }),
+      request: (await rowsWithSavedPunches([{ ...doc.toObject(), employee }]))[0],
     });
   } catch (err) {
     if (err && err.code === 11000) {
@@ -669,7 +712,10 @@ const cancelRegularization = async (req, res) => {
     }
     doc.status = "Cancelled";
     await doc.save();
-    return res.json({ message: "Request cancelled", request: toRow(doc) });
+    return res.json({
+      message: "Request cancelled",
+      request: (await rowsWithSavedPunches([doc]))[0],
+    });
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
@@ -770,7 +816,7 @@ const reviewRegularization = async (req, res) => {
             : dayStatus
               ? `Rejected. Day stays ${dayStatus}.`
               : "Rejected.",
-      request: toRow(request),
+      request: (await rowsWithSavedPunches([request]))[0],
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });

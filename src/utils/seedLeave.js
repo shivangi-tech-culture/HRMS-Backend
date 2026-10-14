@@ -64,7 +64,7 @@ const DEFAULT_POLICIES = [
   ["quarterlyLeave", "Casual Leave", "1 per month, 3 per full quarter", "Q1 Jan–Mar, Q2 Apr–Jun, Q3 Jul–Sep, Q4 Oct–Dec. Take the quarter's days any time in that quarter. Unused days expire."],
   ["emergencyLeave", "Earned Leave", "6 per year", "After probation, usable any time in the leave year. Separate from Casual Leave."],
   ["compOffEarn", "Comp Off earn rule", "1 extra working day = 1 Comp Off", "One eligible extra working day credits one Comp Off. It is not granted automatically."],
-  ["unpaidLeave", "Unpaid Leave", "30 per year", "Salary is deducted. Limit can be changed in Leave Master."],
+  ["unpaidLeave", "Unpaid Leave", "Automatic", "Not selected on apply. Days beyond the paid balance become unpaid and are stored as salary deduction."],
   ["minNotice", "Min notice for leave", "1 day", "Minimum advance notice required before applying leave."],
   ["sandwichRule", "Sandwich rule", "No", "Weekends/holidays between leave days counted as leave."],
   ["halfDayAllowed", "Half day leave allowed", "Yes", "Employees can apply for half day leave sessions."],
