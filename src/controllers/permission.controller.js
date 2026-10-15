@@ -192,6 +192,7 @@ const MASTER_TYPE_PERM = {
   relation: "Relation",
   nominateFor: "Nominate For",
   visaType: "Visa Type",
+  language: "Language",
   regularizationReason: "Regularization Reason",
   markAttendanceReason: "Mark Attendance Reason",
 };

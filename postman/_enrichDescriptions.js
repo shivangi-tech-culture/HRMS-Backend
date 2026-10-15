@@ -270,7 +270,7 @@ function contextualDoc(key, ctx) {
     if (url.includes("/late-early"))
       return "string | optional | `late` = Late Arrivals, `early` = Early Departures, `all`";
     if (isMasterApi || url.includes("/masters"))
-      return "string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)";
+      return "string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)";
     if (name.includes("upload") || name.includes("attachment"))
       return "string | required | attachment category key (form-data text)";
     return PARAM_DOCS.type;
