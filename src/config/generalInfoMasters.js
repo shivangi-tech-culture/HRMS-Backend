@@ -66,6 +66,21 @@ const UI_DROPDOWNS = {
   ],
   maritalStatus: ["Single", "Married", "Divorced", "Widowed"],
   bloodGroup: ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"],
+  language: [
+    "Hindi",
+    "English",
+    "Bengali",
+    "Marathi",
+    "Telugu",
+    "Tamil",
+    "Gujarati",
+    "Urdu",
+    "Kannada",
+    "Malayalam",
+    "Punjabi",
+    "Odia",
+    "Assamese",
+  ],
 };
 
 /** Official org masters (demo seed) */
