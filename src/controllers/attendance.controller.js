@@ -944,7 +944,7 @@ const tallyDailySummary = (summary, row) => {
   if (row.status === "Rejected") summary.rejected += 1;
   if (row.isLate && (row.status === "Present" || row.status === "Late")) summary.late += 1;
   if (row.status === "WFH" || row.workMode === "WFH") summary.wfh += 1;
-  if (row.status === "Pending" || row.canApproveReject || row.needsRemarkReview) summary.pending += 1;
+  if (row.status === "Pending" || row.needsRemarkReview) summary.pending += 1;
 };
 
 const applyEmployeeSearch = (filter, search) => {
