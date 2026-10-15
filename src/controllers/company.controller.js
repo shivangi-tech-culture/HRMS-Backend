@@ -137,6 +137,55 @@ const listCompanies = async (req, res) => {
   }
 };
 
+/** GET /api/companies/:id/branches — branch and shift details for that company only. */
+const getCompanyBranches = async (req, res) => {
+  try {
+    if (!okId(req.params.id)) {
+      return res.status(400).json({ message: "Company is not valid" });
+    }
+    const row = await Company.findById(req.params.id)
+      .select("companyName companyCode branches")
+      .populate(MASTER_POPULATE)
+      .lean();
+    if (!row) return res.status(404).json({ message: "Company not found" });
+    if (!canViewCompany(req.user, row._id)) {
+      return res.status(403).json({ message: "You cannot view this company" });
+    }
+
+    const branches = (row.branches || [])
+      .filter((branch) => branch.isActive !== false && branch.branchId?._id)
+      .map((branch) => ({
+        branchId: branch.branchId._id,
+        name: branch.branchId.name || "",
+        code: branch.branchId.code || "",
+        address: branch.address || "",
+        city: branch.city || "",
+        state: branch.state || "",
+        pincode: branch.pincode || "",
+        shifts: (branch.shifts || [])
+          .filter((shift) => shift.isActive !== false && shift.shiftId?._id)
+          .map((shift) => ({
+            shiftId: shift.shiftId._id,
+            name: shift.shiftId.name || "",
+            code: shift.shiftId.code || "",
+          }))
+          .filter((shift) => shift.name),
+      }))
+      .filter((branch) => branch.name);
+
+    return res.json({
+      data: {
+        companyId: row._id,
+        companyName: row.companyName,
+        companyCode: row.companyCode,
+        branches,
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
 const getCompany = async (req, res) => {
   try {
     if (!okId(req.params.id)) {
@@ -288,6 +337,7 @@ const deleteCompany = async (req, res) => {
 
 module.exports = {
   listCompanies,
+  getCompanyBranches,
   getCompany,
   createCompany,
   updateCompany,
