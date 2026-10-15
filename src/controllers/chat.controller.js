@@ -300,7 +300,11 @@ const sendMessage = async (user, conversationId, text, files = [], options = {})
     throw err;
   }
   const preview = previewOf(body, message.attachments);
-  conversation.lastMessage = options.forwarded ? `Forwarded: ${preview || "a message"}` : preview;
+  conversation.lastMessage = options.forwarded
+    ? `Forwarded: ${preview || "a message"}`
+    : replyTo
+      ? `Reply to ${replyTo.senderName || "a message"}: ${preview}`
+      : preview;
   conversation.lastMessageAt = message.createdAt;
 
   const recipientIds = conversation.participantIds.filter((id) => id !== user.employeeId);
