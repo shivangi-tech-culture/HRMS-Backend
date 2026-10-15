@@ -6,6 +6,7 @@
 const express = require("express");
 const {
   listCompanies,
+  getCompanyBranches,
   getCompany,
   createCompany,
   updateCompany,
@@ -125,6 +126,31 @@ const canView = [
  *       409: { description: Duplicate company name or code }
  */
 router.get("/", ...canView, validateQuery(listCompanyQuerySchema), listCompanies);
+
+/**
+ * @swagger
+ * /api/companies/{id}/branches:
+ *   get:
+ *     tags: [Admin / Company]
+ *     summary: Branch and shift details for one company
+ *     description: |
+ *       Pass the company id. Returns only the branches linked to that company,
+ *       and the shifts linked to each branch. Use these ids on the employee form:
+ *       branchId ← branches[].branchId, shiftId ← branches[].shifts[].shiftId.
+ *       Inactive branches and shifts are left out.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200: { description: Company branches with their shifts }
+ *       403: { description: Not your company }
+ *       404: { description: Not found }
+ */
+router.get("/:id/branches", ...canView, getCompanyBranches);
 
 router.post(
   "/",
