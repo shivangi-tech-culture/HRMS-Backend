@@ -28,6 +28,7 @@ const TYPES = [
   "relation",
   "nominateFor",
   "visaType",
+  "language",
   "regularizationReason",
   "markAttendanceReason",
 ];
@@ -50,6 +51,7 @@ const COLLECTION_BY_TYPE = {
   relation: "relations",
   nominateFor: "nominatefors",
   visaType: "visatypes",
+  language: "languages",
   regularizationReason: "regularizationreasons",
   markAttendanceReason: "markattendancereasons",
 };
@@ -58,6 +60,7 @@ const GENERAL_INFO_DROPDOWNS = {
   personal: {
     gender: "gender",
     maritalStatus: "maritalStatus",
+    languageKnown: "language",
   },
   official: {
     department: "department",

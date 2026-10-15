@@ -204,6 +204,7 @@ const ADMIN_TREE = [
       { name: "Relation", actions: CRUD },
       { name: "Nominate For", actions: CRUD },
       { name: "Visa Type", actions: CRUD },
+      { name: "Language", actions: CRUD },
       { name: "Regularization Reason", actions: CRUD },
       { name: "Mark Attendance Reason", actions: CRUD },
     ],
