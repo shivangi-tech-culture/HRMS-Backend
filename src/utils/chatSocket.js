@@ -38,16 +38,21 @@ const attachChatSocket = (io) => {
 
     const before = onlineCount.get(employeeId) || 0;
     onlineCount.set(employeeId, before + 1);
-    socket.emit("presence:list", { employeeIds: [...onlineCount.keys()] });
+    const onlineNow = () => ({ employeeIds: [...onlineCount.keys()] });
+    socket.emit("presence:list", onlineNow());
     if (before === 0) {
-      socket.to(`company:${companyId}`).emit("presence:update", { employeeId, online: true });
+      socket.broadcast.emit("presence:update", { employeeId, online: true });
     }
+
+    socket.on("presence:sync", () => {
+      socket.emit("presence:list", onlineNow());
+    });
 
     socket.on("disconnect", () => {
       const left = (onlineCount.get(employeeId) || 1) - 1;
       if (left <= 0) {
         onlineCount.delete(employeeId);
-        io.to(`company:${companyId}`).emit("presence:update", { employeeId, online: false });
+        io.emit("presence:update", { employeeId, online: false });
       } else {
         onlineCount.set(employeeId, left);
       }
