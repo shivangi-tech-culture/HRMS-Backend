@@ -5,6 +5,7 @@
  * Client → server: chat:join · chat:leave · message:send · chat:read (each with an ack)
  *                  · chat:delivered (no ack)
  * Server → client: message:new · inbox:update · message:sent · chat:changed · receipt:update · chat:muted
+ *                  · presence:list · presence:update
  *                  (see chatRealtime.js)
  */
 const { chatUserFor, loadLoginUser } = require("./chatAccess");
@@ -15,6 +16,9 @@ const {
   markRead,
   sendMessage,
 } = require("../controllers/chat.controller");
+
+/** Open tabs per employee. Zero means offline. */
+const onlineCount = new Map();
 
 const attachChatSocket = (io) => {
   io.use(async (socket, next) => {
@@ -28,7 +32,26 @@ const attachChatSocket = (io) => {
   });
 
   io.on("connection", (socket) => {
-    socket.join(`user:${socket.chatUser.employeeId}`);
+    const { employeeId, companyId } = socket.chatUser;
+    socket.join(`user:${employeeId}`);
+    socket.join(`company:${companyId}`);
+
+    const before = onlineCount.get(employeeId) || 0;
+    onlineCount.set(employeeId, before + 1);
+    socket.emit("presence:list", { employeeIds: [...onlineCount.keys()] });
+    if (before === 0) {
+      socket.to(`company:${companyId}`).emit("presence:update", { employeeId, online: true });
+    }
+
+    socket.on("disconnect", () => {
+      const left = (onlineCount.get(employeeId) || 1) - 1;
+      if (left <= 0) {
+        onlineCount.delete(employeeId);
+        io.to(`company:${companyId}`).emit("presence:update", { employeeId, online: false });
+      } else {
+        onlineCount.set(employeeId, left);
+      }
+    });
 
     // Online now: everything sent while they were away is delivered
     markDelivered(socket.chatUser)
@@ -53,7 +76,13 @@ const attachChatSocket = (io) => {
 
     socket.on("message:send", async (payload, ack) => {
       try {
-        const result = await sendMessage(socket.chatUser, payload?.conversationId, payload?.text);
+        const result = await sendMessage(
+          socket.chatUser,
+          payload?.conversationId,
+          payload?.text,
+          [],
+          { replyToId: payload?.replyTo }
+        );
         broadcastMessage(io, result);
         ack?.({ ok: true, message: result.message });
       } catch (err) {

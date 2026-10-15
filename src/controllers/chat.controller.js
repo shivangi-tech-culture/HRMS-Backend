@@ -44,6 +44,15 @@ const toMessage = (row) => ({
     size: a.size,
     mimeType: a.mimeType,
   })),
+  replyTo: row.replyTo?.messageId
+    ? {
+        messageId: String(row.replyTo.messageId),
+        senderId: row.replyTo.senderId || "",
+        senderName: row.replyTo.senderName || "",
+        text: row.replyTo.text || "",
+      }
+    : null,
+  forwarded: row.forwarded === true,
   createdAt: row.createdAt,
 });
 
@@ -229,10 +238,41 @@ const listMessages = async (user, conversationId) => {
   return rows.map(toMessage);
 };
 
+const replySnapshot = async (conversation, replyToId) => {
+  if (!replyToId) return undefined;
+  if (!mongoose.isValidObjectId(replyToId)) throw chatError(400, "Reply target is not valid");
+  const original = await ChatMessage.findOne({
+    _id: replyToId,
+    conversationId: conversation._id,
+  }).lean();
+  if (!original) throw chatError(400, "That message is not in this chat");
+  const cards = await peopleCards([original.senderId]);
+  const preview =
+    String(original.text || "").trim() ||
+    (original.attachments?.[0]?.name ? `File: ${original.attachments[0].name}` : "Message");
+  return {
+    messageId: original._id,
+    senderId: original.senderId,
+    senderName: cards.get(String(original.senderId))?.name || "",
+    text: preview.slice(0, 180),
+  };
+};
+
+const copiedFiles = (rows) =>
+  (rows || [])
+    .filter((file) => file?.storageKey && file?.name)
+    .map((file) => ({
+      name: file.name,
+      size: file.size || 0,
+      mimeType: file.mimeType || "application/octet-stream",
+      storageKey: file.storageKey,
+    }));
+
 /** Save a message (text and/or files), bump unread counts; returns what to broadcast */
-const sendMessage = async (user, conversationId, text, files = []) => {
+const sendMessage = async (user, conversationId, text, files = [], options = {}) => {
   const body = String(text || "").trim();
-  if (!body && files.length === 0) {
+  const copies = copiedFiles(options.copyAttachments);
+  if (!body && files.length === 0 && copies.length === 0) {
     throw chatError(400, "Message text or a file is required");
   }
   if (body.length > 4000) throw chatError(400, "Message is too long");
@@ -242,7 +282,8 @@ const sendMessage = async (user, conversationId, text, files = []) => {
     throw chatError(403, "Only members of this chat can send");
   }
 
-  const attachments = files.length ? await storeChatFiles(conversation.companyId, files) : [];
+  const replyTo = await replySnapshot(conversation, options.replyToId);
+  const uploaded = files.length ? await storeChatFiles(conversation.companyId, files) : [];
   let message;
   try {
     message = await ChatMessage.create({
@@ -250,13 +291,16 @@ const sendMessage = async (user, conversationId, text, files = []) => {
       conversationId: conversation._id,
       senderId: user.employeeId,
       text: body,
-      attachments,
+      attachments: [...copies, ...uploaded],
+      replyTo,
+      forwarded: options.forwarded === true,
     });
   } catch (err) {
-    await removeChatFiles(attachments);
+    await removeChatFiles(uploaded);
     throw err;
   }
-  conversation.lastMessage = previewOf(body, attachments);
+  const preview = previewOf(body, message.attachments);
+  conversation.lastMessage = options.forwarded ? `Forwarded: ${preview || "a message"}` : preview;
   conversation.lastMessageAt = message.createdAt;
 
   const recipientIds = conversation.participantIds.filter((id) => id !== user.employeeId);
@@ -282,6 +326,34 @@ const sendMessage = async (user, conversationId, text, files = []) => {
     conversation: toConversation(conversation, user.employeeId, 0),
     recipientIds,
   };
+};
+
+/** Copy one message the user can see into chats they can send in. */
+const forwardMessage = async (user, messageId, conversationIds) => {
+  if (!mongoose.isValidObjectId(messageId)) throw chatError(400, "Message is not valid");
+  const original = await ChatMessage.findById(messageId).lean();
+  if (!original) throw chatError(404, "Message not found");
+  await loadViewableConversation(user, String(original.conversationId));
+
+  const ids = [...new Set((Array.isArray(conversationIds) ? conversationIds : []).map(String))].filter(
+    Boolean
+  );
+  if (ids.length === 0) throw chatError(400, "Pick a chat to share this message with");
+  if (ids.length > 10) throw chatError(400, "Share with up to 10 chats at a time");
+  if (!String(original.text || "").trim() && !(original.attachments || []).length) {
+    throw chatError(400, "This message has nothing to share");
+  }
+
+  const sent = [];
+  for (const id of ids) {
+    sent.push(
+      await sendMessage(user, id, original.text || "", [], {
+        forwarded: true,
+        copyAttachments: original.attachments || [],
+      })
+    );
+  }
+  return sent;
 };
 
 /** After `changedId` got or read messages: fresh ticks for every other member */
@@ -471,10 +543,23 @@ const postMessage = wrap(async (req, res) => {
     req.chatUser,
     req.params.conversationId,
     req.body?.text,
-    req.files || []
+    req.files || [],
+    { replyToId: req.body?.replyTo }
   );
   broadcastMessage(req.app.get("io"), result);
   res.status(201).json(result.message);
+});
+
+/** POST /api/chat/messages/:messageId/forward { conversationIds } */
+const postForward = wrap(async (req, res) => {
+  const results = await forwardMessage(
+    req.chatUser,
+    req.params.messageId,
+    req.body?.conversationIds
+  );
+  const io = req.app.get("io");
+  for (const result of results) broadcastMessage(io, result);
+  res.status(201).json({ data: results.map((result) => result.message) });
 });
 
 /** POST /api/chat/conversations/:conversationId/read */
@@ -638,6 +723,7 @@ module.exports = {
   openDirectChat,
   getMessages,
   postMessage,
+  postForward,
   readConversation,
   muteChat,
   downloadAttachment,

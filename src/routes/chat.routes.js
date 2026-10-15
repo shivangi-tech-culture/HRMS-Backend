@@ -14,6 +14,7 @@ const {
   openDirectChat,
   getMessages,
   postMessage,
+  postForward,
   readConversation,
   muteChat,
   downloadAttachment,
@@ -172,6 +173,9 @@ router.post("/conversations", openDirectChat);
  */
 router.get("/conversations/:conversationId/messages", getMessages);
 router.post("/conversations/:conversationId/messages", uploadChatFiles, postMessage);
+
+/** POST /api/chat/messages/:messageId/forward { conversationIds } — copy into chats the sender belongs to */
+router.post("/messages/:messageId/forward", postForward);
 
 /**
  * @swagger

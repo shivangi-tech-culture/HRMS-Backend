@@ -25,6 +25,15 @@ const messageSchema = new mongoose.Schema(
     senderId: { type: String, required: true, trim: true },
     text: { type: String, default: "", trim: true, maxlength: 4000 },
     attachments: { type: [attachmentSchema], default: [] },
+    /** Snapshot of the message this one answers. Empty messageId means it is not a reply. */
+    replyTo: {
+      messageId: { type: mongoose.Schema.Types.ObjectId, default: null },
+      senderId: { type: String, default: "", trim: true },
+      senderName: { type: String, default: "", trim: true, maxlength: 120 },
+      text: { type: String, default: "", trim: true, maxlength: 180 },
+    },
+    /** Copied into another chat with Share. */
+    forwarded: { type: Boolean, default: false },
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );
