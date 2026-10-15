@@ -19,6 +19,8 @@ const shiftSummary = (shift) =>
         name: shift.name || "",
         startTime: shift.startTime || "",
         endTime: shift.endTime || "",
+        breakStartTime: shift.breakStartTime || "",
+        breakEndTime: shift.breakEndTime || "",
         halfDayEndTime: shift.halfDayEndTime || "",
         graceMinutes: graceMinutesOf(shift.graceMinutes),
         isDefault: !!shift.isDefault,
