@@ -699,7 +699,7 @@
                         "masters"
                       ]
                     },
-                    "description": "POST /api/masters — `type` = `department`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                    "description": "POST /api/masters — `type` = `department`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"type\": \"department\",\n  \"name\": \"Test Department {{rndNo}}\",\n  \"code\": \"T{{rndNo}}\",\n  \"status\": \"Active\"\n}",
@@ -742,7 +742,7 @@
                         {
                           "key": "type",
                           "value": "department",
-                          "description": "string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
+                          "description": "string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
                         },
                         {
                           "key": "status",
@@ -768,7 +768,7 @@
                         }
                       ]
                     },
-                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
                   }
                 },
                 {
@@ -881,7 +881,7 @@
                         "masters"
                       ]
                     },
-                    "description": "POST /api/masters — `type` = `designation`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                    "description": "POST /api/masters — `type` = `designation`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"type\": \"designation\",\n  \"name\": \"Test Designation {{rndNo}}\",\n  \"code\": \"T{{rndNo}}\",\n  \"status\": \"Active\"\n}",
@@ -924,7 +924,7 @@
                         {
                           "key": "type",
                           "value": "designation",
-                          "description": "string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
+                          "description": "string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
                         },
                         {
                           "key": "status",
@@ -950,7 +950,7 @@
                         }
                       ]
                     },
-                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
                   }
                 },
                 {
@@ -1063,7 +1063,7 @@
                         "masters"
                       ]
                     },
-                    "description": "POST /api/masters — `type` = `division`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                    "description": "POST /api/masters — `type` = `division`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"type\": \"division\",\n  \"name\": \"Test Division {{rndNo}}\",\n  \"code\": \"T{{rndNo}}\",\n  \"status\": \"Active\"\n}",
@@ -1106,7 +1106,7 @@
                         {
                           "key": "type",
                           "value": "division",
-                          "description": "string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
+                          "description": "string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
                         },
                         {
                           "key": "status",
@@ -1132,7 +1132,7 @@
                         }
                       ]
                     },
-                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
                   }
                 },
                 {
@@ -1245,7 +1245,7 @@
                         "masters"
                       ]
                     },
-                    "description": "POST /api/masters — `type` = `employeeGroup`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                    "description": "POST /api/masters — `type` = `employeeGroup`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"type\": \"employeeGroup\",\n  \"name\": \"Test Employee Group {{rndNo}}\",\n  \"code\": \"T{{rndNo}}\",\n  \"status\": \"Active\"\n}",
@@ -1288,7 +1288,7 @@
                         {
                           "key": "type",
                           "value": "employeeGroup",
-                          "description": "string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
+                          "description": "string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
                         },
                         {
                           "key": "status",
@@ -1314,7 +1314,7 @@
                         }
                       ]
                     },
-                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
                   }
                 },
                 {
@@ -1427,7 +1427,7 @@
                         "masters"
                       ]
                     },
-                    "description": "POST /api/masters — `type` = `grade`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                    "description": "POST /api/masters — `type` = `grade`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"type\": \"grade\",\n  \"name\": \"Test Grade {{rndNo}}\",\n  \"code\": \"T{{rndNo}}\",\n  \"status\": \"Active\"\n}",
@@ -1470,7 +1470,7 @@
                         {
                           "key": "type",
                           "value": "grade",
-                          "description": "string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
+                          "description": "string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
                         },
                         {
                           "key": "status",
@@ -1496,7 +1496,7 @@
                         }
                       ]
                     },
-                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
                   }
                 },
                 {
@@ -1609,7 +1609,7 @@
                         "masters"
                       ]
                     },
-                    "description": "POST /api/masters — `type` = `jobRole`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                    "description": "POST /api/masters — `type` = `jobRole`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"type\": \"jobRole\",\n  \"name\": \"Test Job Role {{rndNo}}\",\n  \"code\": \"T{{rndNo}}\",\n  \"status\": \"Active\"\n}",
@@ -1652,7 +1652,7 @@
                         {
                           "key": "type",
                           "value": "jobRole",
-                          "description": "string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
+                          "description": "string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
                         },
                         {
                           "key": "status",
@@ -1678,7 +1678,7 @@
                         }
                       ]
                     },
-                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
                   }
                 },
                 {
@@ -1791,7 +1791,7 @@
                         "masters"
                       ]
                     },
-                    "description": "POST /api/masters — `type` = `gender`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                    "description": "POST /api/masters — `type` = `gender`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"type\": \"gender\",\n  \"name\": \"Test Gender {{rndNo}}\",\n  \"code\": \"T{{rndNo}}\",\n  \"status\": \"Active\"\n}",
@@ -1834,7 +1834,7 @@
                         {
                           "key": "type",
                           "value": "gender",
-                          "description": "string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
+                          "description": "string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
                         },
                         {
                           "key": "status",
@@ -1860,7 +1860,7 @@
                         }
                       ]
                     },
-                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
                   }
                 },
                 {
@@ -1973,7 +1973,7 @@
                         "masters"
                       ]
                     },
-                    "description": "POST /api/masters — `type` = `maritalStatus`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                    "description": "POST /api/masters — `type` = `maritalStatus`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"type\": \"maritalStatus\",\n  \"name\": \"Test Marital Status {{rndNo}}\",\n  \"code\": \"T{{rndNo}}\",\n  \"status\": \"Active\"\n}",
@@ -2016,7 +2016,7 @@
                         {
                           "key": "type",
                           "value": "maritalStatus",
-                          "description": "string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
+                          "description": "string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
                         },
                         {
                           "key": "status",
@@ -2042,7 +2042,7 @@
                         }
                       ]
                     },
-                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
                   }
                 },
                 {
@@ -2155,7 +2155,7 @@
                         "masters"
                       ]
                     },
-                    "description": "POST /api/masters — `type` = `bloodGroup`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                    "description": "POST /api/masters — `type` = `bloodGroup`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"type\": \"bloodGroup\",\n  \"name\": \"Test Blood Group {{rndNo}}\",\n  \"code\": \"T{{rndNo}}\",\n  \"status\": \"Active\"\n}",
@@ -2198,7 +2198,7 @@
                         {
                           "key": "type",
                           "value": "bloodGroup",
-                          "description": "string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
+                          "description": "string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
                         },
                         {
                           "key": "status",
@@ -2224,7 +2224,7 @@
                         }
                       ]
                     },
-                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
                   }
                 },
                 {
@@ -2337,7 +2337,7 @@
                         "masters"
                       ]
                     },
-                    "description": "POST /api/masters — `type` = `branch`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                    "description": "POST /api/masters — `type` = `branch`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"type\": \"branch\",\n  \"name\": \"Test Branch {{rndNo}}\",\n  \"code\": \"T{{rndNo}}\",\n  \"status\": \"Active\"\n}",
@@ -2380,7 +2380,7 @@
                         {
                           "key": "type",
                           "value": "branch",
-                          "description": "string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
+                          "description": "string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
                         },
                         {
                           "key": "status",
@@ -2406,7 +2406,7 @@
                         }
                       ]
                     },
-                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
                   }
                 },
                 {
@@ -2519,7 +2519,7 @@
                         "masters"
                       ]
                     },
-                    "description": "POST /api/masters — `type` = `shift`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                    "description": "POST /api/masters — `type` = `shift`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"type\": \"shift\",\n  \"name\": \"Test Shift {{rndNo}}\",\n  \"code\": \"T{{rndNo}}\",\n  \"status\": \"Active\"\n}",
@@ -2562,7 +2562,7 @@
                         {
                           "key": "type",
                           "value": "shift",
-                          "description": "string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
+                          "description": "string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
                         },
                         {
                           "key": "status",
@@ -2588,7 +2588,7 @@
                         }
                       ]
                     },
-                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
                   }
                 },
                 {
@@ -2701,7 +2701,7 @@
                         "masters"
                       ]
                     },
-                    "description": "POST /api/masters — `type` = `courseType`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                    "description": "POST /api/masters — `type` = `courseType`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"type\": \"courseType\",\n  \"name\": \"Test Course Type {{rndNo}}\",\n  \"code\": \"T{{rndNo}}\",\n  \"status\": \"Active\"\n}",
@@ -2744,7 +2744,7 @@
                         {
                           "key": "type",
                           "value": "courseType",
-                          "description": "string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
+                          "description": "string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
                         },
                         {
                           "key": "status",
@@ -2770,7 +2770,7 @@
                         }
                       ]
                     },
-                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
                   }
                 },
                 {
@@ -2883,7 +2883,7 @@
                         "masters"
                       ]
                     },
-                    "description": "POST /api/masters — `type` = `courseLevel`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                    "description": "POST /api/masters — `type` = `courseLevel`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"type\": \"courseLevel\",\n  \"name\": \"Test Course Level {{rndNo}}\",\n  \"code\": \"T{{rndNo}}\",\n  \"status\": \"Active\"\n}",
@@ -2926,7 +2926,7 @@
                         {
                           "key": "type",
                           "value": "courseLevel",
-                          "description": "string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
+                          "description": "string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
                         },
                         {
                           "key": "status",
@@ -2952,7 +2952,7 @@
                         }
                       ]
                     },
-                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
                   }
                 },
                 {
@@ -3065,7 +3065,7 @@
                         "masters"
                       ]
                     },
-                    "description": "POST /api/masters — `type` = `bankName`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                    "description": "POST /api/masters — `type` = `bankName`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"type\": \"bankName\",\n  \"name\": \"Test Bank Name {{rndNo}}\",\n  \"code\": \"T{{rndNo}}\",\n  \"status\": \"Active\"\n}",
@@ -3108,7 +3108,7 @@
                         {
                           "key": "type",
                           "value": "bankName",
-                          "description": "string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
+                          "description": "string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
                         },
                         {
                           "key": "status",
@@ -3134,7 +3134,7 @@
                         }
                       ]
                     },
-                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
                   }
                 },
                 {
@@ -3247,7 +3247,7 @@
                         "masters"
                       ]
                     },
-                    "description": "POST /api/masters — `type` = `relation`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                    "description": "POST /api/masters — `type` = `relation`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"type\": \"relation\",\n  \"name\": \"Test Relation {{rndNo}}\",\n  \"code\": \"T{{rndNo}}\",\n  \"status\": \"Active\"\n}",
@@ -3290,7 +3290,7 @@
                         {
                           "key": "type",
                           "value": "relation",
-                          "description": "string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
+                          "description": "string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
                         },
                         {
                           "key": "status",
@@ -3316,7 +3316,7 @@
                         }
                       ]
                     },
-                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
                   }
                 },
                 {
@@ -3429,7 +3429,7 @@
                         "masters"
                       ]
                     },
-                    "description": "POST /api/masters — `type` = `nominateFor`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                    "description": "POST /api/masters — `type` = `nominateFor`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"type\": \"nominateFor\",\n  \"name\": \"Test Nominate For {{rndNo}}\",\n  \"code\": \"T{{rndNo}}\",\n  \"status\": \"Active\"\n}",
@@ -3472,7 +3472,7 @@
                         {
                           "key": "type",
                           "value": "nominateFor",
-                          "description": "string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
+                          "description": "string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
                         },
                         {
                           "key": "status",
@@ -3498,7 +3498,7 @@
                         }
                       ]
                     },
-                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
                   }
                 },
                 {
@@ -3611,7 +3611,7 @@
                         "masters"
                       ]
                     },
-                    "description": "POST /api/masters — `type` = `visaType`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                    "description": "POST /api/masters — `type` = `visaType`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"type\": \"visaType\",\n  \"name\": \"Test Visa Type {{rndNo}}\",\n  \"code\": \"T{{rndNo}}\",\n  \"status\": \"Active\"\n}",
@@ -3654,7 +3654,7 @@
                         {
                           "key": "type",
                           "value": "visaType",
-                          "description": "string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
+                          "description": "string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
                         },
                         {
                           "key": "status",
@@ -3680,7 +3680,7 @@
                         }
                       ]
                     },
-                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
                   }
                 },
                 {
@@ -3770,6 +3770,188 @@
               ]
             },
             {
+              "name": "Language",
+              "description": "CRUD for master type `language`. Create saves {{languageMasterId}}; Get / Update / Delete use it.",
+              "item": [
+                {
+                  "name": "1. Create Language",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/masters",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "masters"
+                      ]
+                    },
+                    "description": "POST /api/masters — `type` = `language`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"type\": \"language\",\n  \"name\": \"Test Language {{rndNo}}\",\n  \"code\": \"T{{rndNo}}\",\n  \"status\": \"Active\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    }
+                  },
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "const j = pm.response.json();",
+                          "const id = j.master && j.master._id;",
+                          "if (id) pm.collectionVariables.set('languageMasterId', id);"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "name": "2. List Language",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/masters?type=language&page={{page}}&limit={{limit}}",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "masters"
+                      ],
+                      "query": [
+                        {
+                          "key": "type",
+                          "value": "language",
+                          "description": "string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
+                        },
+                        {
+                          "key": "status",
+                          "value": "Active",
+                          "disabled": true,
+                          "description": "string | optional | `Active` or `Inactive`"
+                        },
+                        {
+                          "key": "search",
+                          "value": "",
+                          "disabled": true,
+                          "description": "string | optional | name / email / employee code text search"
+                        },
+                        {
+                          "key": "page",
+                          "value": "{{page}}",
+                          "description": "number | optional | page number, default `1`"
+                        },
+                        {
+                          "key": "limit",
+                          "value": "{{limit}}",
+                          "description": "number | optional | rows per page (usually 1–200)"
+                        }
+                      ]
+                    },
+                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                  }
+                },
+                {
+                  "name": "3. Get Language",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/masters/{{languageMasterId}}",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "masters",
+                        "{{languageMasterId}}"
+                      ]
+                    },
+                    "description": "\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `languageMasterId` → {{languageMasterId}} — string (MongoId / id) | set collection variable after create/list\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                  }
+                },
+                {
+                  "name": "4. Update Language",
+                  "request": {
+                    "method": "PUT",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/masters/{{languageMasterId}}",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "masters",
+                        "{{languageMasterId}}"
+                      ]
+                    },
+                    "description": "Send at least one of name, code, status. Type cannot change.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `languageMasterId` → {{languageMasterId}} — string (MongoId / id) | set collection variable after create/list\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"name\": \"Test Language {{rndNo}} Edited\",\n  \"code\": \"T{{rndNo}}\",\n  \"status\": \"Active\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "5. Delete Language",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/masters/{{languageMasterId}}",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "masters",
+                        "{{languageMasterId}}"
+                      ]
+                    },
+                    "description": "\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `languageMasterId` → {{languageMasterId}} — string (MongoId / id) | set collection variable after create/list\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                  },
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "if (pm.response.code < 300) {",
+                          "  pm.collectionVariables.set('languageMasterId', '');",
+                          "}"
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
               "name": "Regularization Reason",
               "description": "CRUD for master type `regularizationReason`. Create saves {{regularizationReasonMasterId}}; Get / Update / Delete use it.",
               "item": [
@@ -3793,7 +3975,7 @@
                         "masters"
                       ]
                     },
-                    "description": "POST /api/masters — `type` = `regularizationReason`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                    "description": "POST /api/masters — `type` = `regularizationReason`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"type\": \"regularizationReason\",\n  \"name\": \"Test Regularization Reason {{rndNo}}\",\n  \"code\": \"T{{rndNo}}\",\n  \"status\": \"Active\"\n}",
@@ -3836,7 +4018,7 @@
                         {
                           "key": "type",
                           "value": "regularizationReason",
-                          "description": "string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
+                          "description": "string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
                         },
                         {
                           "key": "status",
@@ -3862,7 +4044,7 @@
                         }
                       ]
                     },
-                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
                   }
                 },
                 {
@@ -3975,7 +4157,7 @@
                         "masters"
                       ]
                     },
-                    "description": "POST /api/masters — `type` = `markAttendanceReason`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                    "description": "POST /api/masters — `type` = `markAttendanceReason`. `code` optional (unique inside the type, stored uppercase).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `name` — string | required/optional | display / full name (min 2)\n- `code` — string | required | uppercase short code e.g. `5DAY`\n- `status` — string | optional | `Active` or `Inactive`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"type\": \"markAttendanceReason\",\n  \"name\": \"Test Mark Attendance Reason {{rndNo}}\",\n  \"code\": \"T{{rndNo}}\",\n  \"status\": \"Active\"\n}",
@@ -4018,7 +4200,7 @@
                         {
                           "key": "type",
                           "value": "markAttendanceReason",
-                          "description": "string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
+                          "description": "string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
                         },
                         {
                           "key": "status",
@@ -4044,7 +4226,7 @@
                         }
                       ]
                     },
-                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                    "description": "Tick `status` / `search` in Params to filter.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
                   }
                 },
                 {
@@ -5356,7 +5538,7 @@
                           "key": "search",
                           "value": "",
                           "disabled": true,
-                        "description": "string | optional | name / email / employee code text search"
+                          "description": "string | optional | name / email / employee code text search"
                         },
                         {
                           "key": "department",
@@ -5590,8 +5772,14 @@
                     "header": [],
                     "url": {
                       "raw": "{{baseUrl}}/api/attendance/late-early?type=all&companyId={{companyId}}&page=1&limit=10",
-                      "host": ["{{baseUrl}}"],
-                      "path": ["api", "attendance", "late-early"],
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "attendance",
+                        "late-early"
+                      ],
                       "query": [
                         {
                           "key": "type",
@@ -5706,8 +5894,14 @@
                     "header": [],
                     "url": {
                       "raw": "{{baseUrl}}/api/attendance/regularizations?companyId={{companyId}}&status=Pending&page={{page}}&limit={{limit}}",
-                      "host": ["{{baseUrl}}"],
-                      "path": ["api", "attendance", "regularizations"],
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "attendance",
+                        "regularizations"
+                      ],
                       "query": [
                         {
                           "key": "companyId",
@@ -5737,8 +5931,14 @@
                           "disabled": true,
                           "description": "YYYY-MM-DD"
                         },
-                        { "key": "page", "value": "{{page}}" },
-                        { "key": "limit", "value": "{{limit}}" }
+                        {
+                          "key": "page",
+                          "value": "{{page}}"
+                        },
+                        {
+                          "key": "limit",
+                          "value": "{{limit}}"
+                        }
                       ]
                     },
                     "description": "List regularization requests in scope.\nSuper Admin / Admin: the company (or the first company when companyId is omitted).\nHR: assigned companies. Reporting Manager: own team only.\nTest script saves the first `_id` into {{regularizationId}}."
@@ -5761,19 +5961,40 @@
                   "name": "2. Approve",
                   "request": {
                     "method": "POST",
-                    "header": [{ "key": "Content-Type", "value": "application/json" }],
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      }
+                    ],
                     "url": {
                       "raw": "{{baseUrl}}/api/attendance/regularizations/{{regularizationId}}/review?decision=approve",
-                      "host": ["{{baseUrl}}"],
-                      "path": ["api", "attendance", "regularizations", "{{regularizationId}}", "review"],
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "attendance",
+                        "regularizations",
+                        "{{regularizationId}}",
+                        "review"
+                      ],
                       "query": [
-                        { "key": "decision", "value": "approve", "description": "approve or reject" }
+                        {
+                          "key": "decision",
+                          "value": "approve",
+                          "description": "approve or reject"
+                        }
                       ]
                     },
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"reason\": \"Punch verified. Approved.\"\n}",
-                      "options": { "raw": { "language": "json" } }
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
                     },
                     "description": "Reporting Manager (team), HR (assigned companies), or Super Admin approves the employee's request.\nYou cannot approve your own request.\nMissed punch: saved punch times are scored against the shift (Present, Late, HalfDay, or Absent).\nLate request: day stays Late and attendanceStatus becomes Approved.\nBody `reason` is required."
                   }
@@ -5782,19 +6003,40 @@
                   "name": "3. Reject",
                   "request": {
                     "method": "POST",
-                    "header": [{ "key": "Content-Type", "value": "application/json" }],
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      }
+                    ],
                     "url": {
                       "raw": "{{baseUrl}}/api/attendance/regularizations/{{regularizationId}}/review?decision=reject",
-                      "host": ["{{baseUrl}}"],
-                      "path": ["api", "attendance", "regularizations", "{{regularizationId}}", "review"],
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "attendance",
+                        "regularizations",
+                        "{{regularizationId}}",
+                        "review"
+                      ],
                       "query": [
-                        { "key": "decision", "value": "reject", "description": "approve or reject" }
+                        {
+                          "key": "decision",
+                          "value": "reject",
+                          "description": "approve or reject"
+                        }
                       ]
                     },
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"reason\": \"Times do not match the shift. Rejected.\"\n}",
-                      "options": { "raw": { "language": "json" } }
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
                     },
                     "description": "Reporting Manager (team), HR (assigned companies), or Super Admin rejects the request.\nAn employee cannot reject their own request.\nA Late day stays Late and attendanceStatus becomes Rejected.\nA missed punch-out stays MissedPunch. Body `reason` is required."
                   }
@@ -7338,8 +7580,14 @@
                 "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/attendance/timesheet?month={{attendanceMonth}}",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "attendance", "timesheet"],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "attendance",
+                    "timesheet"
+                  ],
                   "query": [
                     {
                       "key": "month",
@@ -7373,16 +7621,31 @@
               "name": "6. Request Regularization",
               "request": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
                 "url": {
                   "raw": "{{baseUrl}}/api/attendance/regularize",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "attendance", "regularize"]
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "attendance",
+                    "regularize"
+                  ]
                 },
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"date\": \"{{attendanceDate}}\",\n  \"punchInTime\": \"09:30\",\n  \"punchOutTime\": \"18:30\",\n  \"reason\": \"Forgot to Punch\",\n  \"remarks\": \"Biometric did not capture\"\n}",
-                  "options": { "raw": { "language": "json" } }
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 },
                 "description": "Employee only. Use this when punch-in or punch-out is missing.\nSend the missing time: punchInTime, punchOutTime, or both, as 24-hour HH:mm, plus reason.\nUntil the request is approved, a day with no punch-out stays MissedPunch.\nDo not use this for a Late day that already has both punches. Use 6b instead.\nOne pending request per date. Test script saves `_id` into {{regularizationId}}.\nApprove in 1.7 → 4. Attendance Regularization (Reporting Manager, HR, or Super Admin)."
               },
@@ -7404,16 +7667,31 @@
               "name": "6b. Request Late Regularization",
               "request": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
                 "url": {
                   "raw": "{{baseUrl}}/api/attendance/regularize",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "attendance", "regularize"]
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "attendance",
+                    "regularize"
+                  ]
                 },
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"date\": \"{{attendanceDate}}\",\n  \"reason\": \"Traffic delay\",\n  \"remarks\": \"Reached after shift start and left at shift end\"\n}",
-                  "options": { "raw": { "language": "json" } }
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 },
                 "description": "Employee only, after punch-out, when the day is Late (for example shift 10:00–19:00, in at 11:00 or 12:00, out at 19:00).\nDo not send punchInTime or punchOutTime. Both punches are already saved.\nBody: `date` (YYYY-MM-DD) and `reason` (required). `remarks` is optional.\nRequest stays Pending until Reporting Manager (team), HR (assigned companies), or Super Admin approves it in 1.7 → 4. Attendance Regularization.\nApprove keeps status Late and sets attendanceStatus to Approved. Reject keeps status Late.\nOne pending request per date. Test script saves `_id` into {{regularizationId}}."
               },
@@ -7438,8 +7716,14 @@
                 "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/attendance/regularize?status=ALL&page=1&limit=20",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "attendance", "regularize"],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "attendance",
+                    "regularize"
+                  ],
                   "query": [
                     {
                       "key": "status",
@@ -7456,8 +7740,14 @@
                       "value": "{{toDate}}",
                       "disabled": true
                     },
-                    { "key": "page", "value": "1" },
-                    { "key": "limit", "value": "20" }
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    }
                   ]
                 },
                 "description": "Your own regularization list: sheet date, in/out, reason, remarks, submit date, status Pending / Approved / Rejected."
@@ -7470,8 +7760,16 @@
                 "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/attendance/regularize/{{regularizationId}}/cancel",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "attendance", "regularize", "{{regularizationId}}", "cancel"]
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "attendance",
+                    "regularize",
+                    "{{regularizationId}}",
+                    "cancel"
+                  ]
                 },
                 "description": "Withdraw your own Pending request. Approved or rejected requests cannot be cancelled."
               }
@@ -7500,7 +7798,7 @@
                     {
                       "key": "type",
                       "value": "{{masterType}}",
-                      "description": "string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
+                      "description": "string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
                     },
                     {
                       "key": "status",
@@ -7526,7 +7824,7 @@
                     }
                   ]
                 },
-                "description": "Change {{masterType}} (gender, maritalStatus, bloodGroup, country, state, city, bankName, relation, …). Types: 4. Master Types.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                "description": "Change {{masterType}} (gender, maritalStatus, language, bloodGroup, bankName, relation, …). Types: 4. Master Types.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
               }
             },
             {
@@ -7768,8 +8066,14 @@
                 "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/holidays/me?page={{page}}&limit={{limit}}",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "holidays", "me"],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "holidays",
+                    "me"
+                  ],
                   "query": [
                     {
                       "key": "year",
@@ -8004,6 +8308,10 @@
     },
     {
       "key": "visaTypeMasterId",
+      "value": ""
+    },
+    {
+      "key": "languageMasterId",
       "value": ""
     },
     {

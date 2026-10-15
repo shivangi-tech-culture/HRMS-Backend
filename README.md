@@ -282,7 +282,7 @@ ESS **General Info** has **9 modules** (no Vaccination). All dropdowns load from
 
 | Module | Dropdown fields → `type` |
 |--------|---------------------------|
-| Personal | `gender`, `maritalStatus`, `country`, `state`, `city` |
+| Personal | `gender`, `maritalStatus`, `language` (`languageKnown`), `country`, `state`, `city` |
 | Official | `company`, `department`, `designation`, `division`, `employeeGroup`, `grade`, `jobRole` |
 | Other | `bloodGroup` |
 | Education | `courseType`, `courseLevel` |
@@ -313,6 +313,7 @@ ESS **General Info** has **9 modules** (no Vaccination). All dropdowns load from
 | `relation` | `relations` |
 | `nominateFor` | `nominatefors` |
 | `visaType` | `visatypes` |
+| `language` | `languages` |
 
 ```http
 GET /api/masters/meta

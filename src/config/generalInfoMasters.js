@@ -49,6 +49,21 @@ const UI_DROPDOWNS = {
   ],
   // Personal / Other — shown as selects in UI; no hardcoded array in FE chunk
   gender: ["Male", "Female", "Other"],
+  language: [
+    { name: "English", code: "EN" },
+    { name: "Hindi", code: "HI" },
+    { name: "Tamil", code: "TA" },
+    { name: "Telugu", code: "TE" },
+    { name: "Kannada", code: "KN" },
+    { name: "Malayalam", code: "ML" },
+    { name: "Marathi", code: "MR" },
+    { name: "Bengali", code: "BN" },
+    { name: "Gujarati", code: "GU" },
+    { name: "Punjabi", code: "PA" },
+    { name: "Urdu", code: "UR" },
+    { name: "Odia", code: "OR" },
+    { name: "Assamese", code: "AS" },
+  ],
   maritalStatus: ["Single", "Married", "Divorced", "Widowed"],
   bloodGroup: ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"],
 };
