@@ -431,7 +431,11 @@ const updateUser = async (req, res) => {
       user.markModified("official");
     }
 
-    if (!isPlatformRole(user.role)) {
+    const placementTouched =
+      req.body.official?.branchId !== undefined ||
+      req.body.official?.shiftId !== undefined ||
+      req.body.official?.companyIds !== undefined;
+    if (!isPlatformRole(user.role) && placementTouched) {
       const placed = await assertUserPlacement({
         companyIds: user.official?.companyIds,
         branchId: user.official?.branchId,
