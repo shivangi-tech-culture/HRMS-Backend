@@ -374,16 +374,22 @@ const validatePunchAgainstShift = (shift, punchAt, punchType, dateStr) => {
   };
 };
 
-/** "14:30" style clock for UI */
+/** "14:30" style clock for UI. A missing or invalid punch time returns "". */
 const formatPunchStamp = (date) => {
   if (!date) return "";
-  const stamp = new Date(date).toLocaleTimeString("en-GB", {
-    timeZone: TZ(),
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
-  return stamp.replace(/^24:/, "00:");
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) return "";
+  try {
+    const stamp = parsed.toLocaleTimeString("en-GB", {
+      timeZone: TZ(),
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+    return stamp.replace(/^24:/, "00:");
+  } catch {
+    return "";
+  }
 };
 
 /** Minutes → "H:MM" */
