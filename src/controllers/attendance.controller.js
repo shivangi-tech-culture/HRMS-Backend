@@ -401,7 +401,6 @@ const getPunchStatus = async (req, res) => {
     const punchedOut = Boolean(record?.punchOut);
     const punchInTime = formatPunchStamp(record?.punchIn);
     const punchOutTime = formatPunchStamp(record?.punchOut);
-    const placed = await getAssignedShift(employee._id, date);
 
     return res.json({
       date,
