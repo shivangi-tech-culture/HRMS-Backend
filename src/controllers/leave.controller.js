@@ -578,7 +578,7 @@ const listTypes = async (req, res) => {
         const rx = new RegExp(escapeRegex(req.query.search), "i");
         data = data.filter((row) => rx.test(row.name) || rx.test(row.code));
       }
-      data.sort((a, b) => a.name.localeCompare(b.name));
+      data.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
       const { page, limit, skip } = pageOf(req.query);
       const slice = data.slice(skip, skip + limit).map(mapType);
       return res.json({
@@ -621,7 +621,7 @@ const listTypes = async (req, res) => {
     const filter = and.length ? { $and: and } : {};
     const [total, rows] = await Promise.all([
       LeaveType.countDocuments(filter),
-      LeaveType.find(filter).sort({ name: 1 }).skip(skip).limit(limit).lean(),
+      LeaveType.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
     ]);
     return res.json({
       count: rows.length,
@@ -714,7 +714,7 @@ const seedDefaultTypes = async (req, res) => {
     const all = await LeaveType.find(
       scopeName === "common" ? { scope: "common" } : { scope: "company", companyId }
     )
-      .sort({ name: 1 })
+      .sort({ createdAt: -1 })
       .lean();
     return res.status(201).json({
       message: created.length ? "Default leave types added" : "Leave types already exist",
@@ -865,7 +865,7 @@ const listBalances = async (req, res) => {
       User.countDocuments(filter),
       User.find(filter)
         .select("name profileUrl official.employeeCode official.department official.dateOfJoining leaves")
-        .sort({ name: 1 })
+        .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
@@ -1669,7 +1669,7 @@ const listPolicies = async (req, res) => {
     if (!req.query.companyId) {
       const filter = { scope: "common", hidden: { $ne: true } };
       if (req.query.search) filter.label = new RegExp(escapeRegex(req.query.search), "i");
-      const rows = await LeavePolicy.find(filter).sort({ createdAt: 1 }).lean();
+      const rows = await LeavePolicy.find(filter).sort({ createdAt: -1 }).lean();
       return res.json({ count: rows.length, total: rows.length, data: rows.map(mapPolicy) });
     }
     const picked = pickCompany(req.user, req.query.companyId);
@@ -1682,7 +1682,7 @@ const listPolicies = async (req, res) => {
       const rx = new RegExp(escapeRegex(req.query.search), "i");
       data = data.filter((row) => rx.test(row.label));
     }
-    data.sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+    data.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
     return res.json({ count: data.length, total: data.length, data: data.map(mapPolicy) });
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -1814,7 +1814,7 @@ const history = async (req, res) => {
     const { page, limit, skip } = pageOf(req.query);
     const [total, rows] = await Promise.all([
       LeaveRequest.countDocuments(filter),
-      LeaveRequest.find(filter).sort({ reviewedAt: -1 }).skip(skip).limit(limit).lean(),
+      LeaveRequest.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
     ]);
     const data = await asRequests(rows);
     return res.json({
@@ -1909,7 +1909,7 @@ const leaveBalanceSnapshot = async (user) => {
       employee: user._id,
       status: { $in: ["Pending", "Approved", "Partial"] },
     })
-      .sort({ from: -1 })
+      .sort({ createdAt: -1 })
       .limit(200)
       .lean(),
   ]);

@@ -71,7 +71,7 @@ const listMasters = async (req, res) => {
     const [total, rows] = await Promise.all([
       Model.countDocuments(filter),
       Model.find(filter)
-        .sort({ name: 1 })
+        .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .lean(),

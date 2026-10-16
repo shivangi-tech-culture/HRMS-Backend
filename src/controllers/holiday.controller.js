@@ -101,7 +101,7 @@ const listHolidays = async (req, res) => {
     const [total, rows] = await Promise.all([
       Holiday.countDocuments(filter),
       Holiday.find(filter)
-        .sort({ date: 1, name: 1 })
+        .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .populate(COMPANY_POPULATE)
@@ -225,7 +225,7 @@ const assignHolidays = async (req, res) => {
     }
 
     const data = await Holiday.find({ _id: { $in: ids } })
-      .sort({ date: 1 })
+      .sort({ createdAt: -1 })
       .populate(COMPANY_POPULATE)
       .lean();
 
@@ -270,7 +270,7 @@ const myHolidays = async (req, res) => {
       Holiday.countDocuments(filter),
       Holiday.find(filter)
         .select("name date description isActive")
-        .sort({ date: 1, name: 1 })
+        .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .lean(),

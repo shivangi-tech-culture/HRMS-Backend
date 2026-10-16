@@ -116,7 +116,7 @@ const listCompanies = async (req, res) => {
         .select(
           "companyName companyCode isActive monthStartDay monthEndDay branches.branchId branches.address branches.city branches.state branches.pincode branches.isActive branches.shifts.shiftId branches.shifts.isActive"
         )
-        .sort({ companyName: 1 })
+        .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .populate(MASTER_POPULATE)

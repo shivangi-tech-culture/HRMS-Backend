@@ -209,7 +209,7 @@ const listRoles = async (req, res) => {
       ? {}
       : { name: { $nin: [SUPER_ADMIN, "Global Admin"] } };
 
-    const roles = await Role.find(filter).sort({ createdAt: 1 });
+    const roles = await Role.find(filter).sort({ createdAt: -1 });
 
     const list = [];
     for (const role of roles) {

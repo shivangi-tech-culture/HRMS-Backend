@@ -361,7 +361,7 @@ const sendList = async (res, filter, query) => {
   const [total, rows, grouped] = await Promise.all([
     AttendanceRegularization.countDocuments(listFilter),
     AttendanceRegularization.find(listFilter)
-      .sort({ date: -1, createdAt: -1 })
+      .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
       .populate("employee", CARD)

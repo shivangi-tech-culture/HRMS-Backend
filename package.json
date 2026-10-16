@@ -10,6 +10,7 @@
     "seed:masters": "node src/scripts/seedMasters.js",
     "seed:language": "node src/scripts/seedLanguages.js",
     "seed:leave": "node src/scripts/seedLeave.js",
+    "seed:holiday": "node src/scripts/seedHolidays.js",
     "backfill:activity": "node src/scripts/backfillActivityCompanies.js"
   },
   "dependencies": {
