@@ -108,7 +108,7 @@ const employeeOnly = (req, res, next) => {
  *               description: { type: string, example: "" }
  *               isActive: { type: boolean, example: true }
  *     responses:
- *       201: { description: Holiday created with companyIds [] }
+ *       201: { description: "Holiday created with companyIds []" }
  *       409: { description: Date already used }
  */
 /**
