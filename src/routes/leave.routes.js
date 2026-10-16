@@ -5,8 +5,10 @@
  *   GET  /me
  *   GET  /me/types
  *   GET  /me/balance
+ *   GET  /me/details
  *   GET  /employees/:employeeId/balance
- *   POST /requests
+ *   GET  /employees/:employeeId/details
+ *   POST /requests          body.dates = selected days. Response has dates, not from/to.
  *   POST /requests/:id/cancel
  *
  * Admin / Super Admin / HR / Reporting Manager
@@ -16,7 +18,7 @@
  *   GET             /balances
  *   POST            /balances/adjust          comp off — adds days to that type's remaining
  *   GET             /requests
- *   POST            /requests/:id/approve   unpaid leave: Reporting Manager, HR, or Super Admin
+ *   POST            /requests/:id/approve   all days, or dates[{date,status}] to approve some and reject some
  *   POST            /requests/:id/reject    unpaid leave: Reporting Manager, HR, or Super Admin
  *   GET             /calendar?month=YYYY-MM&date=YYYY-MM-DD
  *   GET/POST        /policies       shared catalog, companyId not required
@@ -49,7 +51,9 @@ const {
   myLeave,
   myLeaveTypes,
   myLeaveBalance,
+  myLeaveDetails,
   employeeLeaveBalance,
+  employeeLeaveDetails,
 } = require("../controllers/leave.controller");
 const { protect, authorize } = require("../middleware/auth");
 const { checkPermission } = require("../controllers/permission.controller");
@@ -95,12 +99,27 @@ const employeeOnly = (req, res, next) => {
 
 router.get("/me/types", protect, employeeOnly, myLeaveTypes);
 router.get("/me/balance", protect, employeeOnly, myLeaveBalance);
+router.get("/me/details", protect, employeeOnly, myLeaveDetails);
 router.get("/me", protect, employeeOnly, validateQuery(meQuery), myLeave);
 router.get(
   "/employees/:employeeId/balance",
   ...admin,
   leavePerm("Leave Balances", "view"),
   employeeLeaveBalance
+);
+router.get(
+  "/employees/:employeeId/details",
+  protect,
+  (req, res, next) => {
+    if (String(req.user._id) === String(req.params.employeeId)) return next();
+    if (normalizeRoleName(req.user.role) === EMPLOYEE) {
+      return res.status(403).json({ message: "You can view only your own leave" });
+    }
+    return authorize(...ALL_ACCESS)(req, res, () =>
+      leavePerm("Leave Balances", "view")(req, res, next)
+    );
+  },
+  employeeLeaveDetails
 );
 
 router.get("/types", ...admin, leavePerm("Leave Types", "view"), validateQuery(typeListQuery), listTypes);

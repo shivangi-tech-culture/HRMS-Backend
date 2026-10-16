@@ -365,7 +365,7 @@ const locationCard = (location) => {
 /**
  * GET /api/attendance/punch-status?date=YYYY-MM-DD
  * Employee and company come from the login token (req.user), not the query.
- * Read-only: punch in and punch out for that date.
+ * Read-only: punch in and punch out for that date, plus the shift assigned on the profile.
  */
 const getPunchStatus = async (req, res) => {
   try {
@@ -387,6 +387,10 @@ const getPunchStatus = async (req, res) => {
       return res.status(404).json({ message: "Company not found" });
     }
 
+    const placed = await getAssignedShift(employee._id, date);
+    const shift =
+      placed?.shift && !placed.shift.isDefault ? shiftSummary(placed.shift) : null;
+
     const record = await Attendance.findOne({ employee: employee._id, date })
       .select(
         "date companyId branchId shift punchIn punchOut punchInSource punchOutSource punchInLocation punchOutLocation workMode workedMinutes overtimeMinutes lateByMinutes earlyByMinutes status remarks attendanceStatus reviewReason"
@@ -401,6 +405,7 @@ const getPunchStatus = async (req, res) => {
     return res.json({
       date,
       company: { _id: company._id, companyName: company.companyName || "" },
+      shift,
       employee: {
         _id: employee._id,
         name: employee.name || "",

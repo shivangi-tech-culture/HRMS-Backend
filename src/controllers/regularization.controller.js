@@ -42,7 +42,7 @@ const {
 } = require("../utils/shiftTiming");
 const { resolveDisplayedStatus } = require("../utils/attendanceDayStatus");
 const { shiftDbId, formatDurationLabel } = require("../utils/attendanceFormat");
-const { companyMonthOf, monthStartForUser, leaveDayUnpaid } = require("../utils/leaveBalance");
+const { companyMonthOf, monthStartForUser, leaveDayUnpaid, requestDates, isHalfLeave } = require("../utils/leaveBalance");
 const { userCompanyIds } = require("../utils/companyScope");
 const { assertTeamOrCompanyEmployee } = require("../utils/teamScope");
 const { normalizeRoleName, EMPLOYEE } = require("../config/roles");
@@ -240,15 +240,14 @@ const dayTiming = (schedule, date) => {
   return { isOff: false, startTime: clock.startTime || DEFAULT_SHIFT.startTime, endTime: clock.endTime || DEFAULT_SHIFT.endTime };
 };
 
-const leaveUnits = (leave) => (leave?.dayType === "Half Day" ? 0.5 : 1);
+const leaveUnits = (leave) => (isHalfLeave(leave?.dayType) ? 0.5 : 1);
 
 const leavesOnDates = (rows, from, to) => {
   const map = new Map();
   for (const leave of rows) {
-    const start = leave.from > from ? leave.from : from;
-    const end = leave.to < to ? leave.to : to;
-    for (const date of eachDate(start, end)) {
-      if (!map.has(date)) map.set(date, leave);
+    for (const item of requestDates(leave)) {
+      if (item.status !== "Approved" || item.date < from || item.date > to) continue;
+      if (!map.has(item.date)) map.set(item.date, { ...leave, dayType: item.dayType });
     }
   }
   return map;
@@ -418,7 +417,7 @@ const myTimesheet = async (req, res) => {
         .lean(),
       LeaveRequest.find({
         employee: employee._id,
-        status: "Approved",
+        status: { $in: ["Approved", "Partial"] },
         from: { $lte: to },
         to: { $gte: from },
       })
@@ -522,7 +521,7 @@ const myTimesheet = async (req, res) => {
         statusLabel = leave.leaveType?.name || "On Leave";
         dayDesc = "Leave";
         shift = schedule.name;
-      } else if (leave?.dayType === "Half Day" && (statusLabel === "Present" || statusLabel === "Late")) {
+      } else if (isHalfLeave(leave?.dayType) && (statusLabel === "Present" || statusLabel === "Late")) {
         statusLabel = "HalfDay";
       }
 
@@ -551,7 +550,7 @@ const myTimesheet = async (req, res) => {
       else if (status === "WO") salaryDays += 1;
       else if (onLeave) {
         summary.leaves.totalLeaves += units;
-        if (leave?.dayType === "Half Day") summary.leaves.shortLeave += units;
+        if (isHalfLeave(leave?.dayType)) summary.leaves.shortLeave += units;
         if (leaveDayUnpaid(leave, date) || leave?.leaveType?.paid === false || leaveCode === "UL") {
           summary.leaves.unpaidLeave += units;
           summary.payable.deductionDays = Math.round(((summary.payable.deductionDays || 0) + units) * 10) / 10;

@@ -142,13 +142,25 @@ const quarterlyDateError = (from, to, today = todayYmd(), monthStartDay = 1) => 
   return `Casual Leave for ${from} falls in ${asked.code} (${asked.label}), which is not open. Apply only in the current quarter, ${current.code} (${current.label}).`;
 };
 
-/** Split a request into company-quarter day counts. Half day stays on `from`. */
+/** Leave session. First Half and Second Half are 0.5. An old stored "Half Day" is First Half. */
+const normalizeDayType = (dayType) => {
+  if (dayType === "Half Day" || dayType === "First Half") return "First Half";
+  if (dayType === "Second Half") return "Second Half";
+  return "Full Day";
+};
+
+const isHalfLeave = (dayType) => {
+  const type = normalizeDayType(dayType);
+  return type === "First Half" || type === "Second Half";
+};
+
+/** Split a request into company-quarter day counts. A half stays on `from` as 0.5. */
 const slicesFor = (from, to, dayType = "Full Day", monthStartDay = 1) => {
   const one = (ymd) => {
     const period = companyMonthOf(ymd, monthStartDay);
     return { quarter: period.quarter, year: period.year };
   };
-  if (dayType === "Half Day") {
+  if (isHalfLeave(dayType)) {
     const hit = one(from);
     return [{ ...hit, days: 0.5 }];
   }
@@ -275,6 +287,32 @@ const quarterRoom = (line, type, doj, monthStartDay, calendarYear, quarter, cred
     ceiling: round((creditQuarter ? limit : 0) + spare + (creditQuarter ? over : 0)),
     left: round(own + spare),
   };
+};
+
+/** Q1–Q4 used, pending, and remaining for a quarterly type. Remaining is that quarter's own limit. */
+const quarterCards = (line, type, doj, monthStartDay, year) => {
+  if (!isQuarterlyType(type) || !line) return [];
+  const open = companyMonthOf(todayYmd(), monthStartDay);
+  return [1, 2, 3, 4].map((quarter) => {
+    const calendarYear = calendarYearForQuarter(year, quarter);
+    const room = quarterRoom(line, type, doj, monthStartDay, calendarYear, quarter);
+    const startMonth = (quarter - 1) * 3 + 1;
+    const window = quarterWindow(
+      ymdFromParts(calendarYear, startMonth, cycleOf(monthStartDay).monthStartDay),
+      monthStartDay
+    );
+    return {
+      code: `Q${quarter}`,
+      label: window.label,
+      start: window.start,
+      end: window.end,
+      current: open.quarter === quarter && open.year === calendarYear,
+      limit: room.limit,
+      used: room.used,
+      pending: room.pending,
+      remaining: round(Math.max(0, room.limit - room.used - room.pending)),
+    };
+  });
 };
 
 const MONTH_NAMES = [
@@ -485,6 +523,41 @@ const leaveLine = (user, leaveTypeId, year) =>
     (row) => row.year === year && String(row.leaveType) === String(leaveTypeId)
   );
 
+/** Selected days on a request. Older rows expand from–to, so gaps are not implied for new rows. */
+const requestDates = (leave) => {
+  if (Array.isArray(leave?.dates) && leave.dates.length) {
+    return leave.dates.map((row) => {
+      const dayType = normalizeDayType(row.dayType);
+      const days = round(row.days != null ? row.days : isHalfLeave(dayType) ? 0.5 : 1);
+      return {
+        date: String(row.date || "").slice(0, 10),
+        dayType,
+        days,
+        paid: row.paid !== false,
+        adjustment: round(row.adjustment || 0),
+        status: row.status || "Pending",
+      };
+    });
+  }
+  const dayType = normalizeDayType(leave?.dayType);
+  const span = !leave?.from ? [] : isHalfLeave(dayType) ? [leave.from] : eachYmd(leave.from, leave.to);
+  const weight = isHalfLeave(dayType) ? 0.5 : 1;
+  const split = leave?.paidDays != null || leave?.unpaidDays != null;
+  let paidLeft = split ? round(leave.paidDays || 0) : weight * span.length;
+  return span.filter(Boolean).map((date) => {
+    const paid = paidLeft >= weight;
+    if (paid) paidLeft = round(paidLeft - weight);
+    return {
+      date,
+      dayType,
+      days: weight,
+      paid,
+      adjustment: 0,
+      status: leave?.status && leave.status !== "Partial" ? leave.status : "Pending",
+    };
+  });
+};
+
 /** Wallet counters follow real Pending and Approved requests. Drop stale used days. */
 const rebuildQuarterLine = async (user, type, line, monthStartDay = 1) => {
   if (!user || !type || !line || !isQuarterlyType(type)) return line;
@@ -494,11 +567,11 @@ const rebuildQuarterLine = async (user, type, line, monthStartDay = 1) => {
   const rows = await LeaveRequest.find({
     employee: user._id,
     leaveType: type._id,
-    status: { $in: ["Pending", "Approved"] },
+    status: { $in: ["Pending", "Approved", "Partial"] },
     to: { $gte: start },
     from: { $lte: end },
   })
-    .select("from to dayType status days adjustmentDays")
+    .select("from to dayType status days paidDays unpaidDays adjustmentDays dates")
     .lean();
   const quarterUsed = emptyQuarters();
   const quarterPending = emptyQuarters();
@@ -506,24 +579,41 @@ const rebuildQuarterLine = async (user, type, line, monthStartDay = 1) => {
   let pending = 0;
   let adjustedUsed = 0;
   let adjustedPending = 0;
+  const addSlice = (key, regular, total, adjusted, approved) => {
+    if (!QUARTER_KEYS.includes(key)) return;
+    if (approved) {
+      quarterUsed[key] = round(quarterUsed[key] + regular);
+      used = round(used + total);
+      adjustedUsed = round(adjustedUsed + adjusted);
+    } else {
+      quarterPending[key] = round(quarterPending[key] + regular);
+      pending = round(pending + total);
+      adjustedPending = round(adjustedPending + adjusted);
+    }
+  };
   for (const row of rows) {
+    if (Array.isArray(row.dates) && row.dates.length) {
+      for (const item of requestDates(row)) {
+        if (!item.paid || item.status === "Rejected") continue;
+        const period = companyMonthOf(item.date, monthStartDay);
+        const regular = round(Math.max(0, item.days - item.adjustment));
+        addSlice(quarterKey(period.quarter), regular, item.days, item.adjustment, item.status === "Approved");
+      }
+      continue;
+    }
     const tagged = tagSlices(
       slicesFor(row.from, row.to, row.dayType, monthStartDay),
       row.adjustmentDays || 0,
       monthStartDay
     );
     for (const slice of tagged) {
-      const key = quarterKey(slice.quarter);
-      if (!QUARTER_KEYS.includes(key)) continue;
-      if (row.status === "Approved") {
-        quarterUsed[key] = round(quarterUsed[key] + slice.regularDays);
-        used = round(used + slice.days);
-        adjustedUsed = round(adjustedUsed + slice.adjustmentDays);
-      } else {
-        quarterPending[key] = round(quarterPending[key] + slice.regularDays);
-        pending = round(pending + slice.days);
-        adjustedPending = round(adjustedPending + slice.adjustmentDays);
-      }
+      addSlice(
+        quarterKey(slice.quarter),
+        slice.regularDays,
+        slice.days,
+        slice.adjustmentDays,
+        row.status === "Approved"
+      );
     }
   }
   line.quarterUsed = quarterUsed;
@@ -644,6 +734,11 @@ const summarizeBalances = (balances) => {
 /** True when this date of a request is salary-deducted unpaid leave. Paid days come first. */
 const leaveDayUnpaid = (leave, date) => {
   if (!leave || !date) return false;
+  if (Array.isArray(leave.dates) && leave.dates.length) {
+    const row = requestDates(leave).find((item) => item.date === date);
+    if (!row || row.status === "Rejected") return false;
+    return row.paid === false;
+  }
   const hasSplit = leave.paidDays != null || leave.unpaidDays != null;
   if (!hasSplit) {
     const code = String(leave.leaveType?.code || leave.code || "").toUpperCase();
@@ -652,7 +747,7 @@ const leaveDayUnpaid = (leave, date) => {
   const unpaid = round(leave.unpaidDays || 0);
   const paidDays = round(leave.paidDays || 0);
   if (unpaid <= 0) return false;
-  if (leave.dayType === "Half Day") return paidDays <= 0;
+  if (isHalfLeave(leave.dayType)) return paidDays <= 0;
   const dates = eachYmd(leave.from, leave.to);
   const index = dates.indexOf(date);
   if (index < 0) return false;
@@ -769,12 +864,12 @@ const moveLeave = async (employeeId, type, days, direction, slices = [], knownAd
   if (!line) return { error: "Leave balance not found for this type" };
   const doj = user.official?.dateOfJoining;
   let adjustmentDays = round(knownAdjustment || 0);
+  let tagged = slices;
 
   if (isQuarterlyType(type)) {
     await rebuildQuarterLine(user, type, line, monthStartDay);
     ensureQuarters(line);
     const open = quarterWindow(todayYmd(), monthStartDay);
-    let tagged = slices;
     if (direction === "hold") {
       let spareLeft = spareAdjustment(line, type, doj, monthStartDay);
       const planned = [];
@@ -818,6 +913,8 @@ const moveLeave = async (employeeId, type, days, direction, slices = [], knownAd
       tagged = planned;
       const yearLeft = round((Number(type.maxDays) || 0) + (line.adjusted || 0) - line.used - line.pending);
       if (days > yearLeft) return { error: `Only ${yearLeft} ${type.name} remaining this leave year` };
+    } else if (slices.length && slices.every((slice) => slice.regularDays != null)) {
+      tagged = slices;
     } else {
       tagged = tagSlices(slices, adjustmentDays, monthStartDay);
     }
@@ -845,7 +942,11 @@ const moveLeave = async (employeeId, type, days, direction, slices = [], knownAd
   stampLine(line, type, doj, monthStartDay);
   user.markModified("leaves");
   await user.save();
-  return { item: presentItem(line, type, doj, monthStartDay), adjustmentDays: round(adjustmentDays) };
+  return {
+    item: presentItem(line, type, doj, monthStartDay),
+    adjustmentDays: round(adjustmentDays),
+    slices: tagged,
+  };
 };
 
 /**
@@ -971,6 +1072,9 @@ module.exports = {
   presentItem,
   summarizeBalances,
   leaveDayUnpaid,
+  requestDates,
+  normalizeDayType,
+  isHalfLeave,
   eachYmd,
   stampLine,
   findItem,
@@ -980,6 +1084,7 @@ module.exports = {
   rebuildQuarterLine,
   slicesFor,
   quarterWindow,
+  quarterCards,
   quarterlyDateError,
   probationEndYmd,
   probationBlock,
