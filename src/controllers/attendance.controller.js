@@ -1066,7 +1066,7 @@ const listDailyAttendance = async (req, res) => {
         User.countDocuments(empFilter),
         User.find(empFilter)
           .select(EMPLOYEE_DAILY_SELECT)
-          .sort({ name: 1 })
+          .sort({ createdAt: -1 })
           .skip(skip)
           .limit(limit)
           .lean(),
@@ -1176,7 +1176,7 @@ const listDailyAttendance = async (req, res) => {
     // Attendance-field filters: build all rows then paginate
     const employees = await User.find(empFilter)
       .select(EMPLOYEE_DAILY_SELECT)
-      .sort({ name: 1 })
+      .sort({ createdAt: -1 })
       .lean();
     const empIds = employees.map((e) => e._id);
     const attendanceRows = empIds.length
@@ -1268,7 +1268,7 @@ const attendanceCalendar = async (req, res) => {
       User.distinct("_id", empFilter),
       User.find(dayFilter)
         .select(EMPLOYEE_DAILY_SELECT)
-        .sort({ name: 1 })
+        .sort({ createdAt: -1 })
         .lean(),
     ]);
     const employeeCount = empIds.length;
