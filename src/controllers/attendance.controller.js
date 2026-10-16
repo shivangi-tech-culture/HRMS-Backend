@@ -937,6 +937,13 @@ const emptyDailySummary = () => ({
   rejected: 0,
 });
 
+const isDailyPending = (row) => {
+  if (row.status === "Pending" || row.needsRemarkReview || row.canApproveReject) return true;
+  const reviewed =
+    row.attendanceStatus === "Approved" || row.attendanceStatus === "Rejected";
+  return Boolean(row.punchInTime) && row.isLate && !reviewed;
+};
+
 const tallyDailySummary = (summary, row) => {
   summary.all += 1;
   if (row.status === "Present" || row.status === "Late") summary.present += 1;
@@ -996,7 +1003,13 @@ const passesDailyAttFilters = (row, q) => {
   }
   if ((q.hasRemark === "true" || q.hasRemark === "1") && !row.remarks) return false;
   if ((q.hasRemark === "false" || q.hasRemark === "0") && row.remarks) return false;
-  if (q.attendanceStatus && q.attendanceStatus !== "ALL" && row.attendanceStatus !== q.attendanceStatus) {
+  if (q.attendanceStatus === "Late") {
+    if (!isDailyPending(row)) return false;
+  } else if (
+    q.attendanceStatus &&
+    q.attendanceStatus !== "ALL" &&
+    row.attendanceStatus !== q.attendanceStatus
+  ) {
     return false;
   }
   return true;
@@ -1191,19 +1204,27 @@ const listDailyAttendance = async (req, res) => {
     ]);
 
     const lateFixes = [];
-    const rows = [];
+    const scoped = [];
     for (const emp of employees) {
       const att = byEmp.get(oid(emp._id));
       const built = buildDailyRow(emp, att, date, maps, regByEmp.get(oid(emp._id)));
       if (built.late.persist && att) {
         lateFixes.push(lateFixOp(att, built.late));
       }
-      if (passesDailyAttFilters(built.row, req.query)) rows.push(built.row);
+      if (
+        req.query.workMode &&
+        req.query.workMode !== "ALL" &&
+        built.row.workMode !== req.query.workMode
+      ) {
+        continue;
+      }
+      scoped.push(built.row);
     }
     queueLateFixes(lateFixes);
 
     const summary = emptyDailySummary();
-    for (const row of rows) tallyDailySummary(summary, row);
+    for (const row of scoped) tallyDailySummary(summary, row);
+    const rows = scoped.filter((row) => passesDailyAttFilters(row, { ...req.query, workMode: "ALL" }));
     const total = rows.length;
 
     return res.json({
