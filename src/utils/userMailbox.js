@@ -66,10 +66,7 @@ function serversFor(email) {
   };
 }
 
-async function loadMailboxCreds(userId) {
-  const row = await User.findById(userId).select(
-    "name official.officialEmail official.emailAppPassword official.emailAppPasswordSet",
-  );
+function credsFromRow(row) {
   const email = String(row?.official?.officialEmail || "").trim().toLowerCase();
   const password = cleanAppPassword(openAppPassword(row?.official?.emailAppPassword));
   if (!row || !email || !password) return null;
@@ -80,6 +77,29 @@ async function loadMailboxCreds(userId) {
     password,
     ...serversFor(email),
   };
+}
+
+async function loadMailboxCreds(userId) {
+  const row = await User.findById(userId).select(
+    "name official.officialEmail official.emailAppPassword official.emailAppPasswordSet",
+  );
+  return credsFromRow(row);
+}
+
+/** Same lookup by official email, so the local SMTP bridge can send as that employee. */
+async function loadMailboxCredsByEmail(email, Model = User) {
+  const normalized = String(email || "").trim().toLowerCase();
+  if (!normalized) return null;
+  const row = await Model.findOne({ "official.officialEmail": normalized }).select(
+    "name official.officialEmail official.emailAppPassword official.emailAppPasswordSet",
+  );
+  try {
+    return credsFromRow(row);
+  } catch {
+    const err = new Error("This computer cannot read the saved app password. Save it again in General Info.");
+    err.status = 400;
+    throw err;
+  }
 }
 
 async function sendAsUser(creds, { to, subject, text, attachments, messageId }) {
@@ -143,6 +163,7 @@ async function purgeImportedMail() {
 module.exports = {
   sealAppPassword,
   loadMailboxCreds,
+  loadMailboxCredsByEmail,
   sendAsUser,
   openImap,
   checkMailboxLogin,

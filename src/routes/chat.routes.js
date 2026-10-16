@@ -147,7 +147,7 @@ router.post("/conversations", openDirectChat);
  *       200: { description: "{ data: Message[] }" }
  *   post:
  *     tags: [Chat]
- *     summary: Send a message — JSON { text } or multipart text + files (max 5 × 10 MB)
+ *     summary: Send a message — JSON { text } or multipart text + files (max 5; zip 250 MB, other files 10 MB)
  *     security:
  *       - bearerAuth: []
  *     parameters:

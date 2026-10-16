@@ -160,34 +160,46 @@ app.get("/", (req, res) => {
 });
 
 /**
- * Local machine only. Render cannot open Gmail SMTP, so outside mail
- * is handed to this computer when the app password is in the local env.
+ * This computer only. Render cannot open Gmail SMTP, so when the app is
+ * opened on localhost the browser asks here to send as that employee.
  */
 if (NODE_ENV !== "production") {
-  const { sendAsUser } = require("./utils/userMailbox");
+  const mongoose = require("mongoose");
+  const User = require("./models/User");
+  const { loadMailboxCredsByEmail, sendAsUser } = require("./utils/userMailbox");
+  let lookupUsers;
+
+  function mailUsers() {
+    const uri = String(process.env.MAIL_LOOKUP_URI || "").trim();
+    if (!uri) return Promise.resolve(User);
+    if (!lookupUsers) {
+      const conn = mongoose.createConnection(uri);
+      lookupUsers = conn.asPromise().then(() => conn.model("User", User.schema));
+    }
+    return lookupUsers;
+  }
+
   app.post("/api/mail/local-send", async (req, res) => {
     const ip = String(req.socket?.remoteAddress || "");
     if (ip !== "::1" && !ip.endsWith("127.0.0.1")) {
       return res.status(403).json({ message: "Local send only" });
     }
-    const fromEmail = String(process.env.LOCAL_MAIL_FROM || "").trim().toLowerCase();
-    const password = String(process.env.LOCAL_MAIL_APP_PASSWORD || "").replace(/\s+/g, "");
-    if (!fromEmail || !password) {
-      return res.status(503).json({ message: "Local mailbox is not configured" });
-    }
-    const claimed = String(req.body?.fromEmail || "").trim().toLowerCase();
-    if (claimed !== fromEmail) {
-      return res.status(403).json({ message: "This computer can only send as its configured mailbox" });
-    }
+    const fromEmail = String(req.body?.fromEmail || "").trim().toLowerCase();
     const to = String(req.body?.to || "").trim();
-    if (!to) return res.status(400).json({ message: "To is required" });
+    if (!fromEmail || !to) return res.status(400).json({ message: "From and to are required" });
     try {
+      const creds = await loadMailboxCredsByEmail(fromEmail, await mailUsers());
+      if (!creds) {
+        return res.status(400).json({
+          message: "Save your email app password in General Info before sending mail",
+        });
+      }
       const info = await sendAsUser(
         {
-          name: String(req.body?.fromName || fromEmail),
-          email: fromEmail,
-          password,
-          smtp: "smtp.gmail.com",
+          name: String(req.body?.fromName || creds.name),
+          email: creds.email,
+          password: creds.password,
+          smtp: creds.smtp,
         },
         {
           to,
@@ -197,7 +209,8 @@ if (NODE_ENV !== "production") {
       );
       return res.json({ ok: true, messageId: info.messageId || "" });
     } catch (err) {
-      return res.status(502).json({ message: err.message || "Gmail send failed" });
+      const status = Number(err.status) || 502;
+      return res.status(status).json({ message: err.message || "Gmail send failed" });
     }
   });
 }
@@ -223,6 +236,7 @@ app.use("/api/holidays", holidayRoutes); // catalog + company assignment
 
 /** One HTTP server for the API and Socket.IO (chat) */
 const server = http.createServer(app);
+server.requestTimeout = 15 * 60 * 1000;
 const io = new Server(server, { cors: { origin: "*" } });
 app.set("io", io);
 attachChatSocket(io);

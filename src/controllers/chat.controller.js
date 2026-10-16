@@ -20,7 +20,7 @@ const {
   peopleCards,
   teamDirectory,
 } = require("../utils/chatAccess");
-const { readChatFile, removeChatFiles, storeChatFiles } = require("../utils/chatFiles");
+const { readChatFile, removeChatFiles, signedChatFileUrl, storeChatFiles } = require("../utils/chatFiles");
 const {
   broadcastMessage,
   broadcastReceipts,
@@ -583,6 +583,12 @@ const muteChat = wrap(async (req, res) => {
 /** GET /api/chat/attachments/:attachmentId — file bytes (images / PDF inline) */
 const downloadAttachment = wrap(async (req, res) => {
   const attachment = await findAttachment(req.chatUser, req.params.attachmentId);
+  if (attachment.mimeType === "application/zip") {
+    return res.json({
+      url: signedChatFileUrl(attachment.storageKey),
+      name: attachment.name,
+    });
+  }
   const bytes = await readChatFile(attachment.storageKey);
   const inline =
     attachment.mimeType.startsWith("image/") || attachment.mimeType === "application/pdf";
