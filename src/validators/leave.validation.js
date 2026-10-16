@@ -72,17 +72,34 @@ const defaultsBody = Joi.object({
   companyId: objectId.optional(),
 });
 
+const applyDate = Joi.alternatives().try(
+  ymd,
+  Joi.object({
+    date: ymd.required(),
+    dayType: Joi.string().valid("Full Day", "First Half", "Second Half").optional(),
+  })
+);
+
 const applyBody = Joi.object({
   leaveTypeId: objectId.optional(),
-  from: ymd.required(),
-  to: ymd.required(),
-  dayType: Joi.string().valid("Full Day", "Half Day").default("Full Day"),
+  dates: Joi.array().items(applyDate).min(1).max(62).required(),
+  dayType: Joi.string().valid("Full Day", "First Half", "Second Half").default("Full Day"),
   reason: Joi.string().trim().min(1).max(1000).required(),
   document: Joi.string().trim().allow("").max(500).optional(),
 });
 
 const reviewBody = Joi.object({
   reason: Joi.string().trim().allow("").max(500).optional(),
+  dates: Joi.array()
+    .items(
+      Joi.object({
+        date: ymd.required(),
+        status: Joi.string().valid("Approved", "Rejected").required(),
+      })
+    )
+    .min(1)
+    .max(62)
+    .optional(),
 });
 
 const adjustBody = Joi.object({

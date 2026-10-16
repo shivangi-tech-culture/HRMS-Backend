@@ -4990,7 +4990,7 @@
                     "employees"
                   ]
                 },
-                "description": "POST /api/employees. Saves {{employeeId}}.\nRequired: name, password, official.officialEmail, official.employeeCode, official.companyIds (exactly one), personal.dateOfBirth. Everything else optional.\nCompany / branch / shift / manager ids are auto-filled from GET /api/companies when empty.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `name` — string | required/optional | display / full name (min 2)\n- `password` — string | required (min 6) | plain password; blank on update = keep\n- `role` — string | required on create | `Admin` | `HR Manager` | `Reporting Manager` | `Employee` | custom role name\n- `status` — string | optional | `Active` or `Inactive`\n- `personal.dateOfBirth` — string/date (YYYY-MM-DD) | optional\n- `personal.aadhaarNo` — string | optional | 12 digits\n- `personal.panNo` — string | optional | PAN e.g. `ABCDE1234F`\n- `personal.gender` — string | optional | Gender master name\n- `personal.fatherOrHusbandName` — string | optional\n- `personal.maritalStatus` — string | optional | Marital Status master name\n- `personal.spouseName` — string | optional\n- `personal.personalEmail` — string (email) | optional\n- `personal.languageKnown` — string | optional\n- `personal.emergencyContact1` — string | optional\n- `personal.emergencyContact2` — string | optional\n- `personal.drivingLicenseNo` — string | optional\n- `personal.licenseValidUpto` — date|null | optional\n- `personal.passportNo` — string | optional\n- `personal.remarks` — string | optional\n- `personal.mobileNo` — string | optional | 10-digit mobile digits only\n- `personal.workPhone` — string | optional | office phone\n- `personal.workExt` — string | optional | extension\n- `personal.presentAddress.address` — string | optional\n- `personal.presentAddress.country` — string | optional | free text\n- `personal.presentAddress.state` — string | optional | free text\n- `personal.presentAddress.city` — string | optional | free text\n- `personal.presentAddress.pincode` — string | optional\n- `personal.permanentAddress.address` — string | optional\n- `personal.permanentAddress.country` — string | optional\n- `personal.permanentAddress.state` — string | optional\n- `personal.permanentAddress.city` — string | optional\n- `personal.permanentAddress.pincode` — string | optional\n- `official.officialEmail` — string (email) | required on create | work login email\n- `official.employeeCode` — string | optional | uppercase code e.g. `EMP-1024`\n- `official.companyIds` — string[] (MongoId) | required | array of Company `_id`s ({{companyOrgId}}). Employee and Reporting Manager: exactly one id. HR: one or more. Only Super Admin may send more than one\n- `official.branchId` — string (MongoId) | optional | Branch `_id` from GET /api/companies/{id} → branches[].branchId._id. Create / Get / Update response returns `{ _id, name, code, address, city, state }`\n- `official.shiftId` — string (MongoId) | optional | Shift `_id` from GET /api/companies/{id} → branches[].shifts[].shiftId._id. Needs branchId. Create / Get / Update response returns `{ _id, name, code, monthlySchedule }` — week 1–5 day timings of this shift on the user's company branch\n- `official.department` — string | often required | department master name\n- `official.designation` — string | optional | designation master name\n- `official.division` — string | see sample value | send same JSON type as example (string/number/boolean/array/object/null)\n- `official.employeeGroup` — string | see sample value | send same JSON type as example (string/number/boolean/array/object/null)\n- `official.jobRole` — string | optional | job role master name\n- `official.grade` — string | optional | grade master name\n- `official.reportingHead1` — string (MongoId) | optional | Reporting Manager `_id` from GET /api/companies/{id} → reportingManagers[] (\"\" or null clears). Bulk: POST /api/employees/assign-manager\n- `official.reportingHead2` — string (MongoId) | optional | 2nd Reporting Manager `_id` (same list); cannot equal reportingHead1\n- `official.dateOfJoining` — string/date (YYYY-MM-DD) | optional | joining date\n- `official.calculateSalaryFrom` — string/date (YYYY-MM-DD) | optional\n- `official.dateOfRetirement` — string/date|null | optional\n- `other.bloodGroup` — string | optional | Blood Group master\n- `other.passportExpiry` — string/date | optional\n- `education` — array<object> | optional | education rows (courseType, courseLevel, …)\n- `accounts` — array<object> | optional | bank account rows\n- `family` — array<object> | optional | family rows\n- `nominees` — array<object> | optional | nominee rows\n- `experience` — array<object> | optional | experience rows\n- `visas` — array<object> | optional | visa rows\n- `payroll.salaryGroup` — string | optional\n- `payroll.salaryDate` — string | optional\n- `payroll.appraisalDuration` — string | optional\n- `payroll.basic` — number/string | optional | basic salary\n- `payroll.annualCtc` — number/string | optional\n- `payroll.grossSalary` — number | optional\n- `payroll.totalEarning` — number | optional\n- `payroll.totalDeduction` — number | optional\n- `payroll.appraisalDate` — date|null | optional\n- `payroll.paymentMode` — string | optional\n- `payroll.ot1Rate` — number | optional\n- `payroll.ot2Rate` — number | optional\n- `payroll.remarks` — string | optional\n- `payroll.uanNo` — string | optional\n- `payroll.pfApply` — boolean | optional\n- `payroll.pfEmployerShare` — boolean | optional\n- `payroll.pfNo` — string | optional\n- `payroll.pfType` — string | optional\n- `payroll.pf` — string/number | optional\n- `payroll.pfApplyFrom` — date|null | optional\n- `payroll.pfApplyTo` — date|null | optional\n- `payroll.esiApply` — boolean | optional\n- `payroll.esiNo` — string | optional\n- `payroll.esiEmployerShare` — boolean | optional\n- `payroll.esiApplyFrom` — date|null | optional\n- `payroll.esiApplyTo` — date|null | optional\n- `payroll.ptApply` — boolean | optional\n- `payroll.tdsApply` — boolean | optional\n- `payroll.taxRegime` — string | optional | e.g. `New` / `Old`\n- `payroll.bankName` — string | optional\n- `payroll.bankAccount` — string | optional\n- `payroll.ifsc` — string | optional | IFSC\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                "description": "POST /api/employees. Saves {{employeeId}}.\nWho: Super Admin, Admin, HR Manager, Reporting Manager. These roles can create the full profile and are not denied.\nSections: bank, visa, education, family, nominees, experience, and payroll are optional. Send one object or an array. If any field is filled, that row is saved. Empty dates and a missing file do not reject create.\nRequired: name, password, official.officialEmail, official.employeeCode, official.companyIds (exactly one), personal.dateOfBirth. Everything else optional.\nCompany / branch / shift / manager ids are auto-filled from GET /api/companies when empty.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `name` — string | required/optional | display / full name (min 2)\n- `password` — string | required (min 6) | plain password; blank on update = keep\n- `role` — string | required on create | `Admin` | `HR Manager` | `Reporting Manager` | `Employee` | custom role name\n- `status` — string | optional | `Active` or `Inactive`\n- `personal.dateOfBirth` — string/date (YYYY-MM-DD) | optional\n- `personal.aadhaarNo` — string | optional | 12 digits\n- `personal.panNo` — string | optional | PAN e.g. `ABCDE1234F`\n- `personal.gender` — string | optional | Gender master name\n- `personal.fatherOrHusbandName` — string | optional\n- `personal.maritalStatus` — string | optional | Marital Status master name\n- `personal.spouseName` — string | optional\n- `personal.personalEmail` — string (email) | optional\n- `personal.languageKnown` — string | optional\n- `personal.emergencyContact1` — string | optional\n- `personal.emergencyContact2` — string | optional\n- `personal.drivingLicenseNo` — string | optional\n- `personal.licenseValidUpto` — date|null | optional\n- `personal.passportNo` — string | optional\n- `personal.remarks` — string | optional\n- `personal.mobileNo` — string | optional | 10-digit mobile digits only\n- `personal.workPhone` — string | optional | office phone\n- `personal.workExt` — string | optional | extension\n- `personal.presentAddress.address` — string | optional\n- `personal.presentAddress.country` — string | optional | free text\n- `personal.presentAddress.state` — string | optional | free text\n- `personal.presentAddress.city` — string | optional | free text\n- `personal.presentAddress.pincode` — string | optional\n- `personal.permanentAddress.address` — string | optional\n- `personal.permanentAddress.country` — string | optional\n- `personal.permanentAddress.state` — string | optional\n- `personal.permanentAddress.city` — string | optional\n- `personal.permanentAddress.pincode` — string | optional\n- `official.officialEmail` — string (email) | required on create | work login email\n- `official.employeeCode` — string | optional | uppercase code e.g. `EMP-1024`\n- `official.companyIds` — string[] (MongoId) | required | array of Company `_id`s ({{companyOrgId}}). Employee and Reporting Manager: exactly one id. HR: one or more. Only Super Admin may send more than one\n- `official.branchId` — string (MongoId) | optional | Branch `_id` from GET /api/companies/{id} → branches[].branchId._id. Create / Get / Update response returns `{ _id, name, code, address, city, state }`\n- `official.shiftId` — string (MongoId) | optional | Shift `_id` from GET /api/companies/{id} → branches[].shifts[].shiftId._id. Needs branchId. Create / Get / Update response returns `{ _id, name, code, monthlySchedule }` — week 1–5 day timings of this shift on the user's company branch\n- `official.department` — string | often required | department master name\n- `official.designation` — string | optional | designation master name\n- `official.division` — string | see sample value | send same JSON type as example (string/number/boolean/array/object/null)\n- `official.employeeGroup` — string | see sample value | send same JSON type as example (string/number/boolean/array/object/null)\n- `official.jobRole` — string | optional | job role master name\n- `official.grade` — string | optional | grade master name\n- `official.reportingHead1` — string (MongoId) | optional | Reporting Manager `_id` from GET /api/companies/{id} → reportingManagers[] (\"\" or null clears). Bulk: POST /api/employees/assign-manager\n- `official.reportingHead2` — string (MongoId) | optional | 2nd Reporting Manager `_id` (same list); cannot equal reportingHead1\n- `official.dateOfJoining` — string/date (YYYY-MM-DD) | optional | joining date\n- `official.calculateSalaryFrom` — string/date (YYYY-MM-DD) | optional\n- `official.dateOfRetirement` — string/date|null | optional\n- `other.bloodGroup` — string | optional | Blood Group master\n- `other.passportExpiry` — string/date | optional\n- `education` — array<object> | optional | education rows (courseType, courseLevel, …)\n- `accounts` — array<object> | optional | bank account rows\n- `family` — array<object> | optional | family rows\n- `nominees` — array<object> | optional | nominee rows\n- `experience` — array<object> | optional | experience rows\n- `visas` — array<object> | optional | visa rows\n- `payroll.salaryGroup` — string | optional\n- `payroll.salaryDate` — string | optional\n- `payroll.appraisalDuration` — string | optional\n- `payroll.basic` — number/string | optional | basic salary\n- `payroll.annualCtc` — number/string | optional\n- `payroll.grossSalary` — number | optional\n- `payroll.totalEarning` — number | optional\n- `payroll.totalDeduction` — number | optional\n- `payroll.appraisalDate` — date|null | optional\n- `payroll.paymentMode` — string | optional\n- `payroll.ot1Rate` — number | optional\n- `payroll.ot2Rate` — number | optional\n- `payroll.remarks` — string | optional\n- `payroll.uanNo` — string | optional\n- `payroll.pfApply` — boolean | optional\n- `payroll.pfEmployerShare` — boolean | optional\n- `payroll.pfNo` — string | optional\n- `payroll.pfType` — string | optional\n- `payroll.pf` — string/number | optional\n- `payroll.pfApplyFrom` — date|null | optional\n- `payroll.pfApplyTo` — date|null | optional\n- `payroll.esiApply` — boolean | optional\n- `payroll.esiNo` — string | optional\n- `payroll.esiEmployerShare` — boolean | optional\n- `payroll.esiApplyFrom` — date|null | optional\n- `payroll.esiApplyTo` — date|null | optional\n- `payroll.ptApply` — boolean | optional\n- `payroll.tdsApply` — boolean | optional\n- `payroll.taxRegime` — string | optional | e.g. `New` / `Old`\n- `payroll.bankName` — string | optional\n- `payroll.bankAccount` — string | optional\n- `payroll.ifsc` — string | optional | IFSC\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"name\": \"New Employee\",\n  \"password\": \"{{password}}\",\n  \"role\": \"Employee\",\n  \"status\": \"Active\",\n  \"personal\": {\n    \"dateOfBirth\": \"1995-06-15\",\n    \"aadhaarNo\": \"{{rndAadhaar}}\",\n    \"panNo\": \"{{rndPan}}\",\n    \"gender\": \"Female\",\n    \"fatherOrHusbandName\": \"Ramesh Iyer\",\n    \"maritalStatus\": \"Single\",\n    \"spouseName\": \"\",\n    \"personalEmail\": \"personal{{rndNo}}@test.com\",\n    \"languageKnown\": \"Hindi, English\",\n    \"emergencyContact1\": \"Neha - 9876543210\",\n    \"emergencyContact2\": \"\",\n    \"drivingLicenseNo\": \"DL{{rndNo}}\",\n    \"licenseValidUpto\": \"2030-12-31\",\n    \"passportNo\": \"P{{rndNo}}\",\n    \"remarks\": \"\",\n    \"mobileNo\": \"{{rndMobile}}\",\n    \"workPhone\": \"0120-4000000\",\n    \"workExt\": \"204\",\n    \"presentAddress\": { \"address\": \"Sector 62\", \"country\": \"India\", \"state\": \"Uttar Pradesh\", \"city\": \"Noida\", \"pincode\": \"201301\" },\n    \"permanentAddress\": { \"address\": \"Sector 62\", \"country\": \"India\", \"state\": \"Uttar Pradesh\", \"city\": \"Noida\", \"pincode\": \"201301\" }\n  },\n  \"official\": {\n    \"officialEmail\": \"emp{{rndNo}}@test.com\",\n    \"employeeCode\": \"EMP{{rndNo}}\",\n    \"companyIds\": [\"{{companyId}}\"],\n    \"branchId\": \"{{branchId}}\",\n    \"shiftId\": \"{{shiftId}}\",\n    \"department\": \"Finance\",\n    \"designation\": \"Finance Executive\",\n    \"division\": \"\",\n    \"employeeGroup\": \"\",\n    \"jobRole\": \"Executive\",\n    \"grade\": \"G4\",\n    \"reportingHead1\": \"{{managerId}}\",\n    \"reportingHead2\": \"\",\n    \"dateOfJoining\": \"2024-01-15\",\n    \"calculateSalaryFrom\": \"2024-01-15\",\n    \"dateOfRetirement\": null\n  },\n  \"other\": { \"bloodGroup\": \"B+\", \"passportExpiry\": \"2030-12-31\" },\n  \"education\": [\n    {\n      \"courseType\": \"Full Time\",\n      \"courseLevel\": \"Graduation\",\n      \"courseName\": \"B.Tech\",\n      \"instituteName\": \"ABC College\",\n      \"location\": \"Noida\",\n      \"fromYear\": \"2016\",\n      \"passingYear\": \"2020\",\n      \"major\": \"Computer Science\",\n      \"minor\": \"\",\n      \"percentageOrGrade\": \"8.2 CGPA\",\n      \"document\": \"\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"accounts\": [\n    {\n      \"bankName\": \"HDFC Bank\",\n      \"accountNo\": \"501{{rndNo}}789\",\n      \"accountHolderName\": \"Shivi Gupta\",\n      \"ifscCode\": \"HDFC0001234\",\n      \"location\": \"Noida\",\n      \"remarks\": \"\",\n      \"attachment\": \"\",\n      \"active\": true,\n      \"salaryAccount\": true\n    }\n  ],\n  \"family\": [\n    {\n      \"name\": \"Ramesh Iyer\",\n      \"relation\": \"Father\",\n      \"dob\": \"1965-03-10\",\n      \"occupation\": \"Business\",\n      \"education\": \"Graduate\",\n      \"aadhaarNo\": \"\",\n      \"mobileNo\": \"\",\n      \"mediclaim\": false\n    }\n  ],\n  \"nominees\": [\n    {\n      \"nominateFor\": \"PF\",\n      \"nomineeName\": \"Neha Iyer\",\n      \"relation\": \"Sister\",\n      \"dob\": \"1998-08-20\",\n      \"amountPercent\": 100,\n      \"address\": \"Sector 62, Noida\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"experience\": [\n    {\n      \"organization\": \"Previous Corp\",\n      \"designation\": \"Analyst\",\n      \"location\": \"Noida\",\n      \"fromDate\": \"2020-07-01\",\n      \"toDate\": \"2023-12-31\",\n      \"lastSalaryDrawn\": \"45000\",\n      \"description\": \"\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"visas\": [\n    {\n      \"countryName\": \"USA\",\n      \"visaType\": \"B1/B2\",\n      \"visaNumber\": \"V{{rndNo}}\",\n      \"fromDate\": \"2025-01-01\",\n      \"toDate\": \"2025-12-31\",\n      \"remarks\": \"\"\n    }\n  ],\n  \"payroll\": {\n    \"salaryGroup\": \"\",\n    \"salaryDate\": \"\",\n    \"appraisalDuration\": \"\",\n    \"basic\": 40000,\n    \"annualCtc\": 600000,\n    \"grossSalary\": 50000,\n    \"totalEarning\": 50000,\n    \"totalDeduction\": 0,\n    \"appraisalDate\": null,\n    \"paymentMode\": \"Bank\",\n    \"ot1Rate\": 0,\n    \"ot2Rate\": 0,\n    \"remarks\": \"\",\n    \"uanNo\": \"\",\n    \"pfApply\": false,\n    \"pfEmployerShare\": false,\n    \"pfNo\": \"\",\n    \"pfType\": \"\",\n    \"pf\": \"\",\n    \"pfApplyFrom\": null,\n    \"pfApplyTo\": null,\n    \"esiApply\": false,\n    \"esiNo\": \"\",\n    \"esiEmployerShare\": false,\n    \"esiApplyFrom\": null,\n    \"esiApplyTo\": null,\n    \"ptApply\": false,\n    \"tdsApply\": false,\n    \"taxRegime\": \"New\",\n    \"bankName\": \"HDFC Bank\",\n    \"bankAccount\": \"501{{rndNo}}789\",\n    \"ifsc\": \"HDFC0001234\"\n  }\n}",
@@ -6047,7 +6047,7 @@
         },
         {
           "name": "1.8 Leave",
-          "description": "Leave types, balances, requests, calendar, policies, history.\nAdmin does not apply leave. The employee applies in folder 2.4 Leave.\nThis folder lists requests and approves or rejects them.\nscope common = every company (Super Admin / Admin, no companyId). scope company = one company.\nLeave year is April–March. Casual Leave follows the company month (default 1 to 30 or 31).\nApprove / reject: Reporting Manager (own team), HR (assigned companies), Admin, Super Admin.",
+          "description": "Leave types, balances, requests, calendar, policies, history.\nAdmin does not apply leave. The employee applies in folder 2.4 Leave with a `dates` array. Only those days are leave.\nApprove can accept some of those days and reject the rest. Status becomes Partial when the days are mixed. Rejected days return to the balance.\nReviewer: Reporting Manager (own team), HR (assigned companies), Admin, Super Admin.\nscope common = every company (Super Admin / Admin, no companyId). scope company = one company.\nLeave year is April–March. Casual Leave follows the company month (default 1 to 30 or 31).",
           "item": [
             {
               "name": "1. Leave Types",
@@ -6344,6 +6344,27 @@
                   }
                 },
                 {
+                  "name": "1b. Employee Leave Details",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/leave/employees/{{employeeId}}/details",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "leave",
+                        "employees",
+                        "{{employeeId}}",
+                        "details"
+                      ]
+                    },
+                    "description": "Same short payload as GET /api/leave/me/details, for one employee.\nLogin as Admin, HR, or Reporting Manager. An employee can call it only with their own id.\n`types[].inDropdown` is false when that type has no days left.\n"
+                  }
+                },
+                {
                   "name": "2. Adjust Balance (Comp Off)",
                   "request": {
                     "method": "POST",
@@ -6381,7 +6402,7 @@
             },
             {
               "name": "3. Leave Requests",
-              "description": "Admin does not apply leave. Login as Employee and use 2.4 Leave → Apply Leave.\nHere, login as Admin, HR, or Reporting Manager: list, approve, or reject.\ncompanies in the list response is the company filter. Pass companyId to see one company.",
+              "description": "Admin does not apply leave. Login as Employee and use 2.4 Leave → Apply Leave (`dates` array).\nHere, login as Admin, HR, or Reporting Manager: list, approve, or reject.\nApprove body `dates` decides each day: Approved or Rejected. Omit it to approve every pending day.\ncompanies in the list response is the company filter. Pass companyId to see one company.",
               "item": [
                 {
                   "name": "1. List Requests",
@@ -6402,7 +6423,7 @@
                         {
                           "key": "status",
                           "value": "Pending",
-                          "description": "string | optional | Pending, Approved, Rejected, Cancelled, or All",
+                          "description": "string | optional | Pending, Approved, Rejected, Partial, Cancelled, or All",
                           "disabled": true
                         },
                         {
@@ -6455,7 +6476,7 @@
                         }
                       ]
                     },
-                    "description": "Admin queue. Does not create a leave. summary has all, pending, approved, rejected, onLeaveToday. Saves {{leaveRequestId}} for Approve or Reject.\ncompanies is the filter list. Pass companyId to see one company.\nEach request includes company name, code, and month start/end day.\nManager sees their team. HR sees assigned companies."
+                    "description": "Admin queue. Does not create a leave. summary has all, pending, approved, rejected, partial, cancelled, onLeaveToday.\nEach row has `dates` only: date, dayType, days, paid, status (Pending, Approved, or Rejected). There is no from–to range.\napprovedDays, rejectedDays, and pendingDays are the day totals. Status Partial means some days were approved and some rejected.\nSaves {{leaveRequestId}} for Approve or Reject.\ncompanies is the filter list. Pass companyId to see one company.\nEach request includes company name, code, and month start/end day.\nManager sees their team. HR sees assigned companies."
                   },
                   "event": [
                     {
@@ -6494,10 +6515,10 @@
                         "approve"
                       ]
                     },
-                    "description": "Admin, HR, or Reporting Manager. Approves the employee's pending leave. You cannot approve your own leave.",
+                    "description": "Reporting Manager, HR, or Super Admin. You cannot approve your own leave.\n\n---\n### Body\n- `reason` — string | optional\n- `dates` — array | optional | one row per pending day: `{ date: YYYY-MM-DD, status: Approved | Rejected }`\n\nOmit `dates` to approve every pending day.\nWhen `dates` is sent, every pending day on the request must be included.\nApproved days stay on the balance. Rejected days are released.\nRequest status is Approved, Rejected, or Partial when the days are mixed.\n`dates[].status` on the response is the decision for that day.",
                     "body": {
                       "mode": "raw",
-                      "raw": "{\n  \"reason\": \"Approved\"\n}",
+                      "raw": "{\n  \"reason\": \"Approved\",\n  \"dates\": [\n    { \"date\": \"2026-10-01\", \"status\": \"Approved\" },\n    { \"date\": \"2026-10-09\", \"status\": \"Rejected\" },\n    { \"date\": \"2026-10-14\", \"status\": \"Approved\" }\n  ]\n}",
                       "options": {
                         "raw": {
                           "language": "json"
@@ -6529,7 +6550,7 @@
                         "reject"
                       ]
                     },
-                    "description": "Admin, HR, or Reporting Manager. Rejects the employee's pending leave.",
+                    "description": "Reporting Manager, HR, or Super Admin. Rejects every pending day. The held days go back to the balance.\nTo approve some days and reject others, use 2. Approve and send `dates` with a status for each day.",
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"reason\": \"Not approved\"\n}",
@@ -6559,7 +6580,7 @@
                         "cancel"
                       ]
                     },
-                    "description": "Only a pending request. Releases the held days."
+                    "description": "Only while every selected day is still Pending. Releases those days back to the balance. A Partial request cannot be cancelled here."
                   }
                 }
               ]
@@ -6604,7 +6625,7 @@
                     }
                   ]
                 },
-                "description": "Month counts plus the employees on the selected date (pending and approved)."
+                "description": "Month counts plus the employees on the selected date.\nA day counts only when it is in that request's `dates` array. Gaps between from and to are not leave. A rejected day is left out. Partial requests count on the days that were approved."
               }
             },
             {
@@ -6778,7 +6799,7 @@
                     {
                       "key": "status",
                       "value": "Approved",
-                      "description": "string | optional | Approved or Rejected. Omit for both",
+                      "description": "string | optional | Approved, Rejected, or Partial. Omit for closed requests",
                       "disabled": true
                     },
                     {
@@ -6819,7 +6840,7 @@
                     }
                   ]
                 },
-                "description": "Approved and rejected requests. approvedBy and closedOn are the reviewer and review time."
+                "description": "Closed requests, including Partial (some days approved, some rejected).\nEach row has `dates` with that day's status. approvedBy and closedOn are the reviewer and review time."
               }
             }
           ]
@@ -7407,7 +7428,7 @@
         },
         {
           "name": "2.2 Attendance (Punch)",
-          "description": "Employee self punch and regularization. Login as Employee first (2.1 → 1).\nPunch in with no punch out stays MissedPunch.\nAfter punch-out, status follows the shift: Absent, HalfDay, Present, or Late.\n6 = missed punch. 6b = Late day (reason only, no new punch times).\nApprove and reject are not here. Login as Reporting Manager, HR, or Super Admin and use 1.7 → 4. Attendance Regularization.",
+          "description": "Employee self punch and regularization. Login as Employee first (2.1 → 1).\nPunch in with no punch out stays MissedPunch.\nAfter punch-out, status follows the shift: Absent, HalfDay, Present, or Late.\n4b = punch status for one date (employee and company from the login token).\n6 = missed punch. 6b = Late day (reason only, no new punch times).\nApprove and reject are not here. Login as Reporting Manager, HR, or Super Admin and use 1.7 → 4. Attendance Regularization.",
           "item": [
             {
               "name": "1. Punch In",
@@ -7571,6 +7592,32 @@
                   ]
                 },
                 "description": "Own IN/OUT punch rows.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `from` — string (YYYY-MM-DD) | optional | range start date\n- `to` — string (YYYY-MM-DD) | optional | range end date\n- `date` — string (YYYY-MM-DD) | optional/required by API | single day\n- `status` — string | optional | `ALL` | `Pending` | `Present` | `Absent` | `HalfDay` | `WeeklyOff` | `Holiday` | `MissedPunch` | `OnLeave` | `WFH`\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+              }
+            },
+            {
+              "name": "4b. Punch Status",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/attendance/punch-status?date={{attendanceDate}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "attendance",
+                    "punch-status"
+                  ],
+                  "query": [
+                    {
+                      "key": "date",
+                      "value": "{{attendanceDate}}",
+                      "description": "string (YYYY-MM-DD) | required | day to check. Employee and company come from the login token."
+                    }
+                  ]
+                },
+                "description": "Punch in and punch out for the logged-in employee on one date.\nEmployee and company are taken from the Bearer token, not from the query.\n`shift` is the shift assigned on the employee profile for that date (`_id`, `code`, `name`, `startTime`, `endTime`, `halfDayEndTime`, `graceMinutes`). It is `null` when no shift is assigned.\nFuture dates return 400.\n\nReturns `punchedIn`, `punchedOut`, `punchInTime`, `punchOutTime`, punch cards (`time`, `at`, `source`, `location`), `status`, `attendanceStatus`, `workMode`, `workingHours`, `overtime`, `lateByMinutes`, `earlyByMinutes`, `remarks`, `attendanceId`, plus `company`, `shift`, and `employee`.\nNo row for that date is treated as Absent.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `date` — string (YYYY-MM-DD) | required | single day\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
               }
             },
             {
@@ -7850,7 +7897,7 @@
         },
         {
           "name": "2.4 Leave",
-          "description": "Employee self-service leave. Login as Employee first (2.1 → 1).\nOnly the employee applies leave. Admin does not.\nGET /me/types is the leave type dropdown (saves {{leaveTypeId}}).\nUpload Leave Document uses POST /api/employees/upload with type `leave` (saves {{leaveDocumentUrl}} into hrms/leave).\nGET /me is this employee's leave history.\nApprove and reject are in 1.8 Leave → 3. Leave Requests, after you log in as Admin.",
+          "description": "Employee self-service leave. Login as Employee first (2.1 → 1).\nOnly the employee applies leave. Admin does not.\nApply sends `dates`: the days selected on the calendar. Only those days are leave.\nGET /me/details is used, pending, remaining, and whether each type stays in the dropdown.\nGET /me/types is the leave type dropdown (saves {{leaveTypeId}}).\nUpload Leave Document uses POST /api/employees/upload with type `leave` (saves {{leaveDocumentUrl}} into hrms/leave).\nGET /me is totals, balances, and history. Each history row has `dates`.\nApprove and reject are in 1.8 Leave → 3. Leave Requests. The reviewer can approve some dates and reject others.",
           "item": [
             {
               "name": "1. Leave Types",
@@ -7887,6 +7934,26 @@
               ]
             },
             {
+              "name": "1b. My Leave Details",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/leave/me/details",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "leave",
+                    "me",
+                    "details"
+                  ]
+                },
+                "description": "Logged-in employee's paid leave for the dropdown.\n`types` — name, code, carryForward, used, pending, remaining, inDropdown.\nCasual Leave also has quarter, quarterUsed, quarterPending, quarterRemaining for the open quarter.\ninDropdown is false when remaining is 0, so that type stays out of the dropdown.\nshowLeaveTypeDropdown is false when every paid type is finished.\nUnpaid Leave is not in this response.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}` *(Employee login)*\n"
+              }
+            },
+            {
               "name": "2. My Leave",
               "request": {
                 "method": "GET",
@@ -7905,7 +7972,7 @@
                     {
                       "key": "status",
                       "value": "All",
-                      "description": "All | Pending | Approved | Rejected | Cancelled"
+                      "description": "All | Pending | Approved | Rejected | Partial | Cancelled"
                     },
                     {
                       "key": "search",
@@ -7935,7 +8002,7 @@
                     }
                   ]
                 },
-                "description": "Employee leave dashboard. history is this page. summary is all, pending, approved, rejected, cancelled. search matches reason, type, or date. page and limit paginate."
+                "description": "Employee leave dashboard for the current leave year.\nbalances — each type: total, available, used, pending, remaining. Casual Leave also has the open quarter.\ntotals — Casual + Earned: total, used, pending, remaining. Comp Off and unpaid stay separate.\nhistory — this page. Each row is the leave type plus `dates` (date, dayType, days, paid, status) and approvedDays, rejectedDays, pendingDays.\nsearch matches reason, type, or date. page and limit paginate."
               }
             },
             {
@@ -8007,10 +8074,10 @@
                     "requests"
                   ]
                 },
-                "description": "Applies for the logged-in employee only. Admin cannot call this.\nDo not send employeeId.\nfrom / to = YYYY-MM-DD inside the current leave year. Half Day = one date, 0.5 day.\nCasual Leave uses that employee's company month. Probation blocks dates inside the 3 company months.\n`document` is the Cloudinary url from Upload Leave Document (`type` = `leave`). Empty string if there is no file.\nSaves {{leaveRequestId}}. Approve it from 1.8 Leave → 3. Leave Requests.",
+                "description": "Applies for the logged-in employee only. Admin cannot call this.\nDo not send employeeId.\n\n---\n### Body\n- `leaveTypeId` — string (MongoId) | the type from GET /me/types. Omitted only when every paid type is finished; the request then becomes Unpaid Leave.\n- `dates` — array | required | selected days only, YYYY-MM-DD. Example: `[\"2026-10-01\", \"2026-10-09\"]` with `dayType` `First Half` is 1 day total (0.5 each).\n- `dayType` — `Full Day` deducts 1. `First Half` or `Second Half` deducts 0.5 on Casual Leave, Earned Leave, and Comp Off. The other half of that date can be applied later. There is no `Half Day` value.\n- A date can set its own half: `{ \"date\": \"2026-10-01\", \"dayType\": \"First Half\" }`.\n- `reason` — string | required\n- `document` — string | Cloudinary url from Upload Leave Document, or `\"\"`\n\nDo not send `from` or `to`. The response has `dates` only, so a gap between days is not read as a range.\nCasual Leave uses that employee's company month. Probation blocks dates inside the 3 company months.\nResponse `data.dates` lists each day as Pending. Saves {{leaveRequestId}}.\nApprove from 1.8 Leave → 3. Leave Requests. The reviewer can approve some of these dates and reject the rest.",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"leaveTypeId\": \"{{leaveTypeId}}\",\n  \"from\": \"2026-10-20\",\n  \"to\": \"2026-10-20\",\n  \"dayType\": \"Full Day\",\n  \"reason\": \"Personal work\",\n  \"document\": \"{{leaveDocumentUrl}}\"\n}",
+                  "raw": "{\n  \"leaveTypeId\": \"{{leaveTypeId}}\",\n  \"dates\": [\"2026-10-01\", \"2026-10-09\", \"2026-10-14\"],\n  \"dayType\": \"Full Day\",\n  \"reason\": \"Personal work\",\n  \"document\": \"{{leaveDocumentUrl}}\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -8050,7 +8117,7 @@
                     "cancel"
                   ]
                 },
-                "description": "Cancels your own pending request and releases the held days."
+                "description": "Cancels your own request while every selected day is still Pending, and releases those days."
               }
             }
           ]

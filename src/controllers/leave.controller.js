@@ -16,12 +16,14 @@ const {
   companyOf,
   monthStartForUser,
   monthStartForCompany,
+  companyMonthOf,
   presentItem,
   summarizeBalances,
   stampLine,
   leaveLine,
   moveLeave,
   slicesFor,
+  quarterCards,
   rebuildQuarterLine,
   quarterlyDateError,
   probationBlock,
@@ -37,6 +39,9 @@ const {
   syncTypeOnBalances,
   typesForCompany,
   eachYmd,
+  requestDates,
+  normalizeDayType,
+  isHalfLeave,
 } = require("../utils/leaveBalance");
 const {
   hasGlobalCompanyAccess,
@@ -50,7 +55,9 @@ const { DEFAULT_TYPES } = require("../utils/seedLeave");
 const leaveStatus = (value) => {
   const raw = String(value || "").trim().toLowerCase();
   if (!raw || raw === "all") return "";
-  const match = ["Pending", "Approved", "Rejected", "Cancelled"].find((status) => status.toLowerCase() === raw);
+  const match = ["Pending", "Approved", "Rejected", "Partial", "Cancelled"].find(
+    (status) => status.toLowerCase() === raw
+  );
   return match || "";
 };
 
@@ -133,6 +140,7 @@ const mapRequest = (row, refs) => {
   const paidDays = split ? round(row.paidDays || 0) : paid ? row.days : 0;
   const unpaidDays = split ? round(row.unpaidDays || 0) : paid ? 0 : row.days;
   const deduction = row.deduction != null ? round(row.deduction) : unpaidDays;
+  const dates = requestDates(row);
   return {
     _id: row._id,
     employee: {
@@ -148,15 +156,23 @@ const mapRequest = (row, refs) => {
     leaveTypeId: row.leaveType,
     code: type.code || "",
     paid,
-    from: row.from,
-    to: row.to,
     days: row.days,
-    dayType: row.dayType,
+    ...(dates.length && dates.every((item) => item.dayType === dates[0].dayType) ? { dayType: dates[0].dayType } : {}),
     reason: row.reason,
     document: row.document || "",
     paidDays,
     unpaidDays,
     deduction,
+    dates: dates.map((item) => ({
+      date: item.date,
+      dayType: item.dayType,
+      days: item.days,
+      paid: item.paid,
+      status: item.status,
+    })),
+    approvedDays: round(dates.filter((item) => item.status === "Approved").reduce((sum, item) => sum + item.days, 0)),
+    rejectedDays: round(dates.filter((item) => item.status === "Rejected").reduce((sum, item) => sum + item.days, 0)),
+    pendingDays: round(dates.filter((item) => item.status === "Pending").reduce((sum, item) => sum + item.days, 0)),
     status: row.status,
     applyBy: String(row.appliedBy || row.employee) === String(row.employee) ? "Self" : "Admin",
     reviewedBy: reviewer?.name || "",
@@ -232,19 +248,11 @@ const employeeLeavePage = async (employeeId, query = {}) => {
   }
   const { page, limit, skip } = pageOf(query);
   const listFilter = status ? { ...filter, status } : filter;
-  const [total, rows, grouped] = await Promise.all([
+  const [total, rows] = await Promise.all([
     LeaveRequest.countDocuments(listFilter),
     LeaveRequest.find(listFilter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-    LeaveRequest.aggregate([{ $match: filter }, { $group: { _id: "$status", n: { $sum: 1 } } }]),
   ]);
-  const summary = { all: 0, pending: 0, approved: 0, rejected: 0, cancelled: 0 };
-  for (const row of grouped) {
-    const key = String(row._id || "").toLowerCase();
-    if (summary[key] !== undefined) summary[key] = row.n;
-    summary.all += row.n;
-  }
   return {
-    summary,
     history: await asRequests(rows),
     count: rows.length,
     total,
@@ -290,8 +298,113 @@ const unpaidTypeFor = async (companyId) => {
   return typesForCompany(rows, companyId).find((row) => isUnpaidType(row)) || null;
 };
 
+const plainDate = (row) => ({
+  date: String(row.date || "").slice(0, 10),
+  dayType: normalizeDayType(row.dayType),
+  days: round(row.days != null ? row.days : isHalfLeave(row.dayType) ? 0.5 : 1),
+  paid: row.paid !== false,
+  adjustment: round(row.adjustment || 0),
+  status: row.status || "Pending",
+});
+
+/** Quarter slices for the selected days, keeping each date's adjustment on that quarter. */
+const slicesFromDates = (rows, monthStartDay) => {
+  const totals = new Map();
+  for (const row of rows) {
+    const period = companyMonthOf(row.date, monthStartDay);
+    const key = `${period.year}-${period.quarter}`;
+    const prev = totals.get(key) || {
+      quarter: period.quarter,
+      year: period.year,
+      days: 0,
+      adjustmentDays: 0,
+    };
+    prev.days = round(prev.days + row.days);
+    prev.adjustmentDays = round(prev.adjustmentDays + (row.adjustment || 0));
+    totals.set(key, prev);
+  }
+  return [...totals.values()].map((slice) => ({
+    ...slice,
+    regularDays: round(Math.max(0, slice.days - slice.adjustmentDays)),
+  }));
+};
+
+/** Write the adjustment hold back onto the paid dates that consumed it. */
+const stampAdjustment = (rows, planned, monthStartDay) => {
+  const left = new Map();
+  for (const slice of planned || []) {
+    const key = `${slice.year}-${slice.quarter}`;
+    left.set(key, round((left.get(key) || 0) + (slice.adjustmentDays || 0)));
+  }
+  for (const row of rows) {
+    if (!row.paid) {
+      row.adjustment = 0;
+      continue;
+    }
+    const period = companyMonthOf(row.date, monthStartDay);
+    const key = `${period.year}-${period.quarter}`;
+    const spare = left.get(key) || 0;
+    const take = round(Math.min(row.days, spare));
+    row.adjustment = take;
+    left.set(key, round(spare - take));
+  }
+};
+
+/** Quarterly wallet is rebuilt from saved date statuses. Other types move by the day count. */
+const syncQuarterWallet = async (employeeId, type) => {
+  if (!type || !isQuarterlyType(type)) return { ok: true };
+  const user = await User.findById(employeeId).select("leaves official.dateOfJoining official.companyIds");
+  if (!user) return { error: "Leave balance not found for this type" };
+  const monthStartDay = await monthStartForUser(user);
+  const year = leaveYear(todayYmd(), monthStartDay);
+  const line = leaveLine(user, type._id, year);
+  if (!line) return { error: "Leave balance not found for this type" };
+  await rebuildQuarterLine(user, type, line, monthStartDay);
+  stampLine(line, type, user.official?.dateOfJoining, monthStartDay);
+  user.markModified("leaves");
+  await user.save();
+  return { ok: true };
+};
+
+/** Hold, approve, or release one set of selected days. */
+const settleDateRows = async (request, rows, direction, monthStartDay) => {
+  if (!rows.length) return { ok: true };
+  const type = await LeaveType.findById(request.leaveType).lean();
+  if (!type) return { error: "Leave type not found" };
+  const paidRows = isUnpaidType(type) ? [] : rows.filter((row) => row.paid !== false);
+  const unpaidRows = isUnpaidType(type) ? rows : rows.filter((row) => row.paid === false);
+  if (paidRows.length) {
+    const days = round(paidRows.reduce((sum, row) => sum + row.days, 0));
+    const moved = await holdDays(
+      request.employee,
+      type,
+      days,
+      direction,
+      slicesFromDates(paidRows, monthStartDay),
+      round(paidRows.reduce((sum, row) => sum + (row.adjustment || 0), 0))
+    );
+    if (moved.error) return moved;
+  }
+  if (unpaidRows.length) {
+    let unpaidType = isUnpaidType(type) ? type : null;
+    if (!unpaidType && request.unpaidLeaveType) {
+      unpaidType = await LeaveType.findById(request.unpaidLeaveType).lean();
+    }
+    if (!unpaidType) unpaidType = await unpaidTypeFor(request.companyId);
+    if (!unpaidType) return { error: "Unpaid leave type not found" };
+    const days = round(unpaidRows.reduce((sum, row) => sum + row.days, 0));
+    const moved = await holdDays(request.employee, unpaidType, days, direction, []);
+    if (moved.error) return moved;
+  }
+  return { ok: true, type };
+};
+
 /** Hold, approve, or release the paid part and the automatic unpaid part. */
 const settleRequestDays = async (request, direction, monthStartDay) => {
+  if (request.dates?.length) {
+    const pending = request.dates.filter((row) => !row.status || row.status === "Pending").map(plainDate);
+    return settleDateRows(request, pending, direction, monthStartDay);
+  }
   const type = await LeaveType.findById(request.leaveType).lean();
   if (!type) return { error: "Leave type not found" };
   const slices = slicesFor(request.from, request.to, request.dayType, monthStartDay);
@@ -324,14 +437,21 @@ const settleRequestDays = async (request, direction, monthStartDay) => {
 /** Unpaid dates are the days after the paid balance is used. */
 const unpaidDatesOf = (from, to, dayType, paidDays, unpaidDays) => {
   if (round(unpaidDays) <= 0) return [];
-  if (dayType === "Half Day") return [from];
+  if (isHalfLeave(dayType)) return [from];
   return eachYmd(from, to).slice(Math.floor(round(paidDays)));
+};
+
+const unpaidDateList = (request) => {
+  if (request.dates?.length) {
+    return request.dates.filter((row) => row.paid === false && row.status !== "Rejected").map((row) => row.date);
+  }
+  return unpaidDatesOf(request.from, request.to, request.dayType, request.paidDays, request.unpaidDays);
 };
 
 const saveUnpaidOnUser = async (request, year) => {
   const days = round(request.unpaidDays || 0);
   if (days <= 0) return;
-  const dates = unpaidDatesOf(request.from, request.to, request.dayType, request.paidDays, days);
+  const dates = unpaidDateList(request);
   await User.updateOne(
     { _id: request.employee },
     {
@@ -353,11 +473,34 @@ const saveUnpaidOnUser = async (request, year) => {
 };
 
 const syncUnpaidOnUser = async (request) => {
-  const days = round(request.unpaidDays || 0);
-  if (days <= 0) return;
+  const dates = unpaidDateList(request);
+  if (!dates.length) {
+    if (round(request.unpaidDays || 0) > 0 || request.dates?.some((row) => row.paid === false)) {
+      await dropUnpaidOnUser(request);
+    }
+    return;
+  }
+  const kept = request.dates?.length
+    ? request.dates.filter((row) => row.paid === false && row.status !== "Rejected")
+    : null;
+  const days = kept
+    ? round(kept.reduce((sum, row) => sum + (row.days || (isHalfLeave(row.dayType) ? 0.5 : 1)), 0))
+    : round(request.unpaidDays || dates.length);
+  const approved = kept ? kept.every((row) => row.status === "Approved") : request.status === "Approved";
+  const pending = kept ? kept.some((row) => !row.status || row.status === "Pending") : request.status === "Pending";
+  const status = approved ? "Approved" : pending ? "Pending" : request.status === "Cancelled" ? "Cancelled" : "Rejected";
   await User.updateOne(
     { _id: request.employee, "unpaidLeaves.request": request._id },
-    { $set: { "unpaidLeaves.$.status": request.status } }
+    {
+      $set: {
+        "unpaidLeaves.$.status": status,
+        "unpaidLeaves.$.dates": dates,
+        "unpaidLeaves.$.from": dates[0] || request.from,
+        "unpaidLeaves.$.to": dates[dates.length - 1] || request.to,
+        "unpaidLeaves.$.days": days,
+        "unpaidLeaves.$.deduction": days,
+      },
+    }
   );
 };
 
@@ -916,21 +1059,26 @@ const listRequests = async (req, res) => {
     const { page, limit, skip } = pageOf(req.query);
     const statusFilter = leaveStatus(req.query.status);
     const listFilter = statusFilter ? { ...filter, status: statusFilter } : filter;
-    const [total, rows, grouped, onLeaveToday] = await Promise.all([
+    const [total, rows, grouped, onLeaveRows] = await Promise.all([
       LeaveRequest.countDocuments(listFilter),
       LeaveRequest.find(listFilter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
       LeaveRequest.aggregate([
         { $match: filter },
         { $group: { _id: "$status", n: { $sum: 1 } } },
       ]),
-      LeaveRequest.countDocuments({
+      LeaveRequest.find({
         ...filter,
-        status: "Approved",
+        status: { $in: ["Approved", "Partial"] },
         from: { $lte: today },
         to: { $gte: today },
-      }),
+      })
+        .select("from to dayType dates status paidDays unpaidDays")
+        .lean(),
     ]);
-    const summary = { all: 0, pending: 0, approved: 0, rejected: 0, cancelled: 0, onLeaveToday };
+    const onLeaveToday = onLeaveRows.filter((row) =>
+      requestDates(row).some((item) => item.date === today && item.status === "Approved")
+    ).length;
+    const summary = { all: 0, pending: 0, approved: 0, rejected: 0, partial: 0, cancelled: 0, onLeaveToday };
     for (const row of grouped) {
       const key = String(row._id || "").toLowerCase();
       if (summary[key] !== undefined) summary[key] = row.n;
@@ -950,32 +1098,121 @@ const listRequests = async (req, res) => {
   }
 };
 
+/** Selected dates only. `from` and `to` stay on the row for lookup and are not returned. */
+const normalizeApplyDates = (body) => {
+  const fallbackType = ["First Half", "Second Half"].includes(body.dayType) ? body.dayType : "Full Day";
+  if (!Array.isArray(body.dates) || !body.dates.length) return { error: "Select at least one date" };
+  const rows = [];
+  const seen = new Set();
+  for (const item of body.dates) {
+    const date = typeof item === "string" ? item : item?.date;
+    const dayType = item && typeof item === "object" && item.dayType ? item.dayType : fallbackType;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || ""))) return { error: "Each date must be YYYY-MM-DD" };
+    if (!["Full Day", "First Half", "Second Half"].includes(dayType)) {
+      return { error: "dayType must be Full Day, First Half, or Second Half" };
+    }
+    const key = `${date}|${dayType}`;
+    if (seen.has(key)) return { error: `Duplicate date ${date}` };
+    const other = rows.find((row) => row.date === date);
+    if (other) {
+      const halves = new Set([other.dayType, dayType]);
+      if (!(halves.has("First Half") && halves.has("Second Half"))) {
+        return { error: `${date} is already in this leave` };
+      }
+    }
+    seen.add(key);
+    rows.push({
+      date,
+      dayType,
+      days: isHalfLeave(dayType) ? 0.5 : 1,
+      paid: true,
+      adjustment: 0,
+      status: "Pending",
+    });
+  }
+  rows.sort((a, b) => a.date.localeCompare(b.date) || a.dayType.localeCompare(b.dayType));
+  const dayType = rows.every((row) => row.dayType === rows[0].dayType) ? rows[0].dayType : rows[0].dayType;
+  return {
+    dates: rows,
+    from: rows[0].date,
+    to: rows[rows.length - 1].date,
+    dayType,
+    days: round(rows.reduce((sum, row) => sum + row.days, 0)),
+  };
+};
+
+const halvesClash = (existing, incoming) => {
+  if (!existing || existing.status === "Rejected" || existing.date !== incoming.date) return false;
+  const left = normalizeDayType(existing.dayType);
+  const right = normalizeDayType(incoming.dayType);
+  if (left === "Full Day" || right === "Full Day") return true;
+  return left === right;
+};
+
+const findDateClash = async (employeeId, incoming) => {
+  if (!incoming.length) return "";
+  const dates = [...incoming].sort((a, b) => a.date.localeCompare(b.date));
+  const rows = await LeaveRequest.find({
+    employee: employeeId,
+    status: { $in: ["Pending", "Approved", "Partial"] },
+    from: { $lte: dates[dates.length - 1].date },
+    to: { $gte: dates[0].date },
+  })
+    .select("from to dayType dates status paidDays unpaidDays")
+    .lean();
+  for (const row of rows) {
+    for (const item of requestDates(row)) {
+      const ask = dates.find((entry) => halvesClash(item, entry));
+      if (!ask) continue;
+      if (ask.dayType === "Full Day" || item.dayType === "Full Day") {
+        return `Leave already applied for ${ask.date}`;
+      }
+      return `${ask.dayType} already applied for ${ask.date}`;
+    }
+  }
+  return "";
+};
+
+const markPaidDates = (dates, paidDays) => {
+  let left = round(paidDays);
+  for (const row of dates) {
+    if (left >= row.days) {
+      row.paid = true;
+      left = round(left - row.days);
+    } else {
+      row.paid = false;
+      row.adjustment = 0;
+    }
+  }
+};
+
+const statusFromDates = (dates) => {
+  const pending = dates.some((row) => !row.status || row.status === "Pending");
+  const approved = dates.some((row) => row.status === "Approved");
+  const rejected = dates.some((row) => row.status === "Rejected");
+  if (pending) return "Pending";
+  if (approved && rejected) return "Partial";
+  if (approved) return "Approved";
+  return "Rejected";
+};
+
 const applyLeave = async (req, res) => {
   try {
     if (!isEmployee(req.user)) {
       return res.status(403).json({ message: "Only an employee can apply leave" });
     }
     const employee = req.user;
-    const { from, to, dayType } = req.body;
-    if (to < from) return res.status(400).json({ message: "To date is before from date" });
-    const span = daysBetween(from, to);
-    if (dayType === "Half Day" && span !== 1) {
-      return res.status(400).json({ message: "Half day must be a single date" });
-    }
-    const days = dayType === "Half Day" ? 0.5 : span;
+    const picked = normalizeApplyDates(req.body);
+    if (picked.error) return res.status(400).json({ message: picked.error });
+    const { from, to, dayType, days, dates } = picked;
     const companyId = companyOf(employee);
     if (!companyId) return res.status(400).json({ message: "Your profile has no company" });
     await releaseExpiredQuarterly(employee._id);
     const monthStartDay = await monthStartForUser(employee);
     const blockedProbation = probationBlock(employee.official?.dateOfJoining, from, monthStartDay);
     if (blockedProbation) return res.status(400).json({ message: blockedProbation });
-    const overlap = await LeaveRequest.exists({
-      employee: employee._id,
-      status: { $in: ["Pending", "Approved"] },
-      from: { $lte: to },
-      to: { $gte: from },
-    });
-    if (overlap) return res.status(400).json({ message: "Leave already applied for these dates" });
+    const clash = await findDateClash(employee._id, dates);
+    if (clash) return res.status(400).json({ message: `Leave already applied for ${clash}` });
 
     const year = leaveYear(from, monthStartDay);
     if (year !== leaveYear(to, monthStartDay) || year !== leaveYear(todayYmd(), monthStartDay)) {
@@ -1027,6 +1264,7 @@ const applyLeave = async (req, res) => {
         return res.status(400).json({ message: "Select a leave type. Unpaid leave is used when paid leave is finished" });
       }
       if (!unpaidType) return res.status(400).json({ message: "Unpaid leave is not configured" });
+      markPaidDates(dates, 0);
       const heldUnpaid = await holdDays(employee._id, unpaidType, days, "hold", []);
       if (heldUnpaid.error) return res.status(400).json({ message: heldUnpaid.error });
       const request = await LeaveRequest.create({
@@ -1036,6 +1274,7 @@ const applyLeave = async (req, res) => {
         unpaidLeaveType: unpaidType._id,
         from,
         to,
+        dates,
         days,
         paidDays: 0,
         unpaidDays: days,
@@ -1061,13 +1300,25 @@ const applyLeave = async (req, res) => {
         message: `${type.name} is finished. Paid leave is still available on another type`,
       });
     }
-    const paidDays = round(Math.min(days, remaining));
+    let paidBudget = round(Math.min(days, remaining));
+    const paidRows = [];
+    for (const row of dates) {
+      if (paidBudget >= row.days) {
+        paidRows.push(row);
+        paidBudget = round(paidBudget - row.days);
+      }
+    }
+    const paidDays = round(paidRows.reduce((sum, row) => sum + row.days, 0));
     const unpaidDays = round(days - paidDays);
-    const slices = slicesFor(from, to, dayType, monthStartDay);
-    const paidSlices = takeSlices(slices, paidDays);
+    markPaidDates(dates, paidDays);
+    const paidSlices = slicesFromDates(dates.filter((row) => row.paid), monthStartDay);
     if (paidDays > 0 && isQuarterlyType(type)) {
-      const collapsed = casualDatesError(employee.official?.dateOfJoining, from, to, monthStartDay);
-      if (collapsed) return res.status(400).json({ message: collapsed });
+      for (const row of dates.filter((item) => item.paid)) {
+        const closed = quarterlyDateError(row.date, row.date, todayYmd(), monthStartDay);
+        if (closed) return res.status(400).json({ message: closed });
+        const collapsed = casualDatesError(employee.official?.dateOfJoining, row.date, row.date, monthStartDay);
+        if (collapsed) return res.status(400).json({ message: collapsed });
+      }
     }
     if (unpaidDays > 0 && !unpaidType) {
       return res.status(400).json({ message: "Unpaid leave is not configured" });
@@ -1077,12 +1328,20 @@ const applyLeave = async (req, res) => {
     if (paidDays > 0) {
       heldPaid = await holdDays(employee._id, type, paidDays, "hold", paidSlices);
       if (heldPaid.error) return res.status(400).json({ message: heldPaid.error });
+      stampAdjustment(dates.filter((row) => row.paid), heldPaid.slices, monthStartDay);
     }
     if (unpaidDays > 0) {
       const heldUnpaid = await holdDays(employee._id, unpaidType, unpaidDays, "hold", []);
       if (heldUnpaid.error) {
         if (paidDays > 0) {
-          await holdDays(employee._id, type, paidDays, "release", paidSlices, heldPaid?.adjustmentDays || 0);
+          await holdDays(
+            employee._id,
+            type,
+            paidDays,
+            "release",
+            slicesFromDates(dates.filter((row) => row.paid), monthStartDay),
+            heldPaid?.adjustmentDays || 0
+          );
         }
         return res.status(400).json({ message: heldUnpaid.error });
       }
@@ -1095,6 +1354,7 @@ const applyLeave = async (req, res) => {
       unpaidLeaveType: unpaidDays > 0 ? unpaidType._id : null,
       from,
       to,
+      dates,
       days,
       paidDays,
       unpaidDays,
@@ -1148,31 +1408,121 @@ const decide = async (req, res, nextStatus) => {
       }
     }
     const monthStartDay = await monthStartForCompany(request.companyId);
-    const paidPart = request.paidDays != null || request.unpaidDays != null ? round(request.paidDays || 0) : request.days;
-    const openQuarterMiss = quarterlyDateError(request.from, request.to, todayYmd(), monthStartDay);
-    const coveredByAdjust = round(request.adjustmentDays || 0) >= round(paidPart);
-    if (nextStatus === "Approved" && paidPart > 0 && isQuarterlyType(type) && openQuarterMiss && !coveredByAdjust) {
-      await settleRequestDays(request, "release", monthStartDay);
-      await dropUnpaidOnUser(request);
-      await request.deleteOne();
-      return res.status(400).json({ message: openQuarterMiss });
+    if (!request.dates?.length) {
+      const paidPart = request.paidDays != null || request.unpaidDays != null ? round(request.paidDays || 0) : request.days;
+      const openQuarterMiss = quarterlyDateError(request.from, request.to, todayYmd(), monthStartDay);
+      const coveredByAdjust = round(request.adjustmentDays || 0) >= round(paidPart);
+      if (nextStatus === "Approved" && paidPart > 0 && isQuarterlyType(type) && openQuarterMiss && !coveredByAdjust) {
+        await settleRequestDays(request, "release", monthStartDay);
+        await dropUnpaidOnUser(request);
+        await request.deleteOne();
+        return res.status(400).json({ message: openQuarterMiss });
+      }
+      const direction = nextStatus === "Approved" ? "approve" : "release";
+      const moved = await settleRequestDays(request, direction, monthStartDay);
+      if (moved.error) return res.status(400).json({ message: moved.error });
+      request.status = nextStatus;
+      request.reviewedBy = req.user._id;
+      request.reviewedAt = new Date();
+      request.reviewReason = (req.body.reason || "").trim();
+      await request.save();
+      await syncUnpaidOnUser(request);
+      const [data, history] = await Promise.all([asRequests(request), employeeHistory(request.employee)]);
+      return res.json({
+        message: nextStatus === "Approved" ? "Leave approved" : "Leave rejected",
+        data: data[0],
+        history,
+      });
     }
-    const direction = nextStatus === "Approved" ? "approve" : "release";
-    const moved = await settleRequestDays(request, direction, monthStartDay);
-    if (moved.error) return res.status(400).json({ message: moved.error });
 
-    request.status = nextStatus;
-    request.reviewedBy = req.user._id;
-    request.reviewedAt = new Date();
-    request.reviewReason = (req.body.reason || "").trim();
-    await request.save();
+    const pending = request.dates.filter((row) => !row.status || row.status === "Pending");
+    if (!pending.length) return res.status(400).json({ message: "Leave request is already closed" });
+    const decisions = new Map();
+    if (!req.body.dates?.length) {
+      for (const row of pending) decisions.set(row.date, nextStatus);
+    } else {
+      for (const item of req.body.dates) {
+        const date = String(item.date || "").slice(0, 10);
+        if (decisions.has(date)) return res.status(400).json({ message: `Duplicate date ${date}` });
+        if (item.status !== "Approved" && item.status !== "Rejected") {
+          return res.status(400).json({ message: "Each date needs status Approved or Rejected" });
+        }
+        decisions.set(date, item.status);
+      }
+      const pendingSet = new Set(pending.map((row) => row.date));
+      for (const date of decisions.keys()) {
+        if (!pendingSet.has(date)) {
+          return res.status(400).json({ message: `${date} is not a pending day on this leave` });
+        }
+      }
+      for (const row of pending) {
+        if (!decisions.has(row.date)) {
+          return res.status(400).json({ message: `Decide ${row.date} as Approved or Rejected` });
+        }
+      }
+    }
+    const approved = pending.filter((row) => decisions.get(row.date) === "Approved").map(plainDate);
+    const rejected = pending.filter((row) => decisions.get(row.date) === "Rejected").map(plainDate);
+    if (isQuarterlyType(type)) {
+      for (const row of approved) {
+        if (row.paid === false) continue;
+        const covered = round(row.adjustment) >= round(row.days);
+        const miss = quarterlyDateError(row.date, row.date, todayYmd(), monthStartDay);
+        if (miss && !covered) return res.status(400).json({ message: miss });
+      }
+    }
+    const mixedQuarter =
+      isQuarterlyType(type) &&
+      approved.some((row) => row.paid !== false) &&
+      rejected.some((row) => row.paid !== false);
+    const stampReview = () => {
+      for (const row of request.dates) {
+        if (decisions.has(row.date)) row.status = decisions.get(row.date);
+      }
+      request.markModified("dates");
+      request.status = statusFromDates(request.dates);
+      request.reviewedBy = req.user._id;
+      request.reviewedAt = new Date();
+      request.reviewReason = (req.body.reason || "").trim();
+    };
+    if (mixedQuarter) {
+      stampReview();
+      await request.save();
+      const synced = await syncQuarterWallet(request.employee, type);
+      if (synced.error) return res.status(400).json({ message: synced.error });
+      const unpaidRejected = rejected.filter((row) => row.paid === false);
+      const unpaidApproved = approved.filter((row) => row.paid === false);
+      if (unpaidRejected.length) {
+        const moved = await settleDateRows(request, unpaidRejected, "release", monthStartDay);
+        if (moved.error) return res.status(400).json({ message: moved.error });
+      }
+      if (unpaidApproved.length) {
+        const moved = await settleDateRows(request, unpaidApproved, "approve", monthStartDay);
+        if (moved.error) return res.status(400).json({ message: moved.error });
+      }
+    } else {
+      if (rejected.length) {
+        const moved = await settleDateRows(request, rejected, "release", monthStartDay);
+        if (moved.error) return res.status(400).json({ message: moved.error });
+      }
+      if (approved.length) {
+        const moved = await settleDateRows(request, approved, "approve", monthStartDay);
+        if (moved.error) return res.status(400).json({ message: moved.error });
+      }
+      stampReview();
+      await request.save();
+    }
     await syncUnpaidOnUser(request);
+    const approvedDays = round(approved.reduce((sum, row) => sum + row.days, 0));
+    const rejectedDays = round(rejected.reduce((sum, row) => sum + row.days, 0));
+    const message =
+      approved.length && rejected.length
+        ? `${approvedDays} day(s) approved, ${rejectedDays} day(s) rejected`
+        : approved.length
+          ? "Leave approved"
+          : "Leave rejected";
     const [data, history] = await Promise.all([asRequests(request), employeeHistory(request.employee)]);
-    return res.json({
-      message: nextStatus === "Approved" ? "Leave approved" : "Leave rejected",
-      data: data[0],
-      history,
-    });
+    return res.json({ message, data: data[0], history });
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
@@ -1219,41 +1569,45 @@ const calendar = async (req, res) => {
     const { start, end, days, pad } = monthBounds(month);
     const filter = {
       ...scoped.filter,
-      status: { $in: ["Pending", "Approved"] },
+      status: { $in: ["Pending", "Approved", "Partial"] },
       from: { $lte: end },
       to: { $gte: start },
     };
     const scopedFilter = await narrowEmployees(filter, req.query);
     const rows = await LeaveRequest.find(scopedFilter)
-      .select("employee leaveType days reason status from to")
+      .select("employee leaveType days reason status from to dayType dates paidDays unpaidDays")
       .lean();
+    const hitOn = (row, ymd) =>
+      requestDates(row).find((item) => item.date === ymd && item.status !== "Rejected");
     const dayRows = [];
     for (let d = 1; d <= days; d += 1) {
       const ymd = `${month}-${pad(d)}`;
       let onLeave = 0;
       let pending = 0;
       for (const row of rows) {
-        if (row.from > ymd || row.to < ymd) continue;
-        if (row.status === "Approved") onLeave += 1;
-        else pending += 1;
+        const hit = hitOn(row, ymd);
+        if (!hit) continue;
+        if (hit.status === "Approved") onLeave += 1;
+        else if (hit.status === "Pending") pending += 1;
       }
       dayRows.push({ date: ymd, onLeave, pending });
     }
     const selected = dayRows.find((d) => d.date === date) || { date, onLeave: 0, pending: 0 };
-    const onDate = rows.filter((row) => row.from <= date && row.to >= date);
+    const onDate = rows.filter((row) => hitOn(row, date));
     const refs = await refsFor(onDate);
     const employees = onDate.map((row) => {
       const emp = refs.users.get(String(row.employee)) || {};
       const type = refs.types.get(String(row.leaveType)) || {};
+      const hit = hitOn(row, date);
       return {
         name: emp.name || "",
         employeeCode: emp.official?.employeeCode || "",
         department: emp.official?.department || "",
         leaveType: type.name || "",
         code: type.code || "",
-        days: row.days,
+        days: hit?.days ?? row.days,
         reason: row.reason,
-        status: row.status,
+        status: hit?.status || row.status,
       };
     });
     return res.json({
@@ -1553,7 +1907,7 @@ const leaveBalanceSnapshot = async (user) => {
       .lean(),
     LeaveRequest.find({
       employee: user._id,
-      status: { $in: ["Pending", "Approved"] },
+      status: { $in: ["Pending", "Approved", "Partial"] },
     })
       .sort({ from: -1 })
       .limit(200)
@@ -1568,7 +1922,12 @@ const leaveBalanceSnapshot = async (user) => {
   const balances = visible
     .map((type) => {
       const line = lines.find((row) => String(row.leaveType) === String(type._id));
-      return line ? presentItem(line, type, user.official?.dateOfJoining, monthStartDay) : null;
+      if (!line) return null;
+      const item = presentItem(line, type, user.official?.dateOfJoining, monthStartDay);
+      return {
+        ...item,
+        quarters: quarterCards(line, type, user.official?.dateOfJoining, monthStartDay, year),
+      };
     })
     .filter(Boolean);
   const typeName = new Map(visible.map((type) => [String(type._id), type]));
@@ -1579,12 +1938,20 @@ const leaveBalanceSnapshot = async (user) => {
       const split = row.paidDays != null || row.unpaidDays != null;
       const paidDays = split ? round(row.paidDays || 0) : type.paid === false ? 0 : row.days;
       const unpaidDays = split ? round(row.unpaidDays || 0) : type.paid === false ? row.days : 0;
+      const activeDates = requestDates(row).filter((item) => item.status !== "Rejected");
+      const quarters = [
+        ...new Set(
+          activeDates.flatMap((item) =>
+            slicesFor(item.date, item.date, item.dayType, monthStartDay).map((slice) => `Q${slice.quarter}`)
+          )
+        ),
+      ];
       return {
         _id: row._id,
         leaveType: type.name || "",
         code: type.code || "",
-        from: row.from,
-        to: row.to,
+        dates: activeDates.map((item) => item.date),
+        quarters,
         days: row.days,
         paidDays,
         unpaidDays,
@@ -1611,8 +1978,6 @@ const leaveBalanceSnapshot = async (user) => {
         leaveType: row.leaveType,
         name: typeName.get(String(row.leaveType))?.name || "",
         code: typeName.get(String(row.leaveType))?.code || "",
-        from: row.from,
-        to: row.to,
         dates: row.dates || [],
         days: row.days,
         deduction: row.deduction,
@@ -1631,6 +1996,73 @@ const myLeaveTypes = async (req, res) => {
       count: listed.data.length,
       data: listed.data,
     });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+/** Paid types only. Unpaid is never a dropdown option. Zero remaining sets inDropdown false. */
+const leaveDetailsView = (snapshot) => {
+  const types = (snapshot.balances || [])
+    .filter((row) => row.paid !== false && String(row.code || "").toUpperCase() !== "UL")
+    .map((row) => {
+      const quarter = (row.quarters || []).find((item) => item.current) || null;
+      const item = {
+        _id: row.leaveType,
+        name: row.name,
+        code: row.code,
+        carryForward: !!row.carryForward,
+        used: row.used,
+        pending: row.pending,
+        remaining: row.remaining,
+        inDropdown: round(row.remaining) > 0,
+      };
+      if (quarter) {
+        item.quarter = quarter.code;
+        item.quarterUsed = quarter.used;
+        item.quarterPending = quarter.pending;
+        item.quarterRemaining = quarter.remaining;
+      }
+      return item;
+    });
+  return {
+    year: snapshot.year,
+    showLeaveTypeDropdown: types.some((row) => row.inDropdown),
+    types,
+  };
+};
+
+/**
+ * GET /api/leave/me/details
+ * GET /api/leave/employees/:employeeId/details
+ * Paid types only: used, pending, remaining, and whether each type stays in the dropdown.
+ */
+const leaveDetailsResponse = async (res, user) => {
+  const snapshot = await leaveBalanceSnapshot(user);
+  if (snapshot.error) return res.status(400).json({ message: snapshot.error });
+  return res.json(leaveDetailsView(snapshot));
+};
+
+const myLeaveDetails = async (req, res) => {
+  try {
+    return await leaveDetailsResponse(res, req.user);
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+const employeeLeaveDetails = async (req, res) => {
+  try {
+    if (!/^[a-fA-F0-9]{24}$/.test(String(req.params.employeeId || ""))) {
+      return res.status(400).json({ message: "Invalid employee id" });
+    }
+    const employee = await loadEmployee(req.params.employeeId);
+    if (!employee || !isEmployee(employee)) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+    const denied = assertTeamOrCompanyEmployee(req.user, employee);
+    if (denied) return res.status(403).json({ message: denied });
+    return await leaveDetailsResponse(res, employee);
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
@@ -1667,12 +2099,72 @@ const employeeLeaveBalance = async (req, res) => {
   }
 };
 
-/** Employee dashboard: leave request history for this leave year. */
+/** One leave type on My Leave: yearly total, what is left now, used, and pending. */
+const myLeaveBalanceCard = (row) => {
+  const item = {
+    leaveType: row.leaveType,
+    name: row.name,
+    code: row.code,
+    paid: row.paid !== false,
+    carryForward: !!row.carryForward,
+    total: row.total,
+    available: row.available,
+    used: row.used,
+    pending: row.pending,
+    remaining: row.remaining,
+  };
+  if (row.allocationType === "earned") item.earned = row.earned || 0;
+  if (row.quarter) {
+    item.quarter = row.quarter.code;
+    item.quarterLimit = row.quarter.limit;
+    item.quarterUsed = row.quarter.used;
+    item.quarterPending = row.quarter.pending;
+    item.quarterRemaining = row.quarter.remaining;
+  }
+  return item;
+};
+
+/** Paid annual is Casual + Earned. Comp Off and unpaid stay beside that number. */
+const myLeaveTotals = (summary = {}) => ({
+  total: summary.paidAnnual || 0,
+  used: summary.paidUsed || 0,
+  pending: summary.paidPending || 0,
+  remaining: summary.applyableNow || 0,
+  compOff: summary.compOff || { earned: 0, used: 0, pending: 0, remaining: 0 },
+  unpaid: summary.unpaid || { allotted: 0, used: 0, pending: 0, remaining: 0 },
+  deduction: summary.deduction || { days: 0, pendingDays: 0 },
+});
+
+/** History row for My Leave. Each date carries its own status, so the old day totals are not repeated. */
+const myLeaveHistoryRow = (row) => ({
+  _id: row._id,
+  employee: row.employee,
+  company: row.company,
+  leaveType: row.leaveType,
+  leaveTypeId: row.leaveTypeId,
+  code: row.code,
+  paid: row.paid,
+  reason: row.reason,
+  document: row.document,
+  dates: row.dates,
+  approvedDays: row.approvedDays,
+  rejectedDays: row.rejectedDays,
+  pendingDays: row.pendingDays,
+  status: row.status,
+  applyBy: row.applyBy,
+  reviewedBy: row.reviewedBy,
+  reviewedAt: row.reviewedAt,
+  reviewReason: row.reviewReason,
+  createdAt: row.createdAt,
+});
+
+/** Employee dashboard: this year's leave totals plus request history. */
 const myLeave = async (req, res) => {
   try {
+    const snapshot = await leaveBalanceSnapshot(req.user);
+    if (snapshot.error) return res.status(400).json({ message: snapshot.error });
     const monthStartDay = await monthStartForUser(req.user);
     const year = leaveYear(todayYmd(), monthStartDay);
-    await releaseExpiredQuarterly(req.user._id);
     const listed = await employeeLeavePage(req.user._id, req.query);
     const employee = await User.findById(req.user._id).select("leaveAdjustments").lean();
     const yearNotes = (employee?.leaveAdjustments || []).filter((row) => !row.year || row.year === year);
@@ -1682,9 +2174,10 @@ const myLeave = async (req, res) => {
       : [];
     const typeMap = new Map(types.map((type) => [String(type._id), type]));
     return res.json({
-      year: yearLabel(year),
-      summary: listed.summary,
-      history: listed.history,
+      year: snapshot.year || yearLabel(year),
+      balances: (snapshot.balances || []).map(myLeaveBalanceCard),
+      totals: myLeaveTotals(snapshot.summary),
+      history: listed.history.map(myLeaveHistoryRow),
       count: listed.count,
       total: listed.total,
       page: listed.page,
@@ -1727,5 +2220,7 @@ module.exports = {
   myLeave,
   myLeaveTypes,
   myLeaveBalance,
+  myLeaveDetails,
   employeeLeaveBalance,
+  employeeLeaveDetails,
 };
