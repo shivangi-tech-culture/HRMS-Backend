@@ -401,7 +401,6 @@ const getPunchStatus = async (req, res) => {
     const punchedOut = Boolean(record?.punchOut);
     const punchInTime = formatPunchStamp(record?.punchIn);
     const punchOutTime = formatPunchStamp(record?.punchOut);
-    const placed = await getAssignedShift(employee._id, date);
 
     return res.json({
       date,
@@ -449,7 +448,6 @@ const getPunchStatus = async (req, res) => {
       earlyByMinutes: Number(record?.earlyByMinutes) || 0,
       remarks: String(record?.remarks || "").trim(),
       attendanceId: record?._id || null,
-      shift: shiftSummary(placed.shift),
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });
