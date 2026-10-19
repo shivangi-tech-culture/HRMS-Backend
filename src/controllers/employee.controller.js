@@ -1110,7 +1110,7 @@ const uploadAttachment = async (req, res) => {
 
     if (!req.file) {
       return res.status(400).json({
-        message: "Please choose a file (PDF, image, Word, or Excel — max 5MB)",
+        message: "Please choose a file (PDF, image, or Excel — max 5MB)",
       });
     }
 

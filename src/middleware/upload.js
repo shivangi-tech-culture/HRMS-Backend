@@ -1,8 +1,10 @@
 /**
  * UPLOAD MIDDLEWARE — multer (memory) → Cloudinary secure URL
  * Field "document", max 5 MB.
- * Types: education | account | leave | profile | regularization → hrms/<type>.
- * profile accepts images only (JPEG, PNG, WEBP, GIF).
+ * Types: education | account | leave | profile | regularization | onTour | onDuty → hrms/<type>.
+ * Allowed files: PDF, JPEG, PNG, WEBP, GIF, and Excel (.xls / .xlsx).
+ * The check uses file bytes, not the name the browser sends.
+ * profile accepts images only. Macro Excel is rejected.
  */
 const multer = require("multer");
 const path = require("path");
@@ -14,23 +16,13 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-/** MIME types accepted by the multer fileFilter */
-const allowed = new Set([
-  "application/pdf",
-  "image/jpeg",
-  "image/jpg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "application/octet-stream",
-]);
+const ALLOWED_MESSAGE = "Only PDF, image, or Excel files are allowed";
+
+/** Extension must match the bytes. octet-stream and Word are not accepted. */
+const allowedExt = new Set([".pdf", ".jpg", ".jpeg", ".png", ".webp", ".gif", ".xls", ".xlsx"]);
 
 /** Allowed attachment kinds. Folder on Cloudinary is hrms/<type>. */
-const UPLOAD_TYPES = ["education", "account", "leave", "profile", "regularization"];
+const UPLOAD_TYPES = ["education", "account", "leave", "profile", "regularization", "onTour", "onDuty"];
 
 const IMAGE_KINDS = new Set(["jpg", "png", "gif", "webp"]);
 
@@ -38,8 +30,13 @@ const IMAGE_KINDS = new Set(["jpg", "png", "gif", "webp"]);
 const uploadFile = multer({
   storage: multer.memoryStorage(),
   fileFilter: (_req, file, cb) => {
-    if (allowed.has(file.mimetype)) cb(null, true);
-    else cb(new Error("Only PDF, image, Word, or Excel files are allowed"), false);
+    const ext = path.extname(String(file.originalname || "")).toLowerCase();
+    const mime = String(file.mimetype || "").toLowerCase();
+    if (!allowedExt.has(ext) || mime.startsWith("text/") || mime.includes("javascript") || mime.includes("html")) {
+      cb(new Error(ALLOWED_MESSAGE), false);
+      return;
+    }
+    cb(null, true);
   },
   limits: { fileSize: 5 * 1024 * 1024 },
 }).single("document");
@@ -51,27 +48,77 @@ const safeBaseName = (originalName) =>
     .name.replace(/[^a-zA-Z0-9._-]/g, "_")
     .slice(0, 80) || "file";
 
-/** Detect real file type from bytes (not just extension) */
+const hasUtf16 = (buf, text) => buf.includes(Buffer.from(text, "utf16le"));
+
+/** Names stored inside an xlsx zip. A renamed script archive has none of these. */
+const xlsxEntries = (buf) => {
+  const names = [];
+  const eocd = buf.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+  if (eocd < 0 || eocd + 22 > buf.length) return names;
+  let p = buf.readUInt32LE(eocd + 16);
+  const end = Math.min(buf.length, p + buf.readUInt32LE(eocd + 12));
+  while (p + 46 <= end && buf.readUInt32LE(p) === 0x02014b50) {
+    const nameLen = buf.readUInt16LE(p + 28);
+    const extraLen = buf.readUInt16LE(p + 30);
+    const commentLen = buf.readUInt16LE(p + 32);
+    names.push(buf.slice(p + 46, p + 46 + nameLen).toString("utf8").replace(/\\/g, "/"));
+    p += 46 + nameLen + extraLen + commentLen;
+  }
+  return names;
+};
+
+const isSafeXlsx = (buf) => {
+  const names = xlsxEntries(buf);
+  if (!names.includes("xl/workbook.xml")) return false;
+  const safeExt = new Set([".xml", ".rels", ".jpg", ".jpeg", ".png", ".gif", ".emf", ".wmf"]);
+  return names.every((name) => {
+    if (!name || name.includes("..") || name.startsWith("/") || name.includes("\0")) return false;
+    if (/vba|macro/i.test(name)) return false;
+    if (name === "[Content_Types].xml") return true;
+    if (!/^(xl\/|_rels\/|docProps\/)/.test(name)) return false;
+    const ext = path.extname(name).toLowerCase();
+    if (ext === ".bin") return /printerSettings\.bin$/i.test(name);
+    return !ext || safeExt.has(ext);
+  });
+};
+
+/**
+ * Real type from bytes. A script renamed to .pdf or .xlsx returns null.
+ * Excel with macros returns null.
+ */
 const detectKind = (file) => {
   const buf = file.buffer || Buffer.alloc(0);
-  const name = String(file.originalname || "").toLowerCase();
-  if (buf.slice(0, 4).toString() === "%PDF") return "pdf";
+  if (buf.length < 4) return null;
+  if (buf.slice(0, 5).toString() === "%PDF-") return "pdf";
   if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return "jpg";
   if (buf.slice(0, 4).toString("hex") === "89504e47") return "png";
-  if (buf.slice(0, 3).toString() === "GIF") return "gif";
-  if (buf.slice(0, 4).toString() === "RIFF" && buf.slice(8, 12).toString() === "WEBP") {
-    return "webp";
+  const gif = buf.slice(0, 6).toString();
+  if (gif === "GIF87a" || gif === "GIF89a") return "gif";
+  if (buf.slice(0, 4).toString() === "RIFF" && buf.slice(8, 12).toString() === "WEBP") return "webp";
+  if (buf.slice(0, 8).toString("hex") === "d0cf11e0a1b11ae1") {
+    if (hasUtf16(buf, "WordDocument") || hasUtf16(buf, "_VBA_PROJECT")) return null;
+    if (hasUtf16(buf, "Workbook") || hasUtf16(buf, "Book")) return "xls";
+    return null;
   }
-  // Old Word / Excel (OLE)
-  if (buf.slice(0, 4).toString("hex") === "d0cf11e0") {
-    return name.endsWith(".xls") ? "xls" : "doc";
-  }
-  // New Word / Excel are zip files
-  if (buf[0] === 0x50 && buf[1] === 0x4b) {
-    if (name.endsWith(".xlsx") || name.endsWith(".xls")) return "xlsx";
-    return "docx";
+  if (buf[0] === 0x50 && buf[1] === 0x4b && buf[2] === 0x03 && buf[3] === 0x04 && isSafeXlsx(buf)) {
+    return "xlsx";
   }
   return null;
+};
+
+/** Kind must agree with the extension. Exported so chat and mail use the same rule. */
+const kindForUpload = (file) => {
+  const ext = path.extname(String(file?.originalname || "")).toLowerCase();
+  const kind = detectKind(file);
+  const matches =
+    (kind === "pdf" && ext === ".pdf") ||
+    (kind === "jpg" && (ext === ".jpg" || ext === ".jpeg")) ||
+    (kind === "png" && ext === ".png") ||
+    (kind === "gif" && ext === ".gif") ||
+    (kind === "webp" && ext === ".webp") ||
+    (kind === "xls" && ext === ".xls") ||
+    (kind === "xlsx" && ext === ".xlsx");
+  return matches ? kind : null;
 };
 
 /** Build a 400-style Error for invalid file content */
@@ -84,7 +131,7 @@ const rejectFile = (message) => {
 /** Cloudinary folder: hrms/education, hrms/account, hrms/leave, hrms/profile, or hrms/regularization */
 const folderFor = (type) => {
   const configured = (process.env.CLOUDINARY_FOLDER || "hrms").replace(/\/+$/, "");
-  const root = configured.replace(/\/(education|account|leave|profile|regularization)$/, "") || "hrms";
+  const root = configured.replace(/\/(education|account|leave|profile|regularization|onTour|onDuty)$/, "") || "hrms";
   return `${root}/${type}`;
 };
 
@@ -92,12 +139,10 @@ const folderFor = (type) => {
 const uploadOptionsFor = (file, type = "education") => {
   const folder = folderFor(type);
   const baseId = `${Date.now()}-${safeBaseName(file.originalname)}`;
-  const kind = detectKind(file);
+  const kind = kindForUpload(file);
 
   if (!kind) {
-    throw rejectFile(
-      "This file is not a valid PDF, image, Word, or Excel file"
-    );
+    throw rejectFile("This file is not a valid PDF, image, or Excel file");
   }
 
   if (type === "profile" && !IMAGE_KINDS.has(kind)) {
@@ -115,7 +160,7 @@ const uploadOptionsFor = (file, type = "education") => {
     };
   }
 
-  if (kind === "doc" || kind === "docx" || kind === "xls" || kind === "xlsx") {
+  if (kind === "xls" || kind === "xlsx") {
     return {
       folder,
       resource_type: "raw",
@@ -223,6 +268,8 @@ const forgetProfileImage = async (previous, next = "") => {
 
 module.exports = {
   UPLOAD_TYPES,
+  ALLOWED_MESSAGE,
+  kindForUpload,
   uploadFile,
   uploadToCloudinary,
   deleteProfileImage,

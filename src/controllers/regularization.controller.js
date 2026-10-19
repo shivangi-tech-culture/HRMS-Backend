@@ -169,6 +169,8 @@ const STATUS_CODE = {
   HalfDay: "HD",
   Pending: "Pending",
   Rejected: "Rejected",
+  OnDuty: "OnDuty",
+  OnTour: "OnTour",
 };
 
 /**
@@ -486,7 +488,8 @@ const myTimesheet = async (req, res) => {
         );
       }
 
-      let statusLabel = future
+      const dutyHeld = Boolean(att?.onTourId || att?.onDutyId) || att?.status === "OnTour" || att?.status === "OnDuty";
+      let statusLabel = future && !dutyHeld
         ? ""
         : resolveDisplayedStatus({ att, reg, lateStatus: shiftStatus });
 
@@ -508,15 +511,15 @@ const myTimesheet = async (req, res) => {
 
       let dayDesc = timing.isOff ? "WeeklyOff" : "WorkDay";
       let shift = timing.isOff ? "Weekly Off" : schedule.name;
-      if (timing.isOff && !punched) {
+      if (!dutyHeld && timing.isOff && !punched) {
         statusLabel = "WeeklyOff";
-      } else if (timing.isOff && closed) {
+      } else if (!dutyHeld && timing.isOff && closed) {
         shift = schedule.name;
         statusLabel = "Present";
       }
 
       const leaveCode = String(leave?.leaveType?.code || "").toUpperCase();
-      const onLeave = Boolean(leave) && !punched && !future && statusLabel !== "Pending";
+      const onLeave = Boolean(leave) && !punched && !future && !dutyHeld && statusLabel !== "Pending";
       if (onLeave) {
         statusLabel = leave.leaveType?.name || "On Leave";
         dayDesc = "Leave";
@@ -525,11 +528,17 @@ const myTimesheet = async (req, res) => {
         statusLabel = "HalfDay";
       }
 
+      if (dutyHeld) {
+        statusLabel = "Present";
+        dayDesc = att?.onDutyId || att?.status === "OnDuty" ? "On Duty" : "On Tour";
+        shift = schedule.name;
+      }
+
       const status = onLeave ? leaveCode || "L" : STATUS_CODE[statusLabel] || statusLabel;
       const units = leaveUnits(leave);
 
       summary.daySummary.monthDays += 1;
-      if (timing.isOff && !onLeave) summary.daySummary.weeklyOffs += 1;
+      if (timing.isOff && !onLeave && !dutyHeld) summary.daySummary.weeklyOffs += 1;
       else summary.daySummary.workDays += 1;
 
       if (status === "P" || status === "L" || status === "ELE") {
@@ -547,7 +556,11 @@ const myTimesheet = async (req, res) => {
         summary.rejected += 1;
         summary.absent += 1;
       } else if (status === "A") summary.absent += 1;
-      else if (status === "WO") salaryDays += 1;
+      else if (status === "OnTour" || status === "OnDuty") {
+        summary.present += 1;
+        summary.presentSummary.presents += 1;
+        salaryDays += 1;
+      } else if (status === "WO") salaryDays += 1;
       else if (onLeave) {
         summary.leaves.totalLeaves += units;
         if (isHalfLeave(leave?.dayType)) summary.leaves.shortLeave += units;
