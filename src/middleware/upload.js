@@ -1,7 +1,7 @@
 /**
  * UPLOAD MIDDLEWARE — multer (memory) → Cloudinary secure URL
  * Field "document", max 5 MB.
- * Types: education | account | leave | profile | regularization → hrms/<type>.
+ * Types: education | account | leave | profile | regularization | onTour | onDuty → hrms/<type>.
  * Allowed files: PDF, JPEG, PNG, WEBP, GIF, and Excel (.xls / .xlsx).
  * The check uses file bytes, not the name the browser sends.
  * profile accepts images only. Macro Excel is rejected.
@@ -22,7 +22,7 @@ const ALLOWED_MESSAGE = "Only PDF, image, or Excel files are allowed";
 const allowedExt = new Set([".pdf", ".jpg", ".jpeg", ".png", ".webp", ".gif", ".xls", ".xlsx"]);
 
 /** Allowed attachment kinds. Folder on Cloudinary is hrms/<type>. */
-const UPLOAD_TYPES = ["education", "account", "leave", "profile", "regularization"];
+const UPLOAD_TYPES = ["education", "account", "leave", "profile", "regularization", "onTour", "onDuty"];
 
 const IMAGE_KINDS = new Set(["jpg", "png", "gif", "webp"]);
 
@@ -131,7 +131,7 @@ const rejectFile = (message) => {
 /** Cloudinary folder: hrms/education, hrms/account, hrms/leave, hrms/profile, or hrms/regularization */
 const folderFor = (type) => {
   const configured = (process.env.CLOUDINARY_FOLDER || "hrms").replace(/\/+$/, "");
-  const root = configured.replace(/\/(education|account|leave|profile|regularization)$/, "") || "hrms";
+  const root = configured.replace(/\/(education|account|leave|profile|regularization|onTour|onDuty)$/, "") || "hrms";
   return `${root}/${type}`;
 };
 

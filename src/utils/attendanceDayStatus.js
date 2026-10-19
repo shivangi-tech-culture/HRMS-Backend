@@ -8,7 +8,15 @@
  * Approved request, and both punches exist → Present, Late, EarlyLeave, HalfDay, or Absent.
  * Punch in without punch out → MissedPunch.
  */
+const DUTY_STATUSES = ["OnTour", "OnDuty"];
+
+const isDutyStatus = (status) => DUTY_STATUSES.includes(status);
+
+const isApprovedTourDuty = (att) =>
+  Boolean(att?.onTourId || att?.onDutyId) || isDutyStatus(att?.status);
+
 const resolveDisplayedStatus = ({ att, reg, lateStatus } = {}) => {
+  if (isApprovedTourDuty(att)) return "Present";
   const closed = Boolean(att?.punchIn) && Boolean(att?.punchOut);
   const open = Boolean(att?.punchIn) && !att?.punchOut;
   const regStatus = reg?.status || "";
@@ -25,4 +33,4 @@ const resolveDisplayedStatus = ({ att, reg, lateStatus } = {}) => {
   return "Absent";
 };
 
-module.exports = { resolveDisplayedStatus };
+module.exports = { resolveDisplayedStatus, isDutyStatus, isApprovedTourDuty, DUTY_STATUSES };

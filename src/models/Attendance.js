@@ -24,6 +24,8 @@ const DAY_STATUSES = [
   "Holiday",
   "MissedPunch",
   "OnLeave",
+  "OnTour", // approved On Tour request covers this day
+  "OnDuty", // approved On Duty request covers this day
   "WFH",
   "Working", // display-only for open on-time punch; may also be stored
   "Rejected", // display when a regularization request was rejected; day stays absent
@@ -137,6 +139,18 @@ const attendanceSchema = new mongoose.Schema(
     regularizationId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "AttendanceRegularization",
+      default: null,
+    },
+    /** Set when an On Tour request is approved onto this day */
+    onTourId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "TourDuty",
+      default: null,
+    },
+    /** Set when an On Duty request is approved onto this day */
+    onDutyId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "TourDuty",
       default: null,
     },
   },

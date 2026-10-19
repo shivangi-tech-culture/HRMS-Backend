@@ -195,6 +195,8 @@ const MASTER_TYPE_PERM = {
   language: "Language",
   regularizationReason: "Regularization Reason",
   markAttendanceReason: "Mark Attendance Reason",
+  onTourCategory: "On Tour Category",
+  onDutyCategory: "On Duty Category",
 };
 
 /** Admin write on /api/masters — type from body, query, or :id lookup */

@@ -4314,6 +4314,234 @@
                   ]
                 }
               ]
+            },
+            {
+              "name": "On Tour Category",
+              "description": "CRUD for master type `onTourCategory`. Dropdown for On Tour. Create saves {{onTourCategoryMasterId}}; Get / Update / Delete use it.\nSeeded values: Up Country, Local, Intrastate, International.",
+              "item": [
+                {
+                  "name": "1. Create On Tour Category",
+                  "request": {
+                    "method": "POST",
+                    "header": [{ "key": "Content-Type", "value": "application/json" }],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/masters",
+                      "host": ["{{baseUrl}}"],
+                      "path": ["api", "masters"]
+                    },
+                    "description": "POST /api/masters — `type` = `onTourCategory`. Use the returned `_id` as tourCategory when dutyType is On Tour.",
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"type\": \"onTourCategory\",\n  \"name\": \"Test On Tour {{rndNo}}\",\n  \"code\": \"T{{rndNo}}\",\n  \"status\": \"Active\"\n}",
+                      "options": { "raw": { "language": "json" } }
+                    }
+                  },
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "const j = pm.response.json();",
+                          "const id = j.master && j.master._id;",
+                          "if (id) pm.collectionVariables.set('onTourCategoryMasterId', id);"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "name": "2. List On Tour Category",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/masters?type=onTourCategory&page={{page}}&limit={{limit}}",
+                      "host": ["{{baseUrl}}"],
+                      "path": ["api", "masters"],
+                      "query": [
+                        { "key": "type", "value": "onTourCategory", "description": "onTourCategory" },
+                        { "key": "status", "value": "Active", "disabled": true, "description": "Active or Inactive" },
+                        { "key": "search", "value": "", "disabled": true },
+                        { "key": "page", "value": "{{page}}" },
+                        { "key": "limit", "value": "{{limit}}" }
+                      ]
+                    },
+                    "description": "On Tour category dropdown. Up Country, Local, Intrastate, International."
+                  }
+                },
+                {
+                  "name": "3. Get On Tour Category",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/masters/{{onTourCategoryMasterId}}",
+                      "host": ["{{baseUrl}}"],
+                      "path": ["api", "masters", "{{onTourCategoryMasterId}}"]
+                    },
+                    "description": "One On Tour category. Path id is {{onTourCategoryMasterId}} from Create."
+                  }
+                },
+                {
+                  "name": "4. Update On Tour Category",
+                  "request": {
+                    "method": "PUT",
+                    "header": [{ "key": "Content-Type", "value": "application/json" }],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/masters/{{onTourCategoryMasterId}}",
+                      "host": ["{{baseUrl}}"],
+                      "path": ["api", "masters", "{{onTourCategoryMasterId}}"]
+                    },
+                    "description": "Send at least one of name, code, status. Type cannot change.",
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"name\": \"Test On Tour {{rndNo}} Edited\",\n  \"code\": \"T{{rndNo}}\",\n  \"status\": \"Active\"\n}",
+                      "options": { "raw": { "language": "json" } }
+                    }
+                  }
+                },
+                {
+                  "name": "5. Delete On Tour Category",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/masters/{{onTourCategoryMasterId}}",
+                      "host": ["{{baseUrl}}"],
+                      "path": ["api", "masters", "{{onTourCategoryMasterId}}"]
+                    },
+                    "description": "Deletes the category created above and clears {{onTourCategoryMasterId}}."
+                  },
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "if (pm.response.code < 300) {",
+                          "  pm.collectionVariables.set('onTourCategoryMasterId', '');",
+                          "}"
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "On Duty Category",
+              "description": "CRUD for master type `onDutyCategory`. Dropdown for On Duty. Create saves {{onDutyCategoryMasterId}}; Get / Update / Delete use it.\nSeeded values: Client Site, Bank Work, Field Visit, Office Duty.",
+              "item": [
+                {
+                  "name": "1. Create On Duty Category",
+                  "request": {
+                    "method": "POST",
+                    "header": [{ "key": "Content-Type", "value": "application/json" }],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/masters",
+                      "host": ["{{baseUrl}}"],
+                      "path": ["api", "masters"]
+                    },
+                    "description": "POST /api/masters — `type` = `onDutyCategory`. Use the returned `_id` as tourCategory when dutyType is On Duty.",
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"type\": \"onDutyCategory\",\n  \"name\": \"Test On Duty {{rndNo}}\",\n  \"code\": \"T{{rndNo}}\",\n  \"status\": \"Active\"\n}",
+                      "options": { "raw": { "language": "json" } }
+                    }
+                  },
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "const j = pm.response.json();",
+                          "const id = j.master && j.master._id;",
+                          "if (id) pm.collectionVariables.set('onDutyCategoryMasterId', id);"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "name": "2. List On Duty Category",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/masters?type=onDutyCategory&page={{page}}&limit={{limit}}",
+                      "host": ["{{baseUrl}}"],
+                      "path": ["api", "masters"],
+                      "query": [
+                        { "key": "type", "value": "onDutyCategory", "description": "onDutyCategory" },
+                        { "key": "status", "value": "Active", "disabled": true, "description": "Active or Inactive" },
+                        { "key": "search", "value": "", "disabled": true },
+                        { "key": "page", "value": "{{page}}" },
+                        { "key": "limit", "value": "{{limit}}" }
+                      ]
+                    },
+                    "description": "On Duty category dropdown. Client Site, Bank Work, Field Visit, Office Duty."
+                  }
+                },
+                {
+                  "name": "3. Get On Duty Category",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/masters/{{onDutyCategoryMasterId}}",
+                      "host": ["{{baseUrl}}"],
+                      "path": ["api", "masters", "{{onDutyCategoryMasterId}}"]
+                    },
+                    "description": "One On Duty category. Path id is {{onDutyCategoryMasterId}} from Create."
+                  }
+                },
+                {
+                  "name": "4. Update On Duty Category",
+                  "request": {
+                    "method": "PUT",
+                    "header": [{ "key": "Content-Type", "value": "application/json" }],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/masters/{{onDutyCategoryMasterId}}",
+                      "host": ["{{baseUrl}}"],
+                      "path": ["api", "masters", "{{onDutyCategoryMasterId}}"]
+                    },
+                    "description": "Send at least one of name, code, status. Type cannot change.",
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"name\": \"Test On Duty {{rndNo}} Edited\",\n  \"code\": \"T{{rndNo}}\",\n  \"status\": \"Active\"\n}",
+                      "options": { "raw": { "language": "json" } }
+                    }
+                  }
+                },
+                {
+                  "name": "5. Delete On Duty Category",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/masters/{{onDutyCategoryMasterId}}",
+                      "host": ["{{baseUrl}}"],
+                      "path": ["api", "masters", "{{onDutyCategoryMasterId}}"]
+                    },
+                    "description": "Deletes the category created above and clears {{onDutyCategoryMasterId}}."
+                  },
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "if (pm.response.code < 300) {",
+                          "  pm.collectionVariables.set('onDutyCategoryMasterId', '');",
+                          "}"
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
             }
           ]
         },
@@ -6042,6 +6270,84 @@
                   }
                 }
               ]
+            }
+          ]
+        },
+        {
+          "name": "5. On Tour / On Duty",
+          "description": "Approval queue. Login as Reporting Manager (own team), HR (assigned companies), or Super Admin.\nEmployee applies in 2.2 Attendance.\nApprove sets each day to Present. Reject sets each day to Absent.\nBody reason is required.",
+          "item": [
+            {
+              "name": "1. List",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/attendance/tour-duties?status=ALL&page=1&limit=20",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "attendance", "tour-duties"],
+                  "query": [
+                    { "key": "status", "value": "ALL", "description": "ALL | Pending | Approved | Rejected | Cancelled" },
+                    { "key": "companyId", "value": "{{companyId}}", "disabled": true },
+                    { "key": "search", "value": "", "disabled": true },
+                    { "key": "month", "value": "2026-09", "disabled": true, "description": "YYYY-MM, requests that overlap this month" },
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "20" }
+                  ]
+                },
+                "description": "Attendance → On Tour/On Duty. Saves the first `_id` into {{tourDutyId}}."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const j = pm.response.json();",
+                      "const id = j.data && j.data[0] && j.data[0]._id;",
+                      "if (id) pm.collectionVariables.set('tourDutyId', id);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "2. Approve",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "url": {
+                  "raw": "{{baseUrl}}/api/attendance/tour-duties/{{tourDutyId}}/review?decision=approve",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "attendance", "tour-duties", "{{tourDutyId}}", "review"],
+                  "query": [{ "key": "decision", "value": "approve" }]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reason\": \"Approved for client visit\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "Reporting Manager (own team), HR (assigned companies), or Super Admin.\nSets each day in the range to Present. Response tourCategory is { _id, name }."
+              }
+            },
+            {
+              "name": "3. Reject",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "url": {
+                  "raw": "{{baseUrl}}/api/attendance/tour-duties/{{tourDutyId}}/review?decision=reject",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "attendance", "tour-duties", "{{tourDutyId}}", "review"],
+                  "query": [{ "key": "decision", "value": "reject" }]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reason\": \"Not approved\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "Reporting Manager (own team), HR (assigned companies), or Super Admin.\nSets each day in the range to Absent. Body reason is required."
+              }
             }
           ]
         },
@@ -7820,78 +8126,596 @@
                 },
                 "description": "Withdraw your own Pending request. Approved or rejected requests cannot be cancelled."
               }
+            },
+            {
+              "name": "9a. On Tour Categories",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/masters?type=onTourCategory&status=Active&page=1&limit=20",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "masters"],
+                  "query": [
+                    { "key": "type", "value": "onTourCategory" },
+                    { "key": "status", "value": "Active" },
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "20" }
+                  ]
+                },
+                "description": "On Tour dropdown. Saves the first category `_id` into {{onTourCategoryId}}.\nValues: Up Country, Local, Intrastate, International."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const j = pm.response.json();",
+                      "const row = (j.data || [])[0];",
+                      "if (row && row._id) pm.collectionVariables.set('onTourCategoryId', row._id);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "9b. On Duty Categories",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/masters?type=onDutyCategory&status=Active&page=1&limit=20",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "masters"],
+                  "query": [
+                    { "key": "type", "value": "onDutyCategory" },
+                    { "key": "status", "value": "Active" },
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "20" }
+                  ]
+                },
+                "description": "On Duty dropdown. Saves the first category `_id` into {{onDutyCategoryId}}.\nValues: Client Site, Bank Work, Field Visit, Office Duty."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const j = pm.response.json();",
+                      "const row = (j.data || [])[0];",
+                      "if (row && row._id) pm.collectionVariables.set('onDutyCategoryId', row._id);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "9. Apply On Tour / On Duty",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "url": {
+                  "raw": "{{baseUrl}}/api/attendance/tour-duty",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "attendance", "tour-duty"]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"dutyType\": \"On Tour\",\n  \"tourCategory\": \"{{onTourCategoryId}}\",\n  \"fromDate\": \"2026-10-20\",\n  \"fromTime\": \"09:00\",\n  \"toDate\": \"2026-10-22\",\n  \"toTime\": \"18:00\",\n  \"reason\": \"Client Meeting\",\n  \"remarks\": \"Client workshop\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "Employee only. Run 9a or 9b first.\ntourCategory is the master _id, not the name.\nOn Tour → {{onTourCategoryId}} from type=onTourCategory.\nOn Duty → {{onDutyCategoryId}} from type=onDutyCategory, and set dutyType to On Duty.\nStays Pending until Reporting Manager, HR, or Super Admin reviews it in 1.7 → 5.\nApprove → attendance Present. Reject → attendance Absent.\nOptional document: type=onTour or type=onDuty, then put the url in document.\nResponse tourCategory is { _id, name }. Saves request `_id` into {{tourDutyId}}."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const j = pm.response.json();",
+                      "const id = j.request && j.request._id;",
+                      "if (id) pm.collectionVariables.set('tourDutyId', id);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "10. My On Tour / On Duty",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/attendance/tour-duty?status=ALL&page=1&limit=20",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "attendance", "tour-duty"],
+                  "query": [
+                    { "key": "status", "value": "ALL", "description": "ALL | Pending | Approved | Rejected | Cancelled" },
+                    { "key": "month", "value": "2026-10", "disabled": true },
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "20" }
+                  ]
+                },
+                "description": "Own applied and approved rows. duration is inclusive days, for example 3 Day(s)."
+              }
+            },
+            {
+              "name": "11. Cancel On Tour / On Duty",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/attendance/tour-duty/{{tourDutyId}}/cancel",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "attendance", "tour-duty", "{{tourDutyId}}", "cancel"]
+                },
+                "description": "Withdraw your own Pending request. Approved requests stay on attendance."
+              }
             }
           ]
         },
         {
           "name": "2.3 Dropdowns (Masters)",
-          "description": "Read-only lists an employee can see.",
+          "description": "Read-only dropdowns an employee can open. Login as Employee first (2.1 → 1).\nEach request is one master type. GET /api/masters?type=...&status=Active.\nCompany is not a master. Branch and shift are stored as ids. Other employee fields store the name.\nOn Tour / On Duty store the category _id in tourCategory.",
           "item": [
             {
-              "name": "1. List Masters (dropdown)",
-              "request": {
-                "method": "GET",
-                "header": [],
-                "url": {
-                  "raw": "{{baseUrl}}/api/masters?type={{masterType}}&page={{page}}&limit={{limit}}",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "masters"
-                  ],
-                  "query": [
-                    {
-                      "key": "type",
-                      "value": "{{masterType}}",
-                      "description": "string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)"
-                    },
-                    {
-                      "key": "status",
-                      "value": "Active",
-                      "disabled": true,
-                      "description": "string | optional | `Active` or `Inactive`"
-                    },
-                    {
-                      "key": "search",
-                      "value": "",
-                      "disabled": true,
-                      "description": "string | optional | name / email / employee code text search"
-                    },
-                    {
-                      "key": "page",
-                      "value": "{{page}}",
-                      "description": "number | optional | page number, default `1`"
-                    },
-                    {
-                      "key": "limit",
-                      "value": "{{limit}}",
-                      "description": "number | optional | rows per page (usually 1–200)"
-                    }
-                  ]
-                },
-                "description": "Change {{masterType}} (gender, maritalStatus, language, bloodGroup, bankName, relation, …). Types: 4. Master Types.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `type` — string | required | master type key e.g. `department`, `designation`, `language`, `regularizationReason`, `markAttendanceReason` (company is not a master)\n- `status` — string | optional | `Active` or `Inactive`\n- `search` — string | optional | name / email / employee code text search\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
-              }
-            },
-            {
-              "name": "2. Master Types",
+              "name": "1. Master Types",
               "request": {
                 "method": "GET",
                 "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/masters/meta",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "masters",
-                    "meta"
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "masters", "meta"]
+                },
+                "description": "Every dropdown type.\n\ndepartment — Administration, HR, Engineering, Finance\ndesignation — Software Engineer, HR Manager, Engineering Manager, Finance Executive\ndivision — HO, RO\nemployeeGroup — Permanent, Contract\ngrade — G1 to G5\njobRole — Executive, Manager, Intern, Consultant\ngender — Male, Female, Other\nmaritalStatus — Single, Married, Divorced, Widowed\nbloodGroup — A+, A-, B+, B-, AB+, AB-, O+, O-\nbranch — Noida, Delhi (saved as _id)\nshift — General Shift, Evening Shift (saved as _id)\ncourseType — Full Time, Part Time, Distance, Online\ncourseLevel — 10th, 12th, Diploma, Graduation, Post Graduation, Doctorate, Certification\nbankName — SBI, HDFC, ICICI, Axis, PNB, and others\nrelation — Spouse, Father, Mother, Son, Daughter, Brother, Sister, Other\nnominateFor — PF, FNF, Gratuity, GTLI, GPA, GHI\nvisaType — Employment, Business, Project, Entry, Tourist, Research, Transit, Conference, Medical\nlanguage — Hindi, English, and other Indian languages\nregularizationReason — Forgot to Punch, Biometric Issue, System Downtime, Client Visit, Power Outage, Incorrect Shift Mapping, Other\nmarkAttendanceReason — Missed Punch, Device Issue, Official Travel, Other\nonTourCategory — Up Country, Local, Intrastate, International. Apply On Tour sends this _id.\nonDutyCategory — Client Site, Bank Work, Field Visit, Office Duty. Apply On Duty sends this _id."
+              }
+            },
+            {
+              "name": "2. Department",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/masters?type=department&status=Active&page=1&limit=50",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "masters"],
+                  "query": [
+                    { "key": "type", "value": "department" },
+                    { "key": "status", "value": "Active" },
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "50" }
                   ]
                 },
-                "description": "\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                "description": "Employee official department. Seed: Administration, HR, Engineering, Finance."
               }
+            },
+            {
+              "name": "3. Designation",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/masters?type=designation&status=Active&page=1&limit=50",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "masters"],
+                  "query": [
+                    { "key": "type", "value": "designation" },
+                    { "key": "status", "value": "Active" },
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "50" }
+                  ]
+                },
+                "description": "Job title. Seed: Software Engineer, HR Manager, Engineering Manager, Finance Executive."
+              }
+            },
+            {
+              "name": "4. Division",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/masters?type=division&status=Active&page=1&limit=50",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "masters"],
+                  "query": [
+                    { "key": "type", "value": "division" },
+                    { "key": "status", "value": "Active" },
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "50" }
+                  ]
+                },
+                "description": "Office division. Seed: HO, RO."
+              }
+            },
+            {
+              "name": "5. Employee Group",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/masters?type=employeeGroup&status=Active&page=1&limit=50",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "masters"],
+                  "query": [
+                    { "key": "type", "value": "employeeGroup" },
+                    { "key": "status", "value": "Active" },
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "50" }
+                  ]
+                },
+                "description": "Employment group. Seed: Permanent, Contract."
+              }
+            },
+            {
+              "name": "6. Grade",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/masters?type=grade&status=Active&page=1&limit=50",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "masters"],
+                  "query": [
+                    { "key": "type", "value": "grade" },
+                    { "key": "status", "value": "Active" },
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "50" }
+                  ]
+                },
+                "description": "Pay grade. Seed: G1, G2, G3, G4, G5."
+              }
+            },
+            {
+              "name": "7. Job Role",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/masters?type=jobRole&status=Active&page=1&limit=50",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "masters"],
+                  "query": [
+                    { "key": "type", "value": "jobRole" },
+                    { "key": "status", "value": "Active" },
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "50" }
+                  ]
+                },
+                "description": "Role band. Seed: Executive, Manager, Intern, Consultant."
+              }
+            },
+            {
+              "name": "8. Gender",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/masters?type=gender&status=Active&page=1&limit=50",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "masters"],
+                  "query": [
+                    { "key": "type", "value": "gender" },
+                    { "key": "status", "value": "Active" },
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "50" }
+                  ]
+                },
+                "description": "Personal gender. Seed: Male, Female, Other."
+              }
+            },
+            {
+              "name": "9. Marital Status",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/masters?type=maritalStatus&status=Active&page=1&limit=50",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "masters"],
+                  "query": [
+                    { "key": "type", "value": "maritalStatus" },
+                    { "key": "status", "value": "Active" },
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "50" }
+                  ]
+                },
+                "description": "Seed: Single, Married, Divorced, Widowed."
+              }
+            },
+            {
+              "name": "10. Blood Group",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/masters?type=bloodGroup&status=Active&page=1&limit=50",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "masters"],
+                  "query": [
+                    { "key": "type", "value": "bloodGroup" },
+                    { "key": "status", "value": "Active" },
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "50" }
+                  ]
+                },
+                "description": "Seed: A+, A-, B+, B-, AB+, AB-, O+, O-."
+              }
+            },
+            {
+              "name": "11. Branch",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/masters?type=branch&status=Active&page=1&limit=50",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "masters"],
+                  "query": [
+                    { "key": "type", "value": "branch" },
+                    { "key": "status", "value": "Active" },
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "50" }
+                  ]
+                },
+                "description": "Workplace branch. Seed: Noida (NOIDA), Delhi (DEL). Employee stores the branch _id."
+              }
+            },
+            {
+              "name": "12. Shift",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/masters?type=shift&status=Active&page=1&limit=50",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "masters"],
+                  "query": [
+                    { "key": "type", "value": "shift" },
+                    { "key": "status", "value": "Active" },
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "50" }
+                  ]
+                },
+                "description": "Work shift. Seed: General Shift (GS-01), Evening Shift (ES-01). Employee stores the shift _id."
+              }
+            },
+            {
+              "name": "13. Course Type",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/masters?type=courseType&status=Active&page=1&limit=50",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "masters"],
+                  "query": [
+                    { "key": "type", "value": "courseType" },
+                    { "key": "status", "value": "Active" },
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "50" }
+                  ]
+                },
+                "description": "Education mode. Seed: Full Time, Part Time, Distance, Online."
+              }
+            },
+            {
+              "name": "14. Course Level",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/masters?type=courseLevel&status=Active&page=1&limit=50",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "masters"],
+                  "query": [
+                    { "key": "type", "value": "courseLevel" },
+                    { "key": "status", "value": "Active" },
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "50" }
+                  ]
+                },
+                "description": "Education level. Seed: 10th, 12th, Diploma, Graduation, Post Graduation, Doctorate, Certification."
+              }
+            },
+            {
+              "name": "15. Bank Name",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/masters?type=bankName&status=Active&page=1&limit=50",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "masters"],
+                  "query": [
+                    { "key": "type", "value": "bankName" },
+                    { "key": "status", "value": "Active" },
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "50" }
+                  ]
+                },
+                "description": "Salary bank. Seed includes State Bank of India, HDFC, ICICI, Axis, Punjab National Bank."
+              }
+            },
+            {
+              "name": "16. Relation",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/masters?type=relation&status=Active&page=1&limit=50",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "masters"],
+                  "query": [
+                    { "key": "type", "value": "relation" },
+                    { "key": "status", "value": "Active" },
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "50" }
+                  ]
+                },
+                "description": "Family and nominee relation. Seed: Spouse, Father, Mother, Son, Daughter, Brother, Sister, Other."
+              }
+            },
+            {
+              "name": "17. Nominate For",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/masters?type=nominateFor&status=Active&page=1&limit=50",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "masters"],
+                  "query": [
+                    { "key": "type", "value": "nominateFor" },
+                    { "key": "status", "value": "Active" },
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "50" }
+                  ]
+                },
+                "description": "Nominee benefit. Seed: PF, FNF, Gratuity, GTLI, GPA, GHI."
+              }
+            },
+            {
+              "name": "18. Visa Type",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/masters?type=visaType&status=Active&page=1&limit=50",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "masters"],
+                  "query": [
+                    { "key": "type", "value": "visaType" },
+                    { "key": "status", "value": "Active" },
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "50" }
+                  ]
+                },
+                "description": "Seed: Employment Visa, Business Visa, Project Visa, Entry visa, Tourist Visa, Research Visa, Transit Visa, Conference Visa, Medical Visa."
+              }
+            },
+            {
+              "name": "19. Language",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/masters?type=language&status=Active&page=1&limit=50",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "masters"],
+                  "query": [
+                    { "key": "type", "value": "language" },
+                    { "key": "status", "value": "Active" },
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "50" }
+                  ]
+                },
+                "description": "Languages known. Seed: Hindi, English, Bengali, Marathi, Telugu, Tamil, Gujarati, Urdu, Kannada, Malayalam, Punjabi, Odia, Assamese."
+              }
+            },
+            {
+              "name": "20. Regularization Reason",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/masters?type=regularizationReason&status=Active&page=1&limit=50",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "masters"],
+                  "query": [
+                    { "key": "type", "value": "regularizationReason" },
+                    { "key": "status", "value": "Active" },
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "50" }
+                  ]
+                },
+                "description": "Missed-punch reason. Seed: Forgot to Punch, Biometric Issue, System Downtime, Client Visit, Power Outage, Incorrect Shift Mapping, Other."
+              }
+            },
+            {
+              "name": "21. Mark Attendance Reason",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/masters?type=markAttendanceReason&status=Active&page=1&limit=50",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "masters"],
+                  "query": [
+                    { "key": "type", "value": "markAttendanceReason" },
+                    { "key": "status", "value": "Active" },
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "50" }
+                  ]
+                },
+                "description": "HR mark-attendance reason. Seed: Missed Punch, Device Issue, Official Travel, Other."
+              }
+            },
+            {
+              "name": "22. On Tour Category",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/masters?type=onTourCategory&status=Active&page=1&limit=50",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "masters"],
+                  "query": [
+                    { "key": "type", "value": "onTourCategory" },
+                    { "key": "status", "value": "Active" },
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "50" }
+                  ]
+                },
+                "description": "On Tour dropdown. Seed: Up Country, Local, Intrastate, International.\nApply On Tour sends this row _id in tourCategory. Test script saves the first id into {{onTourCategoryId}}."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const j = pm.response.json();",
+                      "const row = (j.data || [])[0];",
+                      "if (row && row._id) pm.collectionVariables.set('onTourCategoryId', row._id);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "23. On Duty Category",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/masters?type=onDutyCategory&status=Active&page=1&limit=50",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "masters"],
+                  "query": [
+                    { "key": "type", "value": "onDutyCategory" },
+                    { "key": "status", "value": "Active" },
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "50" }
+                  ]
+                },
+                "description": "On Duty dropdown. Seed: Client Site, Bank Work, Field Visit, Office Duty.\nApply On Duty sends this row _id in tourCategory. Test script saves the first id into {{onDutyCategoryId}}."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const j = pm.response.json();",
+                      "const row = (j.data || [])[0];",
+                      "if (row && row._id) pm.collectionVariables.set('onDutyCategoryId', row._id);"
+                    ]
+                  }
+                }
+              ]
             }
           ]
         },
