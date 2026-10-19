@@ -8035,7 +8035,7 @@
                       "key": "document",
                       "type": "file",
                       "src": [],
-                      "description": "file | required | PDF, image, Word, or Excel — max 5 MB"
+                      "description": "file | required | PDF, image, or Excel — max 5 MB"
                     }
                   ]
                 }

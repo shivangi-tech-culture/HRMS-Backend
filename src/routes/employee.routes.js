@@ -333,7 +333,7 @@ router.post(
  *               document:
  *                 type: string
  *                 format: binary
- *                 description: PDF, image, Word, or Excel — max 5MB
+ *                 description: PDF, image, or Excel — max 5MB
  *               type:
  *                 type: string
  *                 enum: [education, account, leave, profile, regularization]
