@@ -15,11 +15,10 @@
  *   GET    /approvals          breaks waiting for the reporting manager
  *   POST   /:id/review         { decision: "approve" | "reject", remarks? }
  *
- * Admin — Break Policy (employee sees published ones only, max 2)
+ * Admin — Break Policy (employee sees published ones only)
  *   GET    /policies
  *   POST   /policies           unpublished until publish
- *   PUT    /policies/:id
- *   PATCH  /policies/:id/publish
+ *   PUT    /policies/:id       includes published true or false
  *   DELETE /policies/:id
  *
  * Scope: Super Admin / Admin = all · HR = assigned companies · Manager = team.
@@ -36,7 +35,6 @@ const {
   listPolicies,
   createPolicy,
   updatePolicy,
-  publishPolicy,
   deletePolicy,
 } = require("../controllers/break.controller");
 const { protect, hasAllAccess } = require("../middleware/auth");
@@ -51,7 +49,6 @@ const {
   reviewSchema,
   policySchema,
   policyUpdateSchema,
-  publishSchema,
 } = require("../validators/break.validation");
 
 const router = express.Router();
@@ -205,13 +202,6 @@ router.put(
   needBreak("Break Policy", "edit"),
   validate(policyUpdateSchema),
   updatePolicy
-);
-router.patch(
-  "/policies/:id/publish",
-  protect,
-  needBreak("Break Policy", "edit"),
-  validate(publishSchema),
-  publishPolicy
 );
 router.delete("/policies/:id", protect, needBreak("Break Policy", "delete"), deletePolicy);
 

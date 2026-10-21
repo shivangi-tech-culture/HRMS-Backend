@@ -45,6 +45,17 @@ const userSchema = new mongoose.Schema(
     status: { type: String, default: "Active" },
     /** Updated on every successful login */
     lastLogin: { type: Date, default: null },
+    /**
+     * Latest JWT from login — stored on every successful login.
+     * Cleared on logout. Named `token` so it shows clearly in Compass.
+     */
+    token: { type: String, default: "" },
+    /** When this token was issued (login time) */
+    tokenIssuedAt: { type: Date, default: null },
+    /** When this token expires (from JWT exp) */
+    tokenExpiresAt: { type: Date, default: null },
+    /** Configured lifetime string used at issue time (e.g. "7d") */
+    tokenExpiresIn: { type: String, default: "" },
     /** Profile photo URL from Cloudinary folder hrms/profile */
     profileUrl: { type: String, default: "" },
 

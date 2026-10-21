@@ -8,7 +8,7 @@
  *   Live Break Status   GET /live
  *   Break History       GET /history
  *
- * Employee sees only the published policies (2 max): Lunch, and a flexible break with no daily count.
+ * Employee sees only the published policies: Lunch, flexible breaks, and any others that are published.
  * Ending past that policy's minutes is Pending until the reporting manager reviews it.
  * Must be punched in. Punch out is blocked while a break is open.
  */
@@ -35,10 +35,8 @@ const {
 const { logEmployeeActivity } = require("../utils/activityLog");
 const BreakPolicy = require("../models/BreakPolicy");
 const {
-  MAX_PUBLISHED,
   publishedPolicies,
   findPublishedByName,
-  publishedCount,
 } = require("../utils/breakPolicy");
 
 const COUNTED_STATUSES = ["Completed", "Approved", "Pending"];
@@ -1001,7 +999,6 @@ const listPolicies = async (req, res) => {
       .sort({ published: -1, flexible: 1, name: 1 })
       .lean();
     return res.json({
-      maxPublished: MAX_PUBLISHED,
       data: rows.map(policyCard),
     });
   } catch (err) {
@@ -1052,33 +1049,17 @@ const updatePolicy = async (req, res) => {
     if (row.flexible) row.minutes = null;
     else if (req.body.minutes != null) row.minutes = Number(req.body.minutes);
     if (req.body.description != null) row.description = String(req.body.description).trim();
+    if (req.body.published != null) {
+      row.published = Boolean(req.body.published);
+    }
     if (!row.flexible && (row.minutes == null || row.minutes < 1)) {
       return res.status(400).json({ message: "minutes is required when the break is not flexible" });
     }
     await row.save();
-    return res.json({ message: "Policy updated", policy: policyCard(row) });
-  } catch (err) {
-    return res.status(500).json({ message: err.message });
-  }
-};
-
-const publishPolicy = async (req, res) => {
-  try {
-    const row = await BreakPolicy.findById(req.params.id);
-    if (!row || !row.name) return res.status(404).json({ message: "Policy not found" });
-    const publish = Boolean(req.body.published);
-    if (publish && !row.published) {
-      const count = await publishedCount(row._id);
-      if (count >= MAX_PUBLISHED) {
-        return res.status(400).json({
-          message: "Only 2 policies can be published. Unpublish one first",
-        });
-      }
-    }
-    row.published = publish;
-    await row.save();
     return res.json({
-      message: publish ? "Policy published. Employees can use it" : "Policy unpublished",
+      message: row.published
+        ? "Policy updated. Employees can use it"
+        : "Policy updated. Employees cannot see it",
       policy: policyCard(row),
     });
   } catch (err) {
@@ -1111,6 +1092,5 @@ module.exports = {
   listPolicies,
   createPolicy,
   updatePolicy,
-  publishPolicy,
   deletePolicy,
 };

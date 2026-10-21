@@ -159,6 +159,16 @@ module.exports = swaggerJsdoc({
               type: "string",
               description: "JWT — also set as httpOnly cookie `token`; optional for Bearer/Swagger",
             },
+            tokenExpiresAt: {
+              type: "string",
+              format: "date-time",
+              description: "When the JWT expires (also stored on the user in DB)",
+            },
+            tokenExpiresIn: {
+              type: "string",
+              example: "7d",
+              description: "Configured JWT lifetime used at login (JWT_EXPIRES_IN)",
+            },
             user: {
               type: "object",
               properties: {

@@ -1,6 +1,6 @@
 /**
  * AUTH CONTROLLER — /api/auth
- * POST /login · POST /logout (JWT httpOnly cookie)
+ * POST /login · POST /logout · GET /token-status (JWT httpOnly cookie)
  */
 const bcrypt = require("bcryptjs");
 const User = require("../models/User");
@@ -11,12 +11,17 @@ const {
   compactPermissions,
   permissionsForRole,
 } = require("../config/permissions");
-const { setAuthCookie, clearAuthCookie } = require("../utils/authCookie");
+const {
+  setAuthCookie,
+  clearAuthCookie,
+  readToken,
+} = require("../utils/authCookie");
 const {
   companyListForUser,
   hasGlobalCompanyAccess,
 } = require("../utils/companyScope");
-const { signToken } = require("../utils/jwt");
+const { signToken, decodeToken, JWT_EXPIRES_IN } = require("../utils/jwt");
+const { inspectSessionToken } = require("../middleware/auth");
 
 const LOCKED_ROLES = new Set(["Super Admin", "Admin", "Employee"]);
 
@@ -43,7 +48,65 @@ const findByOfficialEmail = (officialEmail) =>
     "official.officialEmail": String(officialEmail).toLowerCase().trim(),
   });
 
-/** LOGIN — POST /api/auth/login (officialEmail + password → JWT cookie) */
+/** Persist latest JWT on the user document (issued / expiry timestamps) */
+const saveAuthTokenOnUser = async (user, token) => {
+  const decoded = decodeToken(token);
+  const issuedAt =
+    decoded?.iat != null ? new Date(decoded.iat * 1000) : new Date();
+  const expiresAt =
+    decoded?.exp != null ? new Date(decoded.exp * 1000) : null;
+  const expiresIn = String(JWT_EXPIRES_IN());
+
+  // updateOne so token always lands in MongoDB (not lost on document.save edge cases)
+  await User.updateOne(
+    { _id: user._id },
+    {
+      $set: {
+        token,
+        tokenIssuedAt: issuedAt,
+        tokenExpiresAt: expiresAt,
+        tokenExpiresIn: expiresIn,
+        lastLogin: issuedAt,
+      },
+      $unset: {
+        authToken: 1,
+        authTokenIssuedAt: 1,
+        authTokenExpiresAt: 1,
+        authTokenExpiresIn: 1,
+      },
+    }
+  );
+
+  user.token = token;
+  user.tokenIssuedAt = issuedAt;
+  user.tokenExpiresAt = expiresAt;
+  user.tokenExpiresIn = expiresIn;
+  user.lastLogin = issuedAt;
+};
+
+/** Clear stored JWT fields on the user */
+const clearAuthTokenOnUser = async (userId) => {
+  if (!userId) return;
+  await User.updateOne(
+    { _id: userId },
+    {
+      $set: {
+        token: "",
+        tokenIssuedAt: null,
+        tokenExpiresAt: null,
+        tokenExpiresIn: "",
+      },
+      $unset: {
+        authToken: 1,
+        authTokenIssuedAt: 1,
+        authTokenExpiresAt: 1,
+        authTokenExpiresIn: 1,
+      },
+    }
+  );
+};
+
+/** LOGIN — POST /api/auth/login (officialEmail + password → JWT cookie + DB) */
 const login = async (req, res) => {
   try {
     const { officialEmail, password } = req.body;
@@ -62,12 +125,10 @@ const login = async (req, res) => {
       return res.status(401).json({ message: "Account is inactive" });
     }
 
-    user.lastLogin = new Date();
-    await user.save();
-
     let roleDoc = await Role.findOne({ name: user.role });
     roleDoc = await refreshLockedRole(roleDoc);
     const token = signToken(user._id);
+    await saveAuthTokenOnUser(user, token);
     setAuthCookie(res, token);
     if (user.official?.emailAppPasswordSet) require("../utils/liveMailbox").warm(String(user._id));
 
@@ -79,6 +140,8 @@ const login = async (req, res) => {
     return res.json({
       message: "Login successful",
       token, // optional: cookie is primary; Bearer still works for Swagger
+      tokenExpiresAt: user.tokenExpiresAt,
+      tokenExpiresIn: user.tokenExpiresIn,
       user: {
         id: user._id,
         name: user.name,
@@ -98,10 +161,47 @@ const login = async (req, res) => {
   }
 };
 
-/** LOGOUT — POST /api/auth/logout (clear httpOnly token cookie) */
+/** LOGOUT — POST /api/auth/logout (clear cookie + DB token when present) */
 const logout = async (req, res) => {
+  try {
+    const token = readToken(req);
+    if (token) {
+      const decoded = decodeToken(token);
+      if (decoded?.id) {
+        const user = await User.findById(decoded.id).select("token");
+        if (user && (!user.token || user.token === token)) {
+          await clearAuthTokenOnUser(user._id);
+        }
+      }
+    }
+  } catch {
+    // still clear cookie even if DB clear fails
+  }
   clearAuthCookie(res);
   return res.json({ message: "Logged out" });
 };
 
-module.exports = { login, logout };
+/**
+ * TOKEN STATUS — GET /api/auth/token-status
+ * Header: Authorization Bearer <token> (or cookie token)
+ * Same check as protect (middleware/auth inspectSessionToken)
+ */
+const tokenStatus = async (req, res) => {
+  try {
+    const token = readToken(req);
+    const check = await inspectSessionToken(token);
+    return res.status(token ? 200 : 400).json({
+      message: check.message,
+      isExpired: check.isExpired,
+      isReplaced: check.isReplaced,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      message: err.message,
+      isExpired: false,
+      isReplaced: false,
+    });
+  }
+};
+
+module.exports = { login, logout, tokenStatus };

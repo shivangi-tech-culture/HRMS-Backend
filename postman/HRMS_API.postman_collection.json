@@ -434,7 +434,31 @@
           }
         },
         {
-          "name": "10. Logout",
+          "name": "10. Token Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/token-status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "token-status"
+              ]
+            },
+            "description": "GET /api/auth/token-status — pass JWT in header only.\n\n**Header:** `Authorization: Bearer {{token}}`\n\n**Response:**\n- `message` — text\n- `isExpired` — boolean | JWT time expired\n- `isReplaced` — boolean | logged in from another device\n\nBoth `false` = token valid.\n"
+          }
+        },
+        {
+          "name": "11. Logout",
           "request": {
             "method": "POST",
             "header": [],
@@ -6255,7 +6279,7 @@
             },
             {
               "name": "4. Attendance Regularization",
-              "description": "Approval queue. The employee creates the request in 2.2 Attendance.\n6. Request Regularization = missed punch (send the missing HH:mm).\n6b. Request Late Regularization = Late day, date and reason only.\nLogin as Reporting Manager (own team), HR (assigned companies), or Super Admin. Any one of them can approve or reject. An employee cannot review their own request.\nApprove on a Late day keeps status Late and sets attendanceStatus Approved. Reject keeps the day Late.\nNo punch-out stays MissedPunch until a missed-punch request is approved.",
+              "description": "## Attendance Regularization (approval queue)\nEmployee creates requests in **2.2 Attendance (Punch)**:\n- **6** Missed punch → send missing `HH:mm`\n- **6b** Late → `date` + `reason` only\n- **6c** Break → break start/end + reason\n\nLogin as **Reporting Manager** (own team), **HR** (assigned companies), or **Super Admin**.\nEmployees **cannot** approve/reject (including their own).\n\n| Request type | On Approve | On Reject |\n|--------------|------------|-----------|\n| Missed punch | Saved times scored vs shift → Present/Late/HalfDay/Absent | Missed punch-out stays **MissedPunch** |\n| Late | Day stays **Late**, `attendanceStatus` = **Approved** | Day stays **Late**, `attendanceStatus` = **Rejected** |\n| Break | Break times written; hours recounted | Break unchanged |",
               "item": [
                 {
                   "name": "1. List requests",
@@ -6311,7 +6335,7 @@
                         }
                       ]
                     },
-                    "description": "List regularization requests in scope.\nSuper Admin / Admin: the company (or the first company when companyId is omitted).\nHR: assigned companies. Reporting Manager: own team only.\nTest script saves the first `_id` into {{regularizationId}}."
+                    "description": "## GET `/api/attendance/regularizations`\nApproval inbox for regularization (scope by role).\n\n### Who sees what\n| Role | Scope |\n|------|-------|\n| Super Admin / Admin | Company (or first company if `companyId` omitted) |\n| HR | Assigned companies |\n| Reporting Manager | Own team only |\n\n### Query params\n| Param | Use |\n|-------|-----|\n| `companyId` | Optional company filter |\n| `status` | Pending (often default) \\| Approved \\| Rejected \\| Cancelled \\| ALL |\n| `search` | Name / email / employee code |\n| `from` / `to` | Attendance date range |\n| `page` / `limit` | Pagination |\n\nTest script saves first `_id` → `{{regularizationId}}`.\n\n\n_Tip: dates = `YYYY-MM-DD`, times = `HH:mm` (24h), month = `YYYY-MM`, ids = 24-char hex. Numbers/booleans/null unquoted._"
                   },
                   "event": [
                     {
@@ -6366,7 +6390,7 @@
                         }
                       }
                     },
-                    "description": "Reporting Manager (team), HR (assigned companies), or Super Admin approves the employee's request.\nYou cannot approve your own request.\nMissed punch: saved punch times are scored against the shift (Present, Late, HalfDay, or Absent).\nLate request: day stays Late and attendanceStatus becomes Approved.\nBody `reason` is required."
+                    "description": "## POST `/api/attendance/regularizations/:id/review?decision=approve`\nApprove a Pending regularization.\n\n### Query / body\n| Field | Use |\n|-------|-----|\n| `decision` | Query: `approve` (also accepted in body) |\n| `reason` | Body **required** — reviewer note (min 1 char) |\n\n### Effects\n- **Missed punch:** apply proposed times → score day vs shift.\n- **Late:** keep status Late; set `attendanceStatus` Approved.\n- **Break:** write break; recount hours.\nCannot approve your own request.\n\n\n_Tip: dates = `YYYY-MM-DD`, times = `HH:mm` (24h), month = `YYYY-MM`, ids = 24-char hex. Numbers/booleans/null unquoted._"
                   }
                 },
                 {
@@ -6408,7 +6432,7 @@
                         }
                       }
                     },
-                    "description": "Reporting Manager (team), HR (assigned companies), or Super Admin rejects the request.\nAn employee cannot reject their own request.\nA Late day stays Late and attendanceStatus becomes Rejected.\nA missed punch-out stays MissedPunch. Body `reason` is required."
+                    "description": "## POST `/api/attendance/regularizations/:id/review?decision=reject`\nReject a Pending regularization.\n\n### Query / body\n| Field | Use |\n|-------|-----|\n| `decision` | Query: `reject` |\n| `reason` | Body **required** — why rejected |\n\n### Effects\n- **Late:** stays Late; `attendanceStatus` Rejected.\n- **Missed punch-out:** stays **MissedPunch**.\n- **Break:** unchanged.\nEmployee cannot reject their own request.\n\n\n_Tip: dates = `YYYY-MM-DD`, times = `HH:mm` (24h), month = `YYYY-MM`, ids = 24-char hex. Numbers/booleans/null unquoted._"
                   }
                 }
               ]
@@ -7962,7 +7986,7 @@
                     "policies"
                   ]
                 },
-                "description": "POST /api/break/policies\nSaves a policy as unpublished. Employees do not see it until 8. Publish Policy.\nflexible true = employee sends minutes (5 or 10) and there is no daily count.\nflexible false = minutes is the fixed allowance, like lunch.",
+                "description": "POST /api/break/policies\nSaves a policy as unpublished.\nSet published true or false later on 7. Update Policy.\nflexible true = employee sends minutes (5 or 10) and there is no daily count.\nflexible false = minutes is the fixed allowance, like lunch.",
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"name\": \"Tea Break\",\n  \"flexible\": false,\n  \"minutes\": 15,\n  \"description\": \"\"\n}",
@@ -8008,10 +8032,10 @@
                     "{{policyId}}"
                   ]
                 },
-                "description": "PUT /api/break/policies/:id\nChange the name or minutes. New breaks use the new minutes.\n{{policyId}} comes from 7. Create Policy or 6. List Policies.",
+                "description": "PUT /api/break/policies/:id\nChange the name, minutes, or published.\npublished true shows it to employees. published false hides it.\nAny number of policies can be published.\n{{policyId}} comes from 6. Create Policy or 5. List Policies.",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"name\": \"Tea Break\",\n  \"flexible\": false,\n  \"minutes\": 10,\n  \"description\": \"\"\n}",
+                  "raw": "{\n  \"name\": \"Tea Break\",\n  \"flexible\": false,\n  \"minutes\": 10,\n  \"description\": \"\",\n  \"published\": true\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -8021,77 +8045,7 @@
               }
             },
             {
-              "name": "8. Publish Policy",
-              "request": {
-                "method": "PATCH",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "url": {
-                  "raw": "{{baseUrl}}/api/break/policies/{{policyId}}/publish",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "break",
-                    "policies",
-                    "{{policyId}}",
-                    "publish"
-                  ]
-                },
-                "description": "PATCH /api/break/policies/:id/publish\nEmployees can start this break after publish.\nIf 2 policies are already published, unpublish one first.",
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"published\": true\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                }
-              }
-            },
-            {
-              "name": "9. Unpublish Policy",
-              "request": {
-                "method": "PATCH",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "url": {
-                  "raw": "{{baseUrl}}/api/break/policies/{{policyId}}/publish",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "break",
-                    "policies",
-                    "{{policyId}}",
-                    "publish"
-                  ]
-                },
-                "description": "PATCH /api/break/policies/:id/publish\npublished false hides it from employees again.",
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"published\": false\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                }
-              }
-            },
-            {
-              "name": "10. Delete Policy",
+              "name": "8. Delete Policy",
               "request": {
                 "method": "DELETE",
                 "header": [],
@@ -8107,7 +8061,7 @@
                     "{{policyId}}"
                   ]
                 },
-                "description": "DELETE /api/break/policies/:id\nUnpublish first. Published policies cannot be deleted."
+                "description": "DELETE /api/break/policies/:id\nSet published to false on Update Policy first. A published policy cannot be deleted."
               }
             }
           ]
@@ -8396,7 +8350,7 @@
         },
         {
           "name": "2.2 Attendance (Punch)",
-          "description": "Employee self punch and regularization. Login as Employee first (2.1 → 1).\nPunch in with no punch out stays MissedPunch.\nAfter punch-out, status follows the shift: Absent, HalfDay, Present, or Late.\n4b = punch status for one date (employee and company from the login token).\n6 = missed punch. 6b = Late day (reason only, no new punch times).\nApprove and reject are not here. Login as Reporting Manager, HR, or Super Admin and use 1.7 → 4. Attendance Regularization.",
+          "description": "## Employee Attendance (self)\nLogin as **Employee** first (folder 2.1 → Login).\nAll requests need `Authorization: Bearer {{token}}` (or cookie `token`).\n\n### Flow\n1. **Punch In** → day becomes **MissedPunch** until punch-out.\n2. **Punch Out** → day scored vs shift → Present / Late / HalfDay / Absent.\n3. **My Time Sheet** → month grid; use `canApply` to know if regularize is allowed.\n4. Regularize:\n   - **6** = missed punch (send missing `HH:mm`)\n   - **6b** = Late day already punched (date + reason only)\n   - **6c** = break forgot / too long\n5. Manager/HR/Super Admin approve in **1.7 → 4. Attendance Regularization** (not here).\n\n### Day status codes (timesheet `status`)\n| Code | statusLabel | When |\n|------|-------------|------|\n| `P` | Present | Full day ok vs shift |\n| `L` | Late | Punch-in after grace; both punches present |\n| `A` | Absent | No usable attendance / too short |\n| `MP` | MissedPunch | Punch-in only, no punch-out |\n| `HD` | HalfDay | Left early / half leave + work |\n| `WO` | WeeklyOff | Off day, no work punch |\n| `H` | Holiday | Holiday |\n| `ELE` | EarlyLeave | Left before shift end (when scored) |\n| `Pending` | Pending | Regularization waiting review |\n| `Rejected` | Rejected | Regularization rejected |\n| leave code | leave name | Approved leave, no punch |\n| `OnDuty` / `OnTour` | Present display | Duty approved days show Present |",
           "item": [
             {
               "name": "1. Punch In",
@@ -8419,7 +8373,7 @@
                     "punch-in"
                   ]
                 },
-                "description": "Punch in for the logged-in employee. Status stays MissedPunch until punch-out.\nattendanceStatus is Early (before shift start), On time (start through 10 min grace), or Late (after grace).\nArriving before the shift is allowed. Those minutes are not added to working hours.\n\n**Body:** `source` (web|mobile|biometric), `latitude`, `longitude`, optional `remarks`.\n",
+                "description": "## POST `/api/attendance/punch-in`\nStart the work day for the **logged-in employee** (company/branch/shift from profile).\n\n### When to use\nEmployee reaches office / starts WFH and taps **In**.\n\n### Body fields\n| Field | Type | Required | Use |\n|-------|------|----------|-----|\n| `source` | string | yes | Where punch came from: `web` \\| `mobile` \\| `biometric` |\n| `latitude` | number | yes | GPS lat (−90…90). Address is resolved server-side via Map API |\n| `longitude` | number | yes | GPS lng (−180…180) |\n| `remarks` | string | no | Optional note (max 500), e.g. “Reached office” |\n\n### Result / status\n- Day status stays **`MissedPunch`** until punch-out.\n- `attendanceStatus`: **Early** (before shift start), **On time** (start → grace), or **Late** (after grace).\n- Early minutes before shift start are **not** counted in worked hours.\n- Saves `{{attendanceId}}` from response.\n\n### Auth\n`Authorization: Bearer {{token}}`\n\n\n_Tip: dates = `YYYY-MM-DD`, times = `HH:mm` (24h), month = `YYYY-MM`, ids = 24-char hex. Numbers/booleans/null unquoted._",
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"source\": \"web\",\n  \"latitude\": 28.6301,\n  \"longitude\": 77.2242,\n  \"remarks\": \"Reached office\"\n}",
@@ -8465,7 +8419,7 @@
                     "punch-out"
                   ]
                 },
-                "description": "Punch out. Status is calculated from the shift, not from a 1-hour early exit.\nExample shift 10:00–19:00:\n- 08:00 in, 19:00 out → Present (hours count from 10:00)\n- 11:00 or 12:00 in, 19:00 out → Late\n- 08:00 in, 18:00 out → HalfDay (left before shift end)\n- in, then out within the first half (for example 2 minutes) → Absent\nNo punch-out yet → MissedPunch.\nOvertime is only time after shift end.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n**Body:** `source` web | mobile | biometric, `latitude`, `longitude`, optional `remarks`\n",
+                "description": "## POST `/api/attendance/punch-out`\nEnd the work day. **Status is calculated from the assigned shift**, not from a fixed early-exit rule alone.\n\n### When to use\nEmployee leaves / ends work for the day (must already be punched in).\n\n### Body fields\n| Field | Type | Required | Use |\n|-------|------|----------|-----|\n| `source` | string | yes | `web` \\| `mobile` \\| `biometric` |\n| `latitude` | number | yes | GPS lat |\n| `longitude` | number | yes | GPS lng |\n| `remarks` | string | no | Optional note |\n\n### Example (shift 10:00–19:00)\n| In | Out | Result |\n|----|-----|--------|\n| 08:00 | 19:00 | **Present** (hours count from shift start 10:00) |\n| 11:00 / 12:00 | 19:00 | **Late** |\n| 08:00 | 18:00 | **HalfDay** (left before shift end) |\n| in then out in first half (e.g. 2 min) | | **Absent** |\n| in only, no out | | stays **MissedPunch** |\n\n### Other fields returned\n- `workingHours` / overtime: overtime only **after** shift end.\n- `lateByMinutes` / `earlyByMinutes` vs shift window.\n\n\n_Tip: dates = `YYYY-MM-DD`, times = `HH:mm` (24h), month = `YYYY-MM`, ids = 24-char hex. Numbers/booleans/null unquoted._",
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"source\": \"web\",\n  \"latitude\": 28.6301,\n  \"longitude\": 77.2242,\n  \"remarks\": \"\"\n}",
@@ -8506,7 +8460,7 @@
                     "today"
                   ]
                 },
-                "description": "Today's record + company / branch / shift.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                "description": "## GET `/api/attendance/today`\nToday’s attendance card for the logged-in employee.\n\n### When to use\nHome / dashboard “today” widget: punch state, shift, company, branch.\n\n### Query\nNone.\n\n### Response (typical)\n| Field | Use |\n|-------|-----|\n| punch in/out times | Current day punches |\n| `status` | Day status (Present, MissedPunch, …) |\n| company / branch / shift | Assignment context |\n| working hours, late/early | After punch-out |\n\n### Auth\n`Authorization: Bearer {{token}}`\n\n\n_Tip: dates = `YYYY-MM-DD`, times = `HH:mm` (24h), month = `YYYY-MM`, ids = 24-char hex. Numbers/booleans/null unquoted._"
               }
             },
             {
@@ -8559,7 +8513,7 @@
                     }
                   ]
                 },
-                "description": "Own IN/OUT punch rows.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `from` — string (YYYY-MM-DD) | optional | range start date\n- `to` — string (YYYY-MM-DD) | optional | range end date\n- `date` — string (YYYY-MM-DD) | optional/required by API | single day\n- `status` — string | optional | `ALL` | `Pending` | `Present` | `Absent` | `HalfDay` | `WeeklyOff` | `Holiday` | `MissedPunch` | `OnLeave` | `WFH`\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                "description": "## GET `/api/attendance/web-punches`\nOwn IN/OUT punch history (paginated list for “My Web Punches”).\n\n### When to use\nEmployee views past punches; filter by date range or status.\n\n### Query params\n| Param | Type | Required | Use |\n|-------|------|----------|-----|\n| `from` | YYYY-MM-DD | no | Range start |\n| `to` | YYYY-MM-DD | no | Range end |\n| `date` | YYYY-MM-DD | no | Single day (instead of from/to) |\n| `status` | string | no | `ALL` or day status: Present, Absent, HalfDay, WeeklyOff, Holiday, MissedPunch, OnLeave, WFH, Pending, … |\n| `page` | number | no | Default `1` |\n| `limit` | number | no | Rows per page (1–200, default 50) |\n\n### Auth\n`Authorization: Bearer {{token}}` + permission **Self → My Web Punches → view**\n\n\n_Tip: dates = `YYYY-MM-DD`, times = `HH:mm` (24h), month = `YYYY-MM`, ids = 24-char hex. Numbers/booleans/null unquoted._"
               }
             },
             {
@@ -8585,7 +8539,7 @@
                     }
                   ]
                 },
-                "description": "Punch in and punch out for the logged-in employee on one date.\nEmployee and company are taken from the Bearer token, not from the query.\n`shift` is the shift assigned on the employee profile for that date (`_id`, `code`, `name`, `startTime`, `endTime`, `halfDayEndTime`, `graceMinutes`). It is `null` when no shift is assigned.\nFuture dates return 400.\n\nReturns `punchedIn`, `punchedOut`, `punchInTime`, `punchOutTime`, punch cards (`time`, `at`, `source`, `location`), `status`, `attendanceStatus`, `workMode`, `workingHours`, `overtime`, `lateByMinutes`, `earlyByMinutes`, `remarks`, `attendanceId`, plus `company`, `shift`, and `employee`.\nNo row for that date is treated as Absent.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `date` — string (YYYY-MM-DD) | required | single day\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                "description": "## GET `/api/attendance/punch-status`\nPunch in/out status for **one date**. Employee + company come from the **login token** (not query).\n\n### When to use\nUI “Am I punched in today?” / day detail before regularize.\n\n### Query params\n| Param | Type | Required | Use |\n|-------|------|----------|-----|\n| `date` | YYYY-MM-DD | yes | Day to check. Future dates → `400` |\n\n### Response fields\n| Field | Use |\n|-------|-----|\n| `punchedIn` / `punchedOut` | Booleans |\n| `punchInTime` / `punchOutTime` | Clock times |\n| punch cards | `time`, `at`, `source`, `location` |\n| `status` | Day status; no row → treated as **Absent** |\n| `attendanceStatus` | Early / On time / Late / Approved / … |\n| `workMode` | WFO / WFH / … |\n| `workingHours`, `overtime` | After out |\n| `lateByMinutes`, `earlyByMinutes` | Vs shift |\n| `shift` | Assigned shift (`_id`, code, name, start/end, halfDayEnd, grace) or `null` |\n| `company`, `employee`, `attendanceId` | Context |\n\n\n_Tip: dates = `YYYY-MM-DD`, times = `HH:mm` (24h), month = `YYYY-MM`, ids = 24-char hex. Numbers/booleans/null unquoted._"
               }
             },
             {
@@ -8607,29 +8561,29 @@
                     {
                       "key": "month",
                       "value": "{{attendanceMonth}}",
-                      "description": "YYYY-MM. Or use from and to instead."
+                      "description": "YYYY-MM | optional | company attendance month (e.g. 2026-10). Uses company month-start day. Or use from+to instead."
                     },
                     {
                       "key": "from",
                       "value": "{{fromDate}}",
                       "disabled": true,
-                      "description": "YYYY-MM-DD"
+                      "description": "YYYY-MM-DD | optional | custom range start (with to); max 62 days"
                     },
                     {
                       "key": "to",
                       "value": "{{toDate}}",
                       "disabled": true,
-                      "description": "YYYY-MM-DD"
+                      "description": "YYYY-MM-DD | optional | custom range end"
                     },
                     {
                       "key": "employeeId",
                       "value": "{{employeeId}}",
                       "disabled": true,
-                      "description": "Omit for yourself. HR / manager / admin may pass another employee."
+                      "description": "MongoId | optional | omit = self; HR/manager/admin may pass another employee in scope"
                     }
                   ]
                 },
-                "description": "Employee timesheet for the company month (or from–to).\nEach row: date, day, shift, inOut, workedHours, status, statusLabel, canApply.\nstatus codes: P present, L late, A absent, MP missed punch (no punch-out), HD half day, WO weekly off, Pending, Rejected, or a leave code.\ncanApply is true for Absent, MissedPunch, and Late when no request is already Pending or Approved.\nLate uses 6b (date + reason). Missed punch uses 6 (missing HH:mm)."
+                "description": "## GET `/api/attendance/timesheet`\nEmployee **month timesheet** (company attendance month, or custom from–to).\nSelf: omit `employeeId`. HR/Manager/Admin may pass another employee in scope.\n\n### When to use\nESS Time Sheet screen — day rows + month summary; decide whether to open Regularize.\n\n### Query params\n| Param | Type | Required | Use |\n|-------|------|----------|-----|\n| `month` | YYYY-MM | no* | Company month label (e.g. `2026-10`). Uses company month-start day (1 or e.g. 24) |\n| `from` | YYYY-MM-DD | no* | Custom range start (with `to`) |\n| `to` | YYYY-MM-DD | no* | Custom range end; max **62 days** |\n| `employeeId` | MongoId | no | Other employee (not for Employee role) |\n\n\\* Use either `month` **or** `from`/`to`. Default month = current.\n\n### Each row in `data[]`\n| Field | Use |\n|-------|-----|\n| `date` | Day YYYY-MM-DD |\n| `day` | Weekday name (Mon, Tue, …) |\n| `shift` | Shift name, or “Weekly Off” |\n| `inTime` / `outTime` | Display labels like `10 Oct 09:30` |\n| `inOut` | Combined punch display, or `—` if none |\n| `punchInTime` / `punchOutTime` | Raw `HH:mm` |\n| `workedHours` | `HH:mm` worked (00:00 if empty) |\n| `hours` | Human label (e.g. `8h 30m`) |\n| `status` | Short code for UI badge (see below) |\n| `statusLabel` | Full label: Present, Late, Absent, MissedPunch, … |\n| `dayDesc` | WorkDay \\| WeeklyOff \\| Leave \\| On Duty \\| On Tour |\n| `canApply` | `true` → employee may create a regularization for this day |\n| `requestStatus` | Latest reg: Pending / Approved / Rejected / Cancelled / \"\" |\n| `reason` / `remarks` | From regularization or attendance |\n| `lateByMinutes` / `earlyByMinutes` | Vs shift that day |\n\n### `status` codes\n| Code | Meaning |\n|------|---------|\n| `P` | Present |\n| `L` | Late |\n| `A` | Absent |\n| `MP` | Missed punch (no punch-out) |\n| `HD` | Half day |\n| `WO` | Weekly off |\n| `H` | Holiday |\n| `ELE` | Early leave |\n| `Pending` | Regularization pending |\n| `Rejected` | Regularization rejected |\n| leave code | e.g. CL / SL / UL from leave type |\n\n### When `canApply` is true\nAll of these:\n- `date` ≤ today\n- `dayDesc` is **WorkDay**\n- `status` is one of: **A**, **MP**, **L**, **ELE**, **HD**, **Rejected**\n- No request already **Pending** or **Approved** for that date\n\n### Which regularize API to call\n| Situation | Use request | Body |\n|-----------|-------------|------|\n| Missing in and/or out (`MP` / some `A`) | **6. Request Regularization** | `date` + missing `punchInTime`/`punchOutTime` + `reason` |\n| Day is **Late** but both punches exist | **6b. Request Late Regularization** | `date` + `reason` only (no new times) |\n| Break forgotten / too long | **6c. Request Break Regularization** | `date` + break times + `reason` |\n\n### Top-level response\n`employee`, `month`, `label`, `from`, `to`, `summary` (present/absent/missedPunch/pending/leaves/payable…), `total`, `data`.\n\n\n_Tip: dates = `YYYY-MM-DD`, times = `HH:mm` (24h), month = `YYYY-MM`, ids = 24-char hex. Numbers/booleans/null unquoted._"
               }
             },
             {
@@ -8662,7 +8616,7 @@
                     }
                   }
                 },
-                "description": "Employee only. Use this when punch-in or punch-out is missing.\nSend the missing time: punchInTime, punchOutTime, or both, as 24-hour HH:mm, plus reason.\nUntil the request is approved, a day with no punch-out stays MissedPunch.\nDo not use this for a Late day that already has both punches. Use 6b instead.\nOne pending request per date. Test script saves `_id` into {{regularizationId}}.\nApprove in 1.7 → 4. Attendance Regularization (Reporting Manager, HR, or Super Admin)."
+                "description": "## POST `/api/attendance/regularize` — Missed punch\nEmployee self-only. Fix a day where **punch-in and/or punch-out is missing**.\n\n### When to use\n- Timesheet `status` = **MP** (punched in, forgot out), or\n- Absent / incomplete punches needing times filled.\n- **Do not** use for a Late day that already has both punches → use **6b**.\n\n### Body fields\n| Field | Type | Required | Use |\n|-------|------|----------|-----|\n| `date` | YYYY-MM-DD | yes | Attendance day to fix |\n| `punchInTime` | HH:mm | if in missing | Proposed punch-in (24h) |\n| `punchOutTime` | HH:mm | if out missing | Proposed punch-out (24h) |\n| `reason` | string | yes | From master `regularizationReason` or free text (max 200) |\n| `remarks` | string | no | Extra note (max 500) |\n| `document` | string URL | no | Optional proof attachment URL |\n\nSend at least the **missing** time(s). One **Pending** request per date.\n\n### After submit\n- Request status **Pending**; timesheet may show **Pending**.\n- Until approved, no punch-out still displays as **MissedPunch** on the day logic.\n- Approve/reject: **1.7 → 4. Attendance Regularization** (RM / HR / Super Admin).\n- Test script saves `_id` → `{{regularizationId}}`.\n\n\n_Tip: dates = `YYYY-MM-DD`, times = `HH:mm` (24h), month = `YYYY-MM`, ids = 24-char hex. Numbers/booleans/null unquoted._"
               },
               "event": [
                 {
@@ -8690,15 +8644,25 @@
                 ],
                 "url": {
                   "raw": "{{baseUrl}}/api/attendance/regularize",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "attendance", "regularize"]
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "attendance",
+                    "regularize"
+                  ]
                 },
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"date\": \"{{attendanceDate}}\",\n  \"breakType\": \"Lunch Break\",\n  \"breakStartTime\": \"13:00\",\n  \"breakEndTime\": \"13:30\",\n  \"reason\": \"Forgot to end break\",\n  \"remarks\": \"Break ran long because I did not tap end\"\n}",
-                  "options": { "raw": { "language": "json" } }
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 },
-                "description": "Employee only. Use when break timing was wrong: forgot to end, or took longer than allowed.\nbreakEndTime is required (HH:mm). breakStartTime is required only when no break is still open.\nIf a break is still open, omit breakStartTime and the open start is kept.\nRequest stays Pending. Reporting Manager approves it in 1.7 → 4. Attendance Regularization.\nApprove writes this break time, closes a forgotten open break, and recounts working hours against the 9-hour shift.\nReject leaves the break as it is.\nOne pending request per date. Test script saves {{regularizationId}}."
+                "description": "## POST `/api/attendance/regularize` — Break\nEmployee self-only. Correct **break** timing (forgot to end break, or break ran long).\n\n### When to use\nOpen/wrong break on a worked day; not for missing main punch-in/out (use **6**).\n\n### Body fields\n| Field | Type | Required | Use |\n|-------|------|----------|-----|\n| `date` | YYYY-MM-DD | yes | Day of the break |\n| `breakType` | string | yes* | e.g. `Lunch Break` |\n| `breakStartTime` | HH:mm | if no open break | Start; omit if a break is still open (server keeps open start) |\n| `breakEndTime` | HH:mm | yes | End time to apply |\n| `reason` | string | yes | Why correcting |\n| `remarks` | string | no | Extra note |\n\n### After approve\nWrites break times, closes forgotten open break, recounts working hours vs shift.\nReject leaves break as-is. Review in **1.7 → 4**.\nOne Pending per date. Saves `{{regularizationId}}`.\n\n\n_Tip: dates = `YYYY-MM-DD`, times = `HH:mm` (24h), month = `YYYY-MM`, ids = 24-char hex. Numbers/booleans/null unquoted._"
               },
               "event": [
                 {
@@ -8744,7 +8708,7 @@
                     }
                   }
                 },
-                "description": "Employee only, after punch-out, when the day is Late (for example shift 10:00–19:00, in at 11:00 or 12:00, out at 19:00).\nDo not send punchInTime or punchOutTime. Both punches are already saved.\nBody: `date` (YYYY-MM-DD) and `reason` (required). `remarks` is optional.\nRequest stays Pending until Reporting Manager (team), HR (assigned companies), or Super Admin approves it in 1.7 → 4. Attendance Regularization.\nApprove keeps status Late and sets attendanceStatus to Approved. Reject keeps status Late.\nOne pending request per date. Test script saves `_id` into {{regularizationId}}."
+                "description": "## POST `/api/attendance/regularize` — Late day\nEmployee self-only. Day is already **Late** with **both punches saved**.\n\n### When to use\nExample shift 10:00–19:00, in at 11:00/12:00, out at 19:00 → status **Late**.\nEmployee explains why they were late (traffic, client, etc.).\n\n### Body fields\n| Field | Type | Required | Use |\n|-------|------|----------|-----|\n| `date` | YYYY-MM-DD | yes | The Late day |\n| `reason` | string | yes | Why late |\n| `remarks` | string | no | Extra detail |\n\n**Do not** send `punchInTime` / `punchOutTime` — punches already exist.\n\n### After approve / reject\n| Decision | Day `status` | `attendanceStatus` |\n|----------|-------------|---------------------|\n| Approve | stays **Late** | **Approved** |\n| Reject | stays **Late** | **Rejected** |\n\nReviewers: Reporting Manager (team), HR (assigned companies), Super Admin.\nOne Pending per date. Saves `{{regularizationId}}`.\n\n\n_Tip: dates = `YYYY-MM-DD`, times = `HH:mm` (24h), month = `YYYY-MM`, ids = 24-char hex. Numbers/booleans/null unquoted._"
               },
               "event": [
                 {
@@ -8801,7 +8765,7 @@
                     }
                   ]
                 },
-                "description": "Your own regularization list: sheet date, in/out, reason, remarks, submit date, status Pending / Approved / Rejected."
+                "description": "## GET `/api/attendance/regularize`\nList **your own** regularization requests (missed punch, late, break).\n\n### When to use\nESS “My Regularization” history / track Pending vs Approved.\n\n### Query params\n| Param | Type | Required | Use |\n|-------|------|----------|-----|\n| `status` | string | no | `ALL` (default) \\| `Pending` \\| `Approved` \\| `Rejected` \\| `Cancelled` |\n| `from` / `to` | YYYY-MM-DD | no | Filter by attendance date range |\n| `page` / `limit` | number | no | Pagination (limit max 100) |\n\n### Row fields (typical)\n`date`, punch in/out (if any), break fields, `reason`, `remarks`, submittedAt, `status`.\n\n\n_Tip: dates = `YYYY-MM-DD`, times = `HH:mm` (24h), month = `YYYY-MM`, ids = 24-char hex. Numbers/booleans/null unquoted._"
               }
             },
             {
@@ -8822,7 +8786,7 @@
                     "cancel"
                   ]
                 },
-                "description": "Withdraw your own Pending request. Approved or rejected requests cannot be cancelled."
+                "description": "## POST `/api/attendance/regularize/:id/cancel`\nWithdraw **your own** request while it is still **Pending**.\n\n### When to use\nEmployee filed wrong times/reason and wants to re-apply.\n\n### Path\n| Param | Use |\n|-------|-----|\n| `{{regularizationId}}` | From request **6 / 6b / 6c** or list **7** |\n\n### Rules\n- Only **Pending** can be cancelled.\n- **Approved** / **Rejected** → cannot cancel.\n- After cancel, timesheet `canApply` can become true again if day still qualifies.\n\n\n_Tip: dates = `YYYY-MM-DD`, times = `HH:mm` (24h), month = `YYYY-MM`, ids = 24-char hex. Numbers/booleans/null unquoted._"
               }
             },
             {
@@ -8858,7 +8822,7 @@
                     }
                   ]
                 },
-                "description": "On Tour dropdown. Saves the first category `_id` into {{onTourCategoryId}}.\nValues: Up Country, Local, Intrastate, International."
+                "description": "## GET `/api/masters?type=onTourCategory`\nDropdown values for **On Tour** applications.\n\n### Use\nRun before **9. Apply On Tour**. Saves first `_id` → `{{onTourCategoryId}}`.\nTypical names: Up Country, Local, Intrastate, International.\nSend this **`_id`** in `tourCategory` (not the name).\n\n\n_Tip: dates = `YYYY-MM-DD`, times = `HH:mm` (24h), month = `YYYY-MM`, ids = 24-char hex. Numbers/booleans/null unquoted._"
               },
               "event": [
                 {
@@ -8907,7 +8871,7 @@
                     }
                   ]
                 },
-                "description": "On Duty dropdown. Saves the first category `_id` into {{onDutyCategoryId}}.\nValues: Client Site, Bank Work, Field Visit, Office Duty."
+                "description": "## GET `/api/masters?type=onDutyCategory`\nDropdown values for **On Duty** applications.\n\n### Use\nRun before **9** with `dutyType: \"On Duty\"`. Saves `{{onDutyCategoryId}}`.\nTypical: Client Site, Bank Work, Field Visit, Office Duty.\n\n\n_Tip: dates = `YYYY-MM-DD`, times = `HH:mm` (24h), month = `YYYY-MM`, ids = 24-char hex. Numbers/booleans/null unquoted._"
               },
               "event": [
                 {
@@ -8953,7 +8917,7 @@
                     }
                   }
                 },
-                "description": "Employee only. Run 9a or 9b first.\ntourCategory is the master _id, not the name.\nOn Tour → {{onTourCategoryId}} from type=onTourCategory.\nOn Duty → {{onDutyCategoryId}} from type=onDutyCategory, and set dutyType to On Duty.\nStays Pending until Reporting Manager, HR, or Super Admin reviews it in 1.7 → 5.\nApprove → attendance Present. Reject → attendance Absent.\nOptional document: type=onTour or type=onDuty, then put the url in document.\nResponse tourCategory is { _id, name }. Saves request `_id` into {{tourDutyId}}."
+                "description": "## POST `/api/attendance/tour-duty`\nEmployee applies for **On Tour** or **On Duty** date range.\n\n### When to use\nOfficial travel / client site / bank work instead of office punches.\n\n### Body fields\n| Field | Type | Required | Use |\n|-------|------|----------|-----|\n| `dutyType` | string | yes | `On Tour` or `On Duty` |\n| `tourCategory` | MongoId | yes | Master `_id` from **9a** or **9b** (not the name) |\n| `fromDate` / `toDate` | YYYY-MM-DD | yes | Inclusive range |\n| `fromTime` / `toTime` | HH:mm | yes | Window |\n| `reason` | string | yes | Why |\n| `remarks` | string | no | Extra |\n| `document` | URL | no | Upload with type `onTour` / `onDuty`, then put `url` here |\n\n### After review (1.7 → 5)\n- **Approve** → each covered day attendance **Present**\n- **Reject** → each covered day **Absent**\nSaves `{{tourDutyId}}`.\n\n\n_Tip: dates = `YYYY-MM-DD`, times = `HH:mm` (24h), month = `YYYY-MM`, ids = 24-char hex. Numbers/booleans/null unquoted._"
               },
               "event": [
                 {
@@ -9005,7 +8969,7 @@
                     }
                   ]
                 },
-                "description": "Own applied and approved rows. duration is inclusive days, for example 3 Day(s)."
+                "description": "## GET `/api/attendance/tour-duty`\nOwn On Tour / On Duty applications.\n\n### Query\n| Param | Use |\n|-------|-----|\n| `status` | ALL \\| Pending \\| Approved \\| Rejected \\| Cancelled |\n| `month` | YYYY-MM optional filter |\n| `page` / `limit` | Pagination |\n\n`duration` = inclusive days, e.g. `3 Day(s)`.\n\n\n_Tip: dates = `YYYY-MM-DD`, times = `HH:mm` (24h), month = `YYYY-MM`, ids = 24-char hex. Numbers/booleans/null unquoted._"
               }
             },
             {
@@ -9026,7 +8990,7 @@
                     "cancel"
                   ]
                 },
-                "description": "Withdraw your own Pending request. Approved requests stay on attendance."
+                "description": "## POST `/api/attendance/tour-duty/:id/cancel`\nCancel **your own Pending** On Tour/On Duty request.\n\nApproved requests stay on attendance and cannot be cancelled here.\nPath: `{{tourDutyId}}` from apply or list.\n\n\n_Tip: dates = `YYYY-MM-DD`, times = `HH:mm` (24h), month = `YYYY-MM`, ids = 24-char hex. Numbers/booleans/null unquoted._"
               }
             }
           ]
