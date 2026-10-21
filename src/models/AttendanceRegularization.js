@@ -11,6 +11,10 @@ const attendanceRegularizationSchema = new mongoose.Schema(
     date: { type: String, required: true }, // YYYY-MM-DD
     punchInTime: { type: String, default: "" }, // HH:mm
     punchOutTime: { type: String, default: "" },
+    /** Correct a break the employee forgot to end, or one that ran too long. */
+    breakType: { type: String, default: "" },
+    breakStartTime: { type: String, default: "" },
+    breakEndTime: { type: String, default: "" },
     reason: { type: String, default: "" },
     remarks: { type: String, default: "" },
     /** Cloudinary URL from POST /api/employees/upload with type=regularization */

@@ -11,6 +11,7 @@
  * - Employee create/update still uses companyShift.assertUserPlacement only
  */
 const Attendance = require("../models/Attendance");
+const BreakSession = require("../models/Break");
 const User = require("../models/User");
 const Company = require("../models/Company");
 const { getModel } = require("../models/Master");
@@ -29,6 +30,7 @@ const {
   punchInWindow,
   sameDayClock,
   DEFAULT_SHIFT,
+  workProgress,
 } = require("../utils/shiftTiming");
 const {
   shiftSummary,
@@ -84,6 +86,13 @@ const assertSelfSource = (source) => {
  * Hours and day status from the employee's shift.
  * Punch in only → MissedPunch. Punch out → Present or HalfDay.
  */
+/** Save net worked minutes (shift time minus breaks the employee has ended). */
+const applyWorkProgress = (record, shift) => {
+  if (!record?.punchIn || record.punchOut) return;
+  const progress = workProgress(record, shift);
+  record.workedMinutes = progress.workedMinutes;
+};
+
 const applyMetrics = (record, shift) => {
   const metrics = computeDayMetrics(record, shift, record.date);
   record.workedMinutes = metrics.workedMinutes;
@@ -233,6 +242,15 @@ const punchOut = async (req, res) => {
     if (!record || !record.punchIn) {
       return res.status(400).json({ message: "Please punch in first" });
     }
+    const openBreak = await BreakSession.findOne({
+      employee: employeeId,
+      date,
+      endedAt: null,
+    }).select("_id");
+    if (openBreak) {
+      return res.status(400).json({ message: "End your break before punch out" });
+    }
+
     if (record.punchOut) {
       await record.populate(
         "employee",
@@ -344,6 +362,11 @@ const myToday = async (req, res) => {
       } else if (record.punchIn && !record.punchOut && record.status !== "MissedPunch") {
         record.status = "MissedPunch";
         dirty = true;
+      }
+      if (record.punchIn && !record.punchOut) {
+        const before = record.workedMinutes;
+        applyWorkProgress(record, shift);
+        if (record.workedMinutes !== before) dirty = true;
       } else if (record.punchIn && record.punchOut) {
         applyMetrics(record, shift);
         dirty = true;
@@ -404,12 +427,13 @@ const getPunchStatus = async (req, res) => {
 
     const record = await Attendance.findOne({ employee: employee._id, date })
       .select(
-        "date companyId branchId shift punchIn punchOut punchInSource punchOutSource punchInLocation punchOutLocation workMode workedMinutes overtimeMinutes lateByMinutes earlyByMinutes status remarks attendanceStatus reviewReason"
+        "date companyId branchId shift punchIn punchOut punchInSource punchOutSource punchInLocation punchOutLocation workMode workedMinutes overtimeMinutes lateByMinutes earlyByMinutes status remarks attendanceStatus reviewReason breaks"
       )
       .lean();
 
     const punchedIn = Boolean(record?.punchIn);
     const punchedOut = Boolean(record?.punchOut);
+    const liveWork = record?.punchIn ? workProgress(record, placed.shift) : null;
     const punchInTime = formatPunchStamp(record?.punchIn);
     const punchOutTime = formatPunchStamp(record?.punchOut);
 
@@ -453,7 +477,10 @@ const getPunchStatus = async (req, res) => {
           : record.status || "Absent",
       attendanceStatus: record?.attendanceStatus || null,
       workMode: record?.workMode || "WFO",
-      workingHours: formatDurationLabel(record?.workedMinutes),
+      workingHours: formatDurationLabel(liveWork?.workedMinutes),
+      requiredHours: formatDurationLabel(liveWork?.requiredMinutes),
+      remainingHours: formatDurationLabel(liveWork?.remainingMinutes),
+      shiftCompleted: Boolean(liveWork?.completed),
       overtime: formatDurationLabel(record?.overtimeMinutes),
       lateByMinutes: Number(record?.lateByMinutes) || 0,
       earlyByMinutes: Number(record?.earlyByMinutes) || 0,

@@ -86,17 +86,16 @@ const ADMIN_TREE = [
     ],
   },
 
-  // Break
+  // Break — live board and history. Lunch 30 min, Day Break with no limit.
   {
     module: "Break",
     heading: "Break Management",
     subModules: [
       {
         name: "Live Break Status",
-        actions: ["view", "create", "edit", "export", "download"],
+        actions: ["view", "edit", "export", "download"],
       },
       { name: "Break History", actions: VE },
-      { name: "Break Summary", actions: VE },
       { name: "Break Policy", actions: ["view", "create", "edit", "delete"] },
     ],
   },

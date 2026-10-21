@@ -1,10 +1,10 @@
 /**
  * UPLOAD MIDDLEWARE — multer (memory) → Cloudinary secure URL
  * Field "document", max 5 MB.
- * Types: education | account | leave | profile | regularization | onTour | onDuty → hrms/<type>.
+ * Types: education | account | leave | profile | regularization | onTour | onDuty | companyLogo → hrms/<type>.
  * Allowed files: PDF, JPEG, PNG, WEBP, GIF, and Excel (.xls / .xlsx).
  * The check uses file bytes, not the name the browser sends.
- * profile accepts images only. Macro Excel is rejected.
+ * profile and companyLogo accept images only. Macro Excel is rejected.
  */
 const multer = require("multer");
 const path = require("path");
@@ -22,7 +22,19 @@ const ALLOWED_MESSAGE = "Only PDF, image, or Excel files are allowed";
 const allowedExt = new Set([".pdf", ".jpg", ".jpeg", ".png", ".webp", ".gif", ".xls", ".xlsx"]);
 
 /** Allowed attachment kinds. Folder on Cloudinary is hrms/<type>. */
-const UPLOAD_TYPES = ["education", "account", "leave", "profile", "regularization", "onTour", "onDuty"];
+const UPLOAD_TYPES = [
+  "education",
+  "account",
+  "leave",
+  "profile",
+  "regularization",
+  "onTour",
+  "onDuty",
+  "companyLogo",
+];
+
+/** Images only. PDF and Excel are rejected for these types. */
+const IMAGE_ONLY_TYPES = new Set(["profile", "companyLogo"]);
 
 const IMAGE_KINDS = new Set(["jpg", "png", "gif", "webp"]);
 
@@ -128,10 +140,14 @@ const rejectFile = (message) => {
   return err;
 };
 
-/** Cloudinary folder: hrms/education, hrms/account, hrms/leave, hrms/profile, or hrms/regularization */
+/** Cloudinary folder: hrms/<type>, including hrms/profile and hrms/companyLogo */
 const folderFor = (type) => {
   const configured = (process.env.CLOUDINARY_FOLDER || "hrms").replace(/\/+$/, "");
-  const root = configured.replace(/\/(education|account|leave|profile|regularization|onTour|onDuty)$/, "") || "hrms";
+  const root =
+    configured.replace(
+      /\/(education|account|leave|profile|regularization|onTour|onDuty|companyLogo)$/,
+      ""
+    ) || "hrms";
   return `${root}/${type}`;
 };
 
@@ -145,8 +161,9 @@ const uploadOptionsFor = (file, type = "education") => {
     throw rejectFile("This file is not a valid PDF, image, or Excel file");
   }
 
-  if (type === "profile" && !IMAGE_KINDS.has(kind)) {
-    throw rejectFile("Profile image must be JPEG, PNG, WEBP, or GIF");
+  if (IMAGE_ONLY_TYPES.has(type) && !IMAGE_KINDS.has(kind)) {
+    const label = type === "companyLogo" ? "Company logo" : "Profile image";
+    throw rejectFile(`${label} must be JPEG, PNG, WEBP, or GIF`);
   }
 
   if (kind === "pdf") {

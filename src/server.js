@@ -36,6 +36,7 @@ const companyRoutes = require("./routes/company.routes");
 const chatRoutes = require("./routes/chat.routes");
 const leaveRoutes = require("./routes/leave.routes");
 const holidayRoutes = require("./routes/holiday.routes");
+const breakRoutes = require("./routes/break.routes");
 const { attachChatSocket } = require("./utils/chatSocket");
 
 const app = express();
@@ -233,6 +234,7 @@ app.use("/api/companies", companyRoutes); // Company CRUD
 app.use("/api/chat", chatRoutes); // team chat (REST) — live updates on Socket.IO below
 app.use("/api/leave", leaveRoutes); // types · balance · requests · calendar · policies · history
 app.use("/api/holidays", holidayRoutes); // catalog + company assignment
+app.use("/api/break", breakRoutes); // employee start/end · admin live + history
 
 /** One HTTP server for the API and Socket.IO (chat) */
 const server = http.createServer(app);
@@ -246,6 +248,8 @@ attachChatSocket(io);
 connectDB().then(async () => {
   const { seedLeaveDefaults } = require("./utils/seedLeave");
   await seedLeaveDefaults();
+  const { seedBreakPolicies } = require("./utils/breakPolicy");
+  await seedBreakPolicies();
   const { purgeImportedMail } = require("./utils/userMailbox");
   purgeImportedMail()
     .then((count) => count && console.log(`Removed ${count} copied mailbox mails`))

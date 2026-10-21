@@ -311,9 +311,9 @@ router.post(
  *     summary: Upload attachment to Cloudinary
  *     description: |
  *       No user id. Form-data: `document` (file) and `type`
- *       (`education`, `account`, `leave`, `profile`, `regularization`, `onTour`, or `onDuty`).
+ *       (`education`, `account`, `leave`, `profile`, `regularization`, `onTour`, `onDuty`, or `companyLogo`).
  *       Cloudinary folder is `hrms/<type>`. The same type always uses that same folder.
- *       `profile` accepts JPEG, PNG, WEBP, or GIF only and stores it in `hrms/profile`.
+ *       `profile` and `companyLogo` accept JPEG, PNG, WEBP, or GIF only.
  *       Saves nothing in the database. On Submit, put the returned `url` in:
  *       - education → `education[].document`
  *       - account → `accounts[].attachment`
@@ -322,6 +322,7 @@ router.post(
  *       - regularization → attendance regularize `document`
  *       - onTour → On Tour `document`
  *       - onDuty → On Duty `document`
+ *       - companyLogo → company `logo`
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -338,7 +339,7 @@ router.post(
  *                 description: PDF, image, or Excel — max 5MB
  *               type:
  *                 type: string
- *                 enum: [education, account, leave, profile, regularization, onTour, onDuty]
+ *                 enum: [education, account, leave, profile, regularization, onTour, onDuty, companyLogo]
  *                 example: profile
  *     responses:
  *       201:
@@ -356,7 +357,7 @@ router.post(
  *       500:
  *         description: Cloudinary not configured or upload failed
  */
-// UPLOAD ATTACHMENT — Cloudinary; form-data: document + type (education|account|leave|profile|regularization|onTour|onDuty)
+// UPLOAD ATTACHMENT — Cloudinary; form-data: document + type (education|account|leave|profile|regularization|onTour|onDuty|companyLogo)
 // Admin: Employee→edit | Employee: Self→General Info→edit
 router.post(
   "/upload",
