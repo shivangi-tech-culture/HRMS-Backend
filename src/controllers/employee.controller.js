@@ -1094,15 +1094,15 @@ const deleteEmployee = async (req, res) => {
 
 /**
  * UPLOAD — POST /api/employees/upload
- * Form-data: document + type (education|account|leave|profile|regularization). Returns url only.
- * profile → Cloudinary folder hrms/profile (images only). Put url on profileUrl.
+ * Form-data: document + type. Returns the Cloudinary url only.
+ * profile → hrms/profile (images only). Put url on profileUrl.
+ * companyLogo → hrms/companyLogo (images only). Put url on company logo.
  */
 const uploadAttachment = async (req, res) => {
   try {
-    const type = String(req.body.type || "")
-      .trim()
-      .toLowerCase();
-    if (!UPLOAD_TYPES.includes(type)) {
+    const rawType = String(req.body.type || "").trim();
+    const type = UPLOAD_TYPES.find((item) => item.toLowerCase() === rawType.toLowerCase());
+    if (!type) {
       return res.status(400).json({
         message: `File type must be ${UPLOAD_TYPES.join(", ").replace(/, ([^,]+)$/, ", or $1")}`,
       });

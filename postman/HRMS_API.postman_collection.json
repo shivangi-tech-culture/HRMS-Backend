@@ -493,10 +493,10 @@
                     "companies"
                   ]
                 },
-                "description": "POST /api/companies. Saves {{newCompanyId}}.\n`branchId` / `shiftId` = Branch / Shift **master** ids (auto-filled before send if empty).\n`monthlySchedule` = week 1–5 pattern; each week needs all 7 days. Working day needs startTime + endTime; `isOff: true` = off day.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `companyName` — string | required on create | company display name (min 2)\n- `companyCode` — string | required on create | unique code, stored uppercase e.g. `ABC`\n- `isActive` — boolean | optional | `true` keeps the company active\n- `branches` — array<object> | optional | company branches — branchId (master), address, shifts[].shiftId + monthlySchedule. Update replaces the whole list\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                "description": "POST /api/companies. Saves {{newCompanyId}}.\n`branchId` / `shiftId` = Branch / Shift **master** ids (auto-filled before send if empty).\n`monthlySchedule` = week 1–5 pattern; each week needs all 7 days. Working day needs startTime + endTime; `isOff: true` = off day.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `companyName` — string | required on create | company display name (min 2)\n- `companyCode` — string | required on create | unique code, stored uppercase e.g. `ABC`\n- `isActive` — boolean | optional | `true` keeps the company active\n- `logo` — string (URL) | optional | Cloudinary `url` from POST /api/employees/upload with `type` = `companyLogo` (saved as {{companyLogoUrl}}). JPEG, PNG, WEBP, or GIF. Send `\"\"` to clear\n- `foundedYear` — number | optional | year founded, e.g. `2015` (1800 through the current year). Send `null` to clear\n- `branches` — array<object> | optional | company branches — branchId (master), address, shifts[].shiftId + monthlySchedule. Update replaces the whole list\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"companyName\": \"ABC Technologies {{rndNo}}\",\n  \"companyCode\": \"ABC{{rndNo}}\",\n  \"isActive\": true,\n  \"branches\": [\n    {\n      \"branchId\": \"{{branchId}}\",\n      \"address\": \"Tower A, Sector 62\",\n      \"city\": \"Noida\",\n      \"state\": \"Uttar Pradesh\",\n      \"isActive\": true,\n      \"shifts\": [\n        {\n          \"shiftId\": \"{{shiftId}}\",\n          \"isActive\": true,\n          \"monthlySchedule\": [\n            {\n              \"weekNumber\": 1,\n              \"days\": [\n                {\n                  \"day\": \"monday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"tuesday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"wednesday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"thursday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"friday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"saturday\",\n                  \"isOff\": false,\n                  \"startTime\": \"10:00\",\n                  \"endTime\": \"14:00\",\n                  \"breakStartTime\": \"\",\n                  \"breakEndTime\": \"\"\n                },\n                { \"day\": \"sunday\", \"isOff\": true, \"startTime\": \"\", \"endTime\": \"\", \"breakStartTime\": \"\", \"breakEndTime\": \"\" }\n              ]\n            }\n          ]\n        },\n        { \"shiftId\": \"{{shiftId2}}\", \"isActive\": true, \"monthlySchedule\": [] }\n      ]\n    },\n    {\n      \"branchId\": \"{{branchId2}}\",\n      \"address\": \"Connaught Place\",\n      \"city\": \"New Delhi\",\n      \"state\": \"Delhi\",\n      \"isActive\": true,\n      \"shifts\": [\n        { \"shiftId\": \"{{shiftId}}\", \"isActive\": true, \"monthlySchedule\": [] }\n      ]\n    }\n  ]\n}",
+                  "raw": "{\n  \"companyName\": \"ABC Technologies {{rndNo}}\",\n  \"companyCode\": \"ABC{{rndNo}}\",\n  \"isActive\": true,\n  \"logo\": \"{{companyLogoUrl}}\",\n  \"foundedYear\": 2015,\n  \"branches\": [\n    {\n      \"branchId\": \"{{branchId}}\",\n      \"address\": \"Tower A, Sector 62\",\n      \"city\": \"Noida\",\n      \"state\": \"Uttar Pradesh\",\n      \"isActive\": true,\n      \"shifts\": [\n        {\n          \"shiftId\": \"{{shiftId}}\",\n          \"isActive\": true,\n          \"monthlySchedule\": [\n            {\n              \"weekNumber\": 1,\n              \"days\": [\n                {\n                  \"day\": \"monday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"tuesday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"wednesday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"thursday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"friday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"saturday\",\n                  \"isOff\": false,\n                  \"startTime\": \"10:00\",\n                  \"endTime\": \"14:00\",\n                  \"breakStartTime\": \"\",\n                  \"breakEndTime\": \"\"\n                },\n                { \"day\": \"sunday\", \"isOff\": true, \"startTime\": \"\", \"endTime\": \"\", \"breakStartTime\": \"\", \"breakEndTime\": \"\" }\n              ]\n            }\n          ]\n        },\n        { \"shiftId\": \"{{shiftId2}}\", \"isActive\": true, \"monthlySchedule\": [] }\n      ]\n    },\n    {\n      \"branchId\": \"{{branchId2}}\",\n      \"address\": \"Connaught Place\",\n      \"city\": \"New Delhi\",\n      \"state\": \"Delhi\",\n      \"isActive\": true,\n      \"shifts\": [\n        { \"shiftId\": \"{{shiftId}}\", \"isActive\": true, \"monthlySchedule\": [] }\n      ]\n    }\n  ]\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -576,7 +576,7 @@
                     "{{newCompanyId}}"
                   ]
                 },
-                "description": "All details of one company: companyName, companyCode, isActive, branches[] → shifts[] → monthlySchedule (week 1–5 day timings), and reportingManagers[] (active managers of this company).\nSuper Admin and Admin can open any company. HR can open only a company on their companyIds (own or assigned) — that response includes every branch and shift of that company. Any other id is 403.\nCreate-employee form: companyIds ← `_id`, branchId ← `branches[].branchId._id`, shiftId ← `branches[].shifts[].shiftId._id`, reportingHead1 ← `reportingManagers[]._id`.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `newCompanyId` → {{newCompanyId}} — string (MongoId / id) | set collection variable after create/list\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                "description": "All details of one company: companyName, companyCode, isActive, logo, foundedYear, branches[] → shifts[] → monthlySchedule (week 1–5 day timings), and reportingManagers[] (active managers of this company).\nSuper Admin and Admin can open any company. HR can open only a company on their companyIds (own or assigned) — that response includes every branch and shift of that company. Any other id is 403.\nCreate-employee form: companyIds ← `_id`, branchId ← `branches[].branchId._id`, shiftId ← `branches[].shifts[].shiftId._id`, reportingHead1 ← `reportingManagers[]._id`.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `newCompanyId` → {{newCompanyId}} — string (MongoId / id) | set collection variable after create/list\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
               }
             },
             {
@@ -600,10 +600,10 @@
                     "{{newCompanyId}}"
                   ]
                 },
-                "description": "PUT /api/companies/{{newCompanyId}} — send only the fields you want to change. `branches` **replaces** the whole branch list.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `newCompanyId` → {{newCompanyId}} — string (MongoId / id) | set collection variable after create/list\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `companyName` — string | required on create | company display name (min 2)\n- `companyCode` — string | required on create | unique code, stored uppercase e.g. `ABC`\n- `isActive` — boolean | optional | `true` keeps the company active\n- `branches` — array<object> | optional | company branches — branchId (master), address, shifts[].shiftId + monthlySchedule. Update replaces the whole list\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                "description": "PUT /api/companies/{{newCompanyId}} — send only the fields you want to change. `branches` **replaces** the whole branch list.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `newCompanyId` → {{newCompanyId}} — string (MongoId / id) | set collection variable after create/list\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `companyName` — string | required on create | company display name (min 2)\n- `companyCode` — string | required on create | unique code, stored uppercase e.g. `ABC`\n- `isActive` — boolean | optional | `true` keeps the company active\n- `logo` — string (URL) | optional | Cloudinary `url` from POST /api/employees/upload with `type` = `companyLogo` (saved as {{companyLogoUrl}}). JPEG, PNG, WEBP, or GIF. Send `\"\"` to clear\n- `foundedYear` — number | optional | year founded, e.g. `2015` (1800 through the current year). Send `null` to clear\n- `branches` — array<object> | optional | company branches — branchId (master), address, shifts[].shiftId + monthlySchedule. Update replaces the whole list\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"companyName\": \"ABC Technologies {{rndNo}} Updated\",\n  \"companyCode\": \"ABC{{rndNo}}\",\n  \"isActive\": true,\n  \"branches\": [\n    {\n      \"branchId\": \"{{branchId}}\",\n      \"address\": \"Tower B, Sector 63\",\n      \"city\": \"Noida\",\n      \"state\": \"Uttar Pradesh\",\n      \"isActive\": true,\n      \"shifts\": [\n        {\n          \"shiftId\": \"{{shiftId}}\",\n          \"isActive\": true,\n          \"monthlySchedule\": [\n            {\n              \"weekNumber\": 1,\n              \"days\": [\n                {\n                  \"day\": \"monday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"tuesday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"wednesday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"thursday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"friday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"saturday\",\n                  \"isOff\": false,\n                  \"startTime\": \"10:00\",\n                  \"endTime\": \"14:00\",\n                  \"breakStartTime\": \"\",\n                  \"breakEndTime\": \"\"\n                },\n                { \"day\": \"sunday\", \"isOff\": true, \"startTime\": \"\", \"endTime\": \"\", \"breakStartTime\": \"\", \"breakEndTime\": \"\" }\n              ]\n            }\n          ]\n        }\n      ]\n    }\n  ]\n}",
+                  "raw": "{\n  \"companyName\": \"ABC Technologies {{rndNo}} Updated\",\n  \"companyCode\": \"ABC{{rndNo}}\",\n  \"isActive\": true,\n  \"logo\": \"{{companyLogoUrl}}\",\n  \"foundedYear\": 2015,\n  \"branches\": [\n    {\n      \"branchId\": \"{{branchId}}\",\n      \"address\": \"Tower B, Sector 63\",\n      \"city\": \"Noida\",\n      \"state\": \"Uttar Pradesh\",\n      \"isActive\": true,\n      \"shifts\": [\n        {\n          \"shiftId\": \"{{shiftId}}\",\n          \"isActive\": true,\n          \"monthlySchedule\": [\n            {\n              \"weekNumber\": 1,\n              \"days\": [\n                {\n                  \"day\": \"monday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"tuesday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"wednesday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"thursday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"friday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"saturday\",\n                  \"isOff\": false,\n                  \"startTime\": \"10:00\",\n                  \"endTime\": \"14:00\",\n                  \"breakStartTime\": \"\",\n                  \"breakEndTime\": \"\"\n                },\n                { \"day\": \"sunday\", \"isOff\": true, \"startTime\": \"\", \"endTime\": \"\", \"breakStartTime\": \"\", \"breakEndTime\": \"\" }\n              ]\n            }\n          ]\n        }\n      ]\n    }\n  ]\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -4323,17 +4323,31 @@
                   "name": "1. Create On Tour Category",
                   "request": {
                     "method": "POST",
-                    "header": [{ "key": "Content-Type", "value": "application/json" }],
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      }
+                    ],
                     "url": {
                       "raw": "{{baseUrl}}/api/masters",
-                      "host": ["{{baseUrl}}"],
-                      "path": ["api", "masters"]
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "masters"
+                      ]
                     },
                     "description": "POST /api/masters — `type` = `onTourCategory`. Use the returned `_id` as tourCategory when dutyType is On Tour.",
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"type\": \"onTourCategory\",\n  \"name\": \"Test On Tour {{rndNo}}\",\n  \"code\": \"T{{rndNo}}\",\n  \"status\": \"Active\"\n}",
-                      "options": { "raw": { "language": "json" } }
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
                     }
                   },
                   "event": [
@@ -4357,14 +4371,38 @@
                     "header": [],
                     "url": {
                       "raw": "{{baseUrl}}/api/masters?type=onTourCategory&page={{page}}&limit={{limit}}",
-                      "host": ["{{baseUrl}}"],
-                      "path": ["api", "masters"],
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "masters"
+                      ],
                       "query": [
-                        { "key": "type", "value": "onTourCategory", "description": "onTourCategory" },
-                        { "key": "status", "value": "Active", "disabled": true, "description": "Active or Inactive" },
-                        { "key": "search", "value": "", "disabled": true },
-                        { "key": "page", "value": "{{page}}" },
-                        { "key": "limit", "value": "{{limit}}" }
+                        {
+                          "key": "type",
+                          "value": "onTourCategory",
+                          "description": "onTourCategory"
+                        },
+                        {
+                          "key": "status",
+                          "value": "Active",
+                          "disabled": true,
+                          "description": "Active or Inactive"
+                        },
+                        {
+                          "key": "search",
+                          "value": "",
+                          "disabled": true
+                        },
+                        {
+                          "key": "page",
+                          "value": "{{page}}"
+                        },
+                        {
+                          "key": "limit",
+                          "value": "{{limit}}"
+                        }
                       ]
                     },
                     "description": "On Tour category dropdown. Up Country, Local, Intrastate, International."
@@ -4377,8 +4415,14 @@
                     "header": [],
                     "url": {
                       "raw": "{{baseUrl}}/api/masters/{{onTourCategoryMasterId}}",
-                      "host": ["{{baseUrl}}"],
-                      "path": ["api", "masters", "{{onTourCategoryMasterId}}"]
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "masters",
+                        "{{onTourCategoryMasterId}}"
+                      ]
                     },
                     "description": "One On Tour category. Path id is {{onTourCategoryMasterId}} from Create."
                   }
@@ -4387,17 +4431,32 @@
                   "name": "4. Update On Tour Category",
                   "request": {
                     "method": "PUT",
-                    "header": [{ "key": "Content-Type", "value": "application/json" }],
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      }
+                    ],
                     "url": {
                       "raw": "{{baseUrl}}/api/masters/{{onTourCategoryMasterId}}",
-                      "host": ["{{baseUrl}}"],
-                      "path": ["api", "masters", "{{onTourCategoryMasterId}}"]
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "masters",
+                        "{{onTourCategoryMasterId}}"
+                      ]
                     },
                     "description": "Send at least one of name, code, status. Type cannot change.",
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"name\": \"Test On Tour {{rndNo}} Edited\",\n  \"code\": \"T{{rndNo}}\",\n  \"status\": \"Active\"\n}",
-                      "options": { "raw": { "language": "json" } }
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
                     }
                   }
                 },
@@ -4408,8 +4467,14 @@
                     "header": [],
                     "url": {
                       "raw": "{{baseUrl}}/api/masters/{{onTourCategoryMasterId}}",
-                      "host": ["{{baseUrl}}"],
-                      "path": ["api", "masters", "{{onTourCategoryMasterId}}"]
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "masters",
+                        "{{onTourCategoryMasterId}}"
+                      ]
                     },
                     "description": "Deletes the category created above and clears {{onTourCategoryMasterId}}."
                   },
@@ -4437,17 +4502,31 @@
                   "name": "1. Create On Duty Category",
                   "request": {
                     "method": "POST",
-                    "header": [{ "key": "Content-Type", "value": "application/json" }],
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      }
+                    ],
                     "url": {
                       "raw": "{{baseUrl}}/api/masters",
-                      "host": ["{{baseUrl}}"],
-                      "path": ["api", "masters"]
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "masters"
+                      ]
                     },
                     "description": "POST /api/masters — `type` = `onDutyCategory`. Use the returned `_id` as tourCategory when dutyType is On Duty.",
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"type\": \"onDutyCategory\",\n  \"name\": \"Test On Duty {{rndNo}}\",\n  \"code\": \"T{{rndNo}}\",\n  \"status\": \"Active\"\n}",
-                      "options": { "raw": { "language": "json" } }
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
                     }
                   },
                   "event": [
@@ -4471,14 +4550,38 @@
                     "header": [],
                     "url": {
                       "raw": "{{baseUrl}}/api/masters?type=onDutyCategory&page={{page}}&limit={{limit}}",
-                      "host": ["{{baseUrl}}"],
-                      "path": ["api", "masters"],
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "masters"
+                      ],
                       "query": [
-                        { "key": "type", "value": "onDutyCategory", "description": "onDutyCategory" },
-                        { "key": "status", "value": "Active", "disabled": true, "description": "Active or Inactive" },
-                        { "key": "search", "value": "", "disabled": true },
-                        { "key": "page", "value": "{{page}}" },
-                        { "key": "limit", "value": "{{limit}}" }
+                        {
+                          "key": "type",
+                          "value": "onDutyCategory",
+                          "description": "onDutyCategory"
+                        },
+                        {
+                          "key": "status",
+                          "value": "Active",
+                          "disabled": true,
+                          "description": "Active or Inactive"
+                        },
+                        {
+                          "key": "search",
+                          "value": "",
+                          "disabled": true
+                        },
+                        {
+                          "key": "page",
+                          "value": "{{page}}"
+                        },
+                        {
+                          "key": "limit",
+                          "value": "{{limit}}"
+                        }
                       ]
                     },
                     "description": "On Duty category dropdown. Client Site, Bank Work, Field Visit, Office Duty."
@@ -4491,8 +4594,14 @@
                     "header": [],
                     "url": {
                       "raw": "{{baseUrl}}/api/masters/{{onDutyCategoryMasterId}}",
-                      "host": ["{{baseUrl}}"],
-                      "path": ["api", "masters", "{{onDutyCategoryMasterId}}"]
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "masters",
+                        "{{onDutyCategoryMasterId}}"
+                      ]
                     },
                     "description": "One On Duty category. Path id is {{onDutyCategoryMasterId}} from Create."
                   }
@@ -4501,17 +4610,32 @@
                   "name": "4. Update On Duty Category",
                   "request": {
                     "method": "PUT",
-                    "header": [{ "key": "Content-Type", "value": "application/json" }],
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      }
+                    ],
                     "url": {
                       "raw": "{{baseUrl}}/api/masters/{{onDutyCategoryMasterId}}",
-                      "host": ["{{baseUrl}}"],
-                      "path": ["api", "masters", "{{onDutyCategoryMasterId}}"]
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "masters",
+                        "{{onDutyCategoryMasterId}}"
+                      ]
                     },
                     "description": "Send at least one of name, code, status. Type cannot change.",
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"name\": \"Test On Duty {{rndNo}} Edited\",\n  \"code\": \"T{{rndNo}}\",\n  \"status\": \"Active\"\n}",
-                      "options": { "raw": { "language": "json" } }
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
                     }
                   }
                 },
@@ -4522,8 +4646,14 @@
                     "header": [],
                     "url": {
                       "raw": "{{baseUrl}}/api/masters/{{onDutyCategoryMasterId}}",
-                      "host": ["{{baseUrl}}"],
-                      "path": ["api", "masters", "{{onDutyCategoryMasterId}}"]
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "masters",
+                        "{{onDutyCategoryMasterId}}"
+                      ]
                     },
                     "description": "Deletes the category created above and clears {{onDutyCategoryMasterId}}."
                   },
@@ -5505,7 +5635,7 @@
                     "upload"
                   ]
                 },
-                "description": "multipart form-data. `type`: `education` | `account` | `leave` | `profile`. `document`: pick a file (max 5 MB). Returns a URL for education[].document, accounts[].attachment, leave apply document, or employee `profileUrl`. `profile` stores JPEG/PNG/WEBP/GIF in Cloudinary folder `hrms/profile`. Put that url on `profileUrl`. Delete it with Delete Profile Image.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (form-data)**\n- `type` (text) — string | required | `education`, `account`, `leave`, or `profile`\n- `document` (file) — file | required | upload binary file (multipart form-data)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                "description": "multipart form-data. `type`: `education` | `account` | `leave` | `profile` | `regularization` | `onTour` | `onDuty` | `companyLogo`. `document`: pick a file (max 5 MB).\nResponse `url` is the Cloudinary URL. Put it on the matching field. Nothing is saved in the database here.\n`companyLogo` accepts JPEG, PNG, WEBP, or GIF only and stores it in Cloudinary folder `hrms/companyLogo`. Copy response `url` into company `logo` (also saved as {{companyLogoUrl}}).\n`profile` stores JPEG/PNG/WEBP/GIF in `hrms/profile`. Put that url on `profileUrl`.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (form-data)**\n- `type` (text) — string | required | `education`, `account`, `leave`, `profile`, `regularization`, `onTour`, `onDuty`, or `companyLogo`\n- `document` (file) — file | required | upload binary file (multipart form-data)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
                 "body": {
                   "mode": "formdata",
                   "formdata": [
@@ -5513,7 +5643,7 @@
                       "key": "type",
                       "value": "account",
                       "type": "text",
-                      "description": "string | required | pass exactly one: education (degree file, then put url in education[].document), account (bank proof, then accounts[].attachment), leave (leave file), profile (profile photo JPEG/PNG/WEBP/GIF, then put url in profileUrl)"
+                      "description": "string | required | pass exactly one: education (degree file, then put url in education[].document), account (bank proof, then accounts[].attachment), leave (leave file), profile (profile photo JPEG/PNG/WEBP/GIF, then put url in profileUrl), regularization, onTour, onDuty, companyLogo (company logo JPEG/PNG/WEBP/GIF — response url goes in company logo; also saved as {{companyLogoUrl}})"
                     },
                     {
                       "key": "document",
@@ -5523,7 +5653,19 @@
                     }
                   ]
                 }
-              }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const j = pm.response.json();",
+                      "if (j && j.type === 'companyLogo' && j.url) pm.collectionVariables.set('companyLogoUrl', j.url);"
+                    ]
+                  }
+                }
+              ]
             },
             {
               "name": "7b. Delete Profile Image",
@@ -6284,15 +6426,44 @@
                 "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/attendance/tour-duties?status=ALL&page=1&limit=20",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "attendance", "tour-duties"],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "attendance",
+                    "tour-duties"
+                  ],
                   "query": [
-                    { "key": "status", "value": "ALL", "description": "ALL | Pending | Approved | Rejected | Cancelled" },
-                    { "key": "companyId", "value": "{{companyId}}", "disabled": true },
-                    { "key": "search", "value": "", "disabled": true },
-                    { "key": "month", "value": "2026-09", "disabled": true, "description": "YYYY-MM, requests that overlap this month" },
-                    { "key": "page", "value": "1" },
-                    { "key": "limit", "value": "20" }
+                    {
+                      "key": "status",
+                      "value": "ALL",
+                      "description": "ALL | Pending | Approved | Rejected | Cancelled"
+                    },
+                    {
+                      "key": "companyId",
+                      "value": "{{companyId}}",
+                      "disabled": true
+                    },
+                    {
+                      "key": "search",
+                      "value": "",
+                      "disabled": true
+                    },
+                    {
+                      "key": "month",
+                      "value": "2026-09",
+                      "disabled": true,
+                      "description": "YYYY-MM, requests that overlap this month"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    }
                   ]
                 },
                 "description": "Attendance → On Tour/On Duty. Saves the first `_id` into {{tourDutyId}}."
@@ -6315,17 +6486,39 @@
               "name": "2. Approve",
               "request": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
                 "url": {
                   "raw": "{{baseUrl}}/api/attendance/tour-duties/{{tourDutyId}}/review?decision=approve",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "attendance", "tour-duties", "{{tourDutyId}}", "review"],
-                  "query": [{ "key": "decision", "value": "approve" }]
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "attendance",
+                    "tour-duties",
+                    "{{tourDutyId}}",
+                    "review"
+                  ],
+                  "query": [
+                    {
+                      "key": "decision",
+                      "value": "approve"
+                    }
+                  ]
                 },
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"reason\": \"Approved for client visit\"\n}",
-                  "options": { "raw": { "language": "json" } }
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 },
                 "description": "Reporting Manager (own team), HR (assigned companies), or Super Admin.\nSets each day in the range to Present. Response tourCategory is { _id, name }."
               }
@@ -6334,17 +6527,39 @@
               "name": "3. Reject",
               "request": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
                 "url": {
                   "raw": "{{baseUrl}}/api/attendance/tour-duties/{{tourDutyId}}/review?decision=reject",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "attendance", "tour-duties", "{{tourDutyId}}", "review"],
-                  "query": [{ "key": "decision", "value": "reject" }]
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "attendance",
+                    "tour-duties",
+                    "{{tourDutyId}}",
+                    "review"
+                  ],
+                  "query": [
+                    {
+                      "key": "decision",
+                      "value": "reject"
+                    }
+                  ]
                 },
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"reason\": \"Not approved\"\n}",
-                  "options": { "raw": { "language": "json" } }
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 },
                 "description": "Reporting Manager (own team), HR (assigned companies), or Super Admin.\nSets each day in the range to Absent. Body reason is required."
               }
@@ -7461,6 +7676,441 @@
               ]
             }
           ]
+        },
+        {
+          "name": "1.10 Break",
+          "description": "Live Break Status, approvals, and Break History.\nLogin as Super Admin / Admin / HR / Reporting Manager (0. Login).\nDaily balance is 30 minutes (policy). Unused minutes stay and can be split later, for example 10 then 10 then 10.\nA break that ends past the remaining balance is Pending. Reporting manager approves or rejects it.\nRejected minutes go back into the balance. History keeps every closed break.\nStored status: On Break, Overdue, Completed, Pending, Approved, Rejected.\nAt Desk is only on the live list.",
+          "item": [
+            {
+              "name": "1. Live Break Status",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/break/live?status=all&page={{page}}&limit={{limit}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "break",
+                    "live"
+                  ],
+                  "query": [
+                    {
+                      "key": "search",
+                      "value": "",
+                      "description": "string | optional | employee name or code",
+                      "disabled": true
+                    },
+                    {
+                      "key": "department",
+                      "value": "ALL",
+                      "description": "string | optional | department name, or ALL",
+                      "disabled": true
+                    },
+                    {
+                      "key": "shiftId",
+                      "value": "{{shiftId}}",
+                      "description": "string (MongoId) | optional | shift id, or ALL",
+                      "disabled": true
+                    },
+                    {
+                      "key": "status",
+                      "value": "all",
+                      "description": "string | optional | all, on_break, at_desk, overdue"
+                    },
+                    {
+                      "key": "companyId",
+                      "value": "{{companyId}}",
+                      "description": "string (MongoId) | optional",
+                      "disabled": true
+                    },
+                    {
+                      "key": "page",
+                      "value": "{{page}}",
+                      "description": "number | optional | default 1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "{{limit}}",
+                      "description": "number | optional | default 10, max 100"
+                    }
+                  ]
+                },
+                "description": "GET /api/break/live\nPeople punched in today.\nstatus filter: all | on_break | at_desk | overdue\ncounts: all, onBreak, atDesk, overdue\nEach row includes stored status, splits (count and minutes per break type), and taken (every break today). First open break _id is saved as {{breakId}}.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n- `search` — name or employee code\n- `department` — exact department, or ALL\n- `shiftId` — shift master id, or ALL\n- `status` — all | on_break | at_desk | overdue\n- `companyId` — optional\n- `page` / `limit`\n"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const j = pm.response.json();",
+                      "const row = (j.data || []).find((r) => r._id);",
+                      "if (row) pm.collectionVariables.set('breakId', row._id);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "2. Break History",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/break/history?page={{page}}&limit={{limit}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "break",
+                    "history"
+                  ],
+                  "query": [
+                    {
+                      "key": "search",
+                      "value": "",
+                      "description": "string | optional | employee name or code",
+                      "disabled": true
+                    },
+                    {
+                      "key": "department",
+                      "value": "",
+                      "description": "string | optional | department name",
+                      "disabled": true
+                    },
+                    {
+                      "key": "shiftId",
+                      "value": "{{shiftId}}",
+                      "description": "string (MongoId) | optional",
+                      "disabled": true
+                    },
+                    {
+                      "key": "breakType",
+                      "value": "Lunch Break",
+                      "description": "string | optional | Lunch Break or Day Break",
+                      "disabled": true
+                    },
+                    {
+                      "key": "status",
+                      "value": "all",
+                      "description": "string | optional | all, completed, pending, approved, rejected"
+                    },
+                    {
+                      "key": "from",
+                      "value": "2026-10-01",
+                      "description": "string (YYYY-MM-DD) | optional",
+                      "disabled": true
+                    },
+                    {
+                      "key": "to",
+                      "value": "2026-10-31",
+                      "description": "string (YYYY-MM-DD) | optional",
+                      "disabled": true
+                    },
+                    {
+                      "key": "page",
+                      "value": "{{page}}",
+                      "description": "number | optional | default 1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "{{limit}}",
+                      "description": "number | optional | default 10, max 100"
+                    }
+                  ]
+                },
+                "description": "GET /api/break/history\nClosed breaks only.\nstatus: all | completed | pending | approved | rejected\nbreakType: Lunch Break | Day Break\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n- `search` — name or employee code\n- `department` — exact department\n- `shiftId` — shift master id\n- `breakType` — Lunch Break or Day Break\n- `status` — all | completed | pending | approved | rejected\n- `from` / `to` — YYYY-MM-DD\n- `page` / `limit`\n"
+              }
+            },
+            {
+              "name": "3. Pending Approvals",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/break/approvals?page={{page}}&limit={{limit}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "break",
+                    "approvals"
+                  ],
+                  "query": [
+                    {
+                      "key": "search",
+                      "value": "",
+                      "description": "string | optional | employee name or code",
+                      "disabled": true
+                    },
+                    {
+                      "key": "from",
+                      "value": "2026-10-01",
+                      "description": "string (YYYY-MM-DD) | optional",
+                      "disabled": true
+                    },
+                    {
+                      "key": "to",
+                      "value": "2026-10-31",
+                      "description": "string (YYYY-MM-DD) | optional",
+                      "disabled": true
+                    },
+                    {
+                      "key": "page",
+                      "value": "{{page}}",
+                      "description": "number | optional | default 1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "{{limit}}",
+                      "description": "number | optional | default 10, max 100"
+                    }
+                  ]
+                },
+                "description": "GET /api/break/approvals\nBreaks that ended past today's balance and still need the reporting manager.\nLogin as that person's reporting manager, HR, or admin.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n- `search` / `from` / `to` / `page` / `limit`\n"
+              }
+            },
+            {
+              "name": "4. Review Break",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/break/{{breakId}}/review",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "break",
+                    "{{breakId}}",
+                    "review"
+                  ]
+                },
+                "description": "POST /api/break/:id/review\nReporting manager decision on a Pending break.\ndecision = approve keeps the minutes.\ndecision = reject puts those minutes back.\n{{breakId}} is the pending break id.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"decision\": \"approve\",\n  \"remarks\": \"\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "5. List Policies",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/break/policies",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "break",
+                    "policies"
+                  ]
+                },
+                "description": "GET /api/break/policies\nAll policies. Employees never see this list.\nThey only see policies with published = true, and only 2 can be published.\nLunch Break is fixed minutes. Day Break is flexible (5 or 10) with no daily count.\nSaves {{policyId}} from the Day Break row.\n"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const j = pm.response.json();",
+                      "const row = (j.data || []).find((r) => r.flexible) || (j.data || [])[0];",
+                      "if (row && row._id) pm.collectionVariables.set('policyId', row._id);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "6. Create Policy",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/break/policies",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "break",
+                    "policies"
+                  ]
+                },
+                "description": "POST /api/break/policies\nSaves a policy as unpublished. Employees do not see it until 8. Publish Policy.\nflexible true = employee sends minutes (5 or 10) and there is no daily count.\nflexible false = minutes is the fixed allowance, like lunch.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Tea Break\",\n  \"flexible\": false,\n  \"minutes\": 15,\n  \"description\": \"\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const j = pm.response.json();",
+                      "if (j.policy && j.policy._id) pm.collectionVariables.set('policyId', j.policy._id);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "7. Update Policy",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/break/policies/{{policyId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "break",
+                    "policies",
+                    "{{policyId}}"
+                  ]
+                },
+                "description": "PUT /api/break/policies/:id\nChange the name or minutes. New breaks use the new minutes.\n{{policyId}} comes from 7. Create Policy or 6. List Policies.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Tea Break\",\n  \"flexible\": false,\n  \"minutes\": 10,\n  \"description\": \"\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "8. Publish Policy",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/break/policies/{{policyId}}/publish",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "break",
+                    "policies",
+                    "{{policyId}}",
+                    "publish"
+                  ]
+                },
+                "description": "PATCH /api/break/policies/:id/publish\nEmployees can start this break after publish.\nIf 2 policies are already published, unpublish one first.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"published\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "9. Unpublish Policy",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/break/policies/{{policyId}}/publish",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "break",
+                    "policies",
+                    "{{policyId}}",
+                    "publish"
+                  ]
+                },
+                "description": "PATCH /api/break/policies/:id/publish\npublished false hides it from employees again.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"published\": false\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "10. Delete Policy",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/break/policies/{{policyId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "break",
+                    "policies",
+                    "{{policyId}}"
+                  ]
+                },
+                "description": "DELETE /api/break/policies/:id\nUnpublish first. Published policies cannot be deleted."
+              }
+            }
+          ]
         }
       ]
     },
@@ -7589,7 +8239,7 @@
                     "upload"
                   ]
                 },
-                "description": "`type`: `education` | `account` | `leave` | `profile`. `document`: pick a file (max 5 MB). `profile` puts the image in Cloudinary folder `hrms/profile` (JPEG, PNG, WEBP, GIF). Save the returned url as employee `profileUrl`. Delete that file with Delete Profile Image.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (form-data)**\n- `type` (text) — string | required | `education`, `account`, `leave`, or `profile`\n- `document` (file) — file | required | upload binary file (multipart form-data)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                "description": "`type`: `education` | `account` | `leave` | `profile` | `regularization` | `onTour` | `onDuty` | `companyLogo`. `document`: pick a file (max 5 MB).\nResponse `url` is the Cloudinary URL.\n`companyLogo` puts the image in Cloudinary folder `hrms/companyLogo` (JPEG, PNG, WEBP, GIF). Paste that url into company `logo`. The test script also saves it as {{companyLogoUrl}}.\n`profile` puts the image in `hrms/profile`. Save the returned url as employee `profileUrl`. Delete that file with Delete Profile Image.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (form-data)**\n- `type` (text) — string | required | `education`, `account`, `leave`, `profile`, `regularization`, `onTour`, `onDuty`, or `companyLogo`\n- `document` (file) — file | required | upload binary file (multipart form-data)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
                 "body": {
                   "mode": "formdata",
                   "formdata": [
@@ -7597,7 +8247,7 @@
                       "key": "type",
                       "value": "education",
                       "type": "text",
-                      "description": "string | required | pass exactly one: education (degree file, then put url in education[].document), account (bank proof, then accounts[].attachment), leave (leave file), profile (profile photo JPEG/PNG/WEBP/GIF, then put url in profileUrl)"
+                      "description": "string | required | pass exactly one: education (degree file, then put url in education[].document), account (bank proof, then accounts[].attachment), leave (leave file), profile (profile photo JPEG/PNG/WEBP/GIF, then put url in profileUrl), regularization, onTour, onDuty, companyLogo (company logo JPEG/PNG/WEBP/GIF — response url goes in company logo; also saved as {{companyLogoUrl}})"
                     },
                     {
                       "key": "document",
@@ -7607,7 +8257,19 @@
                     }
                   ]
                 }
-              }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const j = pm.response.json();",
+                      "if (j && j.type === 'companyLogo' && j.url) pm.collectionVariables.set('companyLogoUrl', j.url);"
+                    ]
+                  }
+                }
+              ]
             },
             {
               "name": "4b. Delete Profile Image",
@@ -8017,6 +8679,42 @@
               ]
             },
             {
+              "name": "6c. Request Break Regularization",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/attendance/regularize",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "attendance", "regularize"]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"date\": \"{{attendanceDate}}\",\n  \"breakType\": \"Lunch Break\",\n  \"breakStartTime\": \"13:00\",\n  \"breakEndTime\": \"13:30\",\n  \"reason\": \"Forgot to end break\",\n  \"remarks\": \"Break ran long because I did not tap end\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "description": "Employee only. Use when break timing was wrong: forgot to end, or took longer than allowed.\nbreakEndTime is required (HH:mm). breakStartTime is required only when no break is still open.\nIf a break is still open, omit breakStartTime and the open start is kept.\nRequest stays Pending. Reporting Manager approves it in 1.7 → 4. Attendance Regularization.\nApprove writes this break time, closes a forgotten open break, and recounts working hours against the 9-hour shift.\nReject leaves the break as it is.\nOne pending request per date. Test script saves {{regularizationId}}."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const j = pm.response.json();",
+                      "const id = j.request && j.request._id;",
+                      "if (id) pm.collectionVariables.set('regularizationId', id);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
               "name": "6b. Request Late Regularization",
               "request": {
                 "method": "POST",
@@ -8134,13 +8832,30 @@
                 "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/masters?type=onTourCategory&status=Active&page=1&limit=20",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "masters"],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "masters"
+                  ],
                   "query": [
-                    { "key": "type", "value": "onTourCategory" },
-                    { "key": "status", "value": "Active" },
-                    { "key": "page", "value": "1" },
-                    { "key": "limit", "value": "20" }
+                    {
+                      "key": "type",
+                      "value": "onTourCategory"
+                    },
+                    {
+                      "key": "status",
+                      "value": "Active"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    }
                   ]
                 },
                 "description": "On Tour dropdown. Saves the first category `_id` into {{onTourCategoryId}}.\nValues: Up Country, Local, Intrastate, International."
@@ -8166,13 +8881,30 @@
                 "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/masters?type=onDutyCategory&status=Active&page=1&limit=20",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "masters"],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "masters"
+                  ],
                   "query": [
-                    { "key": "type", "value": "onDutyCategory" },
-                    { "key": "status", "value": "Active" },
-                    { "key": "page", "value": "1" },
-                    { "key": "limit", "value": "20" }
+                    {
+                      "key": "type",
+                      "value": "onDutyCategory"
+                    },
+                    {
+                      "key": "status",
+                      "value": "Active"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    }
                   ]
                 },
                 "description": "On Duty dropdown. Saves the first category `_id` into {{onDutyCategoryId}}.\nValues: Client Site, Bank Work, Field Visit, Office Duty."
@@ -8195,16 +8927,31 @@
               "name": "9. Apply On Tour / On Duty",
               "request": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
                 "url": {
                   "raw": "{{baseUrl}}/api/attendance/tour-duty",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "attendance", "tour-duty"]
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "attendance",
+                    "tour-duty"
+                  ]
                 },
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"dutyType\": \"On Tour\",\n  \"tourCategory\": \"{{onTourCategoryId}}\",\n  \"fromDate\": \"2026-10-20\",\n  \"fromTime\": \"09:00\",\n  \"toDate\": \"2026-10-22\",\n  \"toTime\": \"18:00\",\n  \"reason\": \"Client Meeting\",\n  \"remarks\": \"Client workshop\"\n}",
-                  "options": { "raw": { "language": "json" } }
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 },
                 "description": "Employee only. Run 9a or 9b first.\ntourCategory is the master _id, not the name.\nOn Tour → {{onTourCategoryId}} from type=onTourCategory.\nOn Duty → {{onDutyCategoryId}} from type=onDutyCategory, and set dutyType to On Duty.\nStays Pending until Reporting Manager, HR, or Super Admin reviews it in 1.7 → 5.\nApprove → attendance Present. Reject → attendance Absent.\nOptional document: type=onTour or type=onDuty, then put the url in document.\nResponse tourCategory is { _id, name }. Saves request `_id` into {{tourDutyId}}."
               },
@@ -8229,13 +8976,33 @@
                 "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/attendance/tour-duty?status=ALL&page=1&limit=20",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "attendance", "tour-duty"],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "attendance",
+                    "tour-duty"
+                  ],
                   "query": [
-                    { "key": "status", "value": "ALL", "description": "ALL | Pending | Approved | Rejected | Cancelled" },
-                    { "key": "month", "value": "2026-10", "disabled": true },
-                    { "key": "page", "value": "1" },
-                    { "key": "limit", "value": "20" }
+                    {
+                      "key": "status",
+                      "value": "ALL",
+                      "description": "ALL | Pending | Approved | Rejected | Cancelled"
+                    },
+                    {
+                      "key": "month",
+                      "value": "2026-10",
+                      "disabled": true
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    }
                   ]
                 },
                 "description": "Own applied and approved rows. duration is inclusive days, for example 3 Day(s)."
@@ -8248,8 +9015,16 @@
                 "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/attendance/tour-duty/{{tourDutyId}}/cancel",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "attendance", "tour-duty", "{{tourDutyId}}", "cancel"]
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "attendance",
+                    "tour-duty",
+                    "{{tourDutyId}}",
+                    "cancel"
+                  ]
                 },
                 "description": "Withdraw your own Pending request. Approved requests stay on attendance."
               }
@@ -8267,8 +9042,14 @@
                 "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/masters/meta",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "masters", "meta"]
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "masters",
+                    "meta"
+                  ]
                 },
                 "description": "Every dropdown type.\n\ndepartment — Administration, HR, Engineering, Finance\ndesignation — Software Engineer, HR Manager, Engineering Manager, Finance Executive\ndivision — HO, RO\nemployeeGroup — Permanent, Contract\ngrade — G1 to G5\njobRole — Executive, Manager, Intern, Consultant\ngender — Male, Female, Other\nmaritalStatus — Single, Married, Divorced, Widowed\nbloodGroup — A+, A-, B+, B-, AB+, AB-, O+, O-\nbranch — Noida, Delhi (saved as _id)\nshift — General Shift, Evening Shift (saved as _id)\ncourseType — Full Time, Part Time, Distance, Online\ncourseLevel — 10th, 12th, Diploma, Graduation, Post Graduation, Doctorate, Certification\nbankName — SBI, HDFC, ICICI, Axis, PNB, and others\nrelation — Spouse, Father, Mother, Son, Daughter, Brother, Sister, Other\nnominateFor — PF, FNF, Gratuity, GTLI, GPA, GHI\nvisaType — Employment, Business, Project, Entry, Tourist, Research, Transit, Conference, Medical\nlanguage — Hindi, English, and other Indian languages\nregularizationReason — Forgot to Punch, Biometric Issue, System Downtime, Client Visit, Power Outage, Incorrect Shift Mapping, Other\nmarkAttendanceReason — Missed Punch, Device Issue, Official Travel, Other\nonTourCategory — Up Country, Local, Intrastate, International. Apply On Tour sends this _id.\nonDutyCategory — Client Site, Bank Work, Field Visit, Office Duty. Apply On Duty sends this _id."
               }
@@ -8280,13 +9061,30 @@
                 "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/masters?type=department&status=Active&page=1&limit=50",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "masters"],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "masters"
+                  ],
                   "query": [
-                    { "key": "type", "value": "department" },
-                    { "key": "status", "value": "Active" },
-                    { "key": "page", "value": "1" },
-                    { "key": "limit", "value": "50" }
+                    {
+                      "key": "type",
+                      "value": "department"
+                    },
+                    {
+                      "key": "status",
+                      "value": "Active"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50"
+                    }
                   ]
                 },
                 "description": "Employee official department. Seed: Administration, HR, Engineering, Finance."
@@ -8299,13 +9097,30 @@
                 "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/masters?type=designation&status=Active&page=1&limit=50",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "masters"],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "masters"
+                  ],
                   "query": [
-                    { "key": "type", "value": "designation" },
-                    { "key": "status", "value": "Active" },
-                    { "key": "page", "value": "1" },
-                    { "key": "limit", "value": "50" }
+                    {
+                      "key": "type",
+                      "value": "designation"
+                    },
+                    {
+                      "key": "status",
+                      "value": "Active"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50"
+                    }
                   ]
                 },
                 "description": "Job title. Seed: Software Engineer, HR Manager, Engineering Manager, Finance Executive."
@@ -8318,13 +9133,30 @@
                 "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/masters?type=division&status=Active&page=1&limit=50",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "masters"],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "masters"
+                  ],
                   "query": [
-                    { "key": "type", "value": "division" },
-                    { "key": "status", "value": "Active" },
-                    { "key": "page", "value": "1" },
-                    { "key": "limit", "value": "50" }
+                    {
+                      "key": "type",
+                      "value": "division"
+                    },
+                    {
+                      "key": "status",
+                      "value": "Active"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50"
+                    }
                   ]
                 },
                 "description": "Office division. Seed: HO, RO."
@@ -8337,13 +9169,30 @@
                 "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/masters?type=employeeGroup&status=Active&page=1&limit=50",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "masters"],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "masters"
+                  ],
                   "query": [
-                    { "key": "type", "value": "employeeGroup" },
-                    { "key": "status", "value": "Active" },
-                    { "key": "page", "value": "1" },
-                    { "key": "limit", "value": "50" }
+                    {
+                      "key": "type",
+                      "value": "employeeGroup"
+                    },
+                    {
+                      "key": "status",
+                      "value": "Active"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50"
+                    }
                   ]
                 },
                 "description": "Employment group. Seed: Permanent, Contract."
@@ -8356,13 +9205,30 @@
                 "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/masters?type=grade&status=Active&page=1&limit=50",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "masters"],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "masters"
+                  ],
                   "query": [
-                    { "key": "type", "value": "grade" },
-                    { "key": "status", "value": "Active" },
-                    { "key": "page", "value": "1" },
-                    { "key": "limit", "value": "50" }
+                    {
+                      "key": "type",
+                      "value": "grade"
+                    },
+                    {
+                      "key": "status",
+                      "value": "Active"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50"
+                    }
                   ]
                 },
                 "description": "Pay grade. Seed: G1, G2, G3, G4, G5."
@@ -8375,13 +9241,30 @@
                 "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/masters?type=jobRole&status=Active&page=1&limit=50",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "masters"],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "masters"
+                  ],
                   "query": [
-                    { "key": "type", "value": "jobRole" },
-                    { "key": "status", "value": "Active" },
-                    { "key": "page", "value": "1" },
-                    { "key": "limit", "value": "50" }
+                    {
+                      "key": "type",
+                      "value": "jobRole"
+                    },
+                    {
+                      "key": "status",
+                      "value": "Active"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50"
+                    }
                   ]
                 },
                 "description": "Role band. Seed: Executive, Manager, Intern, Consultant."
@@ -8394,13 +9277,30 @@
                 "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/masters?type=gender&status=Active&page=1&limit=50",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "masters"],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "masters"
+                  ],
                   "query": [
-                    { "key": "type", "value": "gender" },
-                    { "key": "status", "value": "Active" },
-                    { "key": "page", "value": "1" },
-                    { "key": "limit", "value": "50" }
+                    {
+                      "key": "type",
+                      "value": "gender"
+                    },
+                    {
+                      "key": "status",
+                      "value": "Active"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50"
+                    }
                   ]
                 },
                 "description": "Personal gender. Seed: Male, Female, Other."
@@ -8413,13 +9313,30 @@
                 "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/masters?type=maritalStatus&status=Active&page=1&limit=50",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "masters"],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "masters"
+                  ],
                   "query": [
-                    { "key": "type", "value": "maritalStatus" },
-                    { "key": "status", "value": "Active" },
-                    { "key": "page", "value": "1" },
-                    { "key": "limit", "value": "50" }
+                    {
+                      "key": "type",
+                      "value": "maritalStatus"
+                    },
+                    {
+                      "key": "status",
+                      "value": "Active"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50"
+                    }
                   ]
                 },
                 "description": "Seed: Single, Married, Divorced, Widowed."
@@ -8432,13 +9349,30 @@
                 "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/masters?type=bloodGroup&status=Active&page=1&limit=50",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "masters"],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "masters"
+                  ],
                   "query": [
-                    { "key": "type", "value": "bloodGroup" },
-                    { "key": "status", "value": "Active" },
-                    { "key": "page", "value": "1" },
-                    { "key": "limit", "value": "50" }
+                    {
+                      "key": "type",
+                      "value": "bloodGroup"
+                    },
+                    {
+                      "key": "status",
+                      "value": "Active"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50"
+                    }
                   ]
                 },
                 "description": "Seed: A+, A-, B+, B-, AB+, AB-, O+, O-."
@@ -8451,13 +9385,30 @@
                 "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/masters?type=branch&status=Active&page=1&limit=50",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "masters"],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "masters"
+                  ],
                   "query": [
-                    { "key": "type", "value": "branch" },
-                    { "key": "status", "value": "Active" },
-                    { "key": "page", "value": "1" },
-                    { "key": "limit", "value": "50" }
+                    {
+                      "key": "type",
+                      "value": "branch"
+                    },
+                    {
+                      "key": "status",
+                      "value": "Active"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50"
+                    }
                   ]
                 },
                 "description": "Workplace branch. Seed: Noida (NOIDA), Delhi (DEL). Employee stores the branch _id."
@@ -8470,13 +9421,30 @@
                 "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/masters?type=shift&status=Active&page=1&limit=50",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "masters"],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "masters"
+                  ],
                   "query": [
-                    { "key": "type", "value": "shift" },
-                    { "key": "status", "value": "Active" },
-                    { "key": "page", "value": "1" },
-                    { "key": "limit", "value": "50" }
+                    {
+                      "key": "type",
+                      "value": "shift"
+                    },
+                    {
+                      "key": "status",
+                      "value": "Active"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50"
+                    }
                   ]
                 },
                 "description": "Work shift. Seed: General Shift (GS-01), Evening Shift (ES-01). Employee stores the shift _id."
@@ -8489,13 +9457,30 @@
                 "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/masters?type=courseType&status=Active&page=1&limit=50",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "masters"],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "masters"
+                  ],
                   "query": [
-                    { "key": "type", "value": "courseType" },
-                    { "key": "status", "value": "Active" },
-                    { "key": "page", "value": "1" },
-                    { "key": "limit", "value": "50" }
+                    {
+                      "key": "type",
+                      "value": "courseType"
+                    },
+                    {
+                      "key": "status",
+                      "value": "Active"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50"
+                    }
                   ]
                 },
                 "description": "Education mode. Seed: Full Time, Part Time, Distance, Online."
@@ -8508,13 +9493,30 @@
                 "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/masters?type=courseLevel&status=Active&page=1&limit=50",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "masters"],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "masters"
+                  ],
                   "query": [
-                    { "key": "type", "value": "courseLevel" },
-                    { "key": "status", "value": "Active" },
-                    { "key": "page", "value": "1" },
-                    { "key": "limit", "value": "50" }
+                    {
+                      "key": "type",
+                      "value": "courseLevel"
+                    },
+                    {
+                      "key": "status",
+                      "value": "Active"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50"
+                    }
                   ]
                 },
                 "description": "Education level. Seed: 10th, 12th, Diploma, Graduation, Post Graduation, Doctorate, Certification."
@@ -8527,13 +9529,30 @@
                 "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/masters?type=bankName&status=Active&page=1&limit=50",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "masters"],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "masters"
+                  ],
                   "query": [
-                    { "key": "type", "value": "bankName" },
-                    { "key": "status", "value": "Active" },
-                    { "key": "page", "value": "1" },
-                    { "key": "limit", "value": "50" }
+                    {
+                      "key": "type",
+                      "value": "bankName"
+                    },
+                    {
+                      "key": "status",
+                      "value": "Active"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50"
+                    }
                   ]
                 },
                 "description": "Salary bank. Seed includes State Bank of India, HDFC, ICICI, Axis, Punjab National Bank."
@@ -8546,13 +9565,30 @@
                 "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/masters?type=relation&status=Active&page=1&limit=50",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "masters"],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "masters"
+                  ],
                   "query": [
-                    { "key": "type", "value": "relation" },
-                    { "key": "status", "value": "Active" },
-                    { "key": "page", "value": "1" },
-                    { "key": "limit", "value": "50" }
+                    {
+                      "key": "type",
+                      "value": "relation"
+                    },
+                    {
+                      "key": "status",
+                      "value": "Active"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50"
+                    }
                   ]
                 },
                 "description": "Family and nominee relation. Seed: Spouse, Father, Mother, Son, Daughter, Brother, Sister, Other."
@@ -8565,13 +9601,30 @@
                 "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/masters?type=nominateFor&status=Active&page=1&limit=50",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "masters"],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "masters"
+                  ],
                   "query": [
-                    { "key": "type", "value": "nominateFor" },
-                    { "key": "status", "value": "Active" },
-                    { "key": "page", "value": "1" },
-                    { "key": "limit", "value": "50" }
+                    {
+                      "key": "type",
+                      "value": "nominateFor"
+                    },
+                    {
+                      "key": "status",
+                      "value": "Active"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50"
+                    }
                   ]
                 },
                 "description": "Nominee benefit. Seed: PF, FNF, Gratuity, GTLI, GPA, GHI."
@@ -8584,13 +9637,30 @@
                 "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/masters?type=visaType&status=Active&page=1&limit=50",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "masters"],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "masters"
+                  ],
                   "query": [
-                    { "key": "type", "value": "visaType" },
-                    { "key": "status", "value": "Active" },
-                    { "key": "page", "value": "1" },
-                    { "key": "limit", "value": "50" }
+                    {
+                      "key": "type",
+                      "value": "visaType"
+                    },
+                    {
+                      "key": "status",
+                      "value": "Active"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50"
+                    }
                   ]
                 },
                 "description": "Seed: Employment Visa, Business Visa, Project Visa, Entry visa, Tourist Visa, Research Visa, Transit Visa, Conference Visa, Medical Visa."
@@ -8603,13 +9673,30 @@
                 "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/masters?type=language&status=Active&page=1&limit=50",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "masters"],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "masters"
+                  ],
                   "query": [
-                    { "key": "type", "value": "language" },
-                    { "key": "status", "value": "Active" },
-                    { "key": "page", "value": "1" },
-                    { "key": "limit", "value": "50" }
+                    {
+                      "key": "type",
+                      "value": "language"
+                    },
+                    {
+                      "key": "status",
+                      "value": "Active"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50"
+                    }
                   ]
                 },
                 "description": "Languages known. Seed: Hindi, English, Bengali, Marathi, Telugu, Tamil, Gujarati, Urdu, Kannada, Malayalam, Punjabi, Odia, Assamese."
@@ -8622,13 +9709,30 @@
                 "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/masters?type=regularizationReason&status=Active&page=1&limit=50",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "masters"],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "masters"
+                  ],
                   "query": [
-                    { "key": "type", "value": "regularizationReason" },
-                    { "key": "status", "value": "Active" },
-                    { "key": "page", "value": "1" },
-                    { "key": "limit", "value": "50" }
+                    {
+                      "key": "type",
+                      "value": "regularizationReason"
+                    },
+                    {
+                      "key": "status",
+                      "value": "Active"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50"
+                    }
                   ]
                 },
                 "description": "Missed-punch reason. Seed: Forgot to Punch, Biometric Issue, System Downtime, Client Visit, Power Outage, Incorrect Shift Mapping, Other."
@@ -8641,13 +9745,30 @@
                 "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/masters?type=markAttendanceReason&status=Active&page=1&limit=50",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "masters"],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "masters"
+                  ],
                   "query": [
-                    { "key": "type", "value": "markAttendanceReason" },
-                    { "key": "status", "value": "Active" },
-                    { "key": "page", "value": "1" },
-                    { "key": "limit", "value": "50" }
+                    {
+                      "key": "type",
+                      "value": "markAttendanceReason"
+                    },
+                    {
+                      "key": "status",
+                      "value": "Active"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50"
+                    }
                   ]
                 },
                 "description": "HR mark-attendance reason. Seed: Missed Punch, Device Issue, Official Travel, Other."
@@ -8660,13 +9781,30 @@
                 "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/masters?type=onTourCategory&status=Active&page=1&limit=50",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "masters"],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "masters"
+                  ],
                   "query": [
-                    { "key": "type", "value": "onTourCategory" },
-                    { "key": "status", "value": "Active" },
-                    { "key": "page", "value": "1" },
-                    { "key": "limit", "value": "50" }
+                    {
+                      "key": "type",
+                      "value": "onTourCategory"
+                    },
+                    {
+                      "key": "status",
+                      "value": "Active"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50"
+                    }
                   ]
                 },
                 "description": "On Tour dropdown. Seed: Up Country, Local, Intrastate, International.\nApply On Tour sends this row _id in tourCategory. Test script saves the first id into {{onTourCategoryId}}."
@@ -8692,13 +9830,30 @@
                 "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/masters?type=onDutyCategory&status=Active&page=1&limit=50",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "masters"],
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "masters"
+                  ],
                   "query": [
-                    { "key": "type", "value": "onDutyCategory" },
-                    { "key": "status", "value": "Active" },
-                    { "key": "page", "value": "1" },
-                    { "key": "limit", "value": "50" }
+                    {
+                      "key": "type",
+                      "value": "onDutyCategory"
+                    },
+                    {
+                      "key": "status",
+                      "value": "Active"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50"
+                    }
                   ]
                 },
                 "description": "On Duty dropdown. Seed: Client Site, Bank Work, Field Visit, Office Duty.\nApply On Duty sends this row _id in tourCategory. Test script saves the first id into {{onDutyCategoryId}}."
@@ -9012,6 +10167,142 @@
               }
             }
           ]
+        },
+        {
+          "name": "2.6 Break",
+          "description": "Employee start / end. Run 2.1 Login (Employee), then 2.2 Punch In, then these.\nGET /me returns only the 2 published policies.\nLunch Break uses the policy minutes. Day Break needs minutes (5 or 10) and has no daily count.\nUnpublished policies are hidden. Ending past the allowed minutes saves Pending.",
+          "item": [
+            {
+              "name": "1. My Break Today",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/break/me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "break",
+                    "me"
+                  ]
+                },
+                "description": "GET /api/break/me\nEmployee view. policies has the 2 published breaks only.\nLunch includes minutes and remainingMinutes. Day Break is flexible: true.\ntoday.splits is how many times each break was taken today.\nhistory lists every day, including previous days, with each break.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}` from 2.1 Login (Employee)\n"
+              }
+            },
+            {
+              "name": "2. Start Lunch Break",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/break/start",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "break",
+                    "start"
+                  ]
+                },
+                "description": "POST /api/break/start\nBody breakType = Lunch Break.\nUses today's remaining balance. Punch in first. One open break at a time.\nSaves {{breakId}}.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"breakType\": \"Lunch Break\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const j = pm.response.json();",
+                      "const id = (j.break && j.break._id) || j._id;",
+                      "if (id) pm.collectionVariables.set('breakId', id);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "3. Start Day Break",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/break/start",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "break",
+                    "start"
+                  ]
+                },
+                "description": "POST /api/break/start\nBody breakType = Day Break and minutes = 10 (or 5).\nNo daily count. Ending after those minutes needs reporting manager approval.\nSaves {{breakId}}.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"breakType\": \"Day Break\",\n  \"minutes\": 10\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const j = pm.response.json();",
+                      "const id = (j.break && j.break._id) || j._id;",
+                      "if (id) pm.collectionVariables.set('breakId', id);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "4. End My Break",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/break/end",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "break",
+                    "end"
+                  ]
+                },
+                "description": "POST /api/break/end\nOnly the employee can end the break.\nResponse includes this break's minutes and attendance:\nworked, required (9h from the shift), remaining, completed.\nBreak time is removed from working hours."
+              }
+            }
+          ]
         }
       ]
     }
@@ -9051,6 +10342,10 @@
     },
     {
       "key": "companyId2",
+      "value": ""
+    },
+    {
+      "key": "companyLogoUrl",
       "value": ""
     },
     {
@@ -9235,6 +10530,14 @@
     },
     {
       "key": "leavePolicyId",
+      "value": ""
+    },
+    {
+      "key": "breakId",
+      "value": ""
+    },
+    {
+      "key": "policyId",
       "value": ""
     }
   ]

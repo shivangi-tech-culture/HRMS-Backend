@@ -3,7 +3,7 @@
  * Formats punch / daily / calendar rows for the API.
  * Pure formatting — does not touch User or Company assignment.
  */
-const { formatPunchStamp, minutesOfDay, parseHm, punchInWindow, graceMinutesOf, overtimeAfterShiftEnd } = require("./shiftTiming");
+const { formatPunchStamp, minutesOfDay, parseHm, punchInWindow, graceMinutesOf, overtimeAfterShiftEnd, requiredWorkMinutes } = require("./shiftTiming");
 
 const oid = (value) => {
   if (value === undefined || value === null || value === "") return "";
@@ -73,6 +73,10 @@ const formatAttendanceRecord = (record, extras = {}) => {
     typeof record.toObject === "function" ? record.toObject() : { ...record };
 
   const worked = Number(r.workedMinutes) || 0;
+  const requiredMinutes = requiredWorkMinutes(
+    extras.shift || (r.shift && r.shift.startTime ? r.shift : null),
+    r.date
+  );
   const endTime =
     (extras.shift && extras.shift.endTime) ||
     (r.shift && r.shift.endTime) ||
@@ -142,6 +146,9 @@ const formatAttendanceRecord = (record, extras = {}) => {
     status: r.punchIn && !r.punchOut ? "MissedPunch" : r.status || "",
     workMode: r.workMode || "WFO",
     workingHours: formatDurationLabel(worked),
+    requiredHours: formatDurationLabel(requiredMinutes),
+    remainingHours: formatDurationLabel(Math.max(0, requiredMinutes - worked)),
+    shiftCompleted: worked >= requiredMinutes,
     overtime: formatDurationLabel(overtime),
     lateByMinutes: lateBy,
     earlyByMinutes: earlyBy,

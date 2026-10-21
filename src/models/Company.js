@@ -86,6 +86,18 @@ const companySchema = new mongoose.Schema(
       uppercase: true,
     },
     isActive: { type: Boolean, default: true },
+    /** Cloudinary URL from upload type companyLogo. Empty until a logo is saved. */
+    logo: { type: String, default: "", trim: true },
+    /** Calendar year the company was founded. Null until set. */
+    foundedYear: {
+      type: Number,
+      default: null,
+      validate: {
+        validator: (value) =>
+          value == null || (Number.isInteger(value) && value >= 1800 && value <= 2100),
+        message: "Founded year must be between 1800 and 2100",
+      },
+    },
     /**
      * Company month. Default 1 through the last day of that month (30 or 31).
      * A shifted month stores both ends, for example 24 through 23.

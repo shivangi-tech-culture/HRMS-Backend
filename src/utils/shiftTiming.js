@@ -410,6 +410,61 @@ const countedWorkedMinutes = (inMin, outMin, startMin) => {
   return Math.max(0, outMin - countedIn);
 };
 
+/** Closed break minutes that fall inside the counted work window. */
+const breakMinutesBetween = (breaks, fromMin, toMin, skipApproved = false) => {
+  if (fromMin == null || toMin == null || toMin <= fromMin) return 0;
+  let total = 0;
+  for (const row of breaks || []) {
+    if (!row?.start || !row?.end) continue;
+    if (skipApproved && row.approved) continue;
+    const start = minutesOfDay(row.start);
+    const end = minutesOfDay(row.end);
+    const from = Math.max(start, fromMin);
+    const to = Math.min(end, toMin);
+    if (to > from) total += to - from;
+  }
+  return total;
+};
+
+/** Shift length. A 10:00–19:00 day is 9 hours. */
+const requiredWorkMinutes = (shift, dateStr) => {
+  const start = parseHm(shift?.startTime);
+  const end = parseHm(effectiveEndTime(shift || DEFAULT_SHIFT, dateStr));
+  if (start == null || end == null || end <= start) return STANDARD_WORK_MINUTES;
+  return end - start;
+};
+
+/**
+ * Worked time after breaks, against the shift length.
+ * An open break is not subtracted until the employee ends it.
+ */
+const workProgress = (record, shift, asOf = new Date()) => {
+  const requiredMinutes = requiredWorkMinutes(shift, record?.date);
+  if (!record?.punchIn) {
+    return {
+      requiredMinutes,
+      workedMinutes: 0,
+      breakMinutes: 0,
+      remainingMinutes: requiredMinutes,
+      completed: false,
+    };
+  }
+  const start = parseHm(shift?.startTime) ?? 600;
+  const inMin = minutesOfDay(record.punchIn);
+  const outMin = minutesOfDay(record.punchOut || asOf);
+  const gross = countedWorkedMinutes(inMin, outMin, start);
+  const breakMinutes = breakMinutesBetween(record.breaks, Math.max(inMin, start), outMin);
+  const workedMinutes = Math.max(0, gross - breakMinutes);
+  const remainingMinutes = Math.max(0, requiredMinutes - workedMinutes);
+  return {
+    requiredMinutes,
+    workedMinutes,
+    breakMinutes,
+    remainingMinutes,
+    completed: workedMinutes >= requiredMinutes,
+  };
+};
+
 /** At least 5 counted hours, then left more than 1 hour before shift end. */
 const HALF_DAY_MINUTES = 5 * 60;
 
@@ -494,12 +549,17 @@ const computeDayMetrics = (record, shift, dateStr, holidayMap = {}) => {
   const end = parseHm(effectiveEndTime(shiftObj, date)) ?? 1140;
   const inMin = minutesOfDay(record.punchIn);
   const outMin = minutesOfDay(record.punchOut);
-  const workedMinutes = countedWorkedMinutes(inMin, outMin, start);
+  const grossMinutes = countedWorkedMinutes(inMin, outMin, start);
+  const windowStart = Math.max(inMin, start);
+  const breakMinutes = breakMinutesBetween(record.breaks, windowStart, outMin);
+  const statusBreakMinutes = breakMinutesBetween(record.breaks, windowStart, outMin, true);
+  const workedMinutes = Math.max(0, grossMinutes - breakMinutes);
+  const statusMinutes = Math.max(0, grossMinutes - statusBreakMinutes);
   const lateByMinutes = punchInWindow(inMin, start, shiftObj.graceMinutes).lateByMinutes;
   const earlyByMinutes = Math.max(0, end - outMin);
   const overtimeMinutes = Math.max(0, outMin - end);
   const shortDay = end - start > 0 && end - start <= 5 * 60;
-  const closed = statusFromShiftSpan(outMin, end, workedMinutes, type === "halfDay" || shortDay);
+  const closed = statusFromShiftSpan(outMin, end, statusMinutes, type === "halfDay" || shortDay);
   const late = lateByMinutes > 0 && closed.status === "Present";
 
   return {
@@ -535,6 +595,9 @@ module.exports = {
   DEFAULT_SHIFT,
   STANDARD_WORK_MINUTES,
   countedWorkedMinutes,
+  breakMinutesBetween,
+  requiredWorkMinutes,
+  workProgress,
   overtimeMinutesOf,
   overtimeAfterShiftEnd,
   getAssignedShift,

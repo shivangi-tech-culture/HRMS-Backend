@@ -38,6 +38,8 @@ const breakSchema = new mongoose.Schema(
   {
     start: { type: Date, default: null },
     end: { type: Date, default: null },
+    /** Approved extra break. Counted in hours, but it does not change a Present day. */
+    approved: { type: Boolean, default: false },
   },
   { _id: false }
 );

@@ -32,6 +32,8 @@ const description = [
   "| My permissions | `GET /api/permissions/my` |",
   "| My profile | `GET/PUT /api/employees/:id` (own id only) |",
   "| Attendance (self) | `POST /punch-in` `/punch-out` · `GET /today` `/web-punches` |",
+  "| Break (self) | `POST /api/break/start` `/end` · `GET /api/break/me` |",
+  "| Break (admin) | `GET /api/break/live` `/history` `/approvals` `/policies` · `POST /api/break/:id/review` |",
   "| Attendance (admin) | `GET /daily` `/calendar` `/late-early` · `POST /:id/approve` `/reject` |",
   "| Masters (dropdowns) | `GET /api/masters?type=…` |",
   "| Holiday (self) | `GET /api/holidays/me` — Self → Holiday → view |",

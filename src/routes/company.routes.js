@@ -94,6 +94,8 @@ const canView = [
  *             properties:
  *               companyName: { type: string, example: ABC Technologies }
  *               companyCode: { type: string, example: ABC }
+ *               logo: { type: string, example: "https://res.cloudinary.com/demo/image/upload/v1/hrms/companyLogo/logo.png", description: "Optional. Upload with POST /api/employees/upload and type companyLogo, then paste the returned url. Send an empty string to clear it." }
+ *               foundedYear: { type: integer, nullable: true, example: 2015, description: "Optional year the company was founded (1800 through the current year). Send null to clear it." }
  *               monthStartDay: { type: integer, example: 1, description: "Default 1. Shifted month example 24." }
  *               monthEndDay: { type: integer, example: 31, description: "Default 31 means the last day of the month (30 or 31). Shifted month example 23." }
  *               isActive: { type: boolean, example: true }
@@ -168,7 +170,7 @@ router.post(
  *     tags: [Admin / Company]
  *     summary: Get one company — all details
  *     description: |
- *       Everything about the company in one call: companyName, companyCode, isActive,
+ *       Everything about the company in one call: companyName, companyCode, isActive, logo, foundedYear,
  *       branches[] (branchId { _id, name, code }, address, city, state, pincode, isActive,
  *       shifts[] (shiftId { _id, name, code }, isActive, monthlySchedule)) and
  *       reportingManagers[] { _id, name, employeeCode, email } (active managers of this company).

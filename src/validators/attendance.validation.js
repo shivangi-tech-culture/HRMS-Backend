@@ -177,6 +177,9 @@ const regularizeSchema = Joi.object({
   }),
   remarks: Joi.string().trim().allow("").max(500).optional(),
   document: Joi.string().trim().allow("").max(500).optional(),
+  breakType: Joi.string().trim().allow("").max(60).optional(),
+  breakStartTime: Joi.string().trim().allow("").optional(),
+  breakEndTime: Joi.string().trim().allow("").optional(),
 }).unknown(false);
 
 /** GET /api/attendance/regularize — own requests */
