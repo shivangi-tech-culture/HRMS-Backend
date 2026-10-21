@@ -1,9 +1,9 @@
 /**
  * AUTH ROUTES → /api/auth
- * POST /login (public) · POST /logout (public)
+ * POST /login (public) · POST /logout (public) · GET /token-status (public)
  */
 const express = require("express");
-const { login, logout } = require("../controllers/auth.controller");
+const { login, logout, tokenStatus } = require("../controllers/auth.controller");
 const { validate } = require("../middleware/validate");
 const { loginSchema } = require("../validators/user.validation");
 
@@ -69,5 +69,32 @@ router.post("/login", validate(loginSchema), login);
  */
 // LOGOUT — public; clears cookie (no body required)
 router.post("/logout", logout);
+
+/**
+ * @swagger
+ * /api/auth/token-status:
+ *   get:
+ *     tags: [Auth]
+ *     summary: Check token (expired / other device login)
+ *     description: |
+ *       Pass JWT in header only: `Authorization: Bearer <token>` (or cookie `token`).
+ *       Returns `message` + `isExpired` + `isReplaced`.
+ *       Both booleans `false` = token valid.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: header
+ *         name: Authorization
+ *         required: true
+ *         schema:
+ *           type: string
+ *         example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+ *     responses:
+ *       200:
+ *         description: message, isExpired, isReplaced
+ *       400:
+ *         description: token missing from header
+ */
+router.get("/token-status", tokenStatus);
 
 module.exports = router;

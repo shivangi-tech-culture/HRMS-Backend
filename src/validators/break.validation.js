@@ -43,10 +43,7 @@ const policyUpdateSchema = Joi.object({
   flexible: Joi.boolean().optional(),
   minutes: Joi.number().integer().min(1).max(180).optional(),
   description: Joi.string().trim().allow("").max(300).optional(),
-}).unknown(false);
-
-const publishSchema = Joi.object({
-  published: Joi.boolean().required(),
+  published: Joi.boolean().optional(),
 }).unknown(false);
 
 const liveQuerySchema = Joi.object({
@@ -79,5 +76,4 @@ module.exports = {
   reviewSchema,
   policySchema,
   policyUpdateSchema,
-  publishSchema,
 };

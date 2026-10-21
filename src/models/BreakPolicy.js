@@ -1,5 +1,5 @@
 /**
- * Break policies. An employee only sees published ones, and only 2 can be published.
+ * Break policies. An employee only sees published ones; any number can be published.
  * Lunch is a fixed duration. A flexible break (5 min, 10 min, …) has no daily count.
  */
 const mongoose = require("mongoose");
@@ -26,4 +26,3 @@ breakPolicySchema.index(
 );
 
 module.exports = mongoose.model("BreakPolicy", breakPolicySchema);
-module.exports.MAX_PUBLISHED = 2;

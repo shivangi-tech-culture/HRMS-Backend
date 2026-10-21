@@ -169,7 +169,7 @@ const adminBreak = {
     postJson(
       "6. Create Policy",
       "{{baseUrl}}/api/break/policies",
-      "POST /api/break/policies\nSaves a policy as unpublished. Employees do not see it until 8. Publish Policy.\nflexible true = employee sends minutes (5 or 10) and there is no daily count.\nflexible false = minutes is the fixed allowance, like lunch.",
+      "POST /api/break/policies\nSaves a policy as unpublished.\nSet published true or false later on 7. Update Policy.\nflexible true = employee sends minutes (5 or 10) and there is no daily count.\nflexible false = minutes is the fixed allowance, like lunch.",
       { name: "Tea Break", flexible: false, minutes: 15, description: "" },
       [
         "const j = pm.response.json();",
@@ -180,31 +180,17 @@ const adminBreak = {
       "7. Update Policy",
       "PUT",
       "{{baseUrl}}/api/break/policies/{{policyId}}",
-      "PUT /api/break/policies/:id\nChange the name or minutes. New breaks use the new minutes.\n{{policyId}} comes from 7. Create Policy or 6. List Policies.",
-      { name: "Tea Break", flexible: false, minutes: 10, description: "" }
-    ),
-    reqJson(
-      "8. Publish Policy",
-      "PATCH",
-      "{{baseUrl}}/api/break/policies/{{policyId}}/publish",
-      "PATCH /api/break/policies/:id/publish\nEmployees can start this break after publish.\nIf 2 policies are already published, unpublish one first.",
-      { published: true }
-    ),
-    reqJson(
-      "9. Unpublish Policy",
-      "PATCH",
-      "{{baseUrl}}/api/break/policies/{{policyId}}/publish",
-      "PATCH /api/break/policies/:id/publish\npublished false hides it from employees again.",
-      { published: false }
+      "PUT /api/break/policies/:id\nChange the name, minutes, or published.\npublished true shows it to employees. published false hides it.\nAny number of policies can be published.\n{{policyId}} comes from 6. Create Policy or 5. List Policies.",
+      { name: "Tea Break", flexible: false, minutes: 10, description: "", published: true }
     ),
     {
-      name: "10. Delete Policy",
+      name: "8. Delete Policy",
       request: {
         method: "DELETE",
         header: [],
         url: urlOf("{{baseUrl}}/api/break/policies/{{policyId}}"),
         description:
-          "DELETE /api/break/policies/:id\nUnpublish first. Published policies cannot be deleted.",
+          "DELETE /api/break/policies/:id\nSet published to false on Update Policy first. A published policy cannot be deleted.",
       },
     },
   ],

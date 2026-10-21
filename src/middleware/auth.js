@@ -2,6 +2,7 @@
  * AUTH MIDDLEWARE — JWT protect + role authorize
  * protect → cookie/Bearer JWT → req.user (+ admin/ESS flags from Role matrix)
  * authorize(...roles) → system role names OR custom roles with matching side
+ * inspectSessionToken → shared by protect + token-status + chat
  * checkPermission (routes) still enforces the actual action grants.
  */
 const User = require("../models/User");
@@ -95,6 +96,69 @@ const isSystemRoleName = (roleName) => {
   return SYSTEM_ROLES.includes(role) || ALL_ACCESS.includes(role);
 };
 
+/**
+ * Single-session JWT check (DRY for protect + token-status + chat).
+ * Returns { ok, message, isExpired, isReplaced, user?, decoded? }
+ */
+const inspectSessionToken = async (token, opts = {}) => {
+  const raw = String(token || "").trim();
+  if (!raw) {
+    return {
+      ok: false,
+      message: "Token is required",
+      isExpired: false,
+      isReplaced: false,
+    };
+  }
+
+  let decoded;
+  try {
+    decoded = verifyToken(raw);
+  } catch (err) {
+    const isExpired =
+      err?.name === "TokenExpiredError" ||
+      String(err?.message || "")
+        .toLowerCase()
+        .includes("expired");
+    return {
+      ok: false,
+      message: isExpired ? "Token is expired" : "Token is invalid",
+      isExpired,
+      isReplaced: false,
+    };
+  }
+
+  const user = await User.findById(decoded.id).select(opts.select || "-password");
+  if (!user || user.status !== "Active") {
+    return {
+      ok: false,
+      message: "User not found or inactive",
+      isExpired: false,
+      isReplaced: false,
+    };
+  }
+
+  if (!user.token || user.token !== raw) {
+    return {
+      ok: false,
+      message: "Logged in from another device",
+      isExpired: false,
+      isReplaced: true,
+      user,
+      decoded,
+    };
+  }
+
+  return {
+    ok: true,
+    message: "Token is valid",
+    isExpired: false,
+    isReplaced: false,
+    user,
+    decoded,
+  };
+};
+
 /** Require login — JWT from cookie or Bearer → req.user */
 const protect = async (req, res, next) => {
   try {
@@ -103,12 +167,14 @@ const protect = async (req, res, next) => {
       return res.status(401).json({ message: "Please login first" });
     }
 
-    const decoded = verifyToken(token);
-    const user = await User.findById(decoded.id).select("-password");
-
-    if (!user || user.status !== "Active") {
-      return res.status(401).json({ message: "User not found or inactive" });
+    const check = await inspectSessionToken(token, { select: "-password" });
+    if (!check.ok) {
+      const body = { message: check.message };
+      if (check.isReplaced) body.code = "SESSION_REPLACED";
+      return res.status(401).json(body);
     }
+
+    const user = check.user;
 
     // Normalize legacy role names in-memory for this request
     const normalized = normalizeRoleName(user.role);
@@ -184,6 +250,7 @@ module.exports = {
   protect,
   authorize,
   hasAllAccess,
+  inspectSessionToken,
   ALL_ACCESS,
   classifyRoleAccess,
 };
