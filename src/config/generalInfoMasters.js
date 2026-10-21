@@ -125,6 +125,8 @@ const ATTENDANCE_DROPDOWNS = {
     "Official Travel",
     "Other",
   ],
+  onTourCategory: ["Up Country", "Local", "Intrastate", "International"],
+  onDutyCategory: ["Client Site", "Bank Work", "Field Visit", "Office Duty"],
 };
 
 /**

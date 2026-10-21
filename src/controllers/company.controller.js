@@ -33,6 +33,13 @@ const normalizeBranches = (branches) =>
   }));
 const okId = (id) => mongoose.Types.ObjectId.isValid(id);
 
+/** Old companies have neither field stored. Always return both. */
+const withCompanyProfile = (row) => ({
+  ...row,
+  logo: row?.logo || "",
+  foundedYear: row?.foundedYear ?? null,
+});
+
 /** Default month is day 1 through the last day (stored as 31). A shifted month is 24 through 23. */
 const pairMonthDays = (startRaw, endRaw) => {
   const monthStartDay = Math.min(28, Math.max(1, Math.floor(Number(startRaw)) || 1));
@@ -114,9 +121,9 @@ const listCompanies = async (req, res) => {
       Company.countDocuments(filter),
       Company.find(filter)
         .select(
-          "companyName companyCode isActive monthStartDay monthEndDay branches.branchId branches.address branches.city branches.state branches.pincode branches.isActive branches.shifts.shiftId branches.shifts.isActive"
+          "companyName companyCode isActive logo foundedYear monthStartDay monthEndDay branches.branchId branches.address branches.city branches.state branches.pincode branches.isActive branches.shifts.shiftId branches.shifts.isActive"
         )
-        .sort({ companyName: 1 })
+        .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .populate(MASTER_POPULATE)
@@ -130,7 +137,7 @@ const listCompanies = async (req, res) => {
       page,
       limit,
       pages: Math.max(1, Math.ceil(total / limit)),
-      data,
+      data: data.map(withCompanyProfile),
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -210,7 +217,7 @@ const getCompany = async (req, res) => {
 
     return res.json({
       data: {
-        ...row,
+        ...withCompanyProfile(row),
         reportingManagers: managers.map((m) => ({
           _id: m._id,
           name: m.name,
@@ -244,6 +251,8 @@ const createCompany = async (req, res) => {
       companyName,
       companyCode,
       isActive: req.body.isActive !== false,
+      logo: String(req.body.logo || "").trim(),
+      foundedYear: req.body.foundedYear == null ? null : req.body.foundedYear,
       monthStartDay: month.monthStartDay,
       monthEndDay: month.monthEndDay,
       branches: normalizeBranches(req.body.branches || []),
@@ -283,6 +292,10 @@ const updateCompany = async (req, res) => {
     }
 
     if (req.body.isActive !== undefined) row.isActive = req.body.isActive;
+    if (req.body.logo !== undefined) row.logo = String(req.body.logo || "").trim();
+    if (req.body.foundedYear !== undefined) {
+      row.foundedYear = req.body.foundedYear == null ? null : req.body.foundedYear;
+    }
     if (req.body.monthStartDay !== undefined || req.body.monthEndDay !== undefined) {
       const start = req.body.monthStartDay !== undefined ? req.body.monthStartDay : row.monthStartDay;
       const endWasDefault = row.monthEndDay == null || row.monthEndDay >= 28;

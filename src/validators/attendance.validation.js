@@ -5,6 +5,7 @@
  */
 const Joi = require("joi");
 const { DAY_STATUSES, ATTENDANCE_STATUSES } = require("../models/Attendance");
+const { DUTY_TYPES } = require("../models/TourDuty");
 
 const SELF_SOURCES = ["web", "mobile", "biometric"];
 
@@ -176,6 +177,9 @@ const regularizeSchema = Joi.object({
   }),
   remarks: Joi.string().trim().allow("").max(500).optional(),
   document: Joi.string().trim().allow("").max(500).optional(),
+  breakType: Joi.string().trim().allow("").max(60).optional(),
+  breakStartTime: Joi.string().trim().allow("").optional(),
+  breakEndTime: Joi.string().trim().allow("").optional(),
 }).unknown(false);
 
 /** GET /api/attendance/regularize — own requests */
@@ -198,6 +202,58 @@ const regularizationListQuerySchema = Joi.object({
   limit: Joi.number().integer().min(1).max(100).default(20),
 }).unknown(false);
 
+const hm = Joi.string()
+  .trim()
+  .pattern(/^\d{1,2}:\d{2}$/)
+  .messages({ "string.pattern.base": "time must look like 09:00" });
+
+/** POST /api/attendance/tour-duty — employee, self only */
+const tourDutySchema = Joi.object({
+  dutyType: Joi.string().valid(...DUTY_TYPES).required().messages({
+    "any.required": "dutyType is required",
+    "any.only": "dutyType must be On Tour or On Duty",
+  }),
+  tourCategory: objectId.required().messages({
+    "any.required": "tourCategory is required",
+  }),
+  fromDate: dateStr.required().messages({ "any.required": "fromDate is required" }),
+  fromTime: hm.required().messages({ "any.required": "fromTime is required" }),
+  toDate: dateStr.required().messages({ "any.required": "toDate is required" }),
+  toTime: hm.required().messages({ "any.required": "toTime is required" }),
+  reason: Joi.string().trim().min(1).max(200).required().messages({
+    "any.required": "reason is required",
+    "string.empty": "reason is required",
+  }),
+  remarks: Joi.string().trim().allow("").max(500).optional(),
+  document: Joi.string().trim().allow("").max(500).optional(),
+}).unknown(false);
+
+/** GET /api/attendance/tour-duty — own requests */
+const myTourDutyQuerySchema = Joi.object({
+  status: requestStatus,
+  month: Joi.string().pattern(/^\d{4}-\d{2}$/).optional().messages({
+    "string.pattern.base": "month must be YYYY-MM",
+  }),
+  from: dateStr.optional(),
+  to: dateStr.optional(),
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(100).default(20),
+}).unknown(false);
+
+/** GET /api/attendance/tour-duties — approval queue */
+const tourDutyListQuerySchema = Joi.object({
+  status: requestStatus,
+  search: Joi.string().trim().allow("").max(100).optional(),
+  companyId: Joi.alternatives().try(objectId, Joi.string().valid("ALL", "")).optional(),
+  month: Joi.string().pattern(/^\d{4}-\d{2}$/).optional().messages({
+    "string.pattern.base": "month must be YYYY-MM",
+  }),
+  from: dateStr.optional(),
+  to: dateStr.optional(),
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(100).default(20),
+}).unknown(false);
+
 module.exports = {
   punchSchema,
   punchStatusQuerySchema,
@@ -211,5 +267,8 @@ module.exports = {
   regularizeSchema,
   myRegularizeQuerySchema,
   regularizationListQuerySchema,
+  tourDutySchema,
+  myTourDutyQuerySchema,
+  tourDutyListQuerySchema,
   SELF_SOURCES,
 };

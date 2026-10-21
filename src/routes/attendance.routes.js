@@ -18,12 +18,23 @@
  *
  * ─── EMPLOYEE TIMESHEET + REGULARIZATION ─────────────────────
  * GET    /timesheet            ?month=YYYY-MM | from=&to=  optional employeeId
- * POST   /regularize           self only. Missed punch times, or a Late day reason. document is optional (upload type regularization).
+ * POST   /regularize           self only. Missed punch times, a Late day, or a break that was forgotten or too long.
  * GET    /regularize           own requests
  * POST   /regularize/:id/cancel
  * GET    /regularizations      HR / manager / admin / super admin queue
  * POST   /regularizations/:id/review?decision=approve|reject
  *
+ * ─── ON TOUR / ON DUTY ───────────────────────────────────────
+ * POST   /tour-duty            employee. { dutyType, tourCategory, fromDate, fromTime, toDate, toTime, reason, remarks?, document? }
+ * GET    /tour-duty            own list. status, month=YYYY-MM
+ * GET    /tour-duty/:id
+ * POST   /tour-duty/:id/cancel pending only
+ * GET    /tour-duties          Attendance → On Tour/On Duty queue
+ * POST   /tour-duties/:id/review?decision=approve|reject
+ *
+ * Approve sets each covered day to Present.
+ * Reject sets each covered day to Absent.
+ * Reviewer: Reporting Manager (own team), HR (assigned companies), or Super Admin.
  * Approve writes the punches and the day becomes Present.
  * Pending stays pending. Reject stays Absent.
  * Scope: SA/Admin = all · HR = assigned companies · Manager = team
@@ -47,6 +58,14 @@ const {
   reviewRegularization,
 } = require("../controllers/regularization.controller");
 const {
+  requestTourDuty,
+  myTourDuty,
+  getTourDuty,
+  cancelTourDuty,
+  listTourDuty,
+  reviewTourDuty,
+} = require("../controllers/tourDuty.controller");
+const {
   listLateEarly,
   getLateEarlyDetail,
 } = require("../controllers/lateEarly.controller");
@@ -67,6 +86,9 @@ const {
   regularizeSchema,
   myRegularizeQuerySchema,
   regularizationListQuerySchema,
+  tourDutySchema,
+  myTourDutyQuerySchema,
+  tourDutyListQuerySchema,
 } = require("../validators/attendance.validation");
 
 const router = express.Router();
@@ -108,6 +130,25 @@ const needRegularizationReview = (req, res, next) => {
   if (ALL_ACCESS.includes(role) || hasGlobalCompanyAccess(req.user)) return next();
   const action = String(req.body.decision || "").toLowerCase() === "reject" ? "reject" : "approve";
   return checkPermission("Attendance", "Attendance Regularization", action)(req, res, next);
+};
+
+/** Employee applies and cancels. Admin reviews under Attendance → On Tour/On Duty. */
+const needSelfTourDuty = (action) => (req, res, next) => {
+  if (hasAllAccess(req.user) || hasGlobalCompanyAccess(req.user)) return next();
+  if (normalizeRoleName(req.user?.role) === EMPLOYEE) {
+    return checkPermission("Self", "On Tour/On Duty Entries", action)(req, res, next);
+  }
+  return checkPermission("Attendance", "On Tour/On Duty", action === "create" ? "view" : action)(req, res, next);
+};
+
+const needTourDutyReview = (req, res, next) => {
+  const role = normalizeRoleName(req.user?.role);
+  if (role === EMPLOYEE) {
+    return res.status(403).json({ message: "Employees cannot approve or reject On Tour / On Duty" });
+  }
+  if (ALL_ACCESS.includes(role) || hasGlobalCompanyAccess(req.user)) return next();
+  const action = String(req.body.decision || "").toLowerCase() === "reject" ? "reject" : "approve";
+  return checkPermission("Attendance", "On Tour/On Duty", action)(req, res, next);
 };
 
 // ─── Employee self punch ─────────────────────────────────────
@@ -217,6 +258,48 @@ router.post(
   validate(remarkReviewSchema),
   needRegularizationReview,
   reviewRegularization
+);
+
+router.post(
+  "/tour-duty",
+  protect,
+  validate(tourDutySchema),
+  needSelfTourDuty("create"),
+  requestTourDuty
+);
+
+router.get(
+  "/tour-duty",
+  protect,
+  validateQuery(myTourDutyQuerySchema),
+  needSelfTourDuty("view"),
+  myTourDuty
+);
+
+router.get("/tour-duty/:id", protect, needSelfTourDuty("view"), getTourDuty);
+
+router.post(
+  "/tour-duty/:id/cancel",
+  protect,
+  needSelfTourDuty("cancel"),
+  cancelTourDuty
+);
+
+router.get(
+  "/tour-duties",
+  protect,
+  validateQuery(tourDutyListQuerySchema),
+  needAttendance("On Tour/On Duty", "view"),
+  listTourDuty
+);
+
+router.post(
+  "/tour-duties/:id/review",
+  protect,
+  attachReviewDecision,
+  validate(remarkReviewSchema),
+  needTourDutyReview,
+  reviewTourDuty
 );
 
 module.exports = router;

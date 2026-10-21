@@ -11,6 +11,7 @@
  * - Employee create/update still uses companyShift.assertUserPlacement only
  */
 const Attendance = require("../models/Attendance");
+const BreakSession = require("../models/Break");
 const User = require("../models/User");
 const Company = require("../models/Company");
 const { getModel } = require("../models/Master");
@@ -29,6 +30,7 @@ const {
   punchInWindow,
   sameDayClock,
   DEFAULT_SHIFT,
+  workProgress,
 } = require("../utils/shiftTiming");
 const {
   shiftSummary,
@@ -55,7 +57,7 @@ const {
   EMPLOYEE,
   isTeamScopedRole,
 } = require("../config/roles");
-const { resolveDisplayedStatus } = require("../utils/attendanceDayStatus");
+const { resolveDisplayedStatus, isApprovedTourDuty } = require("../utils/attendanceDayStatus");
 
 /**
  * Who can approve/reject attendance remarks:
@@ -84,6 +86,13 @@ const assertSelfSource = (source) => {
  * Hours and day status from the employee's shift.
  * Punch in only → MissedPunch. Punch out → Present or HalfDay.
  */
+/** Save net worked minutes (shift time minus breaks the employee has ended). */
+const applyWorkProgress = (record, shift) => {
+  if (!record?.punchIn || record.punchOut) return;
+  const progress = workProgress(record, shift);
+  record.workedMinutes = progress.workedMinutes;
+};
+
 const applyMetrics = (record, shift) => {
   const metrics = computeDayMetrics(record, shift, record.date);
   record.workedMinutes = metrics.workedMinutes;
@@ -188,9 +197,14 @@ const punchIn = async (req, res) => {
     record.lateByMinutes = windowCheck.isLate ? windowCheck.lateByMinutes || 0 : 0;
     record.earlyByMinutes = windowCheck.isEarly ? windowCheck.earlyByMinutes || 0 : 0;
     record.reviewReason = "";
-    record.status = "MissedPunch";
-    record.attendanceStatus = null;
-    record.remarks = remarks;
+    if (isApprovedTourDuty(record)) {
+      record.status = "Present";
+      if (remarks) record.remarks = remarks;
+    } else {
+      record.status = "MissedPunch";
+      record.attendanceStatus = null;
+      record.remarks = remarks;
+    }
     await record.save();
 
     await record.populate(
@@ -228,6 +242,15 @@ const punchOut = async (req, res) => {
     if (!record || !record.punchIn) {
       return res.status(400).json({ message: "Please punch in first" });
     }
+    const openBreak = await BreakSession.findOne({
+      employee: employeeId,
+      date,
+      endedAt: null,
+    }).select("_id");
+    if (openBreak) {
+      return res.status(400).json({ message: "End your break before punch out" });
+    }
+
     if (record.punchOut) {
       await record.populate(
         "employee",
@@ -261,8 +284,10 @@ const punchOut = async (req, res) => {
     record.punchOutSource = source;
     record.punchOutLocation = location;
     applyRemarkOnPunch(record, remarks);
+    const approvedDuty = isApprovedTourDuty(record);
     applyMetrics(record, shift);
-    if (record.attendanceStatus !== "Approved" && record.attendanceStatus !== "Rejected") {
+    if (approvedDuty) record.status = "Present";
+    if (!approvedDuty && record.attendanceStatus !== "Approved" && record.attendanceStatus !== "Rejected") {
       if (record.status === "Late") {
         record.attendanceStatus = "Late";
         if (!String(record.remarks || "").trim()) record.remarks = DEFAULT_LATE_REMARK;
@@ -329,11 +354,20 @@ const myToday = async (req, res) => {
         }
       }
       applyPlacement(record, { company, branch, shift });
-      if (record.punchIn && !record.punchOut && record.status !== "MissedPunch") {
+      if (isApprovedTourDuty(record)) {
+        if (record.status !== "Present") {
+          record.status = "Present";
+          dirty = true;
+        }
+      } else if (record.punchIn && !record.punchOut && record.status !== "MissedPunch") {
         record.status = "MissedPunch";
         dirty = true;
       }
-      if (record.punchIn && record.punchOut) {
+      if (record.punchIn && !record.punchOut) {
+        const before = record.workedMinutes;
+        applyWorkProgress(record, shift);
+        if (record.workedMinutes !== before) dirty = true;
+      } else if (record.punchIn && record.punchOut) {
         applyMetrics(record, shift);
         dirty = true;
       }
@@ -393,12 +427,13 @@ const getPunchStatus = async (req, res) => {
 
     const record = await Attendance.findOne({ employee: employee._id, date })
       .select(
-        "date companyId branchId shift punchIn punchOut punchInSource punchOutSource punchInLocation punchOutLocation workMode workedMinutes overtimeMinutes lateByMinutes earlyByMinutes status remarks attendanceStatus reviewReason"
+        "date companyId branchId shift punchIn punchOut punchInSource punchOutSource punchInLocation punchOutLocation workMode workedMinutes overtimeMinutes lateByMinutes earlyByMinutes status remarks attendanceStatus reviewReason breaks"
       )
       .lean();
 
     const punchedIn = Boolean(record?.punchIn);
     const punchedOut = Boolean(record?.punchOut);
+    const liveWork = record?.punchIn ? workProgress(record, placed.shift) : null;
     const punchInTime = formatPunchStamp(record?.punchIn);
     const punchOutTime = formatPunchStamp(record?.punchOut);
 
@@ -442,13 +477,15 @@ const getPunchStatus = async (req, res) => {
           : record.status || "Absent",
       attendanceStatus: record?.attendanceStatus || null,
       workMode: record?.workMode || "WFO",
-      workingHours: formatDurationLabel(record?.workedMinutes),
+      workingHours: formatDurationLabel(liveWork?.workedMinutes),
+      requiredHours: formatDurationLabel(liveWork?.requiredMinutes),
+      remainingHours: formatDurationLabel(liveWork?.remainingMinutes),
+      shiftCompleted: Boolean(liveWork?.completed),
       overtime: formatDurationLabel(record?.overtimeMinutes),
       lateByMinutes: Number(record?.lateByMinutes) || 0,
       earlyByMinutes: Number(record?.earlyByMinutes) || 0,
       remarks: String(record?.remarks || "").trim(),
       attendanceId: record?._id || null,
-      shift: shiftSummary(placed.shift),
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -622,7 +659,7 @@ const applyListCompany = (empFilter, resolved) => {
 };
 
 const ATTENDANCE_LIST_SELECT =
-  "employee date companyId branchId shift punchIn punchOut punchInSource workMode workedMinutes overtimeMinutes lateByMinutes earlyByMinutes status remarks attendanceStatus reviewReason";
+  "employee date companyId branchId shift punchIn punchOut punchInSource workMode workedMinutes overtimeMinutes lateByMinutes earlyByMinutes status remarks attendanceStatus reviewReason onTourId onDutyId";
 
 const EMPLOYEE_DAILY_SELECT =
   "name role status profileUrl official.employeeCode official.officialEmail official.department official.designation official.companyIds official.branchId official.shiftId personal.mobileNo";
@@ -727,6 +764,22 @@ const employeeDailyCard = (emp) => ({
  * attendanceStatus: Early · On time · Late · Approved · Rejected
  */
 const applyLateStatus = (att, timing) => {
+  if (isApprovedTourDuty(att)) {
+    return {
+      status: "Present",
+      attendanceStatus: att.attendanceStatus || null,
+      canApproveReject: false,
+      isLate: false,
+      isEarly: false,
+      lateBy: 0,
+      earlyBy: 0,
+      workedMinutes: Number(att.workedMinutes) || 0,
+      overtimeMinutes: Number(att.overtimeMinutes) || 0,
+      persist: false,
+      remarks: String(att?.remarks || "").trim(),
+      defaultRemark: "",
+    };
+  }
   const reviewed =
     att?.attendanceStatus === "Approved" || att?.attendanceStatus === "Rejected";
   let lateBy = Number(att?.lateByMinutes) || 0;
@@ -936,6 +989,8 @@ const emptyDailySummary = () => ({
   pending: 0,
   missedPunch: 0,
   rejected: 0,
+  onTour: 0,
+  onDuty: 0,
 });
 
 const isDailyPending = (row) => {
@@ -947,7 +1002,7 @@ const isDailyPending = (row) => {
 
 const tallyDailySummary = (summary, row) => {
   summary.all += 1;
-  if (row.status === "Present" || row.status === "Late") summary.present += 1;
+  if (row.status === "Present" || row.status === "Late" || row.status === "OnTour" || row.status === "OnDuty") summary.present += 1;
   else if (row.status === "Absent" || row.status === "Rejected") summary.absent += 1;
   else if (row.status === "OnLeave") summary.onLeave += 1;
   else if (row.status === "HalfDay") summary.halfDay += 1;
@@ -957,6 +1012,8 @@ const tallyDailySummary = (summary, row) => {
   if (row.status === "Rejected") summary.rejected += 1;
   if (row.isLate && (row.status === "Present" || row.status === "Late")) summary.late += 1;
   if (row.status === "WFH" || row.workMode === "WFH") summary.wfh += 1;
+  if (row.status === "OnTour") summary.onTour += 1;
+  if (row.status === "OnDuty") summary.onDuty += 1;
   if (row.status === "Pending" || row.needsRemarkReview) summary.pending += 1;
 };
 
@@ -1080,7 +1137,7 @@ const listDailyAttendance = async (req, res) => {
         User.countDocuments(empFilter),
         User.find(empFilter)
           .select(EMPLOYEE_DAILY_SELECT)
-          .sort({ name: 1 })
+          .sort({ createdAt: -1 })
           .skip(skip)
           .limit(limit)
           .lean(),
@@ -1112,7 +1169,7 @@ const listDailyAttendance = async (req, res) => {
         empIds.length
           ? Attendance.find({ employee: { $in: empIds }, date })
               .select(
-                "employee status workMode lateByMinutes remarks attendanceStatus punchIn punchOut"
+                "employee status workMode lateByMinutes remarks attendanceStatus punchIn punchOut onTourId onDutyId"
               )
               .lean()
           : [],
@@ -1190,7 +1247,7 @@ const listDailyAttendance = async (req, res) => {
     // Attendance-field filters: build all rows then paginate
     const employees = await User.find(empFilter)
       .select(EMPLOYEE_DAILY_SELECT)
-      .sort({ name: 1 })
+      .sort({ createdAt: -1 })
       .lean();
     const empIds = employees.map((e) => e._id);
     const attendanceRows = empIds.length
@@ -1290,7 +1347,7 @@ const attendanceCalendar = async (req, res) => {
       User.distinct("_id", empFilter),
       User.find(dayFilter)
         .select(EMPLOYEE_DAILY_SELECT)
-        .sort({ name: 1 })
+        .sort({ createdAt: -1 })
         .lean(),
     ]);
     const employeeCount = empIds.length;
@@ -1300,7 +1357,7 @@ const attendanceCalendar = async (req, res) => {
           employee: { $in: empIds },
           date: { $gte: from, $lte: to },
         })
-          .select("date status lateByMinutes workMode punchIn punchOut employee")
+          .select("date status lateByMinutes workMode punchIn punchOut employee onTourId onDutyId")
           .lean()
       : [];
 

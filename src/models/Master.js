@@ -31,6 +31,8 @@ const TYPES = [
   "language",
   "regularizationReason",
   "markAttendanceReason",
+  "onTourCategory",
+  "onDutyCategory",
 ];
 
 const COLLECTION_BY_TYPE = {
@@ -54,6 +56,8 @@ const COLLECTION_BY_TYPE = {
   language: "languages",
   regularizationReason: "regularizationreasons",
   markAttendanceReason: "markattendancereasons",
+  onTourCategory: "ontourcategories",
+  onDutyCategory: "ondutycategories",
 };
 
 const GENERAL_INFO_DROPDOWNS = {

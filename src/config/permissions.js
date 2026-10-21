@@ -80,24 +80,22 @@ const ADMIN_TREE = [
       },
       { name: "Late & Early Departures", actions: VE },
       {
-        name: "Overtime",
-        actions: ["view", "create", "edit", "approve", "reject", "export", "download", "print"],
+        name: "On Tour/On Duty",
+        actions: ["view", "approve", "reject"],
       },
-      { name: "Attendance Reports", actions: VE },
     ],
   },
 
-  // Break
+  // Break — live board and history. Lunch 30 min, Day Break with no limit.
   {
     module: "Break",
     heading: "Break Management",
     subModules: [
       {
         name: "Live Break Status",
-        actions: ["view", "create", "edit", "export", "download"],
+        actions: ["view", "edit", "export", "download"],
       },
       { name: "Break History", actions: VE },
-      { name: "Break Summary", actions: VE },
       { name: "Break Policy", actions: ["view", "create", "edit", "delete"] },
     ],
   },
@@ -328,7 +326,7 @@ const ESS_TREE = [
       { name: "Leave", actions: VCC }, // Self Service → Leave (UI)
       { name: "Holiday", actions: V }, // Self → holidays assigned to the employee's company
       { name: "My Web Punches", actions: V },
-      { name: "On Tour/On Duty Entries", actions: VC },
+      { name: "On Tour/On Duty Entries", actions: VCC },
       { name: "Additional Request", actions: VCC },
       { name: "Offboarding", actions: V },
     ],

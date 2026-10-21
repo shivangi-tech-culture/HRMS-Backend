@@ -161,6 +161,37 @@ const branchesField = Joi.array()
   .items(branchSchema)
   .custom(uniqueBy("branchId"));
 
+const currentYear = () => new Date().getFullYear();
+
+/** Optional image URL. Blank clears the logo. */
+const logoField = Joi.string()
+  .trim()
+  .max(500)
+  .allow("")
+  .custom((value, helpers) => {
+    if (!value) return "";
+    let parsed;
+    try {
+      parsed = new URL(value);
+    } catch {
+      return helpers.message("Logo must be an http or https image URL");
+    }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return helpers.message("Logo must be an http or https image URL");
+    }
+    return value;
+  });
+
+const foundedYearField = Joi.number()
+  .integer()
+  .min(1800)
+  .max(currentYear())
+  .messages({
+    "number.min": "Founded year must be 1800 or later",
+    "number.max": "Founded year cannot be in the future",
+    "number.base": "Founded year must be a year, such as 2015",
+  });
+
 const createCompanySchema = Joi.object({
   companyName: Joi.string().trim().min(2).max(160).required(),
   companyCode: Joi.string().trim().uppercase().min(1).max(20).required(),
@@ -168,6 +199,8 @@ const createCompanySchema = Joi.object({
   monthStartDay: Joi.number().integer().min(1).max(28).default(1),
   monthEndDay: Joi.number().integer().min(1).max(31).default(31),
   isActive: Joi.boolean().default(true),
+  logo: logoField.default(""),
+  foundedYear: foundedYearField.allow(null).optional(),
 }).unknown(false);
 
 const updateCompanySchema = Joi.object({
@@ -177,6 +210,8 @@ const updateCompanySchema = Joi.object({
   monthStartDay: Joi.number().integer().min(1).max(28).optional(),
   monthEndDay: Joi.number().integer().min(1).max(31).optional(),
   isActive: Joi.boolean().optional(),
+  logo: logoField.optional(),
+  foundedYear: foundedYearField.allow(null).optional(),
 })
   .min(1)
   .unknown(false);
