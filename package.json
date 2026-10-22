@@ -9,9 +9,12 @@
     "seed": "node src/seed.js",
     "seed:masters": "node src/scripts/seedMasters.js",
     "seed:language": "node src/scripts/seedLanguages.js",
-    "seed:duty-categories": "node src/scripts/seedDutyCategories.js",
     "seed:leave": "node src/scripts/seedLeave.js",
     "seed:holiday": "node src/scripts/seedHolidays.js",
+    "seed:on-duty": "node src/scripts/seedDutyCategories.js onDuty",
+    "seed:on-tour": "node src/scripts/seedDutyCategories.js onTour",
+    "sync:break-permissions": "node src/scripts/syncBreakPermissions.js",
+    "check:break-permissions": "node src/scripts/checkBreakPermissions.js",
     "backfill:activity": "node src/scripts/backfillActivityCompanies.js"
   },
   "dependencies": {

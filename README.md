@@ -161,24 +161,41 @@ Lean account for one company. Prefer this over `POST /api/employees` with `role:
 cd HRMS-Backend
 npm install
 # configure .env (see below)
-npm run seed    # sample roles + users (clears users/roles)
+npm run seed    # full demo: roles, masters, company, users, leave, holidays, breaks
 npm run dev     # http://localhost:9001
 ```
 
+`npm run seed` clears users / roles / masters / company / holidays / employee-code counters, then loads everything once. Piece runs (safe to call alone):
+
+| Script | What it seeds |
+|--------|----------------|
+| `npm run seed:masters` | All dropdown masters (includes On Duty + On Tour) |
+| `npm run seed:leave` | Leave types + policies |
+| `npm run seed:holiday` | 2026 gazetted holidays → all companies |
+| `npm run seed:on-duty` | On Duty category masters only |
+| `npm run seed:on-tour` | On Tour category masters only |
+
 ### Seeded logins
 
-| Role | Email | Password | Access |
-|------|-------|----------|--------|
-| Global Admin | `globaladmin@techculture.ai` | `123456` | All companies (seed-only; not in Roles UI) |
-| Super Admin | `shivangi@techculture.ai` | `123456` | Own company (login + company only) |
-| HR Manager | `hr@techculture.ai` | `123456` | Own company + employee profile |
-| Manager | `manager@techculture.ai` | `123456` | Own company + employee profile |
-| Employee | `shivig5964@gmail.com` | `123456` | Self + ESS profile |
+Company code **`TC`** → employee codes `TC001`… Common DOB: **`2005-01-15`**.  
+Staff password = **`{employeeCode}{ddmmyyyy}`** e.g. `TC001` + `15012005` → `TC00115012005`.  
+Platform (Super Admin / Admin) password = **`123456`**.
 
-Login ID = `official.officialEmail`.
+| Role | Email | Code | Password | ID card type |
+|------|-------|------|----------|--------------|
+| Super Admin | `superadmin@gmail.com` | — | `123456` | — |
+| Admin | `admin@gmail.com` | — | `123456` | — |
+| HR Manager | `anupama@techculture.ai` | `TC001` | `TC00115012005` | Permanent |
+| Reporting Manager | `manav@techculture.ai` | `TC002` | `TC00215012005` | Permanent |
+| Reporting Manager | `manoj@techculture.ai` | `TC003` | `TC00315012005` | Permanent |
+| Employee | `shivangi@techculture.ai` | `TC004` | `TC00415012005` | **Permanent** (DOJ 4 months ago) |
+| Employee | `employee@techculture.ai` | `TC005` | `TC00515012005` | **Probation** (DOJ = seed day) |
+| Employee | `vivek@techculture.ai` | `TC006` | `TC00615012005` | **Probation** (DOJ = seed day) |
+| Employee | `ananya@techculture.ai` | `TC007` | `TC00715012005` | **Permanent** (DOJ 4 months ago) |
 
-**Global Admin / Super Admin** documents do **not** store employee profile fields (`personal`, `education`, `payroll`, …).  
-**Super Admin** keeps `official.company` for company scope. **Global Admin** has no company (sees all).
+`employeeType` on ID card is virtual from DOJ (~3 months probation). Dummy `profileUrl` + blood group on staff. Employees `createdBy` = Anupama.
+
+Login body is just `username` + `password` — `username` can be the employee code, official / personal email, or mobile number. Next auto code after seed is `TC008`.
 
 ---
 
@@ -203,15 +220,34 @@ Roles UI / dropdown uses `GET /api/roles` → Super Admin, HR Manager, Manager, 
 
 ```http
 POST /api/auth/login
-{ "officialEmail": "…", "password": "…" }
+{ "username": "TC005", "password": "TC00515012005" }
 ```
+
+Only two fields. `username` is auto-detected (staff password = code + DOB `ddmmyyyy`):
+
+| `username` value | Matched against |
+|---|---|
+| contains `@` | official email or personal email |
+| 10-digit number (`+91` / spaces ok) | personal mobile number |
+| anything else | employee code (case-insensitive) |
+
+```json
+{ "username": "TC005", "password": "TC00515012005" }
+{ "username": "employee@techculture.ai", "password": "TC00515012005" }
+{ "username": "9876500002", "password": "TC00515012005" }
+{ "username": "superadmin@gmail.com", "password": "123456" }
+```
+
+Any other field in the body (e.g. old `officialEmail`) is rejected with 400.
 
 Response:
 
 - Sets httpOnly cookie **`token`**
 - Also returns `token` (for mobile / Swagger / Postman)
-- `user.permissionCount` → e.g. `"254 of 254"` = true flags / catalog max
+- `user.permissionCount` → e.g. `"62 of 62"` = true flags / catalog max
 - `user.permissions` → **only true** actions (false keys omitted)
+
+Point Postman `{{baseUrl}}` at **`http://localhost:9001`** after seeding (No Environment — env `baseUrl` can still point at old Render).
 
 ### Calling protected APIs
 
@@ -245,7 +281,8 @@ Clears the auth cookie.
 │   ├── CRUD /
 │   └── /:id/permissions
 ├── /api/employees          ← role = Employee (management table)
-│   ├── POST   /
+│   ├── GET    /next-code   ← next {companyCode}{NNNN} for Add Employee page
+│   ├── POST   /            ← blank employeeCode → auto-assign
 │   ├── GET    /
 │   ├── GET    /:id
 │   ├── PUT    /:id         ← sole update API
@@ -282,9 +319,8 @@ ESS **General Info** has **9 modules** (no Vaccination). All dropdowns load from
 
 | Module | Dropdown fields → `type` |
 |--------|---------------------------|
-| Personal | `gender`, `maritalStatus`, `language` (`languageKnown`), `country`, `state`, `city` |
+| Personal | `gender`, `maritalStatus`, `bloodGroup`, `language` (`languageKnown`), `country`, `state`, `city` |
 | Official | `company`, `department`, `designation`, `division`, `employeeGroup`, `grade`, `jobRole` |
-| Other | `bloodGroup` |
 | Education | `courseType`, `courseLevel` |
 | Account | `bankName` |
 | Family | `relation` |
@@ -355,28 +391,31 @@ Shared query params: `search`, `status`, `department`, `designation`, `gender`, 
 
 Create and update use the **same nested shape** as the `User` model (not flat fields).
 
+### Employee code (company-wise auto)
+
+Format: **`{companyCode}` + 4-digit sequence** (per company).  
+Example: company `TC` → `TC001`, `TC002`. Another company starts again at `001`.
+
+```http
+GET /api/employees/next-code?companyId=<companyId>
+```
+
+Add Employee page: call after company select. Does **not** reserve the number. Response: `{ companyId, companyName, companyCode, sequence, employeeCode }`.
+
 ### Create — `POST /api/employees`
 
-**Required flat:** `name`, `password`, `role`, `status`  
-**Required nested:** `official.officialEmail` (+ company/department by role — see below)
+**Required flat:** `name`, `password`  
+**Required nested:** `official.officialEmail`, `official.companyIds` (exactly one), `personal.dateOfBirth`  
+**Optional:** `official.employeeCode` — leave blank/`""` and the server assigns the next code for that company. A code you send is kept (must be unique).
 
-| Role created | Company | Department | Profile |
-|--------------|---------|------------|---------|
-| Super Admin | **required** (prefer `POST /api/users/super-admin`) | — | lean |
-| HR / Manager / Employee | defaults to TechCulture.Ai Private Limited if omitted | required | full |
-
-**Global Admin** is seed-only (one system account) — hidden from `GET /api/roles` and cannot be created or assigned via API.
-
-Who: Global Admin, Super Admin, HR Manager, Manager (with Employee → create permission).  
-Actor scope: Global Admin → any company; others → own company only.
-
+Who: Super Admin, Admin, HR Manager (Employee → create permission).  
 After create → welcome email (if SMTP configured).
 
 ### Update — `PUT /api/employees/:id`
 
 | Section | Who |
 |---------|-----|
-| `personal`, `other`, list arrays | Employee + Admin |
+| `personal`, list arrays | Employee + Admin |
 | `official`, `payroll` | Admin only |
 | `role`, `status` | Admin only |
 | `password` | Super Admin / HR Manager |
@@ -460,11 +499,10 @@ Supervisors can read chats where every member is in their contacts, but only mem
 One MongoDB document per person:
 
 1. Account — name, password, role, status, lastLogin  
-2. `personal` — IDs, phones, emails, addresses  
-3. `official` — employeeCode, officialEmail, company, dept, designation, division, employeeGroup, joining  
-4. `other` — blood group, passport expiry  
-5. Arrays — education, accounts, family, nominees, experience, visas  
-6. `payroll` — salary / PF / ESI (admin)
+2. `personal` — IDs, phones, emails, addresses, bloodGroup  
+3. `official` — employeeCode (`{companyCode}{NNNN}` auto on create), officialEmail, companyIds, dept, designation, joining  
+4. Arrays — education, accounts, family, nominees, experience, visas  
+5. `payroll` — salary / PF / ESI (admin)
 
 `personal.anniversaryDate` is derived from `official.dateOfJoining`.
 
@@ -479,11 +517,12 @@ HRMS-Backend/
 │   ├── config/          db, env, permissions catalog
 │   ├── controllers/     auth, employee, role, attendance, mail, permission
 │   ├── middleware/      auth, validate, upload
-│   ├── models/          User, Role, Attendance, Master (dynamic collections by type)
+│   ├── models/          User, Role, Company, EmployeeCodeSeq, Master, …
 │   ├── routes/          auth, employees, users, roles, attendance, mail, masters, health
+│   ├── scripts/         seedMasters, seedLeave, seedHolidays, seedDutyCategories, …
 │   ├── validators/      Joi schemas
-│   ├── utils/           mail, authCookie, companyScope, uniqueFields, anniversary
-│   ├── seed.js
+│   ├── utils/           mail, employeeCode, companyScope, uniqueFields, anniversary
+│   ├── seed.js          full demo seed (also leave / holidays / breaks)
 │   ├── swagger.js
 │   └── server.js
 ├── package.json

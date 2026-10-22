@@ -86,7 +86,7 @@ const ADMIN_TREE = [
     ],
   },
 
-  // Break — live board and history. Lunch 30 min, Day Break with no limit.
+  // Break — matches Break Management UI tabs (true/false flags via toFlags)
   {
     module: "Break",
     heading: "Break Management",
@@ -94,6 +94,11 @@ const ADMIN_TREE = [
       {
         name: "Live Break Status",
         actions: ["view", "edit", "export", "download"],
+      },
+      {
+        name: "Pending Review",
+        // Day Break approve / reject modal
+        actions: ["view", "approve", "reject"],
       },
       { name: "Break History", actions: VE },
       { name: "Break Policy", actions: ["view", "create", "edit", "delete"] },

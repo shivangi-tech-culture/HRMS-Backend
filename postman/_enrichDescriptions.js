@@ -62,7 +62,8 @@ const PARAM_DOCS = {
 
   // ── official / personal (nested) ───────────────────────────────
   "official.officialEmail": "string (email) | required on create | work login email",
-  "official.employeeCode": "string | optional | uppercase code e.g. `EMP-1024`",
+  "official.employeeCode":
+    "string | optional | blank on create = auto `{companyCode}{NNNN}` (GET /api/employees/next-code). Or send e.g. `TCPL0001`",
   "official.company":
     "string | optional | filled from Company.companyName of companyIds[0]",
   "official.companyIds":
@@ -108,7 +109,6 @@ const PARAM_DOCS = {
   "personal.emergencyContact1": "string | optional",
   "personal.emergencyContact2": "string | optional",
   "personal.drivingLicenseNo": "string | optional",
-  "personal.licenseValidUpto": "date|null | optional",
   "personal.passportNo": "string | optional",
   "personal.remarks": "string | optional",
   "personal.presentAddress.address": "string | optional",
@@ -122,8 +122,7 @@ const PARAM_DOCS = {
   "personal.permanentAddress.city": "string | optional",
   "personal.permanentAddress.pincode": "string | optional",
 
-  "other.bloodGroup": "string | optional | Blood Group master",
-  "other.passportExpiry": "string/date | optional",
+  "personal.bloodGroup": "string | optional | Blood Group master",
 
   education: "array<object> | optional | education rows (courseType, courseLevel, …)",
   accounts: "array<object> | optional | bank account rows",
@@ -316,6 +315,13 @@ function contextualDoc(key, ctx) {
   }
   if (key === "decision") {
     return 'string | required | `approve` or `reject` (query and/or body)';
+  }
+
+  if (key === "username" && url.includes("/api/auth/login")) {
+    return "string | required | ONE field for every login id — employee code (`TC005`, case-insensitive), official email, personal email, or mobile (`9876500002`, `+91` ok). Server auto-detects: has `@` → email · 10 digits → mobile · else → employee code";
+  }
+  if (key === "password" && url.includes("/api/auth/login")) {
+    return "string | required | staff = employee code + DOB `ddmmyyyy` (e.g. `TC00515012005`) · Super Admin / Admin = `123456`";
   }
 
   if (key === "role") {

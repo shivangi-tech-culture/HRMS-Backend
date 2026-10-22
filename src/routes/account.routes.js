@@ -17,6 +17,8 @@ const router = express.Router();
 const updateProfileSchema = Joi.object({
   name: Joi.string().trim().min(2).max(120).optional(),
   profileUrl: Joi.string().uri().allow("", null).optional(),
+  /** HR / Admin / Super Admin — Cloudinary url from upload type=signature */
+  signatureUrl: Joi.string().uri().allow("", null).optional(),
 }).unknown(false);
 
 /**

@@ -291,6 +291,7 @@ const buildListQuery = async (req, { forceRole, roleScope } = {}) => {
 const mapListRow = (row) => ({
   _id: row._id,
   name: row.name || "",
+  employeeCode: row.official?.employeeCode || "",
   email: row.official?.officialEmail || "",
   role: row.role || "",
   department: row.official?.department || "",
