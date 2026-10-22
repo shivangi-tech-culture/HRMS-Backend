@@ -144,50 +144,7 @@
               }
             }
           ],
-          "response": [
-            {
-              "name": "200 OK",
-              "originalRequest": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"username\": \"superadmin@gmail.com\",\n  \"password\": \"123456\"\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                },
-                "url": {
-                  "raw": "{{baseUrl}}/api/auth/login",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "auth",
-                    "login"
-                  ]
-                }
-              },
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "body": "{\n  \"message\": \"Login successful\",\n  \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example\",\n  \"user\": {\n    \"id\": \"6ad9e9aa10e5dd00f576f36c\",\n    \"name\": \"Super Admin\",\n    \"role\": \"Super Admin\",\n    \"email\": \"superadmin@gmail.com\"\n  }\n}"
-            }
-          ]
+          "response": []
         },
         {
           "name": "2. Get My Account",
@@ -5142,96 +5099,7 @@
                 },
                 "description": "GET /api/users — tick any filter in Params. `company` = id or name, `branch` / `shift` = id, name or code.\nHR `companies[]` is `{ _id, companyName }` only. Index 0 is their own company. Later items are assigned for access (all branches, shifts and employees of that company). `branch` and `shift` stay on the person.\n**Response shape:** `{ count, total, page, limit, pages, from, to, filters, users: [ … ] }`\n**Each `users[]` row:** `_id`, `name`, **`employeeCode`** (e.g. `TC001`; `\"\"` for Super Admin / Admin — they have no code), `email`, `role`, `department`, `lastLogin`, `status`, `companies[]`, `branch`, `shift`.\n`search` also matches employee code (e.g. `TC00`).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — each has description)*\n- `search` — string | optional | name / email / employee code text search\n- `role` — string | optional filter | role name e.g. `Employee` / `HR Manager`\n- `status` — string | optional | `Active` or `Inactive`\n- `department` — string | optional | department name\n- `company` — string | optional | company `_id` or name\n- `branch` — string | optional | current branch filter — Branch `_id`, branch name or branch code (e.g. `NOI`)\n- `shift` — string | optional | current shift filter — Shift `_id`, shift name or shift code (e.g. `GS-01`)\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1–200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
               },
-              "response": [
-                {
-                  "name": "200 – page 1, limit 2",
-                  "originalRequest": {
-                    "method": "GET",
-                    "header": [],
-                    "url": {
-                      "raw": "{{baseUrl}}/api/users?company={{companyId}}&page={{page}}&limit={{limit}}",
-                      "host": [
-                        "{{baseUrl}}"
-                      ],
-                      "path": [
-                        "api",
-                        "users"
-                      ],
-                      "query": [
-                        {
-                          "key": "search",
-                          "value": "",
-                          "disabled": true,
-                          "description": "string | optional | name / email / employee code text search"
-                        },
-                        {
-                          "key": "role",
-                          "value": "Employee",
-                          "disabled": true,
-                          "description": "string | optional filter | role name e.g. `Employee` / `HR Manager`"
-                        },
-                        {
-                          "key": "status",
-                          "value": "Active",
-                          "disabled": true,
-                          "description": "string | optional | `Active` or `Inactive`"
-                        },
-                        {
-                          "key": "department",
-                          "value": "",
-                          "disabled": true,
-                          "description": "string | optional | department name"
-                        },
-                        {
-                          "key": "company",
-                          "value": "{{companyId}}",
-                          "disabled": false,
-                          "description": "string | optional | Company _id ({{companyId}}) or exact company name — SA/Admin any; HR assigned only"
-                        },
-                        {
-                          "key": "companyId",
-                          "value": "{{companyId}}",
-                          "disabled": true,
-                          "description": "alias of company — Company MongoId"
-                        },
-                        {
-                          "key": "branch",
-                          "value": "",
-                          "disabled": true,
-                          "description": "string | optional | current branch filter — Branch `_id`, branch name or branch code (e.g. `NOI`)"
-                        },
-                        {
-                          "key": "shift",
-                          "value": "",
-                          "disabled": true,
-                          "description": "string | optional | current shift filter — Shift `_id`, shift name or shift code (e.g. `GS-01`)"
-                        },
-                        {
-                          "key": "page",
-                          "value": "{{page}}",
-                          "description": "number | optional | page number, default `1`"
-                        },
-                        {
-                          "key": "limit",
-                          "value": "{{limit}}",
-                          "description": "number | optional | rows per page (usually 1â€“200)"
-                        }
-                      ]
-                    }
-                  },
-                  "status": "OK",
-                  "code": 200,
-                  "_postman_previewlanguage": "json",
-                  "header": [
-                    {
-                      "key": "Content-Type",
-                      "value": "application/json; charset=utf-8"
-                    }
-                  ],
-                  "cookie": [],
-                  "body": "{\n  \"count\": 2,\n  \"total\": 7,\n  \"page\": 1,\n  \"limit\": 2,\n  \"pages\": 4,\n  \"from\": 1,\n  \"to\": 2,\n  \"filters\": {\n    \"search\": \"\",\n    \"role\": \"\",\n    \"status\": \"\",\n    \"department\": \"\",\n    \"designation\": \"\",\n    \"gender\": \"\",\n    \"company\": \"6ad9e98a10e5dd00f576f35b\",\n    \"companyId\": \"6ad9e98a10e5dd00f576f35b\",\n    \"companyName\": \"TechCulture.Ai Private Limited\",\n    \"branch\": \"\",\n    \"shift\": \"\",\n    \"managerId\": \"\",\n    \"unassigned\": false\n  },\n  \"users\": [\n    {\n      \"_id\": \"6ad9e9b410e5dd00f576f370\",\n      \"name\": \"Ananya\",\n      \"employeeCode\": \"TC007\",\n      \"email\": \"ananya@techculture.ai\",\n      \"role\": \"Employee\",\n      \"department\": \"Finance\",\n      \"lastLogin\": null,\n      \"status\": \"Active\",\n      \"companies\": [\n        {\n          \"_id\": \"6ad9e98a10e5dd00f576f35b\",\n          \"companyName\": \"TechCulture.Ai Private Limited\"\n        }\n      ],\n      \"branch\": \"Delhi\",\n      \"shift\": \"Evening Shift\"\n    },\n    {\n      \"_id\": \"6ad9e9af10e5dd00f576f36e\",\n      \"name\": \"Vivek\",\n      \"employeeCode\": \"TC006\",\n      \"email\": \"vivek@techculture.ai\",\n      \"role\": \"Employee\",\n      \"department\": \"Engineering\",\n      \"lastLogin\": null,\n      \"status\": \"Active\",\n      \"companies\": [\n        {\n          \"_id\": \"6ad9e98a10e5dd00f576f35b\",\n          \"companyName\": \"TechCulture.Ai Private Limited\"\n        }\n      ],\n      \"branch\": \"Delhi\",\n      \"shift\": \"Evening Shift\"\n    }\n  ]\n}"
-                }
-              ]
+              "response": []
             },
             {
               "name": "3. Get User",
