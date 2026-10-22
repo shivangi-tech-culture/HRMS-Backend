@@ -8,20 +8,22 @@ const mongoose = require("mongoose");
 /**
  * Saved on the break row.
  * On Break / Overdue = still open (Overdue = past allowed while still open).
- * Completed = ended (employee ends; no overage approve — use regularization if needed).
- * Pending / Approved / Rejected = legacy only (no longer written on end).
+ * Completed = ended within (or equal to) allowedMinutes.
+ * Exceeded = ended past allowedMinutes (no RM approve — employee just ended).
+ * Pending / Approved / Rejected = legacy only.
  * At Desk is not stored — it means the person has no open break.
  */
 const STORED_STATUSES = [
   "On Break",
   "Overdue",
   "Completed",
+  "Exceeded",
   "Pending",
   "Approved",
   "Rejected",
 ];
 
-/** Separate from break status (On Break / Overdue / Completed). */
+/** Separate from break status (On Break / Overdue / Completed / Exceeded). */
 const APPROVAL_STATUSES = ["Idle", "Pending", "Approved", "Rejected"];
 
 const breakSessionSchema = new mongoose.Schema(
@@ -52,7 +54,8 @@ const breakSessionSchema = new mongoose.Schema(
     /**
      * On Break — open, still inside allowed minutes.
      * Overdue — open past allowed (live board only).
-     * Completed — ended by employee.
+     * Completed — ended within allowed.
+     * Exceeded — ended past allowed (no approval flow).
      * Pending / Approved / Rejected — legacy rows only.
      */
     status: { type: String, enum: STORED_STATUSES, default: "On Break" },

@@ -46,7 +46,7 @@ const {
   todayTimeCard,
 } = require("../utils/attendanceFormat");
 
-const COUNTED_STATUSES = ["Completed", "Approved", "Pending"];
+const COUNTED_STATUSES = ["Completed", "Exceeded", "Approved", "Pending"];
 
 const TZ = () => process.env.TZ || "Asia/Kolkata";
 
@@ -149,12 +149,30 @@ const approvalInfo = ({
   };
 };
 
-/** Ended break display status — legacy Approved/Rejected → Completed + approval object. */
-const breakDisplayStatus = (raw) => {
+/**
+ * Ended break display status.
+ * If used > allowed → Exceeded (even if DB still says Completed).
+ * Legacy Approved/Rejected → Completed (approval lives in approvalStatus).
+ */
+const breakDisplayStatus = (raw, minutes, allowedMinutes) => {
+  if (
+    allowedMinutes != null &&
+    Number.isFinite(Number(minutes)) &&
+    Number(minutes) > Number(allowedMinutes)
+  ) {
+    return "Exceeded";
+  }
+  if (raw === "Exceeded") return "Exceeded";
   if (raw === "Approved" || raw === "Rejected" || raw === "Pending") {
     return "Completed";
   }
   return raw || "Completed";
+};
+
+const overMinutesOf = (minutes, allowedMinutes) => {
+  if (allowedMinutes == null) return undefined;
+  const over = Number(minutes) - Number(allowedMinutes);
+  return over > 0 ? over : undefined;
 };
 
 /** Day Break grant row status for history (never empty). */
@@ -196,17 +214,18 @@ const liveKey = (raw) => {
   if (s === "on_break" || s === "onbreak") return "on_break";
   if (s === "at_desk" || s === "atdesk") return "at_desk";
   if (s === "overdue") return "overdue";
+  if (s === "exceeded") return "exceeded";
   return "all";
 };
 
 const historyKey = (raw) => {
   const s = String(raw || "all").trim().toLowerCase().replace(/[\s-]+/g, "_");
   if (s === "completed") return "Completed";
+  if (s === "exceeded") return "Exceeded";
   if (s === "pending") return "Pending";
   if (s === "approved") return "Approved";
   if (s === "rejected") return "Rejected";
   if (s === "idle") return "Idle";
-  if (s === "exceeded") return "Completed";
   return "all";
 };
 
@@ -297,8 +316,15 @@ const canReviewBreak = (actor, employee, status) => {
   return !assertTeamOrCompanyEmployee(actor, employee);
 };
 
-/** End always Completes — no RM overage approval on break (use regularization if needed). */
-const closeStatus = () => "Completed";
+/**
+ * End status from used vs allowed (no RM overage approve).
+ * Within / equal allowed → Completed. Past allowed → Exceeded.
+ */
+const closeStatus = (duration, allowed) => {
+  if (allowed == null) return "Completed";
+  if (Number(duration) > Number(allowed)) return "Exceeded";
+  return "Completed";
+};
 
 /**
  * Minutes of one fixed policy already used today.
@@ -454,7 +480,7 @@ const finishSession = async (session, endedBy, actorId) => {
   const duration = elapsedMinutes(session.startedAt, now);
   session.endedAt = now;
   session.durationMinutes = duration;
-  session.status = closeStatus();
+  session.status = closeStatus(duration, session.allowedMinutes);
   session.endedBy = endedBy;
   session.endedByUser = actorId || null;
   await session.save();
@@ -511,17 +537,27 @@ const employeeBreak = (session) => {
     };
   }
   const open = !session.endedAt;
-  return {
+  const minutes = open
+    ? elapsedMinutes(session.startedAt)
+    : session.durationMinutes || 0;
+  const card = {
     breakType: session.breakType,
     startedAt: clock12(session.startedAt),
     endedAt: open ? "" : clock12(session.endedAt),
-    minutes: open
-      ? elapsedMinutes(session.startedAt)
-      : session.durationMinutes || 0,
-    status: open ? session.status : breakDisplayStatus(session.status),
+    minutes,
+    status: open
+      ? session.status
+      : breakDisplayStatus(
+          session.status,
+          minutes,
+          session.allowedMinutes
+        ),
     approvalStatus: sessionApprovalStatus(session),
     allowedMinutes: session.allowedMinutes,
   };
+  const over = overMinutesOf(minutes, session.allowedMinutes);
+  if (over != null) card.overMinutes = over;
+  return card;
 };
 
 const employeePayload = async (user, attendance, session, message) => {
@@ -600,7 +636,7 @@ const breakCard = (session, user) => {
 const breakHistoryFor = async (employeeId, { limit = 14 } = {}) => {
   const rows = await BreakSession.find({ employee: employeeId })
     .select(
-      "breakType status approvalStatus date startedAt endedAt durationMinutes reviewedBy dayGrantId"
+      "breakType status approvalStatus date startedAt endedAt durationMinutes allowedMinutes reviewedBy dayGrantId"
     )
     .sort({ date: -1, startedAt: 1 })
     .lean();
@@ -619,14 +655,20 @@ const breakHistoryFor = async (employeeId, { limit = 14 } = {}) => {
       byDate.set(row.date, day);
     }
     day.minutes += minutes;
-    day.breaks.push({
+    const item = {
       breakType: row.breakType || "Break",
       startedAt: clock12(row.startedAt),
       endedAt: row.endedAt ? clock12(row.endedAt) : "",
       minutes,
-      status: breakDisplayStatus(row.status),
+      allowedMinutes: row.allowedMinutes,
+      status: row.endedAt
+        ? breakDisplayStatus(row.status, minutes, row.allowedMinutes)
+        : row.status || "On Break",
       approvalStatus: sessionApprovalStatus(row),
-    });
+    };
+    const over = overMinutesOf(minutes, row.allowedMinutes);
+    if (over != null) item.overMinutes = over;
+    day.breaks.push(item);
   }
 
   // Explicit newest-first (YYYY-MM-DD string sort is chronological)
@@ -900,8 +942,22 @@ const endMyBreak = async (req, res) => {
       full.workedMinutes = progress.workedMinutes;
       await full.save();
     }
-    const body = await employeePayload(req.user, full, session, "Break ended");
+    const over =
+      session.allowedMinutes != null &&
+      session.durationMinutes > session.allowedMinutes;
+    const body = await employeePayload(
+      req.user,
+      full,
+      session,
+      over
+        ? `Break ended — used ${session.durationMinutes - session.allowedMinutes}m more than allowed`
+        : "Break ended"
+    );
     body.break.minutes = session.durationMinutes;
+    body.break.status = session.status;
+    if (over) {
+      body.break.overMinutes = session.durationMinutes - session.allowedMinutes;
+    }
     body.attendance = {
       breakMinutes: session.durationMinutes,
       breakMinutesToday: progress.breakMinutes,
@@ -951,7 +1007,9 @@ const liveBreaks = async (req, res) => {
       openBreaks.map((row) => [String(row.employee), row])
     );
     const todayRows = await BreakSession.find({ date, employee: { $in: ids } })
-      .select("employee breakType status startedAt endedAt durationMinutes")
+      .select(
+        "employee breakType status approvalStatus startedAt endedAt durationMinutes allowedMinutes reviewedBy dayGrantId"
+      )
       .sort({ startedAt: 1 })
       .lean();
     const todayByEmployee = new Map();
@@ -961,14 +1019,23 @@ const liveBreaks = async (req, res) => {
       const minutes = row.endedAt
         ? row.durationMinutes || 0
         : elapsedMinutes(row.startedAt);
-      prev.minutes += minutes;
-      prev.breaks.push({
+      const ended = Boolean(row.endedAt);
+      const st = ended
+        ? breakDisplayStatus(row.status, minutes, row.allowedMinutes)
+        : row.status || "On Break";
+      const item = {
         breakType: row.breakType || "Break",
         startedAt: clock12(row.startedAt),
-        endedAt: row.endedAt ? clock12(row.endedAt) : "",
+        endedAt: ended ? clock12(row.endedAt) : "",
         minutes,
-        status: row.status || "On Break",
-      });
+        allowedMinutes: row.allowedMinutes,
+        status: st,
+        approvalStatus: sessionApprovalStatus(row),
+      };
+      const over = overMinutesOf(minutes, row.allowedMinutes);
+      if (over != null) item.overMinutes = over;
+      prev.minutes += minutes;
+      prev.breaks.push(item);
       todayByEmployee.set(key, prev);
     }
 
@@ -1010,13 +1077,21 @@ const liveBreaks = async (req, res) => {
       onBreak: rows.filter((row) => row.status === "On Break").length,
       atDesk: rows.filter((row) => row.status === "At Desk").length,
       overdue: rows.filter((row) => row.status === "Overdue").length,
+      /** People who ended at least one break past allowed today */
+      exceeded: rows.filter((row) =>
+        (row.today?.breaks || []).some((b) => b.status === "Exceeded")
+      ).length,
     };
 
     const key = liveKey(req.query.status);
     const filtered =
       key === "all"
         ? rows
-        : rows.filter((row) => liveKey(row.status) === key);
+        : key === "exceeded"
+          ? rows.filter((row) =>
+              (row.today?.breaks || []).some((b) => b.status === "Exceeded")
+            )
+          : rows.filter((row) => liveKey(row.status) === key);
 
     const rank = { Overdue: 0, "On Break": 1, "At Desk": 2 };
     filtered.sort(
@@ -1027,6 +1102,7 @@ const liveBreaks = async (req, res) => {
 
     return res.json({
       date,
+      statuses: ["all", "on_break", "at_desk", "overdue", "exceeded"],
       counts,
       total: filtered.length,
       page,
@@ -1042,7 +1118,7 @@ const liveBreaks = async (req, res) => {
 /**
  * GET /api/break/history
  * Taken breaks + Day Break requests — newest first.
- * status=pending → Day Break requests only (no overage break approve).
+ * status filter: all | completed | exceeded | pending | idle | approved | rejected
  */
 const breakHistory = async (req, res) => {
   try {
@@ -1069,54 +1145,37 @@ const breakHistory = async (req, res) => {
       if (to) dateFilter.date.$lte = to;
     }
 
-    // Taken breaks — no Pending overage. Idle filter = Approved grants not started yet.
-    const loadSessions = status !== "Pending" && status !== "Idle";
-    const sessionQuery = loadSessions
-      ? {
-          endedAt: { $ne: null },
-          employee: { $in: ids },
-          status: { $nin: ["Pending"] },
-          ...dateFilter,
-        }
-      : null;
-    if (sessionQuery && status !== "all") sessionQuery.status = status;
-    if (sessionQuery && typeFilter) {
-      sessionQuery.breakType = new RegExp(`^${escapeRegex(typeFilter)}$`, "i");
+    const baseSessionQuery = {
+      endedAt: { $ne: null },
+      employee: { $in: ids },
+      status: { $nin: ["Pending"] },
+      ...dateFilter,
+    };
+    if (typeFilter) {
+      baseSessionQuery.breakType = new RegExp(
+        `^${escapeRegex(typeFilter)}$`,
+        "i"
+      );
     }
 
-    // Used grants live on BreakSession (approval snapshotted) — skip duplicate Used rows
-    const grantStatuses =
-      status === "all"
-        ? ["Pending", "Approved", "Rejected"]
-        : status === "Idle"
-          ? ["Approved"]
-          : status === "Completed"
-            ? []
-            : [status];
-    const includeGrants =
-      grantStatuses.length > 0 &&
-      (!typeFilter || /^day\s*break$/i.test(typeFilter));
+    const baseGrantQuery = {
+      employee: { $in: ids },
+      status: { $in: ["Pending", "Approved", "Rejected"] },
+      ...dateFilter,
+    };
+    if (typeFilter && !/^day\s*break$/i.test(typeFilter)) {
+      baseGrantQuery._id = { $in: [] };
+    }
 
-    const grantQuery = includeGrants
-      ? {
-          employee: { $in: ids },
-          status: { $in: grantStatuses },
-          ...dateFilter,
-        }
-      : null;
-
-    const [sessions, grants] = await Promise.all([
-      sessionQuery
-        ? BreakSession.find(sessionQuery).sort({ startedAt: -1 }).lean()
-        : Promise.resolve([]),
-      grantQuery
-        ? BreakDayGrant.find(grantQuery).sort({ createdAt: -1 }).lean()
-        : Promise.resolve([]),
+    // Load full scope for filter counts, then slice by status
+    const [allSessions, allGrants] = await Promise.all([
+      BreakSession.find(baseSessionQuery).sort({ startedAt: -1 }).lean(),
+      BreakDayGrant.find(baseGrantQuery).sort({ createdAt: -1 }).lean(),
     ]);
 
     const reviewerIds = [
       ...new Set(
-        [...sessions, ...grants]
+        [...allSessions, ...allGrants]
           .map((row) => String(row.reviewedBy || ""))
           .filter(Boolean)
       ),
@@ -1128,11 +1187,16 @@ const breakHistory = async (req, res) => {
       reviewers.map((row) => [String(row._id), row])
     );
 
-    const rows = [];
-    for (const session of sessions) {
+    const mapSession = (session) => {
       const user = byId.get(String(session.employee));
       const approvalStatus = sessionApprovalStatus(session);
-      rows.push({
+      const minutes = session.durationMinutes || 0;
+      const display = breakDisplayStatus(
+        session.status,
+        minutes,
+        session.allowedMinutes
+      );
+      const row = {
         type: "break",
         _id: session._id,
         employee: employeeCard(user),
@@ -1143,9 +1207,9 @@ const breakHistory = async (req, res) => {
         breakType: session.breakType,
         startedAt: clock12(session.startedAt),
         endedAt: clock12(session.endedAt),
-        minutes: session.durationMinutes || 0,
+        minutes,
         allowedMinutes: session.allowedMinutes,
-        status: breakDisplayStatus(session.status),
+        status: display,
         approvalStatus,
         approval: approvalInfo({
           status: approvalStatus === "Idle" ? null : approvalStatus,
@@ -1156,12 +1220,16 @@ const breakHistory = async (req, res) => {
         }),
         canReview: false,
         _at: new Date(session.startedAt || session.endedAt || 0).getTime(),
-      });
-    }
-    for (const grant of grants) {
+      };
+      const over = overMinutesOf(minutes, session.allowedMinutes);
+      if (over != null) row.overMinutes = over;
+      return row;
+    };
+
+    const mapGrant = (grant) => {
       const user = byId.get(String(grant.employee));
       const approvalStatus = grantApprovalStatus(grant.status);
-      rows.push({
+      return {
         type: "day_break",
         _id: grant._id,
         employee: employeeCard(user),
@@ -1185,14 +1253,54 @@ const breakHistory = async (req, res) => {
         }),
         canReview: canReviewBreak(req.user, user, grant.status),
         _at: new Date(grant.createdAt || grant.date || 0).getTime(),
-      });
-    }
+      };
+    };
 
-    rows.sort((a, b) => b._at - a._at);
-    const total = rows.length;
-    const data = rows.slice(skip, skip + limit).map(({ _at, ...row }) => row);
+    const allRows = [
+      ...allSessions.map(mapSession),
+      ...allGrants.map(mapGrant),
+    ].sort((a, b) => b._at - a._at);
+
+    const counts = {
+      all: allRows.length,
+      completed: allRows.filter((r) => r.status === "Completed").length,
+      exceeded: allRows.filter((r) => r.status === "Exceeded").length,
+      pending: allRows.filter((r) => r.status === "Pending").length,
+      idle: allRows.filter((r) => r.status === "Idle").length,
+      approved: allRows.filter((r) => r.approvalStatus === "Approved").length,
+      rejected: allRows.filter(
+        (r) => r.status === "Rejected" || r.approvalStatus === "Rejected"
+      ).length,
+    };
+
+    const filtered =
+      status === "all"
+        ? allRows
+        : status === "Approved"
+          ? allRows.filter((r) => r.approvalStatus === "Approved")
+          : status === "Rejected"
+            ? allRows.filter(
+                (r) =>
+                  r.status === "Rejected" || r.approvalStatus === "Rejected"
+              )
+            : allRows.filter((r) => r.status === status);
+
+    const total = filtered.length;
+    const data = filtered
+      .slice(skip, skip + limit)
+      .map(({ _at, ...row }) => row);
 
     return res.json({
+      statuses: [
+        "all",
+        "completed",
+        "exceeded",
+        "pending",
+        "idle",
+        "approved",
+        "rejected",
+      ],
+      counts,
       total,
       page,
       limit,
