@@ -71,6 +71,7 @@ const personalItem = only({
     .optional(),
   gender: str(),
   fatherOrHusbandName: str(),
+  motherName: str(),
   maritalStatus: str(),
   spouseName: str(),
   anniversaryDate: date(), // ignored in controller (auto-calculated)
@@ -269,6 +270,25 @@ const createEmployeeSchema = Joi.object({
   personal: personalItem
     .keys({
       dateOfBirth: Joi.date().required(),
+      aadhaarNo: Joi.string()
+        .trim()
+        .pattern(/^\d{12}$/)
+        .required()
+        .messages({
+          "string.empty": "Aadhaar number is required",
+          "any.required": "Aadhaar number is required",
+          "string.pattern.base": "Aadhaar must be 12 digits",
+        }),
+      panNo: Joi.string()
+        .trim()
+        .uppercase()
+        .pattern(/^[A-Z]{5}[0-9]{4}[A-Z]$/)
+        .required()
+        .messages({
+          "string.empty": "PAN number is required",
+          "any.required": "PAN number is required",
+          "string.pattern.base": "Enter a valid PAN (e.g. ABCDE1234F)",
+        }),
     })
     .required(),
   other: otherItem.optional(),
