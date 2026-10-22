@@ -8,15 +8,17 @@
  *   Live Break Status   GET /live
  *   Break History       GET /history
  *
- * Employee sees only the published policies: Lunch, flexible breaks, and any others that are published.
- * Ending past that policy's minutes is Pending until the reporting manager reviews it.
+ * Employee sees published policies. Fixed minutes come from live policy (e.g. Lunch 30 or 45).
+ * POST /start auto-picks next fixed with remaining; Day Break needs day-request approval first.
+ * End always Completes (no overage approve). Extra time → regularization if needed.
+ * Day Break still needs day-request approval before start.
  * Must be punched in. Punch out is blocked while a break is open.
  */
 const BreakSession = require("../models/Break");
 const Attendance = require("../models/Attendance");
 const User = require("../models/User");
 const { getModel } = require("../models/Master");
-const { todayDate, getAssignedShift, workProgress, computeDayMetrics } = require("../utils/shiftTiming");
+const { todayDate, getAssignedShift, workProgress } = require("../utils/shiftTiming");
 const {
   companyFilter,
   hasGlobalCompanyAccess,
@@ -34,10 +36,15 @@ const {
 } = require("../config/roles");
 const { logEmployeeActivity } = require("../utils/activityLog");
 const BreakPolicy = require("../models/BreakPolicy");
+const BreakDayGrant = require("../models/BreakDayGrant");
 const {
   publishedPolicies,
   findPublishedByName,
 } = require("../utils/breakPolicy");
+const {
+  formatDurationLabel,
+  todayTimeCard,
+} = require("../utils/attendanceFormat");
 
 const COUNTED_STATUSES = ["Completed", "Approved", "Pending"];
 
@@ -68,8 +75,11 @@ const dateLabel = (ymd) => {
   });
 };
 
+/** 275 → "4h 35m", 27 → "0h 27m" (same as attendance) */
 const minsLabel = (n) =>
-  Number.isFinite(n) && n >= 0 ? `${n}m` : "";
+  Number.isFinite(Number(n)) && Number(n) >= 0
+    ? formatDurationLabel(n)
+    : "";
 
 const elapsedMinutes = (startedAt, endedAt) => {
   if (!startedAt) return 0;
@@ -83,6 +93,97 @@ const employeeCard = (user) => ({
   employeeCode: user?.official?.employeeCode || "",
   profileUrl: user?.profileUrl || "",
 });
+
+const reviewerCard = (user) =>
+  user
+    ? { _id: user._id, name: user.name || "" }
+    : null;
+
+const IDLE_APPROVAL = {
+  status: "Idle",
+  by: null,
+  at: "",
+  atLabel: "",
+  note: "",
+  requestedAt: "",
+  waitMinutes: null,
+};
+
+/** Approval log — always an object; Idle when no approval trail. */
+const approvalInfo = ({
+  status,
+  reviewedBy,
+  reviewedAt,
+  reviewNote,
+  requestedAt,
+} = {}) => {
+  let approvalStatus = status === "Used" ? "Approved" : status || null;
+  if (!approvalStatus && !reviewedBy && !reviewedAt) {
+    return { ...IDLE_APPROVAL };
+  }
+  if (!approvalStatus) approvalStatus = "Approved";
+  const waitMinutes =
+    requestedAt && reviewedAt
+      ? Math.max(
+          0,
+          Math.floor(
+            (new Date(reviewedAt).getTime() - new Date(requestedAt).getTime()) /
+              60000
+          )
+        )
+      : null;
+  return {
+    status: approvalStatus,
+    by: reviewerCard(reviewedBy),
+    at: reviewedAt ? clock12(reviewedAt) : "",
+    atLabel: reviewedAt
+      ? `${dateLabel(
+          new Date(reviewedAt).toLocaleDateString("en-CA", {
+            timeZone: TZ(),
+          })
+        )} ${clock12(reviewedAt)}`.trim()
+      : "",
+    note: String(reviewNote || "").trim(),
+    requestedAt: requestedAt ? clock12(requestedAt) : "",
+    waitMinutes,
+  };
+};
+
+/** Ended break display status — legacy Approved/Rejected → Completed + approval object. */
+const breakDisplayStatus = (raw) => {
+  if (raw === "Approved" || raw === "Rejected" || raw === "Pending") {
+    return "Completed";
+  }
+  return raw || "Completed";
+};
+
+/** Day Break grant row status for history (never empty). */
+const grantDisplayStatus = (grantStatus) => {
+  if (grantStatus === "Pending") return "Pending";
+  if (grantStatus === "Approved") return "Idle"; // approved, not started yet
+  if (grantStatus === "Used") return "Completed";
+  if (grantStatus === "Rejected") return "Rejected";
+  return grantStatus || "Idle";
+};
+
+/** Stored / derived approvalStatus on a BreakSession (legacy-safe). */
+const sessionApprovalStatus = (session) => {
+  if (session?.approvalStatus) return session.approvalStatus;
+  if (session?.status === "Approved") return "Approved";
+  if (session?.status === "Rejected") return "Rejected";
+  if (session?.status === "Pending") return "Pending";
+  if (session?.reviewedBy || session?.dayGrantId) return "Approved";
+  return "Idle";
+};
+
+/** approvalStatus for Day Break grant rows in APIs. */
+const grantApprovalStatus = (grantStatus) => {
+  if (grantStatus === "Used") return "Approved";
+  if (grantStatus === "Pending" || grantStatus === "Approved" || grantStatus === "Rejected") {
+    return grantStatus;
+  }
+  return "Idle";
+};
 
 const pageOf = (query) => {
   const page = Math.max(Number(query.page) || 1, 1);
@@ -104,20 +205,10 @@ const historyKey = (raw) => {
   if (s === "pending") return "Pending";
   if (s === "approved") return "Approved";
   if (s === "rejected") return "Rejected";
-  if (s === "exceeded") return "Pending";
+  if (s === "idle") return "Idle";
+  if (s === "exceeded") return "Completed";
   return "all";
 };
-
-/** Status values the live board and history use. At Desk is not saved on a break. */
-const BREAK_STATUSES = [
-  "On Break",
-  "At Desk",
-  "Overdue",
-  "Completed",
-  "Pending",
-  "Approved",
-  "Rejected",
-];
 
 /**
  * Write Overdue when this open break passes the balance it started with.
@@ -198,7 +289,7 @@ const shiftNameMap = async (ids) => {
   return new Map(rows.map((row) => [String(row._id), row.name || ""]));
 };
 
-/** Approve / Reject only for a Pending break, and only for HR or that person's reporting manager. */
+/** Approve / Reject Day Break request — HR or that person's reporting manager. */
 const canReviewBreak = (actor, employee, status) => {
   if (status !== "Pending" || !actor || !employee) return false;
   if (normalizeRoleName(actor.role) === EMPLOYEE) return false;
@@ -206,23 +297,87 @@ const canReviewBreak = (actor, employee, status) => {
   return !assertTeamOrCompanyEmployee(actor, employee);
 };
 
-const closeStatus = (duration, allowed) => {
-  if (allowed == null) return "Completed";
-  if (duration > allowed) return "Pending";
-  return "Completed";
-};
+/** End always Completes — no RM overage approval on break (use regularization if needed). */
+const closeStatus = () => "Completed";
 
-/** Minutes of one policy already used today. Flexible breaks are not pooled. */
+/**
+ * Minutes of one fixed policy already used today.
+ * Uses live policy minutes for remaining: remaining = policy.minutes - used.
+ * Counts Completed / Approved / Pending + open On Break / Overdue (elapsed so far).
+ */
 const usedOfType = async (employeeId, date, breakType) => {
   const rows = await BreakSession.find({
     employee: employeeId,
     date,
     breakType,
-    status: { $in: COUNTED_STATUSES },
+    status: { $in: [...COUNTED_STATUSES, "On Break", "Overdue"] },
   })
-    .select("durationMinutes")
+    .select("durationMinutes startedAt endedAt")
     .lean();
-  return rows.reduce((sum, row) => sum + (row.durationMinutes || 0), 0);
+  return rows.reduce((sum, row) => {
+    if (row.endedAt) return sum + (Number(row.durationMinutes) || 0);
+    return sum + elapsedMinutes(row.startedAt);
+  }, 0);
+};
+
+/** Approved Day Break grant not yet used today (if any). */
+const openDayGrant = (employeeId, date) =>
+  BreakDayGrant.findOne({
+    employee: employeeId,
+    date,
+    status: "Approved",
+  }).sort({ createdAt: 1 });
+
+/** Pending Day Break request today (waiting for RM / HR). */
+const pendingDayGrant = (employeeId, date) =>
+  BreakDayGrant.findOne({
+    employee: employeeId,
+    date,
+    status: "Pending",
+  }).sort({ createdAt: -1 });
+
+/**
+ * Next break to start automatically:
+ * 1) Fixed policies with remaining minutes (Lunch → Tea, …)
+ * 2) Else flexible Day Break only if an Approved grant exists
+ */
+const resolveNextBreak = async (employeeId, date) => {
+  const list = await policiesForEmployee(employeeId, date);
+  const fixed = list.filter((row) => !row.flexible && (row.remainingMinutes || 0) > 0);
+  if (fixed.length) {
+    const pick = fixed[0];
+    const policy = await findPublishedByName(pick.name);
+    return {
+      policy,
+      allowedMinutes: pick.remainingMinutes,
+      kind: "fixed",
+      grant: null,
+    };
+  }
+
+  const flexible = list.find((row) => row.flexible);
+  if (!flexible) {
+    return { policy: null, allowedMinutes: null, kind: "none", grant: null };
+  }
+
+  const grant = await openDayGrant(employeeId, date);
+  if (!grant) {
+    const pending = await pendingDayGrant(employeeId, date);
+    return {
+      policy: await findPublishedByName(flexible.name),
+      allowedMinutes: null,
+      kind: "day_needs_approval",
+      grant: null,
+      pendingGrant: pending,
+    };
+  }
+
+  return {
+    policy: await findPublishedByName(flexible.name),
+    allowedMinutes: grant.minutes,
+    kind: "day_granted",
+    grant,
+  };
 };
 
 /** Employee sees published policies only. No count of how many times they went. */
@@ -231,11 +386,22 @@ const policiesForEmployee = async (employeeId, date) => {
   const list = [];
   for (const row of rows) {
     if (row.flexible) {
-      list.push({ name: row.name, flexible: true });
+      const grant = await openDayGrant(employeeId, date);
+      const pending = await pendingDayGrant(employeeId, date);
+      const card = { name: row.name, flexible: true };
+      if (grant) {
+        card.canStart = true;
+        card.approvedMinutes = grant.minutes;
+      } else {
+        card.needsApproval = true;
+        if (pending) card.pendingMinutes = pending.minutes;
+      }
+      list.push(card);
       continue;
     }
+    // Live policy minutes (e.g. 30 → 45)
     const used = await usedOfType(employeeId, date, row.name);
-    const minutes = row.minutes || 0;
+    const minutes = Math.max(0, Number(row.minutes) || 0);
     list.push({
       name: row.name,
       minutes,
@@ -288,7 +454,7 @@ const finishSession = async (session, endedBy, actorId) => {
   const duration = elapsedMinutes(session.startedAt, now);
   session.endedAt = now;
   session.durationMinutes = duration;
-  session.status = closeStatus(duration, session.allowedMinutes);
+  session.status = closeStatus();
   session.endedBy = endedBy;
   session.endedByUser = actorId || null;
   await session.save();
@@ -303,9 +469,7 @@ const logBreakActivity = async (actor, employee, session) => {
   const who = employee?.name || "Employee";
   const summary = open
     ? `${who} started ${session.breakType}`
-    : session.status === "Pending"
-      ? `${who} ended ${session.breakType} after ${session.durationMinutes}m. Past today's balance — waiting for reporting manager`
-      : `${who} ended ${session.breakType} after ${session.durationMinutes}m. Today ${today.minutes}m in ${today.count} breaks`;
+    : `${who} ended ${session.breakType} after ${session.durationMinutes}m. Today ${today.minutes}m in ${today.count} breaks`;
   await logEmployeeActivity({
     actor,
     employee,
@@ -333,20 +497,31 @@ const logBreakActivity = async (actor, employee, session) => {
   });
 };
 
-/** What the employee sees. No department, shift, ids, or duplicate time fields. */
+/** What the employee sees. Never null — Idle object when no session. */
 const employeeBreak = (session) => {
-  if (!session) return null;
+  if (!session) {
+    return {
+      breakType: "",
+      startedAt: "",
+      endedAt: "",
+      minutes: 0,
+      status: "Idle",
+      approvalStatus: "Idle",
+      allowedMinutes: null,
+    };
+  }
   const open = !session.endedAt;
-  const minutes = open ? elapsedMinutes(session.startedAt) : session.durationMinutes || 0;
-  const card = {
+  return {
     breakType: session.breakType,
     startedAt: clock12(session.startedAt),
-    minutes,
-    status: session.status,
+    endedAt: open ? "" : clock12(session.endedAt),
+    minutes: open
+      ? elapsedMinutes(session.startedAt)
+      : session.durationMinutes || 0,
+    status: open ? session.status : breakDisplayStatus(session.status),
+    approvalStatus: sessionApprovalStatus(session),
+    allowedMinutes: session.allowedMinutes,
   };
-  if (open) card.allowedMinutes = session.allowedMinutes;
-  else card.endedAt = clock12(session.endedAt);
-  return card;
 };
 
 const employeePayload = async (user, attendance, session, message) => {
@@ -354,13 +529,37 @@ const employeePayload = async (user, attendance, session, message) => {
   const punchedIn = Boolean(attendance?.punchIn);
   const punchedOut = Boolean(attendance?.punchOut);
   const onBreak = Boolean(session && !session.endedAt);
+  const { shift } = await getAssignedShift(user._id, date);
   const body = {
     date,
     canStart: punchedIn && !punchedOut && !onBreak,
     canEnd: onBreak,
     policies: await policiesForEmployee(user._id, date),
     break: employeeBreak(session),
+    todayTime: todayTimeCard(attendance, shift, { onBreak, slim: true }),
   };
+
+  // Only when free to start — avoid repeating current open break as "next"
+  if (body.canStart) {
+    const next = await resolveNextBreak(user._id, date);
+    if (next.kind === "fixed") {
+      body.nextBreak = {
+        name: next.policy.name,
+        remainingMinutes: next.allowedMinutes,
+      };
+    } else if (next.kind === "day_granted") {
+      body.nextBreak = {
+        name: next.policy.name,
+        remainingMinutes: next.allowedMinutes,
+      };
+    } else if (next.kind === "day_needs_approval") {
+      body.nextBreak = {
+        name: next.policy?.name || "Day Break",
+        needsApproval: true,
+      };
+    }
+  }
+
   if (message) return { message, ...body };
   return body;
 };
@@ -375,6 +574,7 @@ const breakCard = (session, user) => {
     breakType: session.breakType,
     date: session.date,
     dateLabel: dateLabel(session.date),
+    approvalStatus: sessionApprovalStatus(session),
     startedAt: session.startedAt,
     startedAtLabel: clock12(session.startedAt),
     endedAt: session.endedAt,
@@ -396,10 +596,12 @@ const breakCard = (session, user) => {
  * GET /api/break/me
  * Dashboard button: can the logged-in person start or end a break.
  */
-/** Every break this person has taken, newest day first, split by type. */
-const breakHistoryFor = async (employeeId) => {
+/** Day buckets of breaks — each item is one date object, newest date first. */
+const breakHistoryFor = async (employeeId, { limit = 14 } = {}) => {
   const rows = await BreakSession.find({ employee: employeeId })
-    .select("breakType status date startedAt endedAt durationMinutes")
+    .select(
+      "breakType status approvalStatus date startedAt endedAt durationMinutes reviewedBy dayGrantId"
+    )
     .sort({ date: -1, startedAt: 1 })
     .lean();
 
@@ -411,37 +613,26 @@ const breakHistoryFor = async (employeeId) => {
       day = {
         date: row.date,
         dateLabel: dateLabel(row.date),
-        count: 0,
         minutes: 0,
-        splits: new Map(),
         breaks: [],
       };
       byDate.set(row.date, day);
     }
-    day.count += 1;
     day.minutes += minutes;
-    const type = row.breakType || "Break";
-    const split = day.splits.get(type) || { breakType: type, count: 0, minutes: 0 };
-    split.count += 1;
-    split.minutes += minutes;
-    day.splits.set(type, split);
     day.breaks.push({
-      breakType: type,
+      breakType: row.breakType || "Break",
       startedAt: clock12(row.startedAt),
       endedAt: row.endedAt ? clock12(row.endedAt) : "",
       minutes,
-      status: row.status,
+      status: breakDisplayStatus(row.status),
+      approvalStatus: sessionApprovalStatus(row),
     });
   }
 
-  return [...byDate.values()].map((day) => ({
-    date: day.date,
-    dateLabel: day.dateLabel,
-    count: day.count,
-    minutes: day.minutes,
-    splits: [...day.splits.values()],
-    breaks: day.breaks,
-  }));
+  // Explicit newest-first (YYYY-MM-DD string sort is chronological)
+  return [...byDate.values()]
+    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+    .slice(0, limit);
 };
 
 const myBreak = async (req, res) => {
@@ -449,27 +640,14 @@ const myBreak = async (req, res) => {
     const date = todayDate();
     const employeeId = req.user._id;
     const attendance = await Attendance.findOne({ employee: employeeId, date }).select(
-      "punchIn punchOut companyId"
+      "punchIn punchOut companyId date breaks workedMinutes"
     );
     const open = await storeOpenStatus(
       await BreakSession.findOne({ employee: employeeId, date, endedAt: null })
     );
     const body = await employeePayload(req.user, attendance, open);
-    const history = await breakHistoryFor(employeeId);
-    const today = history.find((day) => day.date === date) || {
-      date,
-      dateLabel: dateLabel(date),
-      count: 0,
-      minutes: 0,
-      splits: [],
-      breaks: [],
-    };
-    body.today = {
-      count: today.count,
-      minutes: today.minutes,
-      splits: today.splits,
-    };
-    body.history = history;
+    // Today + past — one list of day objects, latest date on top
+    body.history = await breakHistoryFor(employeeId, { limit: 14 });
     return res.json(body);
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -478,7 +656,8 @@ const myBreak = async (req, res) => {
 
 /**
  * POST /api/break/start
- * Body: { breakType: "Lunch Break" | "Day Break" }
+ * Body ignored for type — auto-picks next fixed with remaining, then Day Break if granted.
+ * Send {} or omit body. breakType in body is ignored.
  */
 const startBreak = async (req, res) => {
   try {
@@ -493,29 +672,33 @@ const startBreak = async (req, res) => {
       return res.status(400).json({ message: "You have already punched out today" });
     }
 
-    const user = await User.findById(employeeId).select(
-      "name role profileUrl official.employeeCode official.officialEmail official.department official.designation official.shiftId official.companyIds"
-    );
-    const policy = await findPublishedByName(req.body.breakType);
-    if (!policy) {
-      return res.status(400).json({ message: "This break is not available" });
-    }
-    let allowedMinutes;
-    if (policy.flexible) {
-      const picked = Number(req.body.minutes);
-      if (!Number.isInteger(picked) || picked < 1) {
-        return res.status(400).json({ message: "Enter minutes, for example 5 or 10" });
-      }
-      allowedMinutes = picked;
-    } else {
-      const used = await usedOfType(employeeId, date, policy.name);
-      allowedMinutes = Math.max(0, (policy.minutes || 0) - used);
-    }
-
     const open = await BreakSession.findOne({ employee: employeeId, endedAt: null }).select("_id");
     if (open) {
       return res.status(400).json({ message: "You are already on a break" });
     }
+
+    const user = await User.findById(employeeId).select(
+      "name role profileUrl official.employeeCode official.officialEmail official.department official.designation official.shiftId official.companyIds"
+    );
+
+    // Auto only — ignore body.breakType / minutes
+    const next = await resolveNextBreak(employeeId, date);
+    if (next.kind === "none" || !next.policy) {
+      return res.status(400).json({ message: "No break policy available" });
+    }
+    if (next.kind === "day_needs_approval") {
+      return res.status(400).json({
+        message: next.pendingGrant
+          ? "Day Break request is waiting for reporting manager / HR approval"
+          : "Fixed break time is used. Request Day Break approval first (POST /api/break/day-request)",
+        nextBreak: next.policy.name,
+        needsApproval: true,
+        pendingRequest: Boolean(next.pendingGrant),
+      });
+    }
+
+    const policy = next.policy;
+    const allowedMinutes = next.allowedMinutes;
 
     const shiftId = user?.official?.shiftId || null;
     let shiftName = "";
@@ -526,6 +709,7 @@ const startBreak = async (req, res) => {
 
     const companyId = companyIdOf(user, attendance);
     const now = new Date();
+    const grant = next.grant || null;
     const session = new BreakSession({
       employee: employeeId,
       companyId,
@@ -537,6 +721,13 @@ const startBreak = async (req, res) => {
       startedAt: now,
       allowedMinutes,
       status: "On Break",
+      approvalStatus: grant ? "Approved" : "Idle",
+      // Snapshot approval onto the break row for history logs
+      dayGrantId: grant?._id || null,
+      approvalRequestedAt: grant?.createdAt || null,
+      reviewedBy: grant?.reviewedBy || null,
+      reviewedAt: grant?.reviewedAt || null,
+      reviewNote: grant?.reviewNote || "",
     });
 
     try {
@@ -548,19 +739,136 @@ const startBreak = async (req, res) => {
       throw err;
     }
 
+    if (grant) {
+      grant.status = "Used";
+      grant.usedBreakId = session._id;
+      await grant.save();
+    }
+
     await pushAttendanceBreak(employeeId, date, now);
     await logBreakActivity(req.user, user, session);
 
     return res.status(201).json(
-      await employeePayload(
-        user,
-        attendance,
-        session,
-        allowedMinutes > 0
-          ? "Break started"
-          : "Break started. This policy's time is already used, so ending it will need reporting manager approval"
-      )
+      await employeePayload(user, attendance, session, `Break started (${policy.name})`)
     );
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+/**
+ * POST /api/break/day-request
+ * Body: { minutes } — employee asks for Day Break; RM / HR must approve first.
+ */
+const requestDayBreak = async (req, res) => {
+  try {
+    const date = todayDate();
+    const employeeId = req.user._id;
+    const minutes = Number(req.body.minutes);
+    if (!Number.isInteger(minutes) || minutes < 1) {
+      return res.status(400).json({ message: "Enter minutes, for example 5 or 10" });
+    }
+
+    const attendance = await Attendance.findOne({ employee: employeeId, date });
+    if (!attendance?.punchIn) {
+      return res.status(400).json({ message: "Punch in before requesting Day Break" });
+    }
+
+    const next = await resolveNextBreak(employeeId, date);
+    if (next.kind === "fixed") {
+      return res.status(400).json({
+        message: `Use ${next.policy.name} first (${next.allowedMinutes}m left). Day Break is only after fixed breaks are used`,
+        nextBreak: next.policy.name,
+        remainingMinutes: next.allowedMinutes,
+      });
+    }
+    if (next.kind === "day_granted") {
+      return res.status(400).json({
+        message: "Day Break is already approved. Call POST /api/break/start",
+        approvedMinutes: next.allowedMinutes,
+      });
+    }
+
+    const existing = await pendingDayGrant(employeeId, date);
+    if (existing) {
+      return res.status(400).json({
+        message: "Day Break request already pending",
+        request: {
+          _id: existing._id,
+          minutes: existing.minutes,
+          status: existing.status,
+        },
+      });
+    }
+
+    const user = await User.findById(employeeId).select(
+      "name official.companyIds official.department"
+    );
+    const grant = await BreakDayGrant.create({
+      employee: employeeId,
+      companyId: companyIdOf(user, attendance),
+      date,
+      minutes,
+      status: "Pending",
+    });
+
+    return res.status(201).json({
+      message: "Day Break requested. Waiting for reporting manager / HR approval",
+      request: {
+        _id: grant._id,
+        date: grant.date,
+        minutes: grant.minutes,
+        status: "Pending",
+        approvalStatus: "Pending",
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+/**
+ * POST /api/break/day-request/:id/review
+ * Body: { decision: approve|reject, remarks? }
+ */
+const reviewDayRequest = async (req, res) => {
+  try {
+    const grant = await BreakDayGrant.findById(req.params.id);
+    if (!grant) return res.status(404).json({ message: "Day Break request not found" });
+    if (grant.status !== "Pending") {
+      return res.status(400).json({ message: "Only a pending Day Break request can be reviewed" });
+    }
+
+    const employee = await User.findById(grant.employee).select(
+      "name role official.employeeCode official.department official.companyIds official.reportingHead1 official.reportingHead2"
+    );
+    if (!employee) return res.status(404).json({ message: "Employee not found" });
+    if (String(req.user._id) === String(grant.employee)) {
+      return res.status(403).json({ message: "You cannot review your own Day Break request" });
+    }
+    const denied = assertTeamOrCompanyEmployee(req.user, employee);
+    if (denied) return res.status(403).json({ message: denied });
+
+    const approve = String(req.body.decision).toLowerCase() === "approve";
+    grant.status = approve ? "Approved" : "Rejected";
+    grant.reviewNote = String(req.body.remarks || "").trim();
+    grant.reviewedBy = req.user._id;
+    grant.reviewedAt = new Date();
+    await grant.save();
+
+    return res.json({
+      message: approve
+        ? "Day Break approved. Employee can POST /api/break/start"
+        : "Day Break request rejected",
+      request: {
+        _id: grant._id,
+        date: grant.date,
+        minutes: grant.minutes,
+        status: grantDisplayStatus(grant.status),
+        approvalStatus: grantApprovalStatus(grant.status),
+        reviewNote: grant.reviewNote,
+      },
+    });
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
@@ -585,18 +893,6 @@ const endMyBreak = async (req, res) => {
       "name role official.employeeCode official.officialEmail official.department official.designation official.companyIds"
     );
     await logBreakActivity(req.user, employee, session);
-    const attendance = await Attendance.findOne({
-      employee: req.user._id,
-      date: session.date,
-    }).select("punchIn punchOut companyId date");
-    const body = await employeePayload(
-      req.user,
-      attendance,
-      session,
-      session.status === "Pending"
-        ? "Break ended past today's balance. Waiting for reporting manager approval"
-        : "Break ended"
-    );
     const full = await Attendance.findOne({ employee: req.user._id, date: session.date });
     const { shift } = await getAssignedShift(req.user._id, session.date);
     const progress = workProgress(full, shift);
@@ -604,17 +900,14 @@ const endMyBreak = async (req, res) => {
       full.workedMinutes = progress.workedMinutes;
       await full.save();
     }
-    const hours = (n) => {
-      const v = Math.max(0, Math.round(Number(n) || 0));
-      return `${Math.floor(v / 60)}h ${v % 60}m`;
-    };
+    const body = await employeePayload(req.user, full, session, "Break ended");
     body.break.minutes = session.durationMinutes;
     body.attendance = {
       breakMinutes: session.durationMinutes,
       breakMinutesToday: progress.breakMinutes,
-      worked: hours(progress.workedMinutes),
-      required: hours(progress.requiredMinutes),
-      remaining: hours(progress.remainingMinutes),
+      worked: formatDurationLabel(progress.workedMinutes),
+      required: formatDurationLabel(progress.requiredMinutes),
+      remaining: formatDurationLabel(progress.remainingMinutes),
       completed: progress.completed,
     };
     return res.json(body);
@@ -633,7 +926,9 @@ const liveBreaks = async (req, res) => {
     const { page, limit, skip } = pageOf(req.query);
     const filter = buildEmployeeFilter(req.user, req.query);
     const employees = await User.find(filter)
-      .select("name profileUrl role official.employeeCode official.department official.shiftId official.companyIds official.reportingHead1 official.reportingHead2")
+      .select(
+        "name profileUrl role official.employeeCode official.department official.shiftId official.companyIds official.reportingHead1 official.reportingHead2"
+      )
       .lean();
 
     const ids = employees.map((row) => row._id);
@@ -652,7 +947,9 @@ const liveBreaks = async (req, res) => {
 
     await Promise.all(openBreaks.map((session) => storeOpenStatus(session)));
     const inOffice = new Set(attendance.map((row) => String(row.employee)));
-    const openByEmployee = new Map(openBreaks.map((row) => [String(row.employee), row]));
+    const openByEmployee = new Map(
+      openBreaks.map((row) => [String(row.employee), row])
+    );
     const todayRows = await BreakSession.find({ date, employee: { $in: ids } })
       .select("employee breakType status startedAt endedAt durationMinutes")
       .sort({ startedAt: 1 })
@@ -660,23 +957,17 @@ const liveBreaks = async (req, res) => {
     const todayByEmployee = new Map();
     for (const row of todayRows) {
       const key = String(row.employee);
-      const prev = todayByEmployee.get(key) || { count: 0, minutes: 0, splits: new Map(), taken: [] };
-      const minutes = row.endedAt ? row.durationMinutes || 0 : elapsedMinutes(row.startedAt);
-      const breakType = row.breakType || "Break";
-      prev.count += 1;
+      const prev = todayByEmployee.get(key) || { minutes: 0, breaks: [] };
+      const minutes = row.endedAt
+        ? row.durationMinutes || 0
+        : elapsedMinutes(row.startedAt);
       prev.minutes += minutes;
-      const split = prev.splits.get(breakType) || { breakType, count: 0, minutes: 0 };
-      split.count += 1;
-      split.minutes += minutes;
-      prev.splits.set(breakType, split);
-      prev.taken.push({
-        _id: row._id,
-        breakType,
+      prev.breaks.push({
+        breakType: row.breakType || "Break",
         startedAt: clock12(row.startedAt),
         endedAt: row.endedAt ? clock12(row.endedAt) : "",
         minutes,
         status: row.status || "On Break",
-        canReview: false,
       });
       todayByEmployee.set(key, prev);
     }
@@ -686,47 +977,31 @@ const liveBreaks = async (req, res) => {
       const id = String(user._id);
       if (!inOffice.has(id)) continue;
       const session = openByEmployee.get(id) || null;
-      const status = session ? session.status : "At Desk";
-      const today = todayByEmployee.get(id) || { count: 0, minutes: 0, splits: new Map(), taken: [] };
-      const taken = today.taken || [];
+      const today = todayByEmployee.get(id) || { minutes: 0, breaks: [] };
       const row = {
         employee: employeeCard(user),
         department: user.official?.department || "",
-        shift: {
-          _id: user.official?.shiftId || null,
-          name: names.get(String(user.official?.shiftId || "")) || session?.shiftName || "",
+        shift:
+          names.get(String(user.official?.shiftId || "")) ||
+          session?.shiftName ||
+          "",
+        status: session ? session.status : "At Desk",
+        today: {
+          minutes: today.minutes,
+          breaks: today.breaks,
         },
-        todayBreaks: today.count,
-        todayMinutes: today.minutes,
-        splits: [...(today.splits ? today.splits.values() : [])],
-        taken,
-        status,
       };
       if (session) {
-        const elapsed = elapsedMinutes(session.startedAt);
-        row._id = session._id;
-        row.breakType = session.breakType;
-        row.startedAt = session.startedAt;
-        row.startedAtLabel = clock12(session.startedAt);
-        row.elapsedMinutes = elapsed;
-        row.elapsed = minsLabel(elapsed);
-        if (session.allowedMinutes != null) {
-          row.allowedMinutes = session.allowedMinutes;
-          row.allowed = minsLabel(session.allowedMinutes);
-        }
-      } else if (taken.length) {
-        const last = taken[taken.length - 1];
-        row._id = last._id;
-        row.breakType = last.breakType;
-        row.startedAtLabel = last.startedAt;
-        row.endedAtLabel = last.endedAt;
-        row.minutes = last.minutes;
-        row.breakStatus = last.status;
+        row.break = {
+          _id: session._id,
+          breakType: session.breakType,
+          startedAt: clock12(session.startedAt),
+          minutes: elapsedMinutes(session.startedAt),
+          allowedMinutes: session.allowedMinutes,
+          status: session.status,
+          approvalStatus: sessionApprovalStatus(session),
+        };
       }
-      for (const item of taken) {
-        item.canReview = canReviewBreak(req.user, user, item.status);
-      }
-      row.canReview = taken.some((item) => item.canReview);
       rows.push(row);
     }
 
@@ -746,13 +1021,12 @@ const liveBreaks = async (req, res) => {
     const rank = { Overdue: 0, "On Break": 1, "At Desk": 2 };
     filtered.sort(
       (a, b) =>
-        rank[a.status] - rank[b.status] ||
+        (rank[a.status] ?? 9) - (rank[b.status] ?? 9) ||
         a.employee.name.localeCompare(b.employee.name)
     );
 
     return res.json({
       date,
-      statuses: BREAK_STATUSES,
       counts,
       total: filtered.length,
       page,
@@ -767,67 +1041,156 @@ const liveBreaks = async (req, res) => {
 
 /**
  * GET /api/break/history
- * Ended breaks only. Status: Completed or Exceeded.
+ * Taken breaks + Day Break requests — newest first.
+ * status=pending → Day Break requests only (no overage break approve).
  */
 const breakHistory = async (req, res) => {
   try {
     const { page, limit, skip } = pageOf(req.query);
     const people = await User.find(buildEmployeeFilter(req.user, req.query))
-      .select("_id name profileUrl role official.employeeCode official.department official.companyIds official.reportingHead1 official.reportingHead2")
+      .select(
+        "_id name profileUrl role official.employeeCode official.department official.companyIds official.reportingHead1 official.reportingHead2"
+      )
       .lean();
+    const ids = people.map((row) => row._id);
     const byId = new Map(people.map((row) => [String(row._id), row]));
 
-    const query = {
-      endedAt: { $ne: null },
-      employee: { $in: people.map((row) => row._id) },
-    };
-
-    const breakType = String(req.query.breakType || "").trim();
-    if (breakType && breakType.toUpperCase() !== "ALL") {
-      query.breakType = new RegExp(`^${escapeRegex(breakType)}$`, "i");
-    }
-
     const status = historyKey(req.query.status);
-    if (status !== "all") query.status = status;
+    const breakType = String(req.query.breakType || "").trim();
+    const typeFilter =
+      breakType && breakType.toUpperCase() !== "ALL" ? breakType : "";
 
+    const dateFilter = {};
     const from = String(req.query.from || "").trim();
     const to = String(req.query.to || "").trim();
     if (from || to) {
-      query.date = {};
-      if (from) query.date.$gte = from;
-      if (to) query.date.$lte = to;
+      dateFilter.date = {};
+      if (from) dateFilter.date.$gte = from;
+      if (to) dateFilter.date.$lte = to;
     }
 
-    const [total, sessions] = await Promise.all([
-      BreakSession.countDocuments(query),
-      BreakSession.find(query)
-        .sort({ startedAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
+    // Taken breaks — no Pending overage. Idle filter = Approved grants not started yet.
+    const loadSessions = status !== "Pending" && status !== "Idle";
+    const sessionQuery = loadSessions
+      ? {
+          endedAt: { $ne: null },
+          employee: { $in: ids },
+          status: { $nin: ["Pending"] },
+          ...dateFilter,
+        }
+      : null;
+    if (sessionQuery && status !== "all") sessionQuery.status = status;
+    if (sessionQuery && typeFilter) {
+      sessionQuery.breakType = new RegExp(`^${escapeRegex(typeFilter)}$`, "i");
+    }
+
+    // Used grants live on BreakSession (approval snapshotted) — skip duplicate Used rows
+    const grantStatuses =
+      status === "all"
+        ? ["Pending", "Approved", "Rejected"]
+        : status === "Idle"
+          ? ["Approved"]
+          : status === "Completed"
+            ? []
+            : [status];
+    const includeGrants =
+      grantStatuses.length > 0 &&
+      (!typeFilter || /^day\s*break$/i.test(typeFilter));
+
+    const grantQuery = includeGrants
+      ? {
+          employee: { $in: ids },
+          status: { $in: grantStatuses },
+          ...dateFilter,
+        }
+      : null;
+
+    const [sessions, grants] = await Promise.all([
+      sessionQuery
+        ? BreakSession.find(sessionQuery).sort({ startedAt: -1 }).lean()
+        : Promise.resolve([]),
+      grantQuery
+        ? BreakDayGrant.find(grantQuery).sort({ createdAt: -1 }).lean()
+        : Promise.resolve([]),
     ]);
 
-    const data = sessions.map((session) => {
+    const reviewerIds = [
+      ...new Set(
+        [...sessions, ...grants]
+          .map((row) => String(row.reviewedBy || ""))
+          .filter(Boolean)
+      ),
+    ];
+    const reviewers = reviewerIds.length
+      ? await User.find({ _id: { $in: reviewerIds } }).select("name").lean()
+      : [];
+    const reviewerById = new Map(
+      reviewers.map((row) => [String(row._id), row])
+    );
+
+    const rows = [];
+    for (const session of sessions) {
       const user = byId.get(String(session.employee));
-      return {
+      const approvalStatus = sessionApprovalStatus(session);
+      rows.push({
+        type: "break",
         _id: session._id,
         employee: employeeCard(user),
         department: session.department || user?.official?.department || "",
-        shift: { _id: session.shiftId || null, name: session.shiftName || "" },
+        shift: session.shiftName || "",
         date: session.date,
         dateLabel: dateLabel(session.date),
         breakType: session.breakType,
-        start: clock12(session.startedAt),
-        end: clock12(session.endedAt),
-        startedAt: session.startedAt,
-        endedAt: session.endedAt,
-        durationMinutes: session.durationMinutes,
-        duration: minsLabel(session.durationMinutes),
+        startedAt: clock12(session.startedAt),
+        endedAt: clock12(session.endedAt),
+        minutes: session.durationMinutes || 0,
         allowedMinutes: session.allowedMinutes,
-        status: session.status,
-        canReview: canReviewBreak(req.user, user, session.status),
-      };
-    });
+        status: breakDisplayStatus(session.status),
+        approvalStatus,
+        approval: approvalInfo({
+          status: approvalStatus === "Idle" ? null : approvalStatus,
+          reviewedBy: reviewerById.get(String(session.reviewedBy || "")),
+          reviewedAt: session.reviewedAt,
+          reviewNote: session.reviewNote,
+          requestedAt: session.approvalRequestedAt || session.endedAt || null,
+        }),
+        canReview: false,
+        _at: new Date(session.startedAt || session.endedAt || 0).getTime(),
+      });
+    }
+    for (const grant of grants) {
+      const user = byId.get(String(grant.employee));
+      const approvalStatus = grantApprovalStatus(grant.status);
+      rows.push({
+        type: "day_break",
+        _id: grant._id,
+        employee: employeeCard(user),
+        department: user?.official?.department || "",
+        shift: "",
+        date: grant.date,
+        dateLabel: dateLabel(grant.date),
+        breakType: "Day Break",
+        startedAt: "",
+        endedAt: "",
+        minutes: grant.minutes,
+        allowedMinutes: grant.minutes,
+        status: grantDisplayStatus(grant.status),
+        approvalStatus,
+        approval: approvalInfo({
+          status: grant.status,
+          reviewedBy: reviewerById.get(String(grant.reviewedBy || "")),
+          reviewedAt: grant.reviewedAt,
+          reviewNote: grant.reviewNote,
+          requestedAt: grant.createdAt,
+        }),
+        canReview: canReviewBreak(req.user, user, grant.status),
+        _at: new Date(grant.createdAt || grant.date || 0).getTime(),
+      });
+    }
+
+    rows.sort((a, b) => b._at - a._at);
+    const total = rows.length;
+    const data = rows.slice(skip, skip + limit).map(({ _at, ...row }) => row);
 
     return res.json({
       total,
@@ -843,141 +1206,67 @@ const breakHistory = async (req, res) => {
 
 /**
  * GET /api/break/approvals
- * Breaks that ended past the daily balance and still need a decision.
+ * Day Break requests only (Pending).
+ * Review: POST /api/break/day-request/:id/review
  */
 const pendingBreaks = async (req, res) => {
   try {
     const { page, limit, skip } = pageOf(req.query);
     const filter = buildEmployeeFilter(req.user, req.query);
     const employees = await User.find(filter)
-      .select("_id name profileUrl role official.employeeCode official.department official.companyIds official.reportingHead1 official.reportingHead2")
+      .select(
+        "_id name profileUrl role official.employeeCode official.department official.companyIds official.reportingHead1 official.reportingHead2"
+      )
       .lean();
     const ids = employees.map((row) => row._id);
-    const query = { employee: { $in: ids }, status: "Pending" };
+    const byId = new Map(employees.map((row) => [String(row._id), row]));
+
+    const dateFilter = {};
     if (req.query.from || req.query.to) {
-      query.date = {};
-      if (req.query.from) query.date.$gte = String(req.query.from).slice(0, 10);
-      if (req.query.to) query.date.$lte = String(req.query.to).slice(0, 10);
+      dateFilter.date = {};
+      if (req.query.from) dateFilter.date.$gte = String(req.query.from).slice(0, 10);
+      if (req.query.to) dateFilter.date.$lte = String(req.query.to).slice(0, 10);
     }
 
-    const [total, sessions] = await Promise.all([
-      BreakSession.countDocuments(query),
-      BreakSession.find(query).sort({ endedAt: -1 }).skip(skip).limit(limit).lean(),
-    ]);
-    const byId = new Map(employees.map((row) => [String(row._id), row]));
-    const data = sessions.map((session) => ({
-      _id: session._id,
-      employee: employeeCard(byId.get(String(session.employee))),
-      department: session.department || "",
-      date: session.date,
-      breakType: session.breakType,
-      start: clock12(session.startedAt),
-      end: clock12(session.endedAt),
-      durationMinutes: session.durationMinutes,
-      duration: minsLabel(session.durationMinutes),
-      allowedMinutes: session.allowedMinutes,
-      status: session.status,
-      canReview: canReviewBreak(req.user, byId.get(String(session.employee)), session.status),
-    }));
+    const grants = await BreakDayGrant.find({
+      employee: { $in: ids },
+      status: "Pending",
+      ...dateFilter,
+    })
+      .sort({ createdAt: -1 })
+      .lean();
 
+    const rows = grants.map((grant) => {
+      const user = byId.get(String(grant.employee));
+      return {
+        type: "day_break",
+        _id: grant._id,
+        employee: employeeCard(user),
+        department: user?.official?.department || "",
+        date: grant.date,
+        dateLabel: dateLabel(grant.date),
+        breakType: "Day Break",
+        minutes: grant.minutes,
+        status: "Pending",
+        approvalStatus: "Pending",
+        approval: approvalInfo({
+          status: "Pending",
+          reviewedBy: null,
+          reviewedAt: null,
+          reviewNote: "",
+          requestedAt: grant.createdAt,
+        }),
+        canReview: canReviewBreak(req.user, user, "Pending"),
+      };
+    });
+
+    const total = rows.length;
     return res.json({
       total,
       page,
       limit,
       pages: Math.max(1, Math.ceil(total / limit)),
-      data,
-    });
-  } catch (err) {
-    return res.status(500).json({ message: err.message });
-  }
-};
-
-/**
- * POST /api/break/:id/review
- * Body: { decision: "approve" | "reject", remarks? }
- * Reporting manager (or HR / admin) decides a Pending break.
- * Rejected minutes go back into today's balance.
- */
-const reviewBreak = async (req, res) => {
-  try {
-    const session = await BreakSession.findById(req.params.id);
-    if (!session) return res.status(404).json({ message: "Break not found" });
-    if (session.status !== "Pending") {
-      return res.status(400).json({ message: "Only a pending break can be reviewed" });
-    }
-
-    const employee = await User.findById(session.employee).select(
-      "name role official.employeeCode official.officialEmail official.department official.designation official.companyIds official.reportingHead1 official.reportingHead2"
-    );
-    if (!employee) return res.status(404).json({ message: "Employee not found" });
-
-    if (String(req.user._id) === String(session.employee)) {
-      return res.status(403).json({ message: "You cannot review your own break" });
-    }
-    const denied = assertTeamOrCompanyEmployee(req.user, employee);
-    if (denied) return res.status(403).json({ message: denied });
-
-    const approve = String(req.body.decision).toLowerCase() === "approve";
-    session.status = approve ? "Approved" : "Rejected";
-    session.reviewNote = String(req.body.remarks || "").trim();
-    session.reviewedBy = req.user._id;
-    session.reviewedAt = new Date();
-    await session.save();
-
-    const record = await Attendance.findOne({ employee: session.employee, date: session.date });
-    let attendance = null;
-    if (record) {
-      const startMs = new Date(session.startedAt).getTime();
-      let marked = false;
-      for (const row of record.breaks || []) {
-        if (!row?.start) continue;
-        if (Math.abs(new Date(row.start).getTime() - startMs) < 60000) {
-          row.approved = approve;
-          marked = true;
-        }
-      }
-      if (approve && !marked && session.endedAt) {
-        record.breaks.push({ start: session.startedAt, end: session.endedAt, approved: true });
-      }
-      record.markModified("breaks");
-      const { shift } = await getAssignedShift(session.employee, session.date);
-      const previousStatus = record.status;
-      if (record.punchIn && record.punchOut) {
-        const metrics = computeDayMetrics(record, shift, record.date);
-        record.workedMinutes = metrics.workedMinutes;
-        record.overtimeMinutes = metrics.overtimeMinutes;
-        record.lateByMinutes = metrics.lateByMinutes;
-        record.earlyByMinutes = metrics.earlyByMinutes;
-        record.status =
-          approve && (previousStatus === "Present" || previousStatus === "Late")
-            ? previousStatus
-            : metrics.status;
-      } else if (record.punchIn) {
-        record.workedMinutes = workProgress(record, shift).workedMinutes;
-      }
-      await record.save();
-      const progress = workProgress(record, shift);
-      const hours = (n) => {
-        const v = Math.max(0, Math.round(Number(n) || 0));
-        return `${Math.floor(v / 60)}h ${v % 60}m`;
-      };
-      attendance = {
-        breakMinutes: session.durationMinutes,
-        worked: hours(progress.workedMinutes),
-        required: hours(progress.requiredMinutes),
-        remaining: hours(progress.remainingMinutes),
-        status: record.status,
-      };
-    }
-
-    await logBreakActivity(req.user, employee, session);
-
-    return res.json({
-      message: approve
-        ? "Break approved. Time is saved. Present status is unchanged."
-        : "Break rejected. Those minutes are back in the balance",
-      break: breakCard(session, employee),
-      attendance,
+      data: rows.slice(skip, skip + limit),
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -1085,10 +1374,11 @@ module.exports = {
   myBreak,
   startBreak,
   endMyBreak,
+  requestDayBreak,
+  reviewDayRequest,
   liveBreaks,
   breakHistory,
   pendingBreaks,
-  reviewBreak,
   listPolicies,
   createPolicy,
   updatePolicy,

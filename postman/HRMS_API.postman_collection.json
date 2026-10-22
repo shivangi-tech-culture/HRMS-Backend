@@ -7703,7 +7703,7 @@
         },
         {
           "name": "1.10 Break",
-          "description": "Live Break Status, approvals, and Break History.\nLogin as Super Admin / Admin / HR / Reporting Manager (0. Login).\nDaily balance is 30 minutes (policy). Unused minutes stay and can be split later, for example 10 then 10 then 10.\nA break that ends past the remaining balance is Pending. Reporting manager approves or rejects it.\nRejected minutes go back into the balance. History keeps every closed break.\nStored status: On Break, Overdue, Completed, Pending, Approved, Rejected.\nAt Desk is only on the live list.",
+          "description": "Admin Break — Super Admin / Admin / HR / Reporting Manager.\n\n## Who can access (admin dashboard)\n\n| Role | Live | History / Approvals | Break Policy | Data scope |\n|------|------|---------------------|--------------|------------|\n| Super Admin | yes | yes | view/create/edit/delete | All companies |\n| Admin | yes | yes | view/create/edit/delete | All companies |\n| HR Manager | yes | yes | view/create/edit/delete | Assigned companies only |\n| Reporting Manager | yes | yes (+ Day Break review for team) | view/create/edit/delete | Own team only |\n| Employee | no admin APIs | — | — | Own /me /start /end /day-request |\n\nPermissions module: **Break** → Live Break Status, Break History, Break Policy (in Roles & Permissions).\n\nPolicies are global (`companyId: null`) — same Lunch/Tea/Day rules for every company.\nLive / history / approvals rows are filtered by company (HR) or reporting team (RM).\n\nAdmin Break — Super Admin / Admin / HR / Reporting Manager.\n\nOverage: Overdue while open only; end Completes (regularization if needed).\n\nDay Break approval queue: GET /approvals → review.\n\n\n\n## GET /api/break/history\n\nTaken breaks + Day Break requests (not yet Used). Newest first.\n\nQuery: status=all\\|completed\\|pending\\|idle\\|approved\\|rejected, breakType, from, to, search, page, limit.\n\n| Field | Use |\n|-------|-----|\n| `type` | `break` = taken session. `day_break` = grant request row. |\n| `status` | Break/lifecycle: Completed, Idle (approved not started), Pending, Rejected. |\n| `approvalStatus` | Idle \\| Pending \\| Approved \\| Rejected — **stored on break model** for sessions. |\n| `approval` | Log object (never omit): status, by{name}, at, atLabel, note, requestedAt, waitMinutes. Idle when no trail. |\n| `breakType` / times / `minutes` | Display columns. Empty times on day_break until started. |\n| `canReview` | true only for Pending day_break the actor may approve. |\n| `employee` / `department` / `shift` | Table columns. |",
           "item": [
             {
               "name": "1. Live Break Status",
@@ -7762,7 +7762,7 @@
                     }
                   ]
                 },
-                "description": "GET /api/break/live\nPeople punched in today.\nstatus filter: all | on_break | at_desk | overdue\ncounts: all, onBreak, atDesk, overdue\nEach row includes stored status, splits (count and minutes per break type), and taken (every break today). First open break _id is saved as {{breakId}}.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n- `search` — name or employee code\n- `department` — exact department, or ALL\n- `shiftId` — shift master id, or ALL\n- `status` — all | on_break | at_desk | overdue\n- `companyId` — optional\n- `page` / `limit`\n"
+                "description": "## GET /api/break/live\n\nPunched-in people today. Query: `status`=all\\|on_break\\|at_desk\\|overdue, search, department, shiftId, page, limit.\n\n| Field | Use |\n|-------|-----|\n| `date` | Board date. |\n| `counts` | Tab badges: all, onBreak, atDesk, overdue. |\n| `data[].employee` | Name, code, avatar. |\n| `data[].department` / `shift` | Filters / columns. |\n| `data[].status` | At Desk \\| On Break \\| Overdue (live). |\n| `data[].break` | Open session only: type, startedAt, minutes, allowedMinutes, status, approvalStatus. |\n| `data[].today` | `minutes` + `breaks[]` timeline for the day. |"
               },
               "event": [
                 {
@@ -7771,8 +7771,8 @@
                     "type": "text/javascript",
                     "exec": [
                       "const j = pm.response.json();",
-                      "const row = (j.data || []).find((r) => r._id);",
-                      "if (row) pm.collectionVariables.set('breakId', row._id);"
+                      "const row = (j.data || []).find((r) => r.break && r.break._id);",
+                      "if (row) pm.collectionVariables.set('breakId', row.break._id);"
                     ]
                   }
                 }
@@ -7847,7 +7847,7 @@
                     }
                   ]
                 },
-                "description": "GET /api/break/history\nClosed breaks only.\nstatus: all | completed | pending | approved | rejected\nbreakType: Lunch Break | Day Break\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n- `search` — name or employee code\n- `department` — exact department\n- `shiftId` — shift master id\n- `breakType` — Lunch Break or Day Break\n- `status` — all | completed | pending | approved | rejected\n- `from` / `to` — YYYY-MM-DD\n- `page` / `limit`\n"
+                "description": "## GET /api/break/history\n\nTaken breaks + Day Break requests (not yet Used). Newest first.\n\nQuery: status=all\\|completed\\|pending\\|idle\\|approved\\|rejected, breakType, from, to, search, page, limit.\n\n| Field | Use |\n|-------|-----|\n| `type` | `break` = taken session. `day_break` = grant request row. |\n| `status` | Break/lifecycle: Completed, Idle (approved not started), Pending, Rejected. |\n| `approvalStatus` | Idle \\| Pending \\| Approved \\| Rejected — **stored on break model** for sessions. |\n| `approval` | Log object (never omit): status, by{name}, at, atLabel, note, requestedAt, waitMinutes. Idle when no trail. |\n| `breakType` / times / `minutes` | Display columns. Empty times on day_break until started. |\n| `canReview` | true only for Pending day_break the actor may approve. |\n| `employee` / `department` / `shift` | Table columns. |"
               }
             },
             {
@@ -7896,11 +7896,24 @@
                     }
                   ]
                 },
-                "description": "GET /api/break/approvals\nBreaks that ended past today's balance and still need the reporting manager.\nLogin as that person's reporting manager, HR, or admin.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n- `search` / `from` / `to` / `page` / `limit`\n"
-              }
+                "description": "## GET /api/break/approvals\n\nPending Day Break requests only (action inbox).\n\n| Field | Use |\n|-------|-----|\n| `type` | Always `day_break`. |\n| `_id` | → {{dayBreakRequestId}} for review. |\n| `status` | Pending. |\n| `approvalStatus` | Pending. |\n| `approval` | requestedAt set; by/at empty until reviewed. |\n| `minutes` | Minutes employee asked for. |\n| `canReview` | Show Approve/Reject. |\n\nReview: POST /api/break/day-request/:id/review `{ \"decision\": \"approve\"\\|\\\"reject\", \"remarks\": \"\" }`"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const j = pm.response.json();",
+                      "const row = (j.data || [])[0];",
+                      "if (row && row._id) pm.collectionVariables.set('dayBreakRequestId', row._id);"
+                    ]
+                  }
+                }
+              ]
             },
             {
-              "name": "4. Review Break",
+              "name": "3b. Review Day Break Request",
               "request": {
                 "method": "POST",
                 "header": [
@@ -7910,21 +7923,22 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{baseUrl}}/api/break/{{breakId}}/review",
+                  "raw": "{{baseUrl}}/api/break/day-request/{{dayBreakRequestId}}/review",
                   "host": [
                     "{{baseUrl}}"
                   ],
                   "path": [
                     "api",
                     "break",
-                    "{{breakId}}",
+                    "day-request",
+                    "{{dayBreakRequestId}}",
                     "review"
                   ]
                 },
-                "description": "POST /api/break/:id/review\nReporting manager decision on a Pending break.\ndecision = approve keeps the minutes.\ndecision = reject puts those minutes back.\n{{breakId}} is the pending break id.",
+                "description": "## POST /api/break/day-request/{{dayBreakRequestId}}/review\n\nBody: decision approve\\|reject, remarks optional.\n\nApprove → employee can POST /start (auto Day Break; session gets approvalStatus=Approved + reviewer snapshot).",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"decision\": \"approve\",\n  \"remarks\": \"\"\n}",
+                  "raw": "{\n  \"decision\": \"approve\",\n  \"remarks\": \"Ok for 10 minutes\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -7934,7 +7948,7 @@
               }
             },
             {
-              "name": "5. List Policies",
+              "name": "4. List Policies",
               "request": {
                 "method": "GET",
                 "header": [],
@@ -7949,7 +7963,7 @@
                     "policies"
                   ]
                 },
-                "description": "GET /api/break/policies\nAll policies. Employees never see this list.\nThey only see policies with published = true, and only 2 can be published.\nLunch Break is fixed minutes. Day Break is flexible (5 or 10) with no daily count.\nSaves {{policyId}} from the Day Break row.\n"
+                "description": "GET /api/break/policies\n\n## Policies CRUD\n\n| Field | Use |\n|-------|-----|\n| `name` | e.g. Lunch Break, Tea Break, Day Break. |\n| `flexible` | true = Day Break (minutes per request). false = fixed daily minutes. |\n| `minutes` | Fixed cap when not flexible. |\n| `published` | Employee only sees published policies. |"
               },
               "event": [
                 {
@@ -7966,7 +7980,7 @@
               ]
             },
             {
-              "name": "6. Create Policy",
+              "name": "5. Create Policy",
               "request": {
                 "method": "POST",
                 "header": [
@@ -7986,7 +8000,7 @@
                     "policies"
                   ]
                 },
-                "description": "POST /api/break/policies\nSaves a policy as unpublished.\nSet published true or false later on 7. Update Policy.\nflexible true = employee sends minutes (5 or 10) and there is no daily count.\nflexible false = minutes is the fixed allowance, like lunch.",
+                "description": "POST /api/break/policies\n\n## Policies CRUD\n\n| Field | Use |\n|-------|-----|\n| `name` | e.g. Lunch Break, Tea Break, Day Break. |\n| `flexible` | true = Day Break (minutes per request). false = fixed daily minutes. |\n| `minutes` | Fixed cap when not flexible. |\n| `published` | Employee only sees published policies. |\nCreates unpublished until Update sets published.",
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"name\": \"Tea Break\",\n  \"flexible\": false,\n  \"minutes\": 15,\n  \"description\": \"\"\n}",
@@ -8011,7 +8025,7 @@
               ]
             },
             {
-              "name": "7. Update Policy",
+              "name": "6. Update Policy",
               "request": {
                 "method": "PUT",
                 "header": [
@@ -8032,7 +8046,7 @@
                     "{{policyId}}"
                   ]
                 },
-                "description": "PUT /api/break/policies/:id\nChange the name, minutes, or published.\npublished true shows it to employees. published false hides it.\nAny number of policies can be published.\n{{policyId}} comes from 6. Create Policy or 5. List Policies.",
+                "description": "PUT /api/break/policies/:id\n\n## Policies CRUD\n\n| Field | Use |\n|-------|-----|\n| `name` | e.g. Lunch Break, Tea Break, Day Break. |\n| `flexible` | true = Day Break (minutes per request). false = fixed daily minutes. |\n| `minutes` | Fixed cap when not flexible. |\n| `published` | Employee only sees published policies. |\nCan set published true/false.",
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"name\": \"Tea Break\",\n  \"flexible\": false,\n  \"minutes\": 10,\n  \"description\": \"\",\n  \"published\": true\n}",
@@ -8045,7 +8059,7 @@
               }
             },
             {
-              "name": "8. Delete Policy",
+              "name": "7. Delete Policy",
               "request": {
                 "method": "DELETE",
                 "header": [],
@@ -8061,7 +8075,7 @@
                     "{{policyId}}"
                   ]
                 },
-                "description": "DELETE /api/break/policies/:id\nSet published to false on Update Policy first. A published policy cannot be deleted."
+                "description": "DELETE /api/break/policies/:id\nUnpublish first if published."
               }
             }
           ]
@@ -10134,7 +10148,7 @@
         },
         {
           "name": "2.6 Break",
-          "description": "Employee start / end. Run 2.1 Login (Employee), then 2.2 Punch In, then these.\nGET /me returns only the 2 published policies.\nLunch Break uses the policy minutes. Day Break needs minutes (5 or 10) and has no daily count.\nUnpublished policies are hidden. Ending past the allowed minutes saves Pending.",
+          "description": "Employee Break APIs — login as Employee.\n\nStart body always `{}` (auto next type).\n\nDay Break: request minutes → RM approves → start.\n\n\n\n## GET /api/break/me — field guide\n\nHeader: `Authorization: Bearer {{token}}` (Employee)\n\n| Field | Why / how frontend uses it |\n|-------|----------------------------|\n| `date` | Today's attendance date (YYYY-MM-DD). Scope for policies + open break. |\n| `canStart` | Show **Start Break** button. true = punched in, not punched out, not on break. |\n| `canEnd` | Show **End Break** button. true = open break exists. |\n| `policies[]` | Break chips / balance. Fixed: `name`, `minutes` (policy cap), `remainingMinutes` (left today). Day Break: `flexible`, `needsApproval` or `canStart`+`approvedMinutes`. |\n| `break` | **Never null.** Current break card. |\n| `break.status` | `Idle` = not on break. `On Break` / `Overdue` = open (Overdue = past allowed). `Completed` after end response. |\n| `break.approvalStatus` | `Idle` / `Pending` / `Approved` / `Rejected`. Day Break from grant → `Approved`. Normal Lunch/Tea → `Idle`. |\n| `break.breakType` | Type name while on break; empty string when Idle. |\n| `break.startedAt` / `endedAt` | 12h clocks for UI; empty when Idle / still open. |\n| `break.minutes` | Elapsed (open) or duration (ended). 0 when Idle. |\n| `break.allowedMinutes` | Cap for this session (null/empty when Idle or unlimited). |\n| `todayTime.status` | Working / On Break / Clocked Out / Not Clocked In — header badge. |\n| `todayTime.active` | Worked time clock `HH:mm:ss` (not on break). |\n| `todayTime.idle` | Idle bucket clock. |\n| `todayTime.break` | Total break time today clock. |\n| `nextBreak` | **Only if canStart.** Next auto type: `name` + `remainingMinutes`, or `needsApproval: true` for Day Break. Omit when on break. |\n| `history[]` | Day objects, newest date first (today included). |\n| `history[].date` / `dateLabel` | Group key + display label. |\n| `history[].minutes` | Sum of break minutes that day. |\n| `history[].breaks[]` | Each taken break: type, times, minutes, `status` (Completed…), `approvalStatus`. |",
           "item": [
             {
               "name": "1. My Break Today",
@@ -10152,11 +10166,11 @@
                     "me"
                   ]
                 },
-                "description": "GET /api/break/me\nEmployee view. policies has the 2 published breaks only.\nLunch includes minutes and remainingMinutes. Day Break is flexible: true.\ntoday.splits is how many times each break was taken today.\nhistory lists every day, including previous days, with each break.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}` from 2.1 Login (Employee)\n"
+                "description": "## GET /api/break/me — field guide\n\nHeader: `Authorization: Bearer {{token}}` (Employee)\n\n| Field | Why / how frontend uses it |\n|-------|----------------------------|\n| `date` | Today's attendance date (YYYY-MM-DD). Scope for policies + open break. |\n| `canStart` | Show **Start Break** button. true = punched in, not punched out, not on break. |\n| `canEnd` | Show **End Break** button. true = open break exists. |\n| `policies[]` | Break chips / balance. Fixed: `name`, `minutes` (policy cap), `remainingMinutes` (left today). Day Break: `flexible`, `needsApproval` or `canStart`+`approvedMinutes`. |\n| `break` | **Never null.** Current break card. |\n| `break.status` | `Idle` = not on break. `On Break` / `Overdue` = open (Overdue = past allowed). `Completed` after end response. |\n| `break.approvalStatus` | `Idle` / `Pending` / `Approved` / `Rejected`. Day Break from grant → `Approved`. Normal Lunch/Tea → `Idle`. |\n| `break.breakType` | Type name while on break; empty string when Idle. |\n| `break.startedAt` / `endedAt` | 12h clocks for UI; empty when Idle / still open. |\n| `break.minutes` | Elapsed (open) or duration (ended). 0 when Idle. |\n| `break.allowedMinutes` | Cap for this session (null/empty when Idle or unlimited). |\n| `todayTime.status` | Working / On Break / Clocked Out / Not Clocked In — header badge. |\n| `todayTime.active` | Worked time clock `HH:mm:ss` (not on break). |\n| `todayTime.idle` | Idle bucket clock. |\n| `todayTime.break` | Total break time today clock. |\n| `nextBreak` | **Only if canStart.** Next auto type: `name` + `remainingMinutes`, or `needsApproval: true` for Day Break. Omit when on break. |\n| `history[]` | Day objects, newest date first (today included). |\n| `history[].date` / `dateLabel` | Group key + display label. |\n| `history[].minutes` | Sum of break minutes that day. |\n| `history[].breaks[]` | Each taken break: type, times, minutes, `status` (Completed…), `approvalStatus`. |\n\nHeader: Authorization Bearer {{token}}"
               }
             },
             {
-              "name": "2. Start Lunch Break",
+              "name": "2. Start Break",
               "request": {
                 "method": "POST",
                 "header": [
@@ -10176,10 +10190,10 @@
                     "start"
                   ]
                 },
-                "description": "POST /api/break/start\nBody breakType = Lunch Break.\nUses today's remaining balance. Punch in first. One open break at a time.\nSaves {{breakId}}.",
+                "description": "## POST /api/break/start\n\nBody: `{}` — **do not send breakType** (ignored). Auto order: next fixed with remainingMinutes > 0 → Day Break if grant Approved.\n\n| Response field | Use |\n|----------------|-----|\n| `message` | Toast e.g. Break started (Tea Break). |\n| Same as /me | `canStart` false, `canEnd` true, `break` filled (On Break + approvalStatus). |\n\nErrors: not punched in; already on break; Day Break needs `POST /day-request` first.",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"breakType\": \"Lunch Break\"\n}",
+                  "raw": "{}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -10202,7 +10216,7 @@
               ]
             },
             {
-              "name": "3. Start Day Break",
+              "name": "3. Request Day Break",
               "request": {
                 "method": "POST",
                 "header": [
@@ -10212,20 +10226,20 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{baseUrl}}/api/break/start",
+                  "raw": "{{baseUrl}}/api/break/day-request",
                   "host": [
                     "{{baseUrl}}"
                   ],
                   "path": [
                     "api",
                     "break",
-                    "start"
+                    "day-request"
                   ]
                 },
-                "description": "POST /api/break/start\nBody breakType = Day Break and minutes = 10 (or 5).\nNo daily count. Ending after those minutes needs reporting manager approval.\nSaves {{breakId}}.",
+                "description": "## POST /api/break/day-request\n\nBody: `{ \"minutes\": 10 }` — only after all fixed remaining = 0.\n\n| Field | Use |\n|-------|-----|\n| `minutes` | Requested Day Break length for RM/HR to approve. |\n| `request._id` | Save as {{dayBreakRequestId}} for admin review. |\n| `request.status` / `approvalStatus` | `Pending` until RM/HR decides. |",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"breakType\": \"Day Break\",\n  \"minutes\": 10\n}",
+                  "raw": "{\n  \"minutes\": 10\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -10240,8 +10254,8 @@
                     "type": "text/javascript",
                     "exec": [
                       "const j = pm.response.json();",
-                      "const id = (j.break && j.break._id) || j._id;",
-                      "if (id) pm.collectionVariables.set('breakId', id);"
+                      "const id = j.request && j.request._id;",
+                      "if (id) pm.collectionVariables.set('dayBreakRequestId', id);"
                     ]
                   }
                 }
@@ -10263,7 +10277,7 @@
                     "end"
                   ]
                 },
-                "description": "POST /api/break/end\nOnly the employee can end the break.\nResponse includes this break's minutes and attendance:\nworked, required (9h from the shift), remaining, completed.\nBreak time is removed from working hours."
+                "description": "## POST /api/break/end\n\nNo body. Ends open break → `status` Completed (even if was Overdue while open). No RM overage approve — use regularization if needed.\n\nResponse: same shape as /me + optional `attendance` worked/required/remaining."
               }
             }
           ]
@@ -10502,6 +10516,10 @@
     },
     {
       "key": "policyId",
+      "value": ""
+    },
+    {
+      "key": "dayBreakRequestId",
       "value": ""
     }
   ]

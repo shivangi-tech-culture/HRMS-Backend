@@ -20,11 +20,19 @@ const optionalId = Joi.string()
     return value;
   });
 
+/** POST /start — body optional/ignored; next break is auto-picked (do not send breakType) */
 const startSchema = Joi.object({
-  breakType: Joi.string().trim().min(1).max(60).required().messages({
-    "any.required": "breakType is required",
+  breakType: Joi.string().trim().min(1).max(60).optional().strip(),
+  minutes: Joi.number().integer().min(1).max(180).optional().strip(),
+})
+  .unknown(false)
+  .prefs({ stripUnknown: true });
+
+/** POST /day-request — employee asks for Day Break minutes */
+const dayRequestSchema = Joi.object({
+  minutes: Joi.number().integer().min(1).max(180).required().messages({
+    "any.required": "minutes is required",
   }),
-  minutes: Joi.number().integer().min(1).max(180).optional(),
 }).unknown(false);
 
 const policySchema = Joi.object({
@@ -71,6 +79,7 @@ const reviewSchema = Joi.object({
 
 module.exports = {
   startSchema,
+  dayRequestSchema,
   liveQuerySchema,
   historyQuerySchema,
   reviewSchema,
