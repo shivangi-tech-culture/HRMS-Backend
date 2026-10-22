@@ -15,7 +15,7 @@ const {
   isPlatformRole,
   isMultiCompanyRole,
 } = require("../config/roles");
-const { queueWelcomeEmail, sendEmail } = require("../utils/mail");
+const { queueWelcomeEmail, sendWelcomeEmailSafe } = require("../utils/mail");
 const { sendExcel } = require("../utils/excel");
 const {
   findUniqueConflict,
@@ -660,10 +660,26 @@ const assignHrCompanies = async (req, res) => {
   }
 };
 
+/** Staff login password = employeeCode + DOB as ddmmyyyy (e.g. TC00115012005) */
+const dobToDdmmyyyy = (date) => {
+  if (!date) return "";
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return "";
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const yyyy = String(d.getUTCFullYear());
+  return `${dd}${mm}${yyyy}`;
+};
+
+/**
+ * Resend login credentials to user's officialEmail.
+ * POST /api/users/:id/mail — only needs user id (no subject / body / cc).
+ * Rebuilds default password, saves hash, sends welcome mail.
+ */
 const sendUserMail = async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select(
-      "name role official.officialEmail official.companyIds official.reportingHead1 official.reportingHead2"
+      "name role official.officialEmail official.employeeCode official.companyIds official.department official.reportingHead1 official.reportingHead2 personal.dateOfBirth"
     );
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -687,20 +703,51 @@ const sendUserMail = async (req, res) => {
       return res.status(400).json({ message: "User has no official email" });
     }
 
-    const { subject, body, isHtml } = req.body;
-    const result = await sendEmail({
-      to,
-      subject,
-      body,
-      isHtml: Boolean(isHtml),
+    let password;
+    if (isPlatformRole(user.role)) {
+      password = process.env.DEFAULT_PLATFORM_PASSWORD || "123456";
+    } else {
+      const code = String(user.official?.employeeCode || "")
+        .trim()
+        .toUpperCase();
+      const dobPart = dobToDdmmyyyy(user.personal?.dateOfBirth);
+      if (!code || !dobPart) {
+        return res.status(400).json({
+          message:
+            "Cannot build credentials — employee code and date of birth are required",
+        });
+      }
+      password = `${code}${dobPart}`;
+    }
+
+    user.password = await bcrypt.hash(password, 10);
+    await user.save();
+
+    const companyLabel = isPlatformRole(user.role)
+      ? "All companies"
+      : process.env.DEFAULT_COMPANY || "TechCulture.Ai";
+
+    const mail = await sendWelcomeEmailSafe({
+      name: user.name,
+      email: to,
+      password,
+      role: user.role,
+      company: companyLabel,
+      department: user.official?.department || "",
     });
 
+    if (!mail.emailSent) {
+      return res.status(502).json({
+        message: "Credentials reset but email failed to send",
+        to,
+        emailError: mail.emailError,
+      });
+    }
+
     return res.json({
-      message: "Email sent",
+      message: "Welcome email sent with login credentials",
       to,
-      messageId: result.messageId,
-      accepted: result.accepted,
-      rejected: result.rejected,
+      emailSent: true,
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });

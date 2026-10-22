@@ -120,7 +120,7 @@
             "description": "Login as **Super Admin**. Saves {{token}} (Bearer for every request) and {{myId}}.\n\nSeed: `superadmin@gmail.com` / `123456`.\n\nBody: **`username`** + **`password`** only.\n`username` = employee code / official email / personal email / mobile (auto-detected).\n\n**Use local after seed:** collection {{baseUrl}} = `http://localhost:9001` and **No Environment**.\n\n---\n### Parameters (type + how to send)\n**Body (JSON raw)** — `Content-Type: application/json`\n- `username` — string | required | employee code OR email OR mobile\n- `password` — string | required | staff = code + DOB `15012005`; Super Admin / Admin = `123456`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"superadmin@gmail.com\",\n  \"password\": \"{{password}}\"\n}",
+              "raw": "{\n  \"username\": \"superadmin@gmail.com\",\n  \"password\": \"123456\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -144,7 +144,50 @@
               }
             }
           ],
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"username\": \"superadmin@gmail.com\",\n  \"password\": \"123456\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/login",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auth",
+                    "login"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Login successful\",\n  \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example\",\n  \"user\": {\n    \"id\": \"6ad9e9aa10e5dd00f576f36c\",\n    \"name\": \"Super Admin\",\n    \"role\": \"Super Admin\",\n    \"email\": \"superadmin@gmail.com\"\n  }\n}"
+            }
+          ]
         },
         {
           "name": "2. Get My Account",
@@ -5373,15 +5416,10 @@
               }
             },
             {
-              "name": "8. Send Mail to User",
+              "name": "8. Resend Credentials to User",
               "request": {
                 "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
+                "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/users/{{userId}}/mail",
                   "host": [
@@ -5394,53 +5432,11 @@
                     "mail"
                   ]
                 },
-                "description": "\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `userId` â†’ {{userId}} — string (MongoId / id) | set collection variable after create/list\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `subject` — string | required | email subject\n- `body` — string | required | email body text/HTML\n- `isHtml` — boolean | optional | `true` if body is HTML, default false\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"subject\": \"Hello from Access & Control\",\n  \"body\": \"Hi, this is a test mail.\",\n  \"isHtml\": false\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                }
+                "description": "Resends login credentials to the user's officialEmail. Only needs `userId` — no body, no cc/bcc.\n\nPassword rebuilt as `{employeeCode}{ddmmyyyy}` (platform roles → `123456`), saved, then welcome mail sent.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}` *(or Cookie `token`)*\n\n**Path**\n- `userId` → {{userId}} — MongoId from create/list\n\n**Body:** none\n---\n"
               }
             },
             {
-              "name": "9. Send Email (any address)",
-              "request": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "url": {
-                  "raw": "{{baseUrl}}/api/mail/send",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "mail",
-                    "send"
-                  ]
-                },
-                "description": "`to` / `cc` / `bcc`: one email or an array (max 50). `cc` / `bcc` optional — remove the key instead of sending an empty value.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `to` — string (YYYY-MM-DD) | optional | range end date\n- `cc` — array | see sample value | send same JSON type as example (string/number/boolean/array/object/null)\n- `bcc` — array | see sample value | send same JSON type as example (string/number/boolean/array/object/null)\n- `subject` — string | required | email subject\n- `body` — string | required | email body text/HTML\n- `isHtml` — boolean | optional | `true` if body is HTML, default false\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"to\": \"anupama@techculture.ai\",\n  \"cc\": [\n    \"admin@gmail.com\"\n  ],\n  \"bcc\": [\n    \"superadmin@gmail.com\"\n  ],\n  \"subject\": \"HRMS test email\",\n  \"body\": \"Hi, this is a test from HRMS API.\",\n  \"isHtml\": false\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                }
-              }
-            },
-            {
-              "name": "10. Delete User",
+              "name": "9. Delete User",
               "request": {
                 "method": "DELETE",
                 "header": [],

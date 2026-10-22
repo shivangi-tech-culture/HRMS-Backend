@@ -20,7 +20,6 @@ const { validate } = require("../middleware/validate");
 const {
   createAccessUserSchema,
   updateAccessUserSchema,
-  accessSendMailSchema,
   assignHrCompaniesSchema,
 } = require("../validators/accessControl.validation");
 const { assignReportingManager } = require("../controllers/reportingManager.controller");
@@ -257,31 +256,24 @@ router.put(
  * /api/users/{id}/mail:
  *   post:
  *     tags: [Admin / Users]
- *     summary: Send mail to user (row mail icon)
- *     description: Uses user's officialEmail. Permission Access & Control → email
+ *     summary: Resend login credentials to user
+ *     description: |
+ *       Only needs user id in the URL — no body, no cc/bcc.
+ *       Rebuilds default password (`employeeCode` + DOB `ddmmyyyy`, or `123456` for platform),
+ *       saves it, and emails credentials to `officialEmail`.
+ *       Permission: Access & Control → email
  *     security: [{ bearerAuth: [] }]
  *     parameters:
  *       - $ref: '#/components/parameters/UserId'
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [subject, body]
- *             properties:
- *               subject: { type: string }
- *               body: { type: string }
- *               isHtml: { type: boolean, default: false }
  *     responses:
- *       200: { description: Email sent }
+ *       200: { description: Credentials emailed }
+ *       400: { description: Missing email / employee code / DOB }
  */
 router.post(
   "/:id/mail",
   protect,
   authorize(...ACCESS_ROLES),
   checkPermission("Administration", "Access & Control", "email"),
-  validate(accessSendMailSchema),
   sendUserMail
 );
 
