@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "e76ef156-bb7e-4bd7-b543-75856b8a760e",
     "name": "HRMS ALL APIs",
-    "description": "**How to use**\n**Use with No Environment** (or an environment without baseUrl / token / password / *Id keys) — environment values override these collection variables.\n\n1. **0. Login & My Account → 1. Login** (saves {{token}}; every request sends it as Bearer auth). Body is just `{ \"username\", \"password\" }` — `username` = employee code, official / personal email, or mobile (auto-detected).\n2. **1. ADMIN** = all admin modules, **2. EMPLOYEE (ESS)** = employee self-service (starts with Login as Employee).\n3. Every module folder lists all its APIs: **Create → List → Update → Delete** first, then other routes.\n4. **1.2 Masters**: one folder per master type with Create / List / Get / Update / Delete.\n5. Company / branch / shift / manager / employee ids are auto-filled before send when empty.\n6. **1.5 Employees → Next Employee Code** then **Create Employee** — leave `official.employeeCode` blank; server assigns `{companyCode}{001}` per company.\n\n**Seed** (`npm run seed`):\n| Role | Email | Code | Mobile | Password |\n| --- | --- | --- | --- | --- |\n| Super Admin | superadmin@gmail.com | — | — | 123456 |\n| Admin | admin@gmail.com | — | — | 123456 |\n| HR | anupama@techculture.ai | TC001 | 9876500100 | TC00115012005 |\n| Manager | manav@techculture.ai | TC002 | 9876500201 | TC00215012005 |\n| Manager | manoj@techculture.ai | TC003 | 9876500202 | TC00315012005 |\n| Employee | shivangi@techculture.ai | TC004 | 9876500001 | TC00415012005 |\n| Employee | employee@techculture.ai | TC005 | 9876500002 | TC00515012005 |\n| Employee | vivek@techculture.ai | TC006 | 9876500003 | TC00615012005 |\n| Employee | ananya@techculture.ai | TC007 | 9876500004 | TC00715012005 |\n\nStaff password = `{employeeCode}` + DOB `ddmmyyyy` (`15012005`). Any of Email / Code / Mobile works as `username`.\n`employeeType` on the ID card is automatic from DOJ: TC005 / TC006 = **Probation** (joined on seed day), TC004 / TC007 = **Permanent** (joined 4 months earlier).\n\nPiece seeds: `npm run seed:masters` · `seed:leave` · `seed:holiday` · `seed:on-duty` · `seed:on-tour`\n\n**Employee code:** `GET /api/employees/next-code?companyId=` → preview (does not reserve). Blank code on create → auto `{companyCode}` + 3 digits per company (`TC008` next after seed).\n\n**What changed recently**\n- **Login:** one `username` field (code / email / mobile) + `password`; old `officialEmail` / `employeeCode` / `login` keys removed.\n- **Employee code:** company-wise auto increment + **Next Employee Code** preview API.\n- **ID card:** flat object; same API for admin (scoped) and employee (own only) + `GET /api/employees/me/id-card`; adds `dateOfJoining` and auto `employeeType`.\n- **List Users:** each row now has `employeeCode`.\n- **Break Summary** API removed.\n- **Seed:** company `TC`, codes `TC001`–`TC007`, password = code + DOB, profile photo, blood group, DOJ.\n\n**How to read params:** Each request Docs has **Parameters (type + how to send)**. JSON: unquoted numbers/booleans; dates `YYYY-MM-DD`; times `HH:mm`.\n---\n### Sidebar tip\nKeep **1.2 Masters → 2. CRUD by type** collapsed. Windows: **Alt + click** the folder arrow to collapse/expand all.",
+    "description": "**How to use**\n**Use with No Environment** (or an environment without baseUrl / token / password / *Id keys) — environment values override these collection variables.\n\n1. **0. Login & My Account → 1. Login** (saves {{token}}; every request sends it as Bearer auth). Body is just `{ \"username\", \"password\" }` — `username` = employee code, official / personal email, or mobile (auto-detected).\n2. **1. ADMIN** = all admin modules, **2. EMPLOYEE (ESS)** = employee self-service (starts with Login as Employee).\n3. Every module folder lists all its APIs: **Create → List → Update → Delete** first, then other routes.\n4. **1.2 Masters**: one folder per master type with Create / List / Get / Update / Delete.\n5. Company / branch / shift / manager / employee ids are auto-filled before send when empty.\n6. **1.5 Employees → Next Employee Code** then **Create Employee** — leave `official.employeeCode` blank; server assigns `{companyCode}{001}` per company.\n\n**Seed** (`npm run seed`):\n| Role | Email | Code | Mobile | Password |\n| --- | --- | --- | --- | --- |\n| Super Admin | superadmin@gmail.com | — | — | 123456 |\n| Admin | admin@gmail.com | — | — | 123456 |\n| HR | anupama@techculture.ai | TC001 | 9876500100 | TC00115012005 |\n| Manager | manav@techculture.ai | TC002 | 9876500201 | TC00215012005 |\n| Manager | manoj@techculture.ai | TC003 | 9876500202 | TC00315012005 |\n| Employee | shivangi@techculture.ai | TC004 | 9876500001 | TC00415012005 |\n| Employee | employee@techculture.ai | TC005 | 9876500002 | TC00515012005 |\n| Employee | vivek@techculture.ai | TC006 | 9876500003 | TC00615012005 |\n| Employee | ananya@techculture.ai | TC007 | 9876500004 | TC00715012005 |\n\nStaff password = `{employeeCode}` + DOB `ddmmyyyy` (`15012005`). Any of Email / Code / Mobile works as `username`.\n`employeeType` on the ID card is automatic from DOJ: TC005 / TC006 = **Probation** (joined on seed day), TC004 / TC007 = **Permanent** (joined 4 months earlier).\n\nPiece seeds: `npm run seed:masters` · `seed:leave` · `seed:holiday` · `seed:on-duty` · `seed:on-tour`\n\n**Employee code:** `GET /api/employees/next-code?companyId=` → preview (does not reserve). Blank code on create → auto `{companyCode}` + 3 digits per company (`TC008` next after seed).\n\n\n**How to read params:** Each request Docs has **Parameters (type + how to send)**. JSON: unquoted numbers/booleans; dates `YYYY-MM-DD`; times `HH:mm`.\n---\n### Sidebar tip\nKeep **1.2 Masters → 2. CRUD by type** collapsed. Windows: **Alt + click** the folder arrow to collapse/expand all.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -94,7 +94,7 @@
   "item": [
     {
       "name": "0. Login & My Account",
-      "description": "Login first — every other request uses {{token}} (Bearer) and the httpOnly cookie.\n\n**Login body = `{ \"username\": \"…\", \"password\": \"…\" }` only.** `username` is ONE common field: employee code (`TC005`), official email, personal email, or mobile number (`9876500002`). The server auto-detects which one. Old keys (`officialEmail`, `employeeCode`, `login`, `personalEmail`) → 400.\n\nPasswords after `npm run seed`: staff = employee code + DOB `15012005` (e.g. `TC00515012005`), Super Admin / Admin = `123456`. Full table in each Login request.\n\nUse local baseUrl `http://localhost:9001` with **No Environment**.\n\n**Module notes:** Login returns `token` (stored in DB as a single session — logging in elsewhere replaces it). GET /token-status → `isExpired` / `isReplaced`. Logout clears cookie + DB token.",
+      "description": "Login first — every other request uses {{token}}.\nBody: `{ \"username\", \"password\" }` — username = code / email / mobile.\nUse local baseUrl after `npm run seed`. Super Admin / Admin = `123456`; staff = code + DOB `15012005`.\n\n**Module notes:** Auth + profile. Login returns `token` (single session). GET /token-status → `isExpired` / `isReplaced`. Logout clears cookie + DB token.",
       "item": [
         {
           "name": "1. Login (Super Admin)",
@@ -117,7 +117,7 @@
                 "login"
               ]
             },
-            "description": "Login as **Super Admin**. Saves {{token}} (sent as Bearer on every request) and {{myId}}. Also sets httpOnly cookie `token`.\n\n**This request:** `superadmin@gmail.com` / `123456` — Platform role — no employee code / mobile, so only email works.\n\n### One login field: `username`\nBody has **only two keys** — `username` and `password`. Send employee code, email or mobile in the **same** `username` field; the server detects which one it is:\n\n| `username` value | Matched against | Example |\n| --- | --- | --- |\n| contains `@` | `official.officialEmail` **or** `personal.personalEmail` (case-insensitive) | `employee@techculture.ai` |\n| 10-digit number (`+91`, leading `0`, spaces, `-` allowed) | `personal.mobileNo` | `9876500002`, `+91 98765 00002` |\n| anything else | `official.employeeCode` (case-insensitive) | `TC005`, `tc005` |\n\n**Body examples**\n```json\n{ \"username\": \"TC005\", \"password\": \"TC00515012005\" }\n{ \"username\": \"employee@techculture.ai\", \"password\": \"TC00515012005\" }\n{ \"username\": \"9876500002\", \"password\": \"TC00515012005\" }\n{ \"username\": \"superadmin@gmail.com\", \"password\": \"123456\" }\n```\n\n### Seed logins (`npm run seed`)\nStaff password = **employee code + DOB `ddmmyyyy`** (common DOB 2005-01-15 → `15012005`). Super Admin / Admin = `123456`.\n\n| Role | Email | Code | Mobile | Password |\n| --- | --- | --- | --- | --- |\n| Super Admin | superadmin@gmail.com | — | — | 123456 |\n| Admin | admin@gmail.com | — | — | 123456 |\n| HR Manager | anupama@techculture.ai | TC001 | 9876500100 | TC00115012005 |\n| Reporting Manager | manav@techculture.ai | TC002 | 9876500201 | TC00215012005 |\n| Reporting Manager | manoj@techculture.ai | TC003 | 9876500202 | TC00315012005 |\n| Employee (Permanent) | shivangi@techculture.ai | TC004 | 9876500001 | TC00415012005 |\n| Employee (Probation) | employee@techculture.ai | TC005 | 9876500002 | TC00515012005 |\n| Employee (Probation) | vivek@techculture.ai | TC006 | 9876500003 | TC00615012005 |\n| Employee (Permanent) | ananya@techculture.ai | TC007 | 9876500004 | TC00715012005 |\n\n### Responses\n- **200** — `{ message, token, tokenExpiresAt, tokenExpiresIn, user: { id, name, officialEmail, role, department, companies[], status, lastLogin, permissionCount, ... } }`\n- **401** — `{ \"message\": \"Invalid username or password\" }` (unknown username **or** wrong password — same message on purpose)\n- **400** — `username` / `password` missing, or any extra key. Old bodies with `officialEmail` / `personalEmail` / `employeeCode` / `login` are **rejected** → rename the key to `username`.\n\nSee the saved **Examples** (top-right of the request) for each payload variant and its response.\n\n**Use local after seed:** collection {{baseUrl}} = `http://localhost:9001` and choose **No Environment** (an environment baseUrl overrides the collection one and may point at old Render).\n\n---\n### Parameters (type + how to send)\n**Body (JSON raw)** — `Content-Type: application/json`\n- `username` — string | required | employee code OR official email OR personal email OR mobile number (auto-detected)\n- `password` — string | required | staff = code + DOB `ddmmyyyy` (e.g. `TC00515012005`) · platform = `123456`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---",
+            "description": "Login as **Super Admin**. Saves {{token}} (Bearer for every request) and {{myId}}.\n\nSeed: `superadmin@gmail.com` / `123456`.\n\nBody: **`username`** + **`password`** only.\n`username` = employee code / official email / personal email / mobile (auto-detected).\n\n**Use local after seed:** collection {{baseUrl}} = `http://localhost:9001` and **No Environment**.\n\n---\n### Parameters (type + how to send)\n**Body (JSON raw)** — `Content-Type: application/json`\n- `username` — string | required | employee code OR email OR mobile\n- `password` — string | required | staff = code + DOB `15012005`; Super Admin / Admin = `123456`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"superadmin@gmail.com\",\n  \"password\": \"{{password}}\"\n}",
@@ -144,192 +144,7 @@
               }
             }
           ],
-          "response": [
-            {
-              "name": "200 – Super Admin by email",
-              "originalRequest": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "url": {
-                  "raw": "{{baseUrl}}/api/auth/login",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "auth",
-                    "login"
-                  ]
-                },
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"username\": \"superadmin@gmail.com\",\n  \"password\": \"123456\"\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                },
-                "auth": {
-                  "type": "noauth"
-                }
-              },
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json; charset=utf-8"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n  \"message\": \"Login successful\",\n  \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.<payload>.<signature>\",\n  \"tokenExpiresAt\": \"2026-10-29T11:14:58.000Z\",\n  \"tokenExpiresIn\": \"7d\",\n  \"user\": {\n    \"id\": \"6ad9e98d10e5dd00f576f35e\",\n    \"name\": \"Super Admin\",\n    \"officialEmail\": \"superadmin@gmail.com\",\n    \"role\": \"Super Admin\",\n    \"department\": \"\",\n    \"allCompanies\": true,\n    \"companies\": [\n      {\n        \"_id\": \"6ad9e98a10e5dd00f576f35b\",\n        \"companyName\": \"TechCulture.Ai Private Limited\"\n      }\n    ],\n    \"status\": \"Active\",\n    \"lastLogin\": \"2026-10-22T11:14:58.000Z\",\n    \"permissionCount\": \"406 of 406\",\n    \"permissions\": [\n      {\n        \"module\": \"Dashboard\",\n        \"heading\": \"Overview\",\n        \"subModules\": [\n          {\n            \"name\": \"Attendance Summary\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Leave Summary\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Payroll Summary\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Employee Statistics\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Employee\",\n        \"heading\": \"Employee Management\",\n        \"subModules\": [\n          {\n            \"name\": \"Employee\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"approve\": true,\n            \"reject\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true,\n            \"email\": true,\n            \"assign\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Attendance\",\n        \"heading\": \"Attendance & Time\",\n        \"subModules\": [\n          {\n            \"name\": \"Daily Attendance\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"approve\": true,\n            \"reject\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Attendance Calendar\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Attendance Regularization\",\n            \"view\": true,\n            \"create\": true,\n            \"approve\": true,\n            \"reject\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Late & Early Departures\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"On Tour/On Duty\",\n            \"view\": true,\n            \"approve\": true,\n            \"reject\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Break\",\n        \"heading\": \"Break Management\",\n        \"subModules\": [\n          {\n            \"name\": \"Live Break Status\",\n            \"view\": true,\n            \"edit\": true,\n            \"download\": true,\n            \"export\": true\n          },\n          {\n            \"name\": \"Pending Review\",\n            \"view\": true,\n            \"approve\": true,\n            \"reject\": true\n          },\n          {\n            \"name\": \"Break History\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Break Policy\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Leave\",\n        \"heading\": \"Leave Management\",\n        \"subModules\": [\n          {\n            \"name\": \"Leave Requests\",\n            \"view\": true,\n            \"create\": true,\n            \"approve\": true,\n            \"reject\": true,\n            \"download\": true,\n            \"export\": true,\n            \"upload\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Leave Types\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true\n          },\n          {\n            \"name\": \"Leave Balances\",\n            \"view\": true,\n            \"edit\": true\n          },\n          {\n            \"name\": \"Leave Calendar\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Leave Policies\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true\n          },\n          {\n            \"name\": \"Leave History\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Payroll\",\n        \"heading\": \"Payroll & Compensation\",\n        \"subModules\": [\n          {\n            \"name\": \"Salary Structure\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true\n          },\n          {\n            \"name\": \"Payroll Processing\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"approve\": true,\n            \"reject\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Salary Adjustments\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true\n          },\n          {\n            \"name\": \"Deductions\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true\n          },\n          {\n            \"name\": \"Payslips\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Payroll History\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Approvals\",\n        \"heading\": \"Approvals\",\n        \"subModules\": [\n          {\n            \"name\": \"Pending Requests\",\n            \"view\": true,\n            \"approve\": true,\n            \"reject\": true,\n            \"export\": true,\n            \"upload\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"WFH Requests\",\n            \"view\": true,\n            \"create\": true,\n            \"approve\": true,\n            \"reject\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Permission Requests\",\n            \"view\": true,\n            \"create\": true,\n            \"approve\": true,\n            \"reject\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Request History\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Organization\",\n        \"heading\": \"Organization\",\n        \"subModules\": [\n          {\n            \"name\": \"Departments\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Designations\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Teams\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"assign\": true\n          },\n          {\n            \"name\": \"Team Chat\",\n            \"view\": true,\n            \"create\": true,\n            \"share\": true\n          },\n          {\n            \"name\": \"Mail\",\n            \"view\": true,\n            \"create\": true,\n            \"email\": true\n          },\n          {\n            \"name\": \"Branches / Locations\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Reporting Structure\",\n            \"view\": true,\n            \"edit\": true,\n            \"assign\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Masters\",\n        \"heading\": \"Masters\",\n        \"subModules\": [\n          {\n            \"name\": \"Department\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Designation\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Division\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Employee Group\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Grade\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Job Role\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Gender\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Marital Status\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Blood Group\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Branch\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Shift\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Course Type\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Course Level\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Bank Name\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Relation\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Nominate For\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Visa Type\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Language\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Regularization Reason\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Mark Attendance Reason\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Work\",\n        \"heading\": \"Work Schedule\",\n        \"subModules\": [\n          {\n            \"name\": \"Weekly Off\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Reports\",\n        \"heading\": \"Reports & Analytics\",\n        \"subModules\": [\n          {\n            \"name\": \"Employee Reports\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Attendance Reports\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Leave Reports\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Break Reports\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Overtime Reports\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Payroll Reports\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Communication\",\n        \"heading\": \"Communication\",\n        \"subModules\": [\n          {\n            \"name\": \"Announcements\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"share\": true\n          },\n          {\n            \"name\": \"Notifications\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Company Circulars\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"share\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Administration\",\n        \"heading\": \"Administration\",\n        \"subModules\": [\n          {\n            \"name\": \"Access & Control\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true,\n            \"email\": true,\n            \"assign\": true\n          },\n          {\n            \"name\": \"Roles & Permissions\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"export\": true\n          },\n          {\n            \"name\": \"System Configuration\",\n            \"view\": true,\n            \"edit\": true\n          },\n          {\n            \"name\": \"Hierarchy\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Holiday\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true\n          },\n          {\n            \"name\": \"Company\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          }\n        ]\n      }\n    ]\n  }\n}"
-            },
-            {
-              "name": "401 – wrong password",
-              "originalRequest": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "url": {
-                  "raw": "{{baseUrl}}/api/auth/login",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "auth",
-                    "login"
-                  ]
-                },
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"username\": \"TC005\",\n  \"password\": \"wrongpass\"\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                },
-                "auth": {
-                  "type": "noauth"
-                }
-              },
-              "status": "Unauthorized",
-              "code": 401,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json; charset=utf-8"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n  \"message\": \"Invalid username or password\"\n}"
-            },
-            {
-              "name": "400 – old officialEmail key",
-              "originalRequest": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "url": {
-                  "raw": "{{baseUrl}}/api/auth/login",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "auth",
-                    "login"
-                  ]
-                },
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"officialEmail\": \"TC004\",\n  \"password\": \"TC00415012005\"\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                },
-                "auth": {
-                  "type": "noauth"
-                }
-              },
-              "status": "429",
-              "code": 429,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json; charset=utf-8"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n  \"message\": \"Too many login attempts. Please try again later.\"\n}"
-            },
-            {
-              "name": "400 – username missing",
-              "originalRequest": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "url": {
-                  "raw": "{{baseUrl}}/api/auth/login",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "auth",
-                    "login"
-                  ]
-                },
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"password\": \"123456\"\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                },
-                "auth": {
-                  "type": "noauth"
-                }
-              },
-              "status": "429",
-              "code": 429,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json; charset=utf-8"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n  \"message\": \"Too many login attempts. Please try again later.\"\n}"
-            }
-          ]
+          "response": []
         },
         {
           "name": "2. Get My Account",
@@ -406,7 +221,23 @@
         },
         {
           "name": "5. Login (Admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.token) pm.collectionVariables.set('token', j.token);",
+                  "if (j.user && j.user.id) pm.collectionVariables.set('myId', j.user.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
+            "auth": {
+              "type": "noauth"
+            },
             "method": "POST",
             "header": [
               {
@@ -414,18 +245,6 @@
                 "value": "application/json"
               }
             ],
-            "url": {
-              "raw": "{{baseUrl}}/api/auth/login",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "auth",
-                "login"
-              ]
-            },
-            "description": "Login as **Admin**. Saves {{token}} (sent as Bearer on every request) and {{myId}}. Also sets httpOnly cookie `token`.\n\n**This request:** `admin@gmail.com` / `123456` — Platform role — no employee code / mobile, so only email works.\n\n### One login field: `username`\nBody has **only two keys** — `username` and `password`. Send employee code, email or mobile in the **same** `username` field; the server detects which one it is:\n\n| `username` value | Matched against | Example |\n| --- | --- | --- |\n| contains `@` | `official.officialEmail` **or** `personal.personalEmail` (case-insensitive) | `employee@techculture.ai` |\n| 10-digit number (`+91`, leading `0`, spaces, `-` allowed) | `personal.mobileNo` | `9876500002`, `+91 98765 00002` |\n| anything else | `official.employeeCode` (case-insensitive) | `TC005`, `tc005` |\n\n**Body examples**\n```json\n{ \"username\": \"TC005\", \"password\": \"TC00515012005\" }\n{ \"username\": \"employee@techculture.ai\", \"password\": \"TC00515012005\" }\n{ \"username\": \"9876500002\", \"password\": \"TC00515012005\" }\n{ \"username\": \"superadmin@gmail.com\", \"password\": \"123456\" }\n```\n\n### Seed logins (`npm run seed`)\nStaff password = **employee code + DOB `ddmmyyyy`** (common DOB 2005-01-15 → `15012005`). Super Admin / Admin = `123456`.\n\n| Role | Email | Code | Mobile | Password |\n| --- | --- | --- | --- | --- |\n| Super Admin | superadmin@gmail.com | — | — | 123456 |\n| Admin | admin@gmail.com | — | — | 123456 |\n| HR Manager | anupama@techculture.ai | TC001 | 9876500100 | TC00115012005 |\n| Reporting Manager | manav@techculture.ai | TC002 | 9876500201 | TC00215012005 |\n| Reporting Manager | manoj@techculture.ai | TC003 | 9876500202 | TC00315012005 |\n| Employee (Permanent) | shivangi@techculture.ai | TC004 | 9876500001 | TC00415012005 |\n| Employee (Probation) | employee@techculture.ai | TC005 | 9876500002 | TC00515012005 |\n| Employee (Probation) | vivek@techculture.ai | TC006 | 9876500003 | TC00615012005 |\n| Employee (Permanent) | ananya@techculture.ai | TC007 | 9876500004 | TC00715012005 |\n\n### Responses\n- **200** — `{ message, token, tokenExpiresAt, tokenExpiresIn, user: { id, name, officialEmail, role, department, companies[], status, lastLogin, permissionCount, ... } }`\n- **401** — `{ \"message\": \"Invalid username or password\" }` (unknown username **or** wrong password — same message on purpose)\n- **400** — `username` / `password` missing, or any extra key. Old bodies with `officialEmail` / `personalEmail` / `employeeCode` / `login` are **rejected** → rename the key to `username`.\n\nSee the saved **Examples** (top-right of the request) for each payload variant and its response.\n\n**Use local after seed:** collection {{baseUrl}} = `http://localhost:9001` and choose **No Environment** (an environment baseUrl overrides the collection one and may point at old Render).\n\n---\n### Parameters (type + how to send)\n**Body (JSON raw)** — `Content-Type: application/json`\n- `username` — string | required | employee code OR official email OR personal email OR mobile number (auto-detected)\n- `password` — string | required | staff = code + DOB `ddmmyyyy` (e.g. `TC00515012005`) · platform = `123456`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"admin@gmail.com\",\n  \"password\": \"{{password}}\"\n}",
@@ -435,82 +254,6 @@
                 }
               }
             },
-            "auth": {
-              "type": "noauth"
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "const j = pm.response.json();",
-                  "if (j.token) pm.collectionVariables.set('token', j.token);",
-                  "if (j.user && j.user.id) pm.collectionVariables.set('myId', j.user.id);"
-                ]
-              }
-            }
-          ],
-          "response": [
-            {
-              "name": "200 – Admin by email",
-              "originalRequest": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "url": {
-                  "raw": "{{baseUrl}}/api/auth/login",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "auth",
-                    "login"
-                  ]
-                },
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"username\": \"admin@gmail.com\",\n  \"password\": \"123456\"\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                },
-                "auth": {
-                  "type": "noauth"
-                }
-              },
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json; charset=utf-8"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n  \"message\": \"Login successful\",\n  \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.<payload>.<signature>\",\n  \"tokenExpiresAt\": \"2026-10-29T11:14:59.000Z\",\n  \"tokenExpiresIn\": \"7d\",\n  \"user\": {\n    \"id\": \"6ad9e99210e5dd00f576f361\",\n    \"name\": \"Admin User\",\n    \"officialEmail\": \"admin@gmail.com\",\n    \"role\": \"Admin\",\n    \"department\": \"\",\n    \"allCompanies\": true,\n    \"companies\": [\n      {\n        \"_id\": \"6ad9e98a10e5dd00f576f35b\",\n        \"companyName\": \"TechCulture.Ai Private Limited\"\n      }\n    ],\n    \"status\": \"Active\",\n    \"lastLogin\": \"2026-10-22T11:14:59.000Z\",\n    \"permissionCount\": \"406 of 406\",\n    \"permissions\": [\n      {\n        \"module\": \"Dashboard\",\n        \"heading\": \"Overview\",\n        \"subModules\": [\n          {\n            \"name\": \"Attendance Summary\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Leave Summary\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Payroll Summary\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Employee Statistics\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Employee\",\n        \"heading\": \"Employee Management\",\n        \"subModules\": [\n          {\n            \"name\": \"Employee\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"approve\": true,\n            \"reject\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true,\n            \"email\": true,\n            \"assign\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Attendance\",\n        \"heading\": \"Attendance & Time\",\n        \"subModules\": [\n          {\n            \"name\": \"Daily Attendance\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"approve\": true,\n            \"reject\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Attendance Calendar\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Attendance Regularization\",\n            \"view\": true,\n            \"create\": true,\n            \"approve\": true,\n            \"reject\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Late & Early Departures\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"On Tour/On Duty\",\n            \"view\": true,\n            \"approve\": true,\n            \"reject\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Break\",\n        \"heading\": \"Break Management\",\n        \"subModules\": [\n          {\n            \"name\": \"Live Break Status\",\n            \"view\": true,\n            \"edit\": true,\n            \"download\": true,\n            \"export\": true\n          },\n          {\n            \"name\": \"Pending Review\",\n            \"view\": true,\n            \"approve\": true,\n            \"reject\": true\n          },\n          {\n            \"name\": \"Break History\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Break Policy\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Leave\",\n        \"heading\": \"Leave Management\",\n        \"subModules\": [\n          {\n            \"name\": \"Leave Requests\",\n            \"view\": true,\n            \"create\": true,\n            \"approve\": true,\n            \"reject\": true,\n            \"download\": true,\n            \"export\": true,\n            \"upload\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Leave Types\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true\n          },\n          {\n            \"name\": \"Leave Balances\",\n            \"view\": true,\n            \"edit\": true\n          },\n          {\n            \"name\": \"Leave Calendar\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Leave Policies\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true\n          },\n          {\n            \"name\": \"Leave History\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Payroll\",\n        \"heading\": \"Payroll & Compensation\",\n        \"subModules\": [\n          {\n            \"name\": \"Salary Structure\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true\n          },\n          {\n            \"name\": \"Payroll Processing\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"approve\": true,\n            \"reject\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Salary Adjustments\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true\n          },\n          {\n            \"name\": \"Deductions\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true\n          },\n          {\n            \"name\": \"Payslips\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Payroll History\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Approvals\",\n        \"heading\": \"Approvals\",\n        \"subModules\": [\n          {\n            \"name\": \"Pending Requests\",\n            \"view\": true,\n            \"approve\": true,\n            \"reject\": true,\n            \"export\": true,\n            \"upload\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"WFH Requests\",\n            \"view\": true,\n            \"create\": true,\n            \"approve\": true,\n            \"reject\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Permission Requests\",\n            \"view\": true,\n            \"create\": true,\n            \"approve\": true,\n            \"reject\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Request History\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Organization\",\n        \"heading\": \"Organization\",\n        \"subModules\": [\n          {\n            \"name\": \"Departments\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Designations\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Teams\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"assign\": true\n          },\n          {\n            \"name\": \"Team Chat\",\n            \"view\": true,\n            \"create\": true,\n            \"share\": true\n          },\n          {\n            \"name\": \"Mail\",\n            \"view\": true,\n            \"create\": true,\n            \"email\": true\n          },\n          {\n            \"name\": \"Branches / Locations\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Reporting Structure\",\n            \"view\": true,\n            \"edit\": true,\n            \"assign\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Masters\",\n        \"heading\": \"Masters\",\n        \"subModules\": [\n          {\n            \"name\": \"Department\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Designation\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Division\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Employee Group\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Grade\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Job Role\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Gender\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Marital Status\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Blood Group\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Branch\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Shift\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Course Type\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Course Level\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Bank Name\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Relation\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Nominate For\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Visa Type\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Language\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Regularization Reason\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Mark Attendance Reason\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Work\",\n        \"heading\": \"Work Schedule\",\n        \"subModules\": [\n          {\n            \"name\": \"Weekly Off\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Reports\",\n        \"heading\": \"Reports & Analytics\",\n        \"subModules\": [\n          {\n            \"name\": \"Employee Reports\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Attendance Reports\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Leave Reports\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Break Reports\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Overtime Reports\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Payroll Reports\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Communication\",\n        \"heading\": \"Communication\",\n        \"subModules\": [\n          {\n            \"name\": \"Announcements\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"share\": true\n          },\n          {\n            \"name\": \"Notifications\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Company Circulars\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"share\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Administration\",\n        \"heading\": \"Administration\",\n        \"subModules\": [\n          {\n            \"name\": \"Access & Control\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true,\n            \"email\": true,\n            \"assign\": true\n          },\n          {\n            \"name\": \"Roles & Permissions\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"export\": true\n          },\n          {\n            \"name\": \"System Configuration\",\n            \"view\": true,\n            \"edit\": true\n          },\n          {\n            \"name\": \"Hierarchy\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Holiday\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true\n          },\n          {\n            \"name\": \"Company\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          }\n        ]\n      }\n    ]\n  }\n}"
-            }
-          ]
-        },
-        {
-          "name": "6. Login (HR Manager)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
             "url": {
               "raw": "{{baseUrl}}/api/auth/login",
               "host": [
@@ -522,7 +265,36 @@
                 "login"
               ]
             },
-            "description": "Login as **HR Manager**. Saves {{token}} (sent as Bearer on every request) and {{myId}}. Also sets httpOnly cookie `token`.\n\n**This request:** `anupama@techculture.ai` / `TC00115012005` — Anupama — also `TC001` or `9876500100`.\n\n### One login field: `username`\nBody has **only two keys** — `username` and `password`. Send employee code, email or mobile in the **same** `username` field; the server detects which one it is:\n\n| `username` value | Matched against | Example |\n| --- | --- | --- |\n| contains `@` | `official.officialEmail` **or** `personal.personalEmail` (case-insensitive) | `employee@techculture.ai` |\n| 10-digit number (`+91`, leading `0`, spaces, `-` allowed) | `personal.mobileNo` | `9876500002`, `+91 98765 00002` |\n| anything else | `official.employeeCode` (case-insensitive) | `TC005`, `tc005` |\n\n**Body examples**\n```json\n{ \"username\": \"TC005\", \"password\": \"TC00515012005\" }\n{ \"username\": \"employee@techculture.ai\", \"password\": \"TC00515012005\" }\n{ \"username\": \"9876500002\", \"password\": \"TC00515012005\" }\n{ \"username\": \"superadmin@gmail.com\", \"password\": \"123456\" }\n```\n\n### Seed logins (`npm run seed`)\nStaff password = **employee code + DOB `ddmmyyyy`** (common DOB 2005-01-15 → `15012005`). Super Admin / Admin = `123456`.\n\n| Role | Email | Code | Mobile | Password |\n| --- | --- | --- | --- | --- |\n| Super Admin | superadmin@gmail.com | — | — | 123456 |\n| Admin | admin@gmail.com | — | — | 123456 |\n| HR Manager | anupama@techculture.ai | TC001 | 9876500100 | TC00115012005 |\n| Reporting Manager | manav@techculture.ai | TC002 | 9876500201 | TC00215012005 |\n| Reporting Manager | manoj@techculture.ai | TC003 | 9876500202 | TC00315012005 |\n| Employee (Permanent) | shivangi@techculture.ai | TC004 | 9876500001 | TC00415012005 |\n| Employee (Probation) | employee@techculture.ai | TC005 | 9876500002 | TC00515012005 |\n| Employee (Probation) | vivek@techculture.ai | TC006 | 9876500003 | TC00615012005 |\n| Employee (Permanent) | ananya@techculture.ai | TC007 | 9876500004 | TC00715012005 |\n\n### Responses\n- **200** — `{ message, token, tokenExpiresAt, tokenExpiresIn, user: { id, name, officialEmail, role, department, companies[], status, lastLogin, permissionCount, ... } }`\n- **401** — `{ \"message\": \"Invalid username or password\" }` (unknown username **or** wrong password — same message on purpose)\n- **400** — `username` / `password` missing, or any extra key. Old bodies with `officialEmail` / `personalEmail` / `employeeCode` / `login` are **rejected** → rename the key to `username`.\n\nSee the saved **Examples** (top-right of the request) for each payload variant and its response.\n\n**Use local after seed:** collection {{baseUrl}} = `http://localhost:9001` and choose **No Environment** (an environment baseUrl overrides the collection one and may point at old Render).\n\n---\n### Parameters (type + how to send)\n**Body (JSON raw)** — `Content-Type: application/json`\n- `username` — string | required | employee code OR official email OR personal email OR mobile number (auto-detected)\n- `password` — string | required | staff = code + DOB `ddmmyyyy` (e.g. `TC00515012005`) · platform = `123456`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---",
+            "description": "Login as **Admin**. Saves {{token}} (Bearer for every request) and {{myId}}.\n\nSeed: `admin@gmail.com` / `123456`.\n\nBody: **`username`** + **`password`** only.\n`username` = employee code / official email / personal email / mobile (auto-detected).\n\n**Use local after seed:** collection {{baseUrl}} = `http://localhost:9001` and **No Environment**.\n\n---\n### Parameters (type + how to send)\n**Body (JSON raw)** — `Content-Type: application/json`\n- `username` — string | required | employee code OR email OR mobile\n- `password` — string | required | staff = code + DOB `15012005`; Super Admin / Admin = `123456`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---"
+          },
+          "response": []
+        },
+        {
+          "name": "6. Login (HR Manager)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.token) pm.collectionVariables.set('token', j.token);",
+                  "if (j.user && j.user.id) pm.collectionVariables.set('myId', j.user.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"anupama@techculture.ai\",\n  \"password\": \"TC00115012005\"\n}",
@@ -532,82 +304,6 @@
                 }
               }
             },
-            "auth": {
-              "type": "noauth"
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "const j = pm.response.json();",
-                  "if (j.token) pm.collectionVariables.set('token', j.token);",
-                  "if (j.user && j.user.id) pm.collectionVariables.set('myId', j.user.id);"
-                ]
-              }
-            }
-          ],
-          "response": [
-            {
-              "name": "200 – HR Manager by email",
-              "originalRequest": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "url": {
-                  "raw": "{{baseUrl}}/api/auth/login",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "auth",
-                    "login"
-                  ]
-                },
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"username\": \"anupama@techculture.ai\",\n  \"password\": \"TC00115012005\"\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                },
-                "auth": {
-                  "type": "noauth"
-                }
-              },
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json; charset=utf-8"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n  \"message\": \"Login successful\",\n  \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.<payload>.<signature>\",\n  \"tokenExpiresAt\": \"2026-10-29T11:14:59.000Z\",\n  \"tokenExpiresIn\": \"7d\",\n  \"user\": {\n    \"id\": \"6ad9e99910e5dd00f576f364\",\n    \"name\": \"Anupama\",\n    \"officialEmail\": \"anupama@techculture.ai\",\n    \"role\": \"HR Manager\",\n    \"department\": \"HR\",\n    \"allCompanies\": false,\n    \"companies\": [\n      {\n        \"_id\": \"6ad9e98a10e5dd00f576f35b\",\n        \"companyName\": \"TechCulture.Ai Private Limited\"\n      }\n    ],\n    \"status\": \"Active\",\n    \"lastLogin\": \"2026-10-22T11:14:59.000Z\",\n    \"permissionCount\": \"398 of 398\",\n    \"permissions\": [\n      {\n        \"module\": \"Dashboard\",\n        \"heading\": \"Overview\",\n        \"subModules\": [\n          {\n            \"name\": \"Attendance Summary\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Leave Summary\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Payroll Summary\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Employee Statistics\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Employee\",\n        \"heading\": \"Employee Management\",\n        \"subModules\": [\n          {\n            \"name\": \"Employee\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"approve\": true,\n            \"reject\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true,\n            \"email\": true,\n            \"assign\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Attendance\",\n        \"heading\": \"Attendance & Time\",\n        \"subModules\": [\n          {\n            \"name\": \"Daily Attendance\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"approve\": true,\n            \"reject\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Attendance Calendar\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Attendance Regularization\",\n            \"view\": true,\n            \"create\": true,\n            \"approve\": true,\n            \"reject\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Late & Early Departures\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"On Tour/On Duty\",\n            \"view\": true,\n            \"approve\": true,\n            \"reject\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Break\",\n        \"heading\": \"Break Management\",\n        \"subModules\": [\n          {\n            \"name\": \"Live Break Status\",\n            \"view\": true,\n            \"edit\": true,\n            \"download\": true,\n            \"export\": true\n          },\n          {\n            \"name\": \"Pending Review\",\n            \"view\": true,\n            \"approve\": true,\n            \"reject\": true\n          },\n          {\n            \"name\": \"Break History\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Break Policy\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Leave\",\n        \"heading\": \"Leave Management\",\n        \"subModules\": [\n          {\n            \"name\": \"Leave Requests\",\n            \"view\": true,\n            \"create\": true,\n            \"approve\": true,\n            \"reject\": true,\n            \"download\": true,\n            \"export\": true,\n            \"upload\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Leave Types\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true\n          },\n          {\n            \"name\": \"Leave Balances\",\n            \"view\": true,\n            \"edit\": true\n          },\n          {\n            \"name\": \"Leave Calendar\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Leave Policies\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true\n          },\n          {\n            \"name\": \"Leave History\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Payroll\",\n        \"heading\": \"Payroll & Compensation\",\n        \"subModules\": [\n          {\n            \"name\": \"Salary Structure\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true\n          },\n          {\n            \"name\": \"Payroll Processing\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"approve\": true,\n            \"reject\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Salary Adjustments\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true\n          },\n          {\n            \"name\": \"Deductions\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true\n          },\n          {\n            \"name\": \"Payslips\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Payroll History\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Approvals\",\n        \"heading\": \"Approvals\",\n        \"subModules\": [\n          {\n            \"name\": \"Pending Requests\",\n            \"view\": true,\n            \"approve\": true,\n            \"reject\": true,\n            \"export\": true,\n            \"upload\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"WFH Requests\",\n            \"view\": true,\n            \"create\": true,\n            \"approve\": true,\n            \"reject\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Permission Requests\",\n            \"view\": true,\n            \"create\": true,\n            \"approve\": true,\n            \"reject\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Request History\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Organization\",\n        \"heading\": \"Organization\",\n        \"subModules\": [\n          {\n            \"name\": \"Departments\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Designations\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Teams\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"assign\": true\n          },\n          {\n            \"name\": \"Team Chat\",\n            \"view\": true,\n            \"create\": true,\n            \"share\": true\n          },\n          {\n            \"name\": \"Mail\",\n            \"view\": true,\n            \"create\": true,\n            \"email\": true\n          },\n          {\n            \"name\": \"Branches / Locations\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Reporting Structure\",\n            \"view\": true,\n            \"edit\": true,\n            \"assign\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Masters\",\n        \"heading\": \"Masters\",\n        \"subModules\": [\n          {\n            \"name\": \"Department\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Designation\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Division\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Employee Group\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Grade\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Job Role\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Gender\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Marital Status\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Blood Group\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Branch\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Shift\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Course Type\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Course Level\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Bank Name\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Relation\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Nominate For\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Visa Type\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Language\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Regularization Reason\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Mark Attendance Reason\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Work\",\n        \"heading\": \"Work Schedule\",\n        \"subModules\": [\n          {\n            \"name\": \"Weekly Off\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Reports\",\n        \"heading\": \"Reports & Analytics\",\n        \"subModules\": [\n          {\n            \"name\": \"Employee Reports\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Attendance Reports\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Leave Reports\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Break Reports\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Overtime Reports\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Payroll Reports\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Communication\",\n        \"heading\": \"Communication\",\n        \"subModules\": [\n          {\n            \"name\": \"Announcements\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"share\": true\n          },\n          {\n            \"name\": \"Notifications\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Company Circulars\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"share\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Administration\",\n        \"heading\": \"Administration\",\n        \"subModules\": [\n          {\n            \"name\": \"Access & Control\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true,\n            \"email\": true,\n            \"assign\": true\n          },\n          {\n            \"name\": \"Roles & Permissions\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"export\": true\n          },\n          {\n            \"name\": \"System Configuration\",\n            \"view\": true,\n            \"edit\": true\n          },\n          {\n            \"name\": \"Hierarchy\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Holiday\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true\n          }\n        ]\n      }\n    ]\n  }\n}"
-            }
-          ]
-        },
-        {
-          "name": "7. Login (Reporting Manager)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
             "url": {
               "raw": "{{baseUrl}}/api/auth/login",
               "host": [
@@ -619,7 +315,36 @@
                 "login"
               ]
             },
-            "description": "Login as **Reporting Manager**. Saves {{token}} (sent as Bearer on every request) and {{myId}}. Also sets httpOnly cookie `token`.\n\n**This request:** `manav@techculture.ai` / `TC00215012005` — Manav — also `TC002` or `9876500201`. Manoj = `TC003` / `9876500202` / `TC00315012005`.\n\n### One login field: `username`\nBody has **only two keys** — `username` and `password`. Send employee code, email or mobile in the **same** `username` field; the server detects which one it is:\n\n| `username` value | Matched against | Example |\n| --- | --- | --- |\n| contains `@` | `official.officialEmail` **or** `personal.personalEmail` (case-insensitive) | `employee@techculture.ai` |\n| 10-digit number (`+91`, leading `0`, spaces, `-` allowed) | `personal.mobileNo` | `9876500002`, `+91 98765 00002` |\n| anything else | `official.employeeCode` (case-insensitive) | `TC005`, `tc005` |\n\n**Body examples**\n```json\n{ \"username\": \"TC005\", \"password\": \"TC00515012005\" }\n{ \"username\": \"employee@techculture.ai\", \"password\": \"TC00515012005\" }\n{ \"username\": \"9876500002\", \"password\": \"TC00515012005\" }\n{ \"username\": \"superadmin@gmail.com\", \"password\": \"123456\" }\n```\n\n### Seed logins (`npm run seed`)\nStaff password = **employee code + DOB `ddmmyyyy`** (common DOB 2005-01-15 → `15012005`). Super Admin / Admin = `123456`.\n\n| Role | Email | Code | Mobile | Password |\n| --- | --- | --- | --- | --- |\n| Super Admin | superadmin@gmail.com | — | — | 123456 |\n| Admin | admin@gmail.com | — | — | 123456 |\n| HR Manager | anupama@techculture.ai | TC001 | 9876500100 | TC00115012005 |\n| Reporting Manager | manav@techculture.ai | TC002 | 9876500201 | TC00215012005 |\n| Reporting Manager | manoj@techculture.ai | TC003 | 9876500202 | TC00315012005 |\n| Employee (Permanent) | shivangi@techculture.ai | TC004 | 9876500001 | TC00415012005 |\n| Employee (Probation) | employee@techculture.ai | TC005 | 9876500002 | TC00515012005 |\n| Employee (Probation) | vivek@techculture.ai | TC006 | 9876500003 | TC00615012005 |\n| Employee (Permanent) | ananya@techculture.ai | TC007 | 9876500004 | TC00715012005 |\n\n### Responses\n- **200** — `{ message, token, tokenExpiresAt, tokenExpiresIn, user: { id, name, officialEmail, role, department, companies[], status, lastLogin, permissionCount, ... } }`\n- **401** — `{ \"message\": \"Invalid username or password\" }` (unknown username **or** wrong password — same message on purpose)\n- **400** — `username` / `password` missing, or any extra key. Old bodies with `officialEmail` / `personalEmail` / `employeeCode` / `login` are **rejected** → rename the key to `username`.\n\nSee the saved **Examples** (top-right of the request) for each payload variant and its response.\n\n**Use local after seed:** collection {{baseUrl}} = `http://localhost:9001` and choose **No Environment** (an environment baseUrl overrides the collection one and may point at old Render).\n\n---\n### Parameters (type + how to send)\n**Body (JSON raw)** — `Content-Type: application/json`\n- `username` — string | required | employee code OR official email OR personal email OR mobile number (auto-detected)\n- `password` — string | required | staff = code + DOB `ddmmyyyy` (e.g. `TC00515012005`) · platform = `123456`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---",
+            "description": "Login as **HR Manager**. Saves {{token}} (Bearer for every request) and {{myId}}.\n\nSeed: `anupama@techculture.ai` / `TC001` / `9876500100` / password `TC00115012005`.\n\nBody: **`username`** + **`password`** only.\n`username` = employee code / official email / personal email / mobile (auto-detected).\n\n**Use local after seed:** collection {{baseUrl}} = `http://localhost:9001` and **No Environment**.\n\n---\n### Parameters (type + how to send)\n**Body (JSON raw)** — `Content-Type: application/json`\n- `username` — string | required | employee code OR email OR mobile\n- `password` — string | required | staff = code + DOB `15012005`; Super Admin / Admin = `123456`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---"
+          },
+          "response": []
+        },
+        {
+          "name": "7. Login (Reporting Manager)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.token) pm.collectionVariables.set('token', j.token);",
+                  "if (j.user && j.user.id) pm.collectionVariables.set('myId', j.user.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"manav@techculture.ai\",\n  \"password\": \"TC00215012005\"\n}",
@@ -629,82 +354,6 @@
                 }
               }
             },
-            "auth": {
-              "type": "noauth"
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "const j = pm.response.json();",
-                  "if (j.token) pm.collectionVariables.set('token', j.token);",
-                  "if (j.user && j.user.id) pm.collectionVariables.set('myId', j.user.id);"
-                ]
-              }
-            }
-          ],
-          "response": [
-            {
-              "name": "200 – Reporting Manager by email",
-              "originalRequest": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "url": {
-                  "raw": "{{baseUrl}}/api/auth/login",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "auth",
-                    "login"
-                  ]
-                },
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"username\": \"manav@techculture.ai\",\n  \"password\": \"TC00215012005\"\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                },
-                "auth": {
-                  "type": "noauth"
-                }
-              },
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json; charset=utf-8"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n  \"message\": \"Login successful\",\n  \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.<payload>.<signature>\",\n  \"tokenExpiresAt\": \"2026-10-29T11:14:59.000Z\",\n  \"tokenExpiresIn\": \"7d\",\n  \"user\": {\n    \"id\": \"6ad9e99d10e5dd00f576f366\",\n    \"name\": \"Manav\",\n    \"officialEmail\": \"manav@techculture.ai\",\n    \"role\": \"Reporting Manager\",\n    \"department\": \"Engineering\",\n    \"allCompanies\": false,\n    \"companies\": [\n      {\n        \"_id\": \"6ad9e98a10e5dd00f576f35b\",\n        \"companyName\": \"TechCulture.Ai Private Limited\"\n      }\n    ],\n    \"status\": \"Active\",\n    \"lastLogin\": \"2026-10-22T11:14:59.000Z\",\n    \"permissionCount\": \"398 of 398\",\n    \"permissions\": [\n      {\n        \"module\": \"Dashboard\",\n        \"heading\": \"Overview\",\n        \"subModules\": [\n          {\n            \"name\": \"Attendance Summary\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Leave Summary\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Payroll Summary\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Employee Statistics\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Employee\",\n        \"heading\": \"Employee Management\",\n        \"subModules\": [\n          {\n            \"name\": \"Employee\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"approve\": true,\n            \"reject\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true,\n            \"email\": true,\n            \"assign\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Attendance\",\n        \"heading\": \"Attendance & Time\",\n        \"subModules\": [\n          {\n            \"name\": \"Daily Attendance\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"approve\": true,\n            \"reject\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Attendance Calendar\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Attendance Regularization\",\n            \"view\": true,\n            \"create\": true,\n            \"approve\": true,\n            \"reject\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Late & Early Departures\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"On Tour/On Duty\",\n            \"view\": true,\n            \"approve\": true,\n            \"reject\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Break\",\n        \"heading\": \"Break Management\",\n        \"subModules\": [\n          {\n            \"name\": \"Live Break Status\",\n            \"view\": true,\n            \"edit\": true,\n            \"download\": true,\n            \"export\": true\n          },\n          {\n            \"name\": \"Pending Review\",\n            \"view\": true,\n            \"approve\": true,\n            \"reject\": true\n          },\n          {\n            \"name\": \"Break History\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Break Policy\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Leave\",\n        \"heading\": \"Leave Management\",\n        \"subModules\": [\n          {\n            \"name\": \"Leave Requests\",\n            \"view\": true,\n            \"create\": true,\n            \"approve\": true,\n            \"reject\": true,\n            \"download\": true,\n            \"export\": true,\n            \"upload\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Leave Types\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true\n          },\n          {\n            \"name\": \"Leave Balances\",\n            \"view\": true,\n            \"edit\": true\n          },\n          {\n            \"name\": \"Leave Calendar\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Leave Policies\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true\n          },\n          {\n            \"name\": \"Leave History\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Payroll\",\n        \"heading\": \"Payroll & Compensation\",\n        \"subModules\": [\n          {\n            \"name\": \"Salary Structure\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true\n          },\n          {\n            \"name\": \"Payroll Processing\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"approve\": true,\n            \"reject\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Salary Adjustments\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true\n          },\n          {\n            \"name\": \"Deductions\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true\n          },\n          {\n            \"name\": \"Payslips\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Payroll History\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Approvals\",\n        \"heading\": \"Approvals\",\n        \"subModules\": [\n          {\n            \"name\": \"Pending Requests\",\n            \"view\": true,\n            \"approve\": true,\n            \"reject\": true,\n            \"export\": true,\n            \"upload\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"WFH Requests\",\n            \"view\": true,\n            \"create\": true,\n            \"approve\": true,\n            \"reject\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Permission Requests\",\n            \"view\": true,\n            \"create\": true,\n            \"approve\": true,\n            \"reject\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Request History\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Organization\",\n        \"heading\": \"Organization\",\n        \"subModules\": [\n          {\n            \"name\": \"Departments\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Designations\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Teams\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"assign\": true\n          },\n          {\n            \"name\": \"Team Chat\",\n            \"view\": true,\n            \"create\": true,\n            \"share\": true\n          },\n          {\n            \"name\": \"Mail\",\n            \"view\": true,\n            \"create\": true,\n            \"email\": true\n          },\n          {\n            \"name\": \"Branches / Locations\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Reporting Structure\",\n            \"view\": true,\n            \"edit\": true,\n            \"assign\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Masters\",\n        \"heading\": \"Masters\",\n        \"subModules\": [\n          {\n            \"name\": \"Department\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Designation\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Division\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Employee Group\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Grade\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Job Role\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Gender\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Marital Status\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Blood Group\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Branch\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Shift\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Course Type\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Course Level\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Bank Name\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Relation\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Nominate For\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Visa Type\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Language\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Regularization Reason\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          },\n          {\n            \"name\": \"Mark Attendance Reason\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Work\",\n        \"heading\": \"Work Schedule\",\n        \"subModules\": [\n          {\n            \"name\": \"Weekly Off\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Reports\",\n        \"heading\": \"Reports & Analytics\",\n        \"subModules\": [\n          {\n            \"name\": \"Employee Reports\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Attendance Reports\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Leave Reports\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Break Reports\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Overtime Reports\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          },\n          {\n            \"name\": \"Payroll Reports\",\n            \"view\": true,\n            \"download\": true,\n            \"export\": true,\n            \"print\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Communication\",\n        \"heading\": \"Communication\",\n        \"subModules\": [\n          {\n            \"name\": \"Announcements\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"share\": true\n          },\n          {\n            \"name\": \"Notifications\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Company Circulars\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"share\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Administration\",\n        \"heading\": \"Administration\",\n        \"subModules\": [\n          {\n            \"name\": \"Access & Control\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"download\": true,\n            \"export\": true,\n            \"import\": true,\n            \"upload\": true,\n            \"email\": true,\n            \"assign\": true\n          },\n          {\n            \"name\": \"Roles & Permissions\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true,\n            \"export\": true\n          },\n          {\n            \"name\": \"System Configuration\",\n            \"view\": true,\n            \"edit\": true\n          },\n          {\n            \"name\": \"Hierarchy\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Holiday\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true,\n            \"delete\": true\n          }\n        ]\n      }\n    ]\n  }\n}"
-            }
-          ]
-        },
-        {
-          "name": "8. Login (Employee)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
             "url": {
               "raw": "{{baseUrl}}/api/auth/login",
               "host": [
@@ -716,7 +365,36 @@
                 "login"
               ]
             },
-            "description": "Login as **Employee**. Saves {{token}} (sent as Bearer on every request) and {{myId}}. Also sets httpOnly cookie `token`.\n\n**This request:** `employee@techculture.ai` / `TC00515012005` — Employee — also `TC005` or `9876500002`.\n\n### One login field: `username`\nBody has **only two keys** — `username` and `password`. Send employee code, email or mobile in the **same** `username` field; the server detects which one it is:\n\n| `username` value | Matched against | Example |\n| --- | --- | --- |\n| contains `@` | `official.officialEmail` **or** `personal.personalEmail` (case-insensitive) | `employee@techculture.ai` |\n| 10-digit number (`+91`, leading `0`, spaces, `-` allowed) | `personal.mobileNo` | `9876500002`, `+91 98765 00002` |\n| anything else | `official.employeeCode` (case-insensitive) | `TC005`, `tc005` |\n\n**Body examples**\n```json\n{ \"username\": \"TC005\", \"password\": \"TC00515012005\" }\n{ \"username\": \"employee@techculture.ai\", \"password\": \"TC00515012005\" }\n{ \"username\": \"9876500002\", \"password\": \"TC00515012005\" }\n{ \"username\": \"superadmin@gmail.com\", \"password\": \"123456\" }\n```\n\n### Seed logins (`npm run seed`)\nStaff password = **employee code + DOB `ddmmyyyy`** (common DOB 2005-01-15 → `15012005`). Super Admin / Admin = `123456`.\n\n| Role | Email | Code | Mobile | Password |\n| --- | --- | --- | --- | --- |\n| Super Admin | superadmin@gmail.com | — | — | 123456 |\n| Admin | admin@gmail.com | — | — | 123456 |\n| HR Manager | anupama@techculture.ai | TC001 | 9876500100 | TC00115012005 |\n| Reporting Manager | manav@techculture.ai | TC002 | 9876500201 | TC00215012005 |\n| Reporting Manager | manoj@techculture.ai | TC003 | 9876500202 | TC00315012005 |\n| Employee (Permanent) | shivangi@techculture.ai | TC004 | 9876500001 | TC00415012005 |\n| Employee (Probation) | employee@techculture.ai | TC005 | 9876500002 | TC00515012005 |\n| Employee (Probation) | vivek@techculture.ai | TC006 | 9876500003 | TC00615012005 |\n| Employee (Permanent) | ananya@techculture.ai | TC007 | 9876500004 | TC00715012005 |\n\n### Responses\n- **200** — `{ message, token, tokenExpiresAt, tokenExpiresIn, user: { id, name, officialEmail, role, department, companies[], status, lastLogin, permissionCount, ... } }`\n- **401** — `{ \"message\": \"Invalid username or password\" }` (unknown username **or** wrong password — same message on purpose)\n- **400** — `username` / `password` missing, or any extra key. Old bodies with `officialEmail` / `personalEmail` / `employeeCode` / `login` are **rejected** → rename the key to `username`.\n\nSee the saved **Examples** (top-right of the request) for each payload variant and its response.\n\n**Use local after seed:** collection {{baseUrl}} = `http://localhost:9001` and choose **No Environment** (an environment baseUrl overrides the collection one and may point at old Render).\n\n---\n### Parameters (type + how to send)\n**Body (JSON raw)** — `Content-Type: application/json`\n- `username` — string | required | employee code OR official email OR personal email OR mobile number (auto-detected)\n- `password` — string | required | staff = code + DOB `ddmmyyyy` (e.g. `TC00515012005`) · platform = `123456`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---",
+            "description": "Login as **Reporting Manager**. Saves {{token}} (Bearer for every request) and {{myId}}.\n\nSeed: `manav@techculture.ai` / `TC002` / `9876500201` / password `TC00215012005`.\n\nBody: **`username`** + **`password`** only.\n`username` = employee code / official email / personal email / mobile (auto-detected).\n\n**Use local after seed:** collection {{baseUrl}} = `http://localhost:9001` and **No Environment**.\n\n---\n### Parameters (type + how to send)\n**Body (JSON raw)** — `Content-Type: application/json`\n- `username` — string | required | employee code OR email OR mobile\n- `password` — string | required | staff = code + DOB `15012005`; Super Admin / Admin = `123456`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---"
+          },
+          "response": []
+        },
+        {
+          "name": "8. Login (Employee)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.token) pm.collectionVariables.set('token', j.token);",
+                  "if (j.user && j.user.id) pm.collectionVariables.set('myId', j.user.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"employee@techculture.ai\",\n  \"password\": \"TC00515012005\"\n}",
@@ -726,301 +404,20 @@
                 }
               }
             },
-            "auth": {
-              "type": "noauth"
-            }
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Login as **Employee**. Saves {{token}} (Bearer for every request) and {{myId}}.\n\nSeed: `employee@techculture.ai` / `TC005` / `9876500002` / password `TC00515012005`.\n\nBody: **`username`** + **`password`** only.\n`username` = employee code / official email / personal email / mobile (auto-detected).\n\n**Use local after seed:** collection {{baseUrl}} = `http://localhost:9001` and **No Environment**.\n\n---\n### Parameters (type + how to send)\n**Body (JSON raw)** — `Content-Type: application/json`\n- `username` — string | required | employee code OR email OR mobile\n- `password` — string | required | staff = code + DOB `15012005`; Super Admin / Admin = `123456`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---"
           },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "const j = pm.response.json();",
-                  "if (j.token) pm.collectionVariables.set('token', j.token);",
-                  "if (j.user && j.user.id) pm.collectionVariables.set('myId', j.user.id);"
-                ]
-              }
-            }
-          ],
-          "response": [
-            {
-              "name": "200 – Employee by email",
-              "originalRequest": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "url": {
-                  "raw": "{{baseUrl}}/api/auth/login",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "auth",
-                    "login"
-                  ]
-                },
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"username\": \"employee@techculture.ai\",\n  \"password\": \"TC00515012005\"\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                },
-                "auth": {
-                  "type": "noauth"
-                }
-              },
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json; charset=utf-8"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n  \"message\": \"Login successful\",\n  \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.<payload>.<signature>\",\n  \"tokenExpiresAt\": \"2026-10-29T11:14:59.000Z\",\n  \"tokenExpiresIn\": \"7d\",\n  \"user\": {\n    \"id\": \"6ad9e9aa10e5dd00f576f36c\",\n    \"name\": \"Employee\",\n    \"officialEmail\": \"employee@techculture.ai\",\n    \"role\": \"Employee\",\n    \"department\": \"Engineering\",\n    \"allCompanies\": false,\n    \"companies\": [\n      {\n        \"_id\": \"6ad9e98a10e5dd00f576f35b\",\n        \"companyName\": \"TechCulture.Ai Private Limited\"\n      }\n    ],\n    \"status\": \"Active\",\n    \"lastLogin\": \"2026-10-22T11:14:59.000Z\",\n    \"permissionCount\": \"62 of 62\",\n    \"permissions\": [\n      {\n        \"module\": \"Dashboard\",\n        \"heading\": \"\",\n        \"subModules\": [\n          {\n            \"name\": \"My Home\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Attendance Summary\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Leave Summary\",\n            \"view\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Self\",\n        \"heading\": \"\",\n        \"subModules\": [\n          {\n            \"name\": \"General Info\",\n            \"view\": true,\n            \"edit\": true\n          },\n          {\n            \"name\": \"Time Sheet\",\n            \"view\": true,\n            \"create\": true\n          },\n          {\n            \"name\": \"Regularize Attendance\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Leave\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Holiday\",\n            \"view\": true\n          },\n          {\n            \"name\": \"My Web Punches\",\n            \"view\": true\n          },\n          {\n            \"name\": \"On Tour/On Duty Entries\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Additional Request\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Offboarding\",\n            \"view\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Team\",\n        \"heading\": \"\",\n        \"subModules\": [\n          {\n            \"name\": \"Team Dashboard\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Team Request\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Team Chat\",\n            \"view\": true,\n            \"create\": true,\n            \"share\": true\n          },\n          {\n            \"name\": \"Mail\",\n            \"view\": true,\n            \"create\": true,\n            \"email\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Request\",\n        \"heading\": \"\",\n        \"subModules\": [\n          {\n            \"name\": \"Employee Details\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Attendance\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Web Punches\",\n            \"view\": true\n          },\n          {\n            \"name\": \"On Tour/On Duty\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"On Tour Cancellation\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Leave Applied\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Leave Cancellation\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Additional Request\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Offboarding Request\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Trip Tracking\",\n            \"view\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Tasks\",\n        \"heading\": \"\",\n        \"subModules\": [\n          {\n            \"name\": \"Dashboard\",\n            \"view\": true,\n            \"create\": true\n          },\n          {\n            \"name\": \"To Do Tasks\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true\n          },\n          {\n            \"name\": \"Task Sheet\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true\n          }\n        ]\n      }\n    ]\n  }\n}"
-            },
-            {
-              "name": "200 – by employee code (TC005)",
-              "originalRequest": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "url": {
-                  "raw": "{{baseUrl}}/api/auth/login",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "auth",
-                    "login"
-                  ]
-                },
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"username\": \"TC005\",\n  \"password\": \"TC00515012005\"\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                },
-                "auth": {
-                  "type": "noauth"
-                }
-              },
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json; charset=utf-8"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n  \"message\": \"Login successful\",\n  \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.<payload>.<signature>\",\n  \"tokenExpiresAt\": \"2026-10-29T11:15:00.000Z\",\n  \"tokenExpiresIn\": \"7d\",\n  \"user\": {\n    \"id\": \"6ad9e9aa10e5dd00f576f36c\",\n    \"name\": \"Employee\",\n    \"officialEmail\": \"employee@techculture.ai\",\n    \"role\": \"Employee\",\n    \"department\": \"Engineering\",\n    \"allCompanies\": false,\n    \"companies\": [\n      {\n        \"_id\": \"6ad9e98a10e5dd00f576f35b\",\n        \"companyName\": \"TechCulture.Ai Private Limited\"\n      }\n    ],\n    \"status\": \"Active\",\n    \"lastLogin\": \"2026-10-22T11:15:00.000Z\",\n    \"permissionCount\": \"62 of 62\",\n    \"permissions\": [\n      {\n        \"module\": \"Dashboard\",\n        \"heading\": \"\",\n        \"subModules\": [\n          {\n            \"name\": \"My Home\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Attendance Summary\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Leave Summary\",\n            \"view\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Self\",\n        \"heading\": \"\",\n        \"subModules\": [\n          {\n            \"name\": \"General Info\",\n            \"view\": true,\n            \"edit\": true\n          },\n          {\n            \"name\": \"Time Sheet\",\n            \"view\": true,\n            \"create\": true\n          },\n          {\n            \"name\": \"Regularize Attendance\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Leave\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Holiday\",\n            \"view\": true\n          },\n          {\n            \"name\": \"My Web Punches\",\n            \"view\": true\n          },\n          {\n            \"name\": \"On Tour/On Duty Entries\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Additional Request\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Offboarding\",\n            \"view\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Team\",\n        \"heading\": \"\",\n        \"subModules\": [\n          {\n            \"name\": \"Team Dashboard\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Team Request\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Team Chat\",\n            \"view\": true,\n            \"create\": true,\n            \"share\": true\n          },\n          {\n            \"name\": \"Mail\",\n            \"view\": true,\n            \"create\": true,\n            \"email\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Request\",\n        \"heading\": \"\",\n        \"subModules\": [\n          {\n            \"name\": \"Employee Details\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Attendance\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Web Punches\",\n            \"view\": true\n          },\n          {\n            \"name\": \"On Tour/On Duty\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"On Tour Cancellation\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Leave Applied\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Leave Cancellation\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Additional Request\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Offboarding Request\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Trip Tracking\",\n            \"view\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Tasks\",\n        \"heading\": \"\",\n        \"subModules\": [\n          {\n            \"name\": \"Dashboard\",\n            \"view\": true,\n            \"create\": true\n          },\n          {\n            \"name\": \"To Do Tasks\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true\n          },\n          {\n            \"name\": \"Task Sheet\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true\n          }\n        ]\n      }\n    ]\n  }\n}"
-            },
-            {
-              "name": "200 – by mobile (9876500002)",
-              "originalRequest": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "url": {
-                  "raw": "{{baseUrl}}/api/auth/login",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "auth",
-                    "login"
-                  ]
-                },
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"username\": \"9876500002\",\n  \"password\": \"TC00515012005\"\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                },
-                "auth": {
-                  "type": "noauth"
-                }
-              },
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json; charset=utf-8"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n  \"message\": \"Login successful\",\n  \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.<payload>.<signature>\",\n  \"tokenExpiresAt\": \"2026-10-29T11:15:00.000Z\",\n  \"tokenExpiresIn\": \"7d\",\n  \"user\": {\n    \"id\": \"6ad9e9aa10e5dd00f576f36c\",\n    \"name\": \"Employee\",\n    \"officialEmail\": \"employee@techculture.ai\",\n    \"role\": \"Employee\",\n    \"department\": \"Engineering\",\n    \"allCompanies\": false,\n    \"companies\": [\n      {\n        \"_id\": \"6ad9e98a10e5dd00f576f35b\",\n        \"companyName\": \"TechCulture.Ai Private Limited\"\n      }\n    ],\n    \"status\": \"Active\",\n    \"lastLogin\": \"2026-10-22T11:15:00.000Z\",\n    \"permissionCount\": \"62 of 62\",\n    \"permissions\": [\n      {\n        \"module\": \"Dashboard\",\n        \"heading\": \"\",\n        \"subModules\": [\n          {\n            \"name\": \"My Home\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Attendance Summary\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Leave Summary\",\n            \"view\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Self\",\n        \"heading\": \"\",\n        \"subModules\": [\n          {\n            \"name\": \"General Info\",\n            \"view\": true,\n            \"edit\": true\n          },\n          {\n            \"name\": \"Time Sheet\",\n            \"view\": true,\n            \"create\": true\n          },\n          {\n            \"name\": \"Regularize Attendance\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Leave\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Holiday\",\n            \"view\": true\n          },\n          {\n            \"name\": \"My Web Punches\",\n            \"view\": true\n          },\n          {\n            \"name\": \"On Tour/On Duty Entries\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Additional Request\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Offboarding\",\n            \"view\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Team\",\n        \"heading\": \"\",\n        \"subModules\": [\n          {\n            \"name\": \"Team Dashboard\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Team Request\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Team Chat\",\n            \"view\": true,\n            \"create\": true,\n            \"share\": true\n          },\n          {\n            \"name\": \"Mail\",\n            \"view\": true,\n            \"create\": true,\n            \"email\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Request\",\n        \"heading\": \"\",\n        \"subModules\": [\n          {\n            \"name\": \"Employee Details\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Attendance\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Web Punches\",\n            \"view\": true\n          },\n          {\n            \"name\": \"On Tour/On Duty\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"On Tour Cancellation\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Leave Applied\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Leave Cancellation\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Additional Request\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Offboarding Request\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Trip Tracking\",\n            \"view\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Tasks\",\n        \"heading\": \"\",\n        \"subModules\": [\n          {\n            \"name\": \"Dashboard\",\n            \"view\": true,\n            \"create\": true\n          },\n          {\n            \"name\": \"To Do Tasks\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true\n          },\n          {\n            \"name\": \"Task Sheet\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true\n          }\n        ]\n      }\n    ]\n  }\n}"
-            },
-            {
-              "name": "401 – wrong password",
-              "originalRequest": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "url": {
-                  "raw": "{{baseUrl}}/api/auth/login",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "auth",
-                    "login"
-                  ]
-                },
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"username\": \"TC005\",\n  \"password\": \"wrongpass\"\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                },
-                "auth": {
-                  "type": "noauth"
-                }
-              },
-              "status": "Unauthorized",
-              "code": 401,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json; charset=utf-8"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n  \"message\": \"Invalid username or password\"\n}"
-            },
-            {
-              "name": "400 – old officialEmail key",
-              "originalRequest": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "url": {
-                  "raw": "{{baseUrl}}/api/auth/login",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "auth",
-                    "login"
-                  ]
-                },
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"officialEmail\": \"TC004\",\n  \"password\": \"TC00415012005\"\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                },
-                "auth": {
-                  "type": "noauth"
-                }
-              },
-              "status": "429",
-              "code": 429,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json; charset=utf-8"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n  \"message\": \"Too many login attempts. Please try again later.\"\n}"
-            },
-            {
-              "name": "400 – username missing",
-              "originalRequest": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "url": {
-                  "raw": "{{baseUrl}}/api/auth/login",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "auth",
-                    "login"
-                  ]
-                },
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"password\": \"123456\"\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                },
-                "auth": {
-                  "type": "noauth"
-                }
-              },
-              "status": "429",
-              "code": 429,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json; charset=utf-8"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n  \"message\": \"Too many login attempts. Please try again later.\"\n}"
-            }
-          ]
+          "response": []
         },
         {
           "name": "9. Get My Profile (basic)",
@@ -9131,7 +8528,7 @@
     },
     {
       "name": "2. EMPLOYEE (ESS)",
-      "description": "Employee self-service. Start with **2.1 My Profile → 1. Login (Employee)** — `username` = `employee@techculture.ai` / `TC005` / `9876500002`, password `TC00515012005`.\n\nOwn ID card: **2.1 My Profile → Get My ID Card** (`GET /api/employees/me/id-card`).\n\nUse local baseUrl after `npm run seed`. Switch back to **0. Login & My Account** (admin login) before using **1. ADMIN**.\n\n**Module notes:** Employee self-service. Login as Employee first (`username`: `TC005` / email / mobile). ID card: `GET /api/employees/me/id-card` (own only).",
+      "description": "Employee self-service. Start with **2.1 My Profile → 1. Login (Employee)** — `username` = `employee@techculture.ai` / `TC005` / mobile, password `TC00515012005`.\nOwn ID card: **Get My ID Card**.\nUse local baseUrl after seed. Switch back to **0. Login** (Super Admin) before **1. ADMIN**.",
       "item": [
         {
           "name": "2.1 My Profile",
@@ -9162,7 +8559,7 @@
                         "login"
                       ]
                     },
-                    "description": "Login as **Employee**. Saves {{token}} (sent as Bearer on every request) and {{myId}}. Also sets httpOnly cookie `token`.\n\n**This request:** `employee@techculture.ai` / `TC00515012005` — Employee — also `TC005` or `9876500002`.\n\n### One login field: `username`\nBody has **only two keys** — `username` and `password`. Send employee code, email or mobile in the **same** `username` field; the server detects which one it is:\n\n| `username` value | Matched against | Example |\n| --- | --- | --- |\n| contains `@` | `official.officialEmail` **or** `personal.personalEmail` (case-insensitive) | `employee@techculture.ai` |\n| 10-digit number (`+91`, leading `0`, spaces, `-` allowed) | `personal.mobileNo` | `9876500002`, `+91 98765 00002` |\n| anything else | `official.employeeCode` (case-insensitive) | `TC005`, `tc005` |\n\n**Body examples**\n```json\n{ \"username\": \"TC005\", \"password\": \"TC00515012005\" }\n{ \"username\": \"employee@techculture.ai\", \"password\": \"TC00515012005\" }\n{ \"username\": \"9876500002\", \"password\": \"TC00515012005\" }\n{ \"username\": \"superadmin@gmail.com\", \"password\": \"123456\" }\n```\n\n### Seed logins (`npm run seed`)\nStaff password = **employee code + DOB `ddmmyyyy`** (common DOB 2005-01-15 → `15012005`). Super Admin / Admin = `123456`.\n\n| Role | Email | Code | Mobile | Password |\n| --- | --- | --- | --- | --- |\n| Super Admin | superadmin@gmail.com | — | — | 123456 |\n| Admin | admin@gmail.com | — | — | 123456 |\n| HR Manager | anupama@techculture.ai | TC001 | 9876500100 | TC00115012005 |\n| Reporting Manager | manav@techculture.ai | TC002 | 9876500201 | TC00215012005 |\n| Reporting Manager | manoj@techculture.ai | TC003 | 9876500202 | TC00315012005 |\n| Employee (Permanent) | shivangi@techculture.ai | TC004 | 9876500001 | TC00415012005 |\n| Employee (Probation) | employee@techculture.ai | TC005 | 9876500002 | TC00515012005 |\n| Employee (Probation) | vivek@techculture.ai | TC006 | 9876500003 | TC00615012005 |\n| Employee (Permanent) | ananya@techculture.ai | TC007 | 9876500004 | TC00715012005 |\n\n### Responses\n- **200** — `{ message, token, tokenExpiresAt, tokenExpiresIn, user: { id, name, officialEmail, role, department, companies[], status, lastLogin, permissionCount, ... } }`\n- **401** — `{ \"message\": \"Invalid username or password\" }` (unknown username **or** wrong password — same message on purpose)\n- **400** — `username` / `password` missing, or any extra key. Old bodies with `officialEmail` / `personalEmail` / `employeeCode` / `login` are **rejected** → rename the key to `username`.\n\nSee the saved **Examples** (top-right of the request) for each payload variant and its response.\n\n**Use local after seed:** collection {{baseUrl}} = `http://localhost:9001` and choose **No Environment** (an environment baseUrl overrides the collection one and may point at old Render).\n\n---\n### Parameters (type + how to send)\n**Body (JSON raw)** — `Content-Type: application/json`\n- `username` — string | required | employee code OR official email OR personal email OR mobile number (auto-detected)\n- `password` — string | required | staff = code + DOB `ddmmyyyy` (e.g. `TC00515012005`) · platform = `123456`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---",
+                    "description": "Login as **Employee**. Saves {{token}} (Bearer for every request) and {{myId}}.\n\nSeed: `employee@techculture.ai` / `TC005` / `9876500002` / password `TC00515012005`.\n\nBody: **`username`** + **`password`** only.\n`username` = employee code / official email / personal email / mobile (auto-detected).\n\n**Use local after seed:** collection {{baseUrl}} = `http://localhost:9001` and **No Environment**.\n\n---\n### Parameters (type + how to send)\n**Body (JSON raw)** — `Content-Type: application/json`\n- `username` — string | required | employee code OR email OR mobile\n- `password` — string | required | staff = code + DOB `15012005`; Super Admin / Admin = `123456`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---",
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"username\": \"employee@techculture.ai\",\n  \"password\": \"TC00515012005\"\n}",
@@ -9189,284 +8586,7 @@
                       }
                     }
                   ],
-                  "response": [
-                    {
-                      "name": "200 – Employee by email",
-                      "originalRequest": {
-                        "method": "POST",
-                        "header": [
-                          {
-                            "key": "Content-Type",
-                            "value": "application/json"
-                          }
-                        ],
-                        "url": {
-                          "raw": "{{baseUrl}}/api/auth/login",
-                          "host": [
-                            "{{baseUrl}}"
-                          ],
-                          "path": [
-                            "api",
-                            "auth",
-                            "login"
-                          ]
-                        },
-                        "body": {
-                          "mode": "raw",
-                          "raw": "{\n  \"username\": \"employee@techculture.ai\",\n  \"password\": \"TC00515012005\"\n}",
-                          "options": {
-                            "raw": {
-                              "language": "json"
-                            }
-                          }
-                        },
-                        "auth": {
-                          "type": "noauth"
-                        }
-                      },
-                      "status": "OK",
-                      "code": 200,
-                      "_postman_previewlanguage": "json",
-                      "header": [
-                        {
-                          "key": "Content-Type",
-                          "value": "application/json; charset=utf-8"
-                        }
-                      ],
-                      "cookie": [],
-                      "body": "{\n  \"message\": \"Login successful\",\n  \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.<payload>.<signature>\",\n  \"tokenExpiresAt\": \"2026-10-29T11:14:59.000Z\",\n  \"tokenExpiresIn\": \"7d\",\n  \"user\": {\n    \"id\": \"6ad9e9aa10e5dd00f576f36c\",\n    \"name\": \"Employee\",\n    \"officialEmail\": \"employee@techculture.ai\",\n    \"role\": \"Employee\",\n    \"department\": \"Engineering\",\n    \"allCompanies\": false,\n    \"companies\": [\n      {\n        \"_id\": \"6ad9e98a10e5dd00f576f35b\",\n        \"companyName\": \"TechCulture.Ai Private Limited\"\n      }\n    ],\n    \"status\": \"Active\",\n    \"lastLogin\": \"2026-10-22T11:14:59.000Z\",\n    \"permissionCount\": \"62 of 62\",\n    \"permissions\": [\n      {\n        \"module\": \"Dashboard\",\n        \"heading\": \"\",\n        \"subModules\": [\n          {\n            \"name\": \"My Home\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Attendance Summary\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Leave Summary\",\n            \"view\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Self\",\n        \"heading\": \"\",\n        \"subModules\": [\n          {\n            \"name\": \"General Info\",\n            \"view\": true,\n            \"edit\": true\n          },\n          {\n            \"name\": \"Time Sheet\",\n            \"view\": true,\n            \"create\": true\n          },\n          {\n            \"name\": \"Regularize Attendance\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Leave\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Holiday\",\n            \"view\": true\n          },\n          {\n            \"name\": \"My Web Punches\",\n            \"view\": true\n          },\n          {\n            \"name\": \"On Tour/On Duty Entries\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Additional Request\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Offboarding\",\n            \"view\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Team\",\n        \"heading\": \"\",\n        \"subModules\": [\n          {\n            \"name\": \"Team Dashboard\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Team Request\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Team Chat\",\n            \"view\": true,\n            \"create\": true,\n            \"share\": true\n          },\n          {\n            \"name\": \"Mail\",\n            \"view\": true,\n            \"create\": true,\n            \"email\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Request\",\n        \"heading\": \"\",\n        \"subModules\": [\n          {\n            \"name\": \"Employee Details\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Attendance\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Web Punches\",\n            \"view\": true\n          },\n          {\n            \"name\": \"On Tour/On Duty\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"On Tour Cancellation\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Leave Applied\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Leave Cancellation\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Additional Request\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Offboarding Request\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Trip Tracking\",\n            \"view\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Tasks\",\n        \"heading\": \"\",\n        \"subModules\": [\n          {\n            \"name\": \"Dashboard\",\n            \"view\": true,\n            \"create\": true\n          },\n          {\n            \"name\": \"To Do Tasks\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true\n          },\n          {\n            \"name\": \"Task Sheet\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true\n          }\n        ]\n      }\n    ]\n  }\n}"
-                    },
-                    {
-                      "name": "200 – by employee code (TC005)",
-                      "originalRequest": {
-                        "method": "POST",
-                        "header": [
-                          {
-                            "key": "Content-Type",
-                            "value": "application/json"
-                          }
-                        ],
-                        "url": {
-                          "raw": "{{baseUrl}}/api/auth/login",
-                          "host": [
-                            "{{baseUrl}}"
-                          ],
-                          "path": [
-                            "api",
-                            "auth",
-                            "login"
-                          ]
-                        },
-                        "body": {
-                          "mode": "raw",
-                          "raw": "{\n  \"username\": \"TC005\",\n  \"password\": \"TC00515012005\"\n}",
-                          "options": {
-                            "raw": {
-                              "language": "json"
-                            }
-                          }
-                        },
-                        "auth": {
-                          "type": "noauth"
-                        }
-                      },
-                      "status": "OK",
-                      "code": 200,
-                      "_postman_previewlanguage": "json",
-                      "header": [
-                        {
-                          "key": "Content-Type",
-                          "value": "application/json; charset=utf-8"
-                        }
-                      ],
-                      "cookie": [],
-                      "body": "{\n  \"message\": \"Login successful\",\n  \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.<payload>.<signature>\",\n  \"tokenExpiresAt\": \"2026-10-29T11:15:00.000Z\",\n  \"tokenExpiresIn\": \"7d\",\n  \"user\": {\n    \"id\": \"6ad9e9aa10e5dd00f576f36c\",\n    \"name\": \"Employee\",\n    \"officialEmail\": \"employee@techculture.ai\",\n    \"role\": \"Employee\",\n    \"department\": \"Engineering\",\n    \"allCompanies\": false,\n    \"companies\": [\n      {\n        \"_id\": \"6ad9e98a10e5dd00f576f35b\",\n        \"companyName\": \"TechCulture.Ai Private Limited\"\n      }\n    ],\n    \"status\": \"Active\",\n    \"lastLogin\": \"2026-10-22T11:15:00.000Z\",\n    \"permissionCount\": \"62 of 62\",\n    \"permissions\": [\n      {\n        \"module\": \"Dashboard\",\n        \"heading\": \"\",\n        \"subModules\": [\n          {\n            \"name\": \"My Home\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Attendance Summary\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Leave Summary\",\n            \"view\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Self\",\n        \"heading\": \"\",\n        \"subModules\": [\n          {\n            \"name\": \"General Info\",\n            \"view\": true,\n            \"edit\": true\n          },\n          {\n            \"name\": \"Time Sheet\",\n            \"view\": true,\n            \"create\": true\n          },\n          {\n            \"name\": \"Regularize Attendance\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Leave\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Holiday\",\n            \"view\": true\n          },\n          {\n            \"name\": \"My Web Punches\",\n            \"view\": true\n          },\n          {\n            \"name\": \"On Tour/On Duty Entries\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Additional Request\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Offboarding\",\n            \"view\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Team\",\n        \"heading\": \"\",\n        \"subModules\": [\n          {\n            \"name\": \"Team Dashboard\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Team Request\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Team Chat\",\n            \"view\": true,\n            \"create\": true,\n            \"share\": true\n          },\n          {\n            \"name\": \"Mail\",\n            \"view\": true,\n            \"create\": true,\n            \"email\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Request\",\n        \"heading\": \"\",\n        \"subModules\": [\n          {\n            \"name\": \"Employee Details\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Attendance\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Web Punches\",\n            \"view\": true\n          },\n          {\n            \"name\": \"On Tour/On Duty\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"On Tour Cancellation\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Leave Applied\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Leave Cancellation\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Additional Request\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Offboarding Request\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Trip Tracking\",\n            \"view\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Tasks\",\n        \"heading\": \"\",\n        \"subModules\": [\n          {\n            \"name\": \"Dashboard\",\n            \"view\": true,\n            \"create\": true\n          },\n          {\n            \"name\": \"To Do Tasks\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true\n          },\n          {\n            \"name\": \"Task Sheet\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true\n          }\n        ]\n      }\n    ]\n  }\n}"
-                    },
-                    {
-                      "name": "200 – by mobile (9876500002)",
-                      "originalRequest": {
-                        "method": "POST",
-                        "header": [
-                          {
-                            "key": "Content-Type",
-                            "value": "application/json"
-                          }
-                        ],
-                        "url": {
-                          "raw": "{{baseUrl}}/api/auth/login",
-                          "host": [
-                            "{{baseUrl}}"
-                          ],
-                          "path": [
-                            "api",
-                            "auth",
-                            "login"
-                          ]
-                        },
-                        "body": {
-                          "mode": "raw",
-                          "raw": "{\n  \"username\": \"9876500002\",\n  \"password\": \"TC00515012005\"\n}",
-                          "options": {
-                            "raw": {
-                              "language": "json"
-                            }
-                          }
-                        },
-                        "auth": {
-                          "type": "noauth"
-                        }
-                      },
-                      "status": "OK",
-                      "code": 200,
-                      "_postman_previewlanguage": "json",
-                      "header": [
-                        {
-                          "key": "Content-Type",
-                          "value": "application/json; charset=utf-8"
-                        }
-                      ],
-                      "cookie": [],
-                      "body": "{\n  \"message\": \"Login successful\",\n  \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.<payload>.<signature>\",\n  \"tokenExpiresAt\": \"2026-10-29T11:15:00.000Z\",\n  \"tokenExpiresIn\": \"7d\",\n  \"user\": {\n    \"id\": \"6ad9e9aa10e5dd00f576f36c\",\n    \"name\": \"Employee\",\n    \"officialEmail\": \"employee@techculture.ai\",\n    \"role\": \"Employee\",\n    \"department\": \"Engineering\",\n    \"allCompanies\": false,\n    \"companies\": [\n      {\n        \"_id\": \"6ad9e98a10e5dd00f576f35b\",\n        \"companyName\": \"TechCulture.Ai Private Limited\"\n      }\n    ],\n    \"status\": \"Active\",\n    \"lastLogin\": \"2026-10-22T11:15:00.000Z\",\n    \"permissionCount\": \"62 of 62\",\n    \"permissions\": [\n      {\n        \"module\": \"Dashboard\",\n        \"heading\": \"\",\n        \"subModules\": [\n          {\n            \"name\": \"My Home\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Attendance Summary\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Leave Summary\",\n            \"view\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Self\",\n        \"heading\": \"\",\n        \"subModules\": [\n          {\n            \"name\": \"General Info\",\n            \"view\": true,\n            \"edit\": true\n          },\n          {\n            \"name\": \"Time Sheet\",\n            \"view\": true,\n            \"create\": true\n          },\n          {\n            \"name\": \"Regularize Attendance\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Leave\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Holiday\",\n            \"view\": true\n          },\n          {\n            \"name\": \"My Web Punches\",\n            \"view\": true\n          },\n          {\n            \"name\": \"On Tour/On Duty Entries\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Additional Request\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Offboarding\",\n            \"view\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Team\",\n        \"heading\": \"\",\n        \"subModules\": [\n          {\n            \"name\": \"Team Dashboard\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Team Request\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Team Chat\",\n            \"view\": true,\n            \"create\": true,\n            \"share\": true\n          },\n          {\n            \"name\": \"Mail\",\n            \"view\": true,\n            \"create\": true,\n            \"email\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Request\",\n        \"heading\": \"\",\n        \"subModules\": [\n          {\n            \"name\": \"Employee Details\",\n            \"view\": true\n          },\n          {\n            \"name\": \"Attendance\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Web Punches\",\n            \"view\": true\n          },\n          {\n            \"name\": \"On Tour/On Duty\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"On Tour Cancellation\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Leave Applied\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Leave Cancellation\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Additional Request\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Offboarding Request\",\n            \"view\": true,\n            \"create\": true,\n            \"cancel\": true\n          },\n          {\n            \"name\": \"Trip Tracking\",\n            \"view\": true\n          }\n        ]\n      },\n      {\n        \"module\": \"Tasks\",\n        \"heading\": \"\",\n        \"subModules\": [\n          {\n            \"name\": \"Dashboard\",\n            \"view\": true,\n            \"create\": true\n          },\n          {\n            \"name\": \"To Do Tasks\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true\n          },\n          {\n            \"name\": \"Task Sheet\",\n            \"view\": true,\n            \"create\": true,\n            \"edit\": true\n          }\n        ]\n      }\n    ]\n  }\n}"
-                    },
-                    {
-                      "name": "401 – wrong password",
-                      "originalRequest": {
-                        "method": "POST",
-                        "header": [
-                          {
-                            "key": "Content-Type",
-                            "value": "application/json"
-                          }
-                        ],
-                        "url": {
-                          "raw": "{{baseUrl}}/api/auth/login",
-                          "host": [
-                            "{{baseUrl}}"
-                          ],
-                          "path": [
-                            "api",
-                            "auth",
-                            "login"
-                          ]
-                        },
-                        "body": {
-                          "mode": "raw",
-                          "raw": "{\n  \"username\": \"TC005\",\n  \"password\": \"wrongpass\"\n}",
-                          "options": {
-                            "raw": {
-                              "language": "json"
-                            }
-                          }
-                        },
-                        "auth": {
-                          "type": "noauth"
-                        }
-                      },
-                      "status": "Unauthorized",
-                      "code": 401,
-                      "_postman_previewlanguage": "json",
-                      "header": [
-                        {
-                          "key": "Content-Type",
-                          "value": "application/json; charset=utf-8"
-                        }
-                      ],
-                      "cookie": [],
-                      "body": "{\n  \"message\": \"Invalid username or password\"\n}"
-                    },
-                    {
-                      "name": "400 – old officialEmail key",
-                      "originalRequest": {
-                        "method": "POST",
-                        "header": [
-                          {
-                            "key": "Content-Type",
-                            "value": "application/json"
-                          }
-                        ],
-                        "url": {
-                          "raw": "{{baseUrl}}/api/auth/login",
-                          "host": [
-                            "{{baseUrl}}"
-                          ],
-                          "path": [
-                            "api",
-                            "auth",
-                            "login"
-                          ]
-                        },
-                        "body": {
-                          "mode": "raw",
-                          "raw": "{\n  \"officialEmail\": \"TC004\",\n  \"password\": \"TC00415012005\"\n}",
-                          "options": {
-                            "raw": {
-                              "language": "json"
-                            }
-                          }
-                        },
-                        "auth": {
-                          "type": "noauth"
-                        }
-                      },
-                      "status": "429",
-                      "code": 429,
-                      "_postman_previewlanguage": "json",
-                      "header": [
-                        {
-                          "key": "Content-Type",
-                          "value": "application/json; charset=utf-8"
-                        }
-                      ],
-                      "cookie": [],
-                      "body": "{\n  \"message\": \"Too many login attempts. Please try again later.\"\n}"
-                    },
-                    {
-                      "name": "400 – username missing",
-                      "originalRequest": {
-                        "method": "POST",
-                        "header": [
-                          {
-                            "key": "Content-Type",
-                            "value": "application/json"
-                          }
-                        ],
-                        "url": {
-                          "raw": "{{baseUrl}}/api/auth/login",
-                          "host": [
-                            "{{baseUrl}}"
-                          ],
-                          "path": [
-                            "api",
-                            "auth",
-                            "login"
-                          ]
-                        },
-                        "body": {
-                          "mode": "raw",
-                          "raw": "{\n  \"password\": \"123456\"\n}",
-                          "options": {
-                            "raw": {
-                              "language": "json"
-                            }
-                          }
-                        },
-                        "auth": {
-                          "type": "noauth"
-                        }
-                      },
-                      "status": "429",
-                      "code": 429,
-                      "_postman_previewlanguage": "json",
-                      "header": [
-                        {
-                          "key": "Content-Type",
-                          "value": "application/json; charset=utf-8"
-                        }
-                      ],
-                      "cookie": [],
-                      "body": "{\n  \"message\": \"Too many login attempts. Please try again later.\"\n}"
-                    }
-                  ]
+                  "response": []
                 },
                 {
                   "name": "2. Get My Profile",

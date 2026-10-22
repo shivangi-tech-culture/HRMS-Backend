@@ -629,7 +629,7 @@ function enrichRequest(item) {
 /** Folder-level docs (modules) — enums + how fields are used */
 const FOLDER_DOCS = {
   "0. Login & My Account":
-    "Auth + profile. Login body = `{ username, password }` only — `username` is employee code / official or personal email / mobile (auto-detected). Login returns `token` (store in DB as single session). GET /token-status → `isExpired` / `isReplaced`. Logout clears cookie + DB token.",
+    "Auth + profile. Login returns `token` (store in DB as single session). GET /token-status → `isExpired` / `isReplaced`. Logout clears cookie + DB token.",
   "1. ADMIN":
     "Admin catalog. Scope: Super Admin/Admin = all · HR = assigned companies · Reporting Manager = team.",
   "1.2 Masters":
@@ -643,7 +643,7 @@ const FOLDER_DOCS = {
   "1.10 Break":
     "Live board, overage Pending review, Day Break grants, policies. Policy minutes are live (e.g. Lunch 30→45).",
   "2. EMPLOYEE (ESS)":
-    "Employee self-service. Login as Employee first (`username`: `TC005` / email / mobile). ID card: `GET /api/employees/me/id-card` (own only).",
+    "Employee self-service. Login as Employee first.",
   "2.2 Attendance (Punch)":
     "Punch in/out, todayTime ACTIVE/IDLE/BREAK, timesheet, regularize, On Tour/On Duty.",
   "2.4 Leave":
