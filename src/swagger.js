@@ -330,6 +330,7 @@ module.exports = swaggerJsdoc({
             panNo: { type: "string", example: "ABCDE1234F", description: "Unique when set" },
             gender: { type: "string", example: "Female" },
             fatherOrHusbandName: { type: "string", example: "Ramesh Iyer" },
+            motherName: { type: "string", example: "Sita Iyer" },
             maritalStatus: { type: "string", example: "Single" },
             spouseName: { type: "string" },
             anniversaryDate: {

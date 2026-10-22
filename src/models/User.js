@@ -70,6 +70,8 @@ const userSchema = new mongoose.Schema(
       panNo: { type: String, default: "" },
       gender: { type: String, default: "" },
       fatherOrHusbandName: { type: String, default: "" },
+      /** Mother's name */
+      motherName: { type: String, default: "" },
       maritalStatus: { type: String, default: "" },
       spouseName: { type: String, default: "" },
       /**
