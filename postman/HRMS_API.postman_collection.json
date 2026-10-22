@@ -7742,7 +7742,7 @@
                     {
                       "key": "status",
                       "value": "all",
-                      "description": "string | optional | all, on_break, at_desk, overdue"
+                      "description": "string | optional | all | on_break | at_desk | overdue | exceeded"
                     },
                     {
                       "key": "companyId",
@@ -7762,7 +7762,7 @@
                     }
                   ]
                 },
-                "description": "## GET /api/break/live\n\nPunched-in people today. Query: `status`=all\\|on_break\\|at_desk\\|overdue, search, department, shiftId, page, limit.\n\n| Field | Use |\n|-------|-----|\n| `date` | Board date. |\n| `counts` | Tab badges: all, onBreak, atDesk, overdue. |\n| `data[].employee` | Name, code, avatar. |\n| `data[].department` / `shift` | Filters / columns. |\n| `data[].status` | At Desk \\| On Break \\| Overdue (live). |\n| `data[].break` | Open session only: type, startedAt, minutes, allowedMinutes, status, approvalStatus. |\n| `data[].today` | `minutes` + `breaks[]` timeline for the day. |"
+                "description": "GET /api/break/live\nPunched-in today. Live status: On Break | At Desk | Overdue (open past allowed).\n\nQuery status: all | on_break | at_desk | overdue | exceeded\n- exceeded = people who ended at least one break past allowed today (today.breaks[].status=Exceeded)\n\nResponse counts: all, onBreak, atDesk, overdue, exceeded\nstatuses: filter keys for UI tabs\ntoday.breaks[]: status Completed|Exceeded|On Break|Overdue + overMinutes when exceeded"
               },
               "event": [
                 {
@@ -7821,7 +7821,8 @@
                     {
                       "key": "status",
                       "value": "all",
-                      "description": "string | optional | all, completed, pending, approved, rejected"
+                      "description": "string | optional | all | completed | exceeded | pending | idle | approved | rejected",
+                      "disabled": false
                     },
                     {
                       "key": "from",
@@ -7847,7 +7848,7 @@
                     }
                   ]
                 },
-                "description": "## GET /api/break/history\n\nTaken breaks + Day Break requests (not yet Used). Newest first.\n\nQuery: status=all\\|completed\\|pending\\|idle\\|approved\\|rejected, breakType, from, to, search, page, limit.\n\n| Field | Use |\n|-------|-----|\n| `type` | `break` = taken session. `day_break` = grant request row. |\n| `status` | Break/lifecycle: Completed, Idle (approved not started), Pending, Rejected. |\n| `approvalStatus` | Idle \\| Pending \\| Approved \\| Rejected — **stored on break model** for sessions. |\n| `approval` | Log object (never omit): status, by{name}, at, atLabel, note, requestedAt, waitMinutes. Idle when no trail. |\n| `breakType` / times / `minutes` | Display columns. Empty times on day_break until started. |\n| `canReview` | true only for Pending day_break the actor may approve. |\n| `employee` / `department` / `shift` | Table columns. |"
+                "description": "GET /api/break/history\nTaken breaks + Day Break requests. Newest first.\n\nQuery status: all | completed | exceeded | pending | idle | approved | rejected\n- completed = ended within allowed\n- exceeded = ended past allowed (overMinutes set)\n- pending / idle = Day Break grant (waiting RM / approved not started)\n\nResponse: statuses[], counts{all,completed,exceeded,pending,idle,approved,rejected}, data[]\nEach break row: status + approvalStatus + approval{by,at,waitMinutes} + overMinutes if exceeded"
               }
             },
             {
