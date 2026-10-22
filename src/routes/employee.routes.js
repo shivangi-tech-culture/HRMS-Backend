@@ -479,10 +479,15 @@ router.delete(
  * /api/employees/me/id-card:
  *   get:
  *     tags: [Employee / ESS]
- *     summary: My ID card (Employee self)
+ *     summary: My virtual ID card (Employee self)
  *     description: |
- *       Same as `GET /api/employees/{id}/id-card` for the logged-in employee.
- *       Use this from ESS — no need to pass your own id.
+ *       Own virtual ID card. Same flat object as `GET /api/employees/{id}/id-card`.
+ *       The id comes from the token — do not pass one.
+ *
+ *       **How it works:** `employeeType` is calculated from date of joining
+ *       (Probation for 3 company months, then Permanent). `hrName` and
+ *       `hrSignatureUrl` come from the HR who created this employee.
+ *       No signature on that HR → 400.
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -507,14 +512,25 @@ router.get(
  * /api/employees/{id}/id-card:
  *   get:
  *     tags: [Admin / Employees, Employee / ESS]
- *     summary: Employee ID card (Admin or own)
+ *     summary: Virtual ID card (Admin or own)
  *     description: |
- *       Flat ID-card payload. **One API for both sides:**
- *       - **Employee ESS:** only own `:id` (or use `GET /api/employees/me/id-card`)
- *       - **Admin / HR / Reporting Manager:** any employee in company / team scope
+ *       One flat object for the virtual ID card. Same payload for admin and employee.
+ *
+ *       **Who**
+ *       - Super Admin / Admin — any employee
+ *       - HR Manager — assigned companies
+ *       - Reporting Manager — own team
+ *       - Employee — own `:id` only, or `GET /api/employees/me/id-card`. Another id → 403
+ *
+ *       **How it works**
+ *       - `employeeType` is not stored. Date of joining → Probation for 3 company
+ *         months (that company's month start day), then Permanent. No joining date
+ *         → `official.employeeGroup` when it is already Permanent or Probation.
+ *       - `hrName` and `hrSignatureUrl` come from the user who created the employee.
+ *         That HR must have uploaded a signature, or the API returns 400.
  *
  *       **Fields:** `employeeId`, `name`, `profileUrl`, `employeeCode`,
- *       `dateOfBirth`, `bloodGroup`, `mobileNo`, `employeeType`,
+ *       `dateOfBirth`, `dateOfJoining`, `bloodGroup`, `mobileNo`, `employeeType`,
  *       `department`, `designation`, `hrName`, `hrSignatureUrl`
  *     security:
  *       - bearerAuth: []

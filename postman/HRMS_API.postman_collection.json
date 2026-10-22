@@ -1,4 +1,4 @@
-﻿{
+{
   "info": {
     "_postman_id": "e76ef156-bb7e-4bd7-b543-75856b8a760e",
     "name": "HRMS ALL APIs",
@@ -4997,10 +4997,10 @@
                     "users"
                   ]
                 },
-                "description": "POST /api/users. Saves {{userId}}.\n`role`: Employee | Reporting Manager | HR Manager | Admin.\nAdmin: send only officialEmail / employeeCode / department in `official` (no company, branch, shift).\nEmployee / Reporting Manager: exactly one company id. HR: one or more.\nCompany / branch / shift / manager ids are auto-filled from GET /api/companies when empty.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `name` — string | required/optional | display / full name (min 2)\n- `password` — string | required (min 6) | plain password; blank on update = keep\n- `role` — string | required on create | `Admin` | `HR Manager` | `Reporting Manager` | `Employee` | custom role name\n- `status` — string | optional | `Active` or `Inactive`\n- `official.officialEmail` — string (email) | required on create | work login email\n- `official.employeeCode` — string | optional | blank = auto `{companyCode}{NNNN}`; or send e.g. `TC001` (or blank on create to auto-generate)\n- `official.companyIds` — string[] (MongoId) | required | array of Company `_id`s ({{companyOrgId}}). Employee and Reporting Manager: exactly one id. HR: one or more. Only Super Admin may send more than one\n- `official.department` — string | often required | department master name\n- `official.branchId` — string (MongoId) | optional | Branch `_id` from GET /api/companies/{id} â†’ branches[].branchId._id. Create / Get / Update response returns `{ _id, name, code, address, city, state }`\n- `official.shiftId` — string (MongoId) | optional | Shift `_id` from GET /api/companies/{id} â†’ branches[].shifts[].shiftId._id. Needs branchId. Create / Get / Update response returns `{ _id, name, code, monthlySchedule }` — week 1â€“5 day timings of this shift on the user's company branch\n- `personal.mobileNo` — string | optional | 10-digit mobile digits only\n- `personal.presentAddress.city` — string | optional | free text\n- `personal.presentAddress.state` — string | optional | free text\n- `personal.presentAddress.country` — string | optional | free text\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                "description": "POST /api/users. Saves {{userId}}.\n`role`: Employee | Reporting Manager | HR Manager | Admin.\nAdmin: send only officialEmail / employeeCode / department in `official` (no company, branch, shift).\nEmployee / Reporting Manager: exactly one company id. HR: one or more.\nCompany / branch / shift / manager ids are auto-filled from GET /api/companies when empty.\n`personal.dateOfBirth` is **required**. Frontend builds staff password as `{employeeCode}` + DOB `ddmmyyyy` (e.g. `TC001` + `15012005` → `TC00115012005`).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `name` — string | required/optional | display / full name (min 2)\n- `password` — string | required (min 6) | plain password; staff = empCode + DOB `ddmmyyyy`\n- `role` — string | required on create | `Admin` | `HR Manager` | `Reporting Manager` | `Employee` | custom role name\n- `status` — string | optional | `Active` or `Inactive`\n- `official.officialEmail` — string (email) | required on create | work login email\n- `official.employeeCode` — string | optional | blank = auto `{companyCode}{NNNN}`; or send e.g. `TC001` (or blank on create to auto-generate)\n- `official.companyIds` — string[] (MongoId) | required | array of Company `_id`s ({{companyOrgId}}). Employee and Reporting Manager: exactly one id. HR: one or more. Only Super Admin may send more than one\n- `official.department` — string | often required | department master name\n- `official.branchId` — string (MongoId) | optional | Branch `_id` from GET /api/companies/{id} â†’ branches[].branchId._id. Create / Get / Update response returns `{ _id, name, code, address, city, state }`\n- `official.shiftId` — string (MongoId) | optional | Shift `_id` from GET /api/companies/{id} â†’ branches[].shifts[].shiftId._id. Needs branchId. Create / Get / Update response returns `{ _id, name, code, monthlySchedule }` — week 1â€“5 day timings of this shift on the user's company branch\n- `personal.dateOfBirth` — string/date (YYYY-MM-DD) | **required** | used by frontend with empCode to build password\n- `personal.mobileNo` — string | optional | 10-digit mobile digits only\n- `personal.presentAddress.city` — string | optional | free text\n- `personal.presentAddress.state` — string | optional | free text\n- `personal.presentAddress.country` — string | optional | free text\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"name\": \"New User\",\n  \"password\": \"{{password}}\",\n  \"role\": \"Employee\",\n  \"status\": \"Active\",\n  \"official\": {\n    \"officialEmail\": \"user{{rndNo}}@test.com\",\n    \"employeeCode\": \"TC{{rndNo}}\",\n    \"companyIds\": [\n      \"{{companyId}}\"\n    ],\n    \"department\": \"Finance\",\n    \"branchId\": \"{{branchId}}\",\n    \"shiftId\": \"{{shiftId}}\"\n  },\n  \"personal\": {\n    \"mobileNo\": \"{{rndMobile}}\",\n    \"presentAddress\": {\n      \"city\": \"Noida\",\n      \"state\": \"Uttar Pradesh\",\n      \"country\": \"India\"\n    },\n    \"bloodGroup\": \"B+\"\n  }\n}",
+                  "raw": "{\n  \"name\": \"New User\",\n  \"password\": \"{{password}}\",\n  \"role\": \"Employee\",\n  \"status\": \"Active\",\n  \"official\": {\n    \"officialEmail\": \"user{{rndNo}}@test.com\",\n    \"employeeCode\": \"TC{{rndNo}}\",\n    \"companyIds\": [\n      \"{{companyId}}\"\n    ],\n    \"department\": \"Finance\",\n    \"branchId\": \"{{branchId}}\",\n    \"shiftId\": \"{{shiftId}}\"\n  },\n  \"personal\": {\n    \"dateOfBirth\": \"1995-06-15\",\n    \"mobileNo\": \"{{rndMobile}}\",\n    \"presentAddress\": {\n      \"city\": \"Noida\",\n      \"state\": \"Uttar Pradesh\",\n      \"country\": \"India\"\n    }\n  }\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -5230,10 +5230,10 @@
                     "{{userId}}"
                   ]
                 },
-                "description": "PUT /api/users/{{userId}} — send only what changes. `password: \"\"` keeps the old password. Official email cannot change.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `userId` â†’ {{userId}} — string (MongoId / id) | set collection variable after create/list\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `name` — string | required/optional | display / full name (min 2)\n- `password` — string | required (min 6) | plain password; blank on update = keep\n- `role` — string | required on create | `Admin` | `HR Manager` | `Reporting Manager` | `Employee` | custom role name\n- `status` — string | optional | `Active` or `Inactive`\n- `official.employeeCode` — string | optional | blank = auto `{companyCode}{NNNN}`; or send e.g. `TC001` (or blank on create to auto-generate)\n- `official.companyIds` — string[] (MongoId) | required | array of Company `_id`s ({{companyOrgId}}). Employee and Reporting Manager: exactly one id. HR: one or more. Only Super Admin may send more than one\n- `official.department` — string | often required | department master name\n- `official.branchId` — string (MongoId) | optional | Branch `_id` from GET /api/companies/{id} â†’ branches[].branchId._id. Create / Get / Update response returns `{ _id, name, code, address, city, state }`\n- `official.shiftId` — string (MongoId) | optional | Shift `_id` from GET /api/companies/{id} â†’ branches[].shifts[].shiftId._id. Needs branchId. Create / Get / Update response returns `{ _id, name, code, monthlySchedule }` — week 1â€“5 day timings of this shift on the user's company branch\n- `personal.mobileNo` — string | optional | 10-digit mobile digits only\n- `personal.presentAddress.city` — string | optional | free text\n- `personal.presentAddress.state` — string | optional | free text\n- `personal.presentAddress.country` — string | optional | free text\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                "description": "PUT /api/users/{{userId}} — send only what changes. `password: \"\"` keeps the old password. Official email cannot change.\n`personal.dateOfBirth` optional on edit (required on create for empCode + DOB password combo).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `userId` â†’ {{userId}} — string (MongoId / id) | set collection variable after create/list\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `name` — string | required/optional | display / full name (min 2)\n- `password` — string | required (min 6) | plain password; blank on update = keep\n- `role` — string | required on create | `Admin` | `HR Manager` | `Reporting Manager` | `Employee` | custom role name\n- `status` — string | optional | `Active` or `Inactive`\n- `official.employeeCode` — string | optional | blank = auto `{companyCode}{NNNN}`; or send e.g. `TC001` (or blank on create to auto-generate)\n- `official.companyIds` — string[] (MongoId) | required | array of Company `_id`s ({{companyOrgId}}). Employee and Reporting Manager: exactly one id. HR: one or more. Only Super Admin may send more than one\n- `official.department` — string | often required | department master name\n- `official.branchId` — string (MongoId) | optional | Branch `_id` from GET /api/companies/{id} â†’ branches[].branchId._id. Create / Get / Update response returns `{ _id, name, code, address, city, state }`\n- `official.shiftId` — string (MongoId) | optional | Shift `_id` from GET /api/companies/{id} â†’ branches[].shifts[].shiftId._id. Needs branchId. Create / Get / Update response returns `{ _id, name, code, monthlySchedule }` — week 1â€“5 day timings of this shift on the user's company branch\n- `personal.dateOfBirth` — string/date (YYYY-MM-DD) | optional on update | DOB for password combo with empCode\n- `personal.mobileNo` — string | optional | 10-digit mobile digits only\n- `personal.presentAddress.city` — string | optional | free text\n- `personal.presentAddress.state` — string | optional | free text\n- `personal.presentAddress.country` — string | optional | free text\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"name\": \"Updated User\",\n  \"password\": \"\",\n  \"role\": \"Employee\",\n  \"status\": \"Active\",\n  \"official\": {\n    \"employeeCode\": \"TC{{rndNo}}\",\n    \"companyIds\": [\n      \"{{companyId}}\"\n    ],\n    \"department\": \"Administration\",\n    \"branchId\": \"{{branchId}}\",\n    \"shiftId\": \"{{shiftId}}\"\n  },\n  \"personal\": {\n    \"mobileNo\": \"{{rndMobile}}\",\n    \"presentAddress\": {\n      \"city\": \"Noida\",\n      \"state\": \"Uttar Pradesh\",\n      \"country\": \"India\"\n    },\n    \"bloodGroup\": \"B+\"\n  }\n}",
+                  "raw": "{\n  \"name\": \"Updated User\",\n  \"password\": \"\",\n  \"role\": \"Employee\",\n  \"status\": \"Active\",\n  \"official\": {\n    \"employeeCode\": \"TC{{rndNo}}\",\n    \"companyIds\": [\n      \"{{companyId}}\"\n    ],\n    \"department\": \"Administration\",\n    \"branchId\": \"{{branchId}}\",\n    \"shiftId\": \"{{shiftId}}\"\n  },\n  \"personal\": {\n    \"dateOfBirth\": \"1995-06-15\",\n    \"mobileNo\": \"{{rndMobile}}\",\n    \"presentAddress\": {\n      \"city\": \"Noida\",\n      \"state\": \"Uttar Pradesh\",\n      \"country\": \"India\"\n    }\n  }\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -5475,7 +5475,7 @@
         },
         {
           "name": "1.5 Employees",
-          "description": "Full employee profile (personal, official, education, bank, family, nominees, experience, visas, payroll).\n\n**Add Employee flow**\n1. Select company → **Next Employee Code** (`GET /api/employees/next-code?companyId=`)\n2. **Create Employee** — leave `official.employeeCode` `\"\"` so the server assigns the next `{companyCode}{NNNN}` for that company only.\n3. Or send your own unique code.\n\nSeed company code TC → codes TC001… after seed next is TC005.",
+          "description": "Full employee profile (personal, official, education, bank, family, nominees, experience, visas, payroll).\n\n**Add Employee flow**\n1. Select company → **Next Employee Code** (`GET /api/employees/next-code?companyId=`)\n2. **Create Employee** — leave `official.employeeCode` `\"\"` so the server assigns the next `{companyCode}{NNNN}` for that company only.\n3. Or send your own unique code.\n\nSeed company code TC → codes TC001… after seed the next code is TC008.",
           "item": [
             {
               "name": "Next Employee Code",
@@ -5496,85 +5496,19 @@
                     {
                       "key": "companyId",
                       "value": "{{companyId}}",
-                      "description": "Company selected on the Add Employee page. Or send companyCode (e.g. TC) instead."
+                      "description": "string (MongoId 24-hex) | tick this OR companyCode. Company selected on Add Employee."
+                    },
+                    {
+                      "key": "companyCode",
+                      "value": "TC",
+                      "disabled": true,
+                      "description": "string | optional | e.g. TC. Untick companyId and tick this when you have the code, not the id."
                     }
                   ]
                 },
-                "description": "GET /api/employees/next-code — preview the **next employee code** on the **Add Employee** page, right after a company is selected.\n\n**How codes work**\n- Format: `companyCode` + **3-digit** running number → `TC001`, `TC002` … `TC999`, then `TC1000`.\n- Each company has its **own** sequence (company `TC` and another company `AB` both start at `001`).\n- This call does **not** reserve the number — safe to call again while the form is being filled.\n- On **POST /api/employees** leave `official.employeeCode` blank (`\"\"` or omit) → the server assigns the next code at save time. A code you type yourself is kept as-is.\n- After `npm run seed` (TC001–TC007 used) the next code is **`TC008`**.\n\n**Who:** Super Admin, Admin, HR Manager (Reporting Manager / others need Employee → create permission).\n\n**Errors**\n- 400 — neither `companyId` nor `companyCode` sent\n- 404 — company not found / inactive\n- 403 — HR / manager asking for a company outside their scope\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params**\n- `companyId` — string (MongoId 24-hex) | company selected on the add page. Send this **or** `companyCode`\n- `companyCode` — string | optional | e.g. `TC` when `companyId` is not available\n\n**Response 200**\n```json\n{ \"companyId\": \"…\", \"companyName\": \"TechCulture.Ai Private Limited\", \"companyCode\": \"TC\", \"sequence\": 8, \"employeeCode\": \"TC008\" }\n```\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---"
+                "description": "GET /api/employees/next-code — **one request**. Preview the next employee code on Add Employee, after a company is selected.\n\nTick **one** option in Params (not both):\n- `companyId` = `{{companyId}}` — company selected on the page (on by default)\n- `companyCode` = `TC` — use this when you have the code, not the id. Untick `companyId`, tick `companyCode`.\n\n### How it works\n- Format: company code + 3-digit number → `TC001`, `TC002` … `TC999`, then `TC1000`.\n- Each company has its own sequence. `TC` and `AB` both start at `001`.\n- This call does **not** reserve the number. Safe to call again while the form is open.\n- **Create Employee:** leave `official.employeeCode` blank (`\"\"` or omit). The server assigns the next code when you save. A code you type is kept.\n- After seed (TC001–TC007 already used) the next code is **TC008**.\n\n**Who:** Super Admin, Admin, HR Manager (needs Employee → create).\n\n**Errors:** 400 if both params are empty · 404 company not found or inactive · 403 company is outside your scope.\n\n**Response 200**\n```json\n{\n  \"companyId\": \"6ad9e98a10e5dd00f576f35b\",\n  \"companyName\": \"TechCulture.Ai Private Limited\",\n  \"companyCode\": \"TC\",\n  \"sequence\": 8,\n  \"employeeCode\": \"TC008\"\n}\n```\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Query params** *(Params tab — tick one)*\n- `companyId` — string (MongoId 24-hex) | company selected on the add page\n- `companyCode` — string | e.g. `TC` when `companyId` is not sent\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
               },
-              "response": [
-                {
-                  "name": "200 – by companyId",
-                  "originalRequest": {
-                    "method": "GET",
-                    "header": [],
-                    "url": {
-                      "raw": "{{baseUrl}}/api/employees/next-code?companyId={{companyId}}",
-                      "host": [
-                        "{{baseUrl}}"
-                      ],
-                      "path": [
-                        "api",
-                        "employees",
-                        "next-code"
-                      ],
-                      "query": [
-                        {
-                          "key": "companyId",
-                          "value": "{{companyId}}",
-                          "description": "Company selected on the Add Employee page. Or send companyCode (e.g. TC) instead."
-                        }
-                      ]
-                    }
-                  },
-                  "status": "OK",
-                  "code": 200,
-                  "_postman_previewlanguage": "json",
-                  "header": [
-                    {
-                      "key": "Content-Type",
-                      "value": "application/json; charset=utf-8"
-                    }
-                  ],
-                  "cookie": [],
-                  "body": "{\n  \"companyId\": \"6ad9e98a10e5dd00f576f35b\",\n  \"companyName\": \"TechCulture.Ai Private Limited\",\n  \"companyCode\": \"TC\",\n  \"sequence\": 8,\n  \"employeeCode\": \"TC008\"\n}"
-                },
-                {
-                  "name": "200 – by companyCode=TC",
-                  "originalRequest": {
-                    "method": "GET",
-                    "header": [],
-                    "url": {
-                      "raw": "{{baseUrl}}/api/employees/next-code?companyCode=TC",
-                      "host": [
-                        "{{baseUrl}}"
-                      ],
-                      "path": [
-                        "api",
-                        "employees",
-                        "next-code"
-                      ],
-                      "query": [
-                        {
-                          "key": "companyCode",
-                          "value": "TC"
-                        }
-                      ]
-                    }
-                  },
-                  "status": "OK",
-                  "code": 200,
-                  "_postman_previewlanguage": "json",
-                  "header": [
-                    {
-                      "key": "Content-Type",
-                      "value": "application/json; charset=utf-8"
-                    }
-                  ],
-                  "cookie": [],
-                  "body": "{\n  \"companyId\": \"6ad9e98a10e5dd00f576f35b\",\n  \"companyName\": \"TechCulture.Ai Private Limited\",\n  \"companyCode\": \"TC\",\n  \"sequence\": 8,\n  \"employeeCode\": \"TC008\"\n}"
-                }
-              ]
+              "response": []
             },
             {
               "name": "1. Create Employee",
@@ -5749,100 +5683,9 @@
                     "id-card"
                   ]
                 },
-                "description": "GET /api/employees/{{employeeId}}/id-card — **one flat object** with everything the ID card needs (no nested / repeated data).\n\n**Who can call (same API for admin and employee)**\n- **Super Admin / Admin** — any employee\n- **HR Manager** — employees of assigned companies\n- **Reporting Manager** — own team\n- **Employee** — only own `_id`; another person's id → **403** `You can only generate / view your own ID card`. Shortcut without id: `GET /api/employees/me/id-card` (2. EMPLOYEE → 2.1 My Profile).\n\n**Response fields**\n| Field | Meaning |\n| --- | --- |\n| `employeeId` | employee `_id` |\n| `name` | full name |\n| `profileUrl` | profile photo URL (Cloudinary) |\n| `employeeCode` | e.g. `TC005` |\n| `dateOfBirth` | `YYYY-MM-DD` |\n| `dateOfJoining` | `YYYY-MM-DD` |\n| `bloodGroup` | e.g. `B+` |\n| `mobileNo` | personal mobile |\n| `employeeType` | **auto** from DOJ: `Probation` until ~3 months after joining, then `Permanent` (no manual update needed) |\n| `department` / `designation` | names (not ids) |\n| `hrName` / `hrSignatureUrl` | HR who created the employee + their uploaded signature |\n\n**Errors:** 403 out of scope / not own card · 404 employee not found · 400 creating HR unknown or HR signature not uploaded.\n\nSeed check: `TC005` / `TC006` → `Probation` (joined on seed day); `TC004` / `TC007` → `Permanent` (joined 4 months earlier).\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `employeeId` → {{employeeId}} — string (MongoId 24-hex) | from List Employees / Create Employee. Employee may also use `me`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---"
+                "description": "GET /api/employees/{{employeeId}}/id-card — **Virtual ID card**. One request. Do not add a separate call for Permanent, Probation, or the 403 case — pick an option below and Send.\n\n### What this feature does\nReturns one flat JSON object the ID card screen prints: photo, name, code, dates, blood group, mobile, department, designation, Permanent or Probation, and the creating HR's name plus signature. No nested profile and no repeated blocks.\n\n### How it works\n1. Log in first. Every call sends `Authorization: Bearer {{token}}`.\n2. Set `{{employeeId}}` to the person whose card you want (**2. List Employees** or **1. Create Employee**). An employee may send `me` instead of an id.\n3. The server builds the card. Nothing here is typed by the caller:\n   - **employeeType** is calculated from date of joining. **Probation** until 3 company months after joining (uses that company's month start day), then **Permanent**. If date of joining is missing, it uses `official.employeeGroup` when that value is already Permanent or Probation.\n   - **HR stamp** is the user who created the employee (`createdBy`, otherwise the first create activity). Their name → `hrName`. Their uploaded signature → `hrSignatureUrl`.\n4. The card is returned only when that HR has a signature. Otherwise **400**. Fix it with **7a. Upload HR Signature**, then **7a2. Save HR SignatureUrl**.\n\n### Who can open a card\n- **Super Admin / Admin** — any employee\n- **HR Manager** — employees of assigned companies\n- **Reporting Manager** — own team only\n- **Employee** — only their own `_id`. Another person's id → **403** `You can only generate / view your own ID card`. Own card with no id: **2. EMPLOYEE → 2.1 My Profile → 2b. Get My ID Card** (`GET /api/employees/me/id-card`).\n\n### Options (this same request)\n| Option | What to set | Result |\n| --- | --- | --- |\n| Permanent | `{{employeeId}}` = Shivangi **TC004** (seed joining date is 4 months back). Ananya **TC007** is the same. | 200, `employeeType`: `Permanent` |\n| Probation | `{{employeeId}}` = **TC005** (`employee@techculture.ai`) or Vivek **TC006** (seed joining date is the seed day). | 200, `employeeType`: `Probation` |\n| Own card | Employee login, then **2b. Get My ID Card**. Seed TC005 → Probation. | 200 for the logged-in person |\n| Not your card | Employee token + someone else's `{{employeeId}}` on this URL. | 403 |\n\n### Response fields\n| Field | Meaning |\n| --- | --- |\n| `employeeId` | employee `_id` |\n| `name` | full name |\n| `profileUrl` | profile photo URL (Cloudinary) |\n| `employeeCode` | e.g. `TC004` |\n| `dateOfBirth` | `YYYY-MM-DD` |\n| `dateOfJoining` | `YYYY-MM-DD` — used only to decide Permanent or Probation |\n| `bloodGroup` | e.g. `A+` |\n| `mobileNo` | personal mobile |\n| `employeeType` | `Permanent` or `Probation` (auto) |\n| `department` / `designation` | names, not ids |\n| `hrName` / `hrSignatureUrl` | creating HR and their signature image |\n\n### Sample 200 — Permanent (TC004, Shivangi)\n```json\n{\n  \"employeeId\": \"6ad9e9a610e5dd00f576f36a\",\n  \"name\": \"Shivangi\",\n  \"profileUrl\": \"https://res.cloudinary.com/z5fmkizc/image/upload/v1792665355/hrms/profile/seed-profile-shivangi.svg\",\n  \"employeeCode\": \"TC004\",\n  \"dateOfBirth\": \"2005-01-15\",\n  \"dateOfJoining\": \"2026-06-22\",\n  \"bloodGroup\": \"A+\",\n  \"mobileNo\": \"9876500001\",\n  \"employeeType\": \"Permanent\",\n  \"department\": \"Engineering\",\n  \"designation\": \"Software Engineer\",\n  \"hrName\": \"Anupama\",\n  \"hrSignatureUrl\": \"https://res.cloudinary.com/z5fmkizc/image/upload/v1792665341/hrms/signature/seed-sign-anupama.svg\"\n}\n```\n\n### Sample 200 — Probation (TC005)\n```json\n{\n  \"employeeId\": \"<TC005 _id from List Employees>\",\n  \"name\": \"Employee\",\n  \"profileUrl\": \"\",\n  \"employeeCode\": \"TC005\",\n  \"dateOfBirth\": \"2005-01-15\",\n  \"dateOfJoining\": \"2026-10-22\",\n  \"bloodGroup\": \"B+\",\n  \"mobileNo\": \"9876500002\",\n  \"employeeType\": \"Probation\",\n  \"department\": \"Engineering\",\n  \"designation\": \"Software Engineer\",\n  \"hrName\": \"Anupama\",\n  \"hrSignatureUrl\": \"https://res.cloudinary.com/z5fmkizc/image/upload/v1792665341/hrms/signature/seed-sign-anupama.svg\"\n}\n```\n\n### Errors\n- **400** — creating HR is unknown, or that HR has not uploaded a signature\n- **403** — employee opened another person's card, or HR / manager is outside company or team scope\n- **404** — employee not found\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `employeeId` → {{employeeId}} — string (MongoId 24-hex) | whose card to print. From List Employees / Create Employee. An employee may send `me`.\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
               },
-              "response": [
-                {
-                  "name": "200 – TC004 (Permanent)",
-                  "originalRequest": {
-                    "method": "GET",
-                    "header": [],
-                    "url": {
-                      "raw": "{{baseUrl}}/api/employees/{{employeeId}}/id-card",
-                      "host": [
-                        "{{baseUrl}}"
-                      ],
-                      "path": [
-                        "api",
-                        "employees",
-                        "{{employeeId}}",
-                        "id-card"
-                      ]
-                    }
-                  },
-                  "status": "OK",
-                  "code": 200,
-                  "_postman_previewlanguage": "json",
-                  "header": [
-                    {
-                      "key": "Content-Type",
-                      "value": "application/json; charset=utf-8"
-                    }
-                  ],
-                  "cookie": [],
-                  "body": "{\n  \"employeeId\": \"6ad9e9a610e5dd00f576f36a\",\n  \"name\": \"Shivangi\",\n  \"profileUrl\": \"https://res.cloudinary.com/z5fmkizc/image/upload/v1792665355/hrms/profile/seed-profile-shivangi.svg\",\n  \"employeeCode\": \"TC004\",\n  \"dateOfBirth\": \"2005-01-15\",\n  \"dateOfJoining\": \"2026-06-22\",\n  \"bloodGroup\": \"A+\",\n  \"mobileNo\": \"9876500001\",\n  \"employeeType\": \"Permanent\",\n  \"department\": \"Engineering\",\n  \"designation\": \"Software Engineer\",\n  \"hrName\": \"Anupama\",\n  \"hrSignatureUrl\": \"https://res.cloudinary.com/z5fmkizc/image/upload/v1792665341/hrms/signature/seed-sign-anupama.svg\"\n}"
-                },
-                {
-                  "name": "200 – TC005 (Probation)",
-                  "originalRequest": {
-                    "method": "GET",
-                    "header": [],
-                    "url": {
-                      "raw": "{{baseUrl}}/api/employees/{{employeeId}}/id-card",
-                      "host": [
-                        "{{baseUrl}}"
-                      ],
-                      "path": [
-                        "api",
-                        "employees",
-                        "{{employeeId}}",
-                        "id-card"
-                      ]
-                    }
-                  },
-                  "status": "Unauthorized",
-                  "code": 401,
-                  "_postman_previewlanguage": "json",
-                  "header": [
-                    {
-                      "key": "Content-Type",
-                      "value": "application/json; charset=utf-8"
-                    }
-                  ],
-                  "cookie": [],
-                  "body": "{\n  \"message\": \"Logged in from another device\",\n  \"code\": \"SESSION_REPLACED\"\n}"
-                },
-                {
-                  "name": "403 – Employee opening another employee's card",
-                  "originalRequest": {
-                    "method": "GET",
-                    "header": [],
-                    "url": {
-                      "raw": "{{baseUrl}}/api/employees/{{employeeId}}/id-card",
-                      "host": [
-                        "{{baseUrl}}"
-                      ],
-                      "path": [
-                        "api",
-                        "employees",
-                        "{{employeeId}}",
-                        "id-card"
-                      ]
-                    }
-                  },
-                  "status": "Unauthorized",
-                  "code": 401,
-                  "_postman_previewlanguage": "json",
-                  "header": [
-                    {
-                      "key": "Content-Type",
-                      "value": "application/json; charset=utf-8"
-                    }
-                  ],
-                  "cookie": [],
-                  "body": "{\n  \"message\": \"Logged in from another device\",\n  \"code\": \"SESSION_REPLACED\"\n}"
-                }
-              ]
+              "response": []
             },
             {
               "name": "4. Update Employee",
@@ -8624,40 +8467,9 @@
                         "id-card"
                       ]
                     },
-                    "description": "GET /api/employees/me/id-card — ESS: generate / view **own** ID card. No id needed — taken from the token.\n\nSame response as admin **1.5 Employees → Get Employee ID Card**. `GET /api/employees/{{myId}}/id-card` also works; any other employee's id → **403**.\n\n**Response fields**\n| Field | Meaning |\n| --- | --- |\n| `employeeId` | employee `_id` |\n| `name` | full name |\n| `profileUrl` | profile photo URL (Cloudinary) |\n| `employeeCode` | e.g. `TC005` |\n| `dateOfBirth` | `YYYY-MM-DD` |\n| `dateOfJoining` | `YYYY-MM-DD` |\n| `bloodGroup` | e.g. `B+` |\n| `mobileNo` | personal mobile |\n| `employeeType` | **auto** from DOJ: `Probation` until ~3 months after joining, then `Permanent` (no manual update needed) |\n| `department` / `designation` | names (not ids) |\n| `hrName` / `hrSignatureUrl` | HR who created the employee + their uploaded signature |\n\n**Who:** logged-in Employee (needs Self / General Info → view). Login first with **1. Login (Employee)**.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(Employee login)*\n\nNo query / body.\n---"
+                    "description": "GET /api/employees/me/id-card — **Virtual ID card** for the logged-in employee. One request. The URL has no id — the token is the employee.\n\nSame card as admin **1.5 Employees → 3b. Get Employee ID Card**. This call is only the **own card** option.\n\n### What this feature does\nReturns one flat object: name, photo, employee code, date of birth, date of joining, blood group, mobile, department, designation, `employeeType` (`Permanent` or `Probation`), and the creating HR's name plus signature.\n\n### How it works\n1. Run **1. Login (Employee)** first. Seed: `employee@techculture.ai` or `TC005`, password `TC00515012005`. That saves `{{token}}`.\n2. Send this request. Seed TC005 joined on the seed day, so `employeeType` is **Probation**.\n3. `employeeType` is calculated from date of joining: **Probation** for 3 company months, then **Permanent**. You do not send it.\n4. `hrName` and `hrSignatureUrl` come from the HR who created this employee. If that HR has no signature, the API returns **400** (upload with type `signature`, then save `signatureUrl` on the HR account).\n\n### Options\n| Option | How | Result |\n| --- | --- | --- |\n| Own card | This request, after employee login | 200, your card. Seed TC005 → Probation |\n| Someone else's card | Employee token on `GET /api/employees/{{employeeId}}/id-card` with another id | 403 `You can only generate / view your own ID card` |\n| Any employee's card | Switch to **0. Login** (admin), set `{{employeeId}}`, use **3b. Get Employee ID Card** | 200. TC004 / TC007 → Permanent. TC005 / TC006 → Probation |\n\n### Sample 200 (seed TC005, Probation)\n```json\n{\n  \"name\": \"Employee\",\n  \"employeeCode\": \"TC005\",\n  \"dateOfBirth\": \"2005-01-15\",\n  \"dateOfJoining\": \"2026-10-22\",\n  \"bloodGroup\": \"B+\",\n  \"mobileNo\": \"9876500002\",\n  \"employeeType\": \"Probation\",\n  \"department\": \"Engineering\",\n  \"designation\": \"Software Engineer\",\n  \"hrName\": \"Anupama\"\n}\n```\n`employeeId`, `profileUrl`, and `hrSignatureUrl` are also returned. `profileUrl` is the Cloudinary photo. `hrSignatureUrl` is the HR stamp.\n\nNeeds **Self → General Info → view**.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(Employee login)*\n\nNo query and no body. Path is fixed: `/api/employees/me/id-card`.\n---\n"
                   },
-                  "response": [
-                    {
-                      "name": "200 – own card (TC005, Probation)",
-                      "originalRequest": {
-                        "method": "GET",
-                        "header": [],
-                        "url": {
-                          "raw": "{{baseUrl}}/api/employees/me/id-card",
-                          "host": [
-                            "{{baseUrl}}"
-                          ],
-                          "path": [
-                            "api",
-                            "employees",
-                            "me",
-                            "id-card"
-                          ]
-                        }
-                      },
-                      "status": "Unauthorized",
-                      "code": 401,
-                      "_postman_previewlanguage": "json",
-                      "header": [
-                        {
-                          "key": "Content-Type",
-                          "value": "application/json; charset=utf-8"
-                        }
-                      ],
-                      "cookie": [],
-                      "body": "{\n  \"message\": \"Logged in from another device\",\n  \"code\": \"SESSION_REPLACED\"\n}"
-                    }
-                  ]
+                  "response": []
                 },
                 {
                   "name": "3. Update My Profile",
