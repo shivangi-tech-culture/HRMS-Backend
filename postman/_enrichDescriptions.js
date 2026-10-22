@@ -185,6 +185,30 @@ const PARAM_DOCS = {
   latitude: "number | required | GPS latitude (-90…90) — send as number, not string",
   longitude: "number | required | GPS longitude (-180…180) — send as number, not string",
   remarks: "string | optional | max ~500 chars",
+  reason: "string | required on review/regularize | why approve/reject or regularization reason",
+  breakType: "string | optional on auto-start | e.g. `Lunch Break` | `Tea Break` | `Day Break` (omit on POST /break/start — auto-picked)",
+  minutes: "number | required for Day Break request / flexible | e.g. `10` or `15`",
+  flexible: "boolean | policy | `true` = Day Break style (needs approval); `false` = fixed minutes",
+  published: "boolean | policy | `true` = employees can see/use this break",
+  punchInTime: "string (HH:mm) | optional | missing punch-in for regularization",
+  punchOutTime: "string (HH:mm) | optional | missing punch-out for regularization",
+  breakStartTime: "string (HH:mm) | optional | break regularization start",
+  breakEndTime: "string (HH:mm) | required for break regularization | end time",
+  dutyType: "string | required | `On Tour` | `On Duty`",
+  tourCategory: "string (MongoId) | required | master `_id` from onTourCategory / onDutyCategory",
+  fromDate: "string (YYYY-MM-DD) | required | tour/duty/leave start",
+  toDate: "string (YYYY-MM-DD) | required | tour/duty/leave end",
+  fromTime: "string (HH:mm) | required on tour-duty | start time",
+  toTime: "string (HH:mm) | required on tour-duty | end time",
+  leaveType: "string (MongoId) | required on apply leave | LeaveType `_id`",
+  dayType: "string | optional | `Full` | `First Half` | `Second Half`",
+  token: "string (JWT) | header Bearer | from login — also used by GET /api/auth/token-status",
+
+  // response field docs (for description enums)
+  attendanceStatus:
+    "string | punch-in timing | `Early` | `On time` | `Late` | `Approved` | `Rejected` (null only if not punched in)",
+  todayTime:
+    "object | UI clocks | `{ status, active, idle, break, required, remaining }` each bucket `{ minutes, clock HH:mm:ss, label }`",
 
   code: "string | required | uppercase short code e.g. `5DAY`",
   startTime: "string (HH:mm) | required | shift start 24h",
@@ -261,8 +285,14 @@ function contextualDoc(key, ctx) {
   }
 
   if (key === "status") {
+    if (url.includes("/break"))
+      return "string | optional | live: `all`\\|`on_break`\\|`at_desk`\\|`overdue` · history: `all`\\|`completed`\\|`pending`\\|`approved`\\|`rejected` · day-request: `Pending`\\|`Approved`\\|`Rejected`\\|`Used`\\|`ALL`";
+    if (url.includes("/leave"))
+      return "string | optional | `ALL` | `Pending` | `Approved` | `Rejected` | `Cancelled` | `Partial`";
+    if (url.includes("/regulariz") || url.includes("/tour-dut"))
+      return "string | optional | `ALL` | `Pending` | `Approved` | `Rejected` | `Cancelled`";
     if (isAttendanceApi)
-      return "string | optional | `ALL` | `Pending` | `Present` | `Absent` | `HalfDay` | `WeeklyOff` | `Holiday` | `MissedPunch` | `OnLeave` | `WFH`";
+      return "string | optional | `ALL` | `Pending` | `Present` | `Absent` | `HalfDay` | `WeeklyOff` | `Holiday` | `MissedPunch` | `OnLeave` | `OnTour` | `OnDuty` | `WFH` | `EarlyLeave`";
     return "string | optional | `Active` or `Inactive`";
   }
 
@@ -274,6 +304,18 @@ function contextualDoc(key, ctx) {
     if (name.includes("upload") || name.includes("attachment"))
       return "string | required | attachment category key (form-data text)";
     return PARAM_DOCS.type;
+  }
+
+  if ((key === "breakStartTime" || key === "breakEndTime") && url.includes("/regulariz")) {
+    return key === "breakEndTime"
+      ? "string (HH:mm) | required | break end for break regularization"
+      : "string (HH:mm) | optional | break start (omit if open break — server keeps start)";
+  }
+  if (key === "minutes" && url.includes("/break")) {
+    return "number | required on day-request / flexible policy | e.g. `10` or `15`";
+  }
+  if (key === "decision") {
+    return 'string | required | `approve` or `reject` (query and/or body)';
   }
 
   if (key === "role") {
@@ -365,6 +407,73 @@ function stripOldParamsBlock(desc) {
   return (before + rest.slice(end + MARKER_END.length)).trimEnd();
 }
 
+/** Extra enums / field uses by API area (appended to every request in that area) */
+function enumsBlock(ctx) {
+  const url = (ctx.url || "").toLowerCase();
+  const name = (ctx.name || "").toLowerCase();
+  const blocks = [];
+
+  if (url.includes("/auth/token-status") || name.includes("token status")) {
+    blocks.push(
+      "**Response fields:** `message`, `isExpired` (boolean — JWT time), `isReplaced` (boolean — other device login). Both false = valid."
+    );
+  }
+
+  if (url.includes("/attendance/today") || (name.includes("my today") && url.includes("attendance"))) {
+    blocks.push(
+      [
+        "**Response — `todayTime`:** `status`=`Working`\\|`On Break`\\|`Clocked Out`\\|`Not Clocked In`; `active`/`idle`/`break`/`required`/`remaining` = `{ minutes, clock, label }`.",
+        "**Response — `record.status` (day):** `MissedPunch`\\|`Present`\\|`Late`\\|`HalfDay`\\|`Absent`\\|`EarlyLeave`\\|`WeeklyOff`\\|`OnLeave`\\|`OnTour`\\|`OnDuty`\\|…",
+        "**Response — `record.attendanceStatus` (timing):** `Early`\\|`On time`\\|`Late`\\|`Approved`\\|`Rejected` (shown while punched in).",
+      ].join("\n")
+    );
+  }
+
+  if (url.includes("/break")) {
+    blocks.push(
+      [
+        "**Break enums:** open=`On Break`\\|`Overdue`; closed=`Completed`\\|`Pending`\\|`Approved`\\|`Rejected`.",
+        "**Auto start:** omit `breakType` — next fixed policy with `remainingMinutes`>0 (policy minutes − used), then Day Break only if grant Approved.",
+        "**Day Break:** `POST /day-request` `{ minutes }` → RM/HR `POST /day-request/:id/review` → `POST /start`.",
+        "**todayTime:** same ACTIVE/IDLE/BREAK buckets as attendance/today.",
+      ].join("\n")
+    );
+  }
+
+  if (url.includes("/leave")) {
+    blocks.push(
+      "**Leave request status:** `Pending` | `Approved` | `Rejected` | `Cancelled` | `Partial`. **dayType:** `Full` | `First Half` | `Second Half`."
+    );
+  }
+
+  if (url.includes("/regulariz") || name.includes("regularization")) {
+    blocks.push(
+      "**Regularization:** missed punch → send missing `HH:mm`; Late day → `date`+`reason` only; break → break times. Status: `Pending`\\|`Approved`\\|`Rejected`\\|`Cancelled`."
+    );
+  }
+
+  if (url.includes("/tour-dut")) {
+    blocks.push(
+      "**On Tour / On Duty:** `dutyType`=`On Tour`\\|`On Duty`; `tourCategory`=master `_id`. Approve→Present days; Reject→Absent."
+    );
+  }
+
+  if (url.includes("/masters") || name.includes("master types")) {
+    blocks.push(
+      "**Master `type` enum:** `department`\\|`designation`\\|`division`\\|`employeeGroup`\\|`grade`\\|`jobRole`\\|`gender`\\|`maritalStatus`\\|`bloodGroup`\\|`branch`\\|`shift`\\|`courseType`\\|`courseLevel`\\|`bankName`\\|`relation`\\|`nominateFor`\\|`visaType`\\|`language`\\|`regularizationReason`\\|`markAttendanceReason`\\|`onTourCategory`\\|`onDutyCategory`. Status: `Active`\\|`Inactive`."
+    );
+  }
+
+  if (url.includes("/punch-in") || url.includes("/punch-out")) {
+    blocks.push(
+      "**Punch body:** `source`=`web`\\|`mobile`\\|`biometric`; `latitude`/`longitude` numbers; optional `remarks`. After in-only: day `status`=`MissedPunch`, `attendanceStatus`=`Early`\\|`On time`\\|`Late`."
+    );
+  }
+
+  if (!blocks.length) return "";
+  return "\n**Enums / field uses**\n" + blocks.join("\n\n") + "\n";
+}
+
 function buildParamsMarkdown(ctx) {
   const lines = [];
 
@@ -433,6 +542,9 @@ function buildParamsMarkdown(ctx) {
   lines.push(
     "_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._"
   );
+
+  const enums = enumsBlock(ctx);
+  if (enums) lines.push(enums);
 
   return lines.join("\n");
 }
@@ -508,10 +620,43 @@ function enrichRequest(item) {
   r.description = baseDesc + MARKER_START + block + MARKER_END;
 }
 
-function walk(items) {
+/** Folder-level docs (modules) — enums + how fields are used */
+const FOLDER_DOCS = {
+  "0. Login & My Account":
+    "Auth + profile. Login returns `token` (store in DB as single session). GET /token-status → `isExpired` / `isReplaced`. Logout clears cookie + DB token.",
+  "1. ADMIN":
+    "Admin catalog. Scope: Super Admin/Admin = all · HR = assigned companies · Reporting Manager = team.",
+  "1.2 Masters":
+    "CRUD by `type`. Employee ESS dropdowns = published/Active only. Company is NOT a master (`/api/companies`).",
+  "1.7 Attendance":
+    "Daily / calendar / late-early / regularization queue. Day `status` ≠ `attendanceStatus` (timing).",
+  "1.8 Leave":
+    "Types, balances, requests, policies. Request status: Pending|Approved|Rejected|Cancelled|Partial.",
+  "1.9 Holiday":
+    "Company holidays. Assign companies; employees see assigned via ESS My Holidays.",
+  "1.10 Break":
+    "Live board, overage Pending review, Day Break grants, policies. Policy minutes are live (e.g. Lunch 30→45).",
+  "2. EMPLOYEE (ESS)":
+    "Employee self-service. Login as Employee first.",
+  "2.2 Attendance (Punch)":
+    "Punch in/out, todayTime ACTIVE/IDLE/BREAK, timesheet, regularize, On Tour/On Duty.",
+  "2.4 Leave":
+    "Apply/cancel leave, balances, upload document.",
+  "2.6 Break":
+    "Auto start (no breakType), day-request for Day Break, end. todayTime + policies remainingMinutes.",
+};
+
+function walk(items, parentName) {
   for (const it of items || []) {
     if (it.item) {
-      walk(it.item);
+      const doc = FOLDER_DOCS[it.name];
+      if (doc) {
+        const prev = String(it.description || "");
+        if (!prev.includes("**Module notes:**")) {
+          it.description = (prev.trimEnd() ? prev.trimEnd() + "\n\n" : "") + "**Module notes:** " + doc;
+        }
+      }
+      walk(it.item, it.name);
       continue;
     }
     enrichRequest(it);
@@ -527,7 +672,7 @@ if (!String(collection.info.description || "").includes("How to read params")) {
   collection.info.description = String(collection.info.description || "").trimEnd() + tip;
 }
 
-walk(collection.item);
+walk(collection.item, "");
 
 fs.writeFileSync(COLLECTION, JSON.stringify(collection, null, 2) + "\n", "utf8");
 console.log("Updated:", COLLECTION);

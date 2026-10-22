@@ -10,14 +10,23 @@ const DEFAULTS = [
     minutes: 30,
     flexible: false,
     published: true,
-    description: "Fixed lunch time. Unused minutes stay and can be taken later the same day.",
+    description:
+      "Fixed minutes from policy (change anytime, e.g. 30 → 45). Remaining = policy minutes − used today.",
+  },
+  {
+    name: "Tea Break",
+    minutes: 15,
+    flexible: false,
+    published: true,
+    description: "Fixed tea minutes from policy. Used after Lunch remaining is 0.",
   },
   {
     name: "Day Break",
     minutes: null,
     flexible: true,
     published: true,
-    description: "Take 5 or 10 minutes whenever needed. No limit on how many times.",
+    description:
+      "Needs RM/HR approval first (day-request). Approved minutes (10/15/…) then employee can start.",
   },
 ];
 

@@ -39,6 +39,7 @@ const {
   shiftDbId,
   formatAttendanceRecord,
   formatDurationLabel,
+  todayTimeCard,
   oid,
 } = require("../utils/attendanceFormat");
 const {
@@ -201,8 +202,13 @@ const punchIn = async (req, res) => {
       record.status = "Present";
       if (remarks) record.remarks = remarks;
     } else {
+      // Day still open until punch-out; attendanceStatus = punch-in timing
       record.status = "MissedPunch";
-      record.attendanceStatus = null;
+      record.attendanceStatus = windowCheck.isLate
+        ? "Late"
+        : windowCheck.isEarly
+          ? "Early"
+          : "On time";
       record.remarks = remarks;
     }
     await record.save();
@@ -375,11 +381,23 @@ const myToday = async (req, res) => {
       await record.populate("employee", empSelect);
     }
 
+    const onBreak = record
+      ? Boolean(
+          await BreakSession.exists({
+            employee: req.user._id,
+            date,
+            endedAt: null,
+          })
+        )
+      : false;
+
     return res.json({
       date,
       company: companySummary(company),
       branch: branchSummary(branch),
       shift: shiftSummary(shift),
+      /** Desktop-style Today's Time — ACTIVE / IDLE / BREAK */
+      todayTime: todayTimeCard(record, shift, { onBreak }),
       record: formatAttendanceRecord(record, punchExtras({ company, branch, shift })),
     });
   } catch (err) {

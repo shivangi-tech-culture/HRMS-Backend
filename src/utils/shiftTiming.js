@@ -410,15 +410,23 @@ const countedWorkedMinutes = (inMin, outMin, startMin) => {
   return Math.max(0, outMin - countedIn);
 };
 
-/** Closed break minutes that fall inside the counted work window. */
-const breakMinutesBetween = (breaks, fromMin, toMin, skipApproved = false) => {
+/**
+ * Break minutes inside the counted work window.
+ * Open breaks (no end) count through asOfMin when provided (live ACTIVE/BREAK UI).
+ */
+const breakMinutesBetween = (breaks, fromMin, toMin, skipApproved = false, asOfMin = null) => {
   if (fromMin == null || toMin == null || toMin <= fromMin) return 0;
   let total = 0;
   for (const row of breaks || []) {
-    if (!row?.start || !row?.end) continue;
+    if (!row?.start) continue;
     if (skipApproved && row.approved) continue;
     const start = minutesOfDay(row.start);
-    const end = minutesOfDay(row.end);
+    const end = row.end
+      ? minutesOfDay(row.end)
+      : asOfMin != null
+        ? asOfMin
+        : null;
+    if (end == null) continue;
     const from = Math.max(start, fromMin);
     const to = Math.min(end, toMin);
     if (to > from) total += to - from;
@@ -436,7 +444,7 @@ const requiredWorkMinutes = (shift, dateStr) => {
 
 /**
  * Worked time after breaks, against the shift length.
- * An open break is not subtracted until the employee ends it.
+ * Open break minutes count live (asOf) so todayTime.break grows while On Break.
  */
 const workProgress = (record, shift, asOf = new Date()) => {
   const requiredMinutes = requiredWorkMinutes(shift, record?.date);
@@ -452,8 +460,15 @@ const workProgress = (record, shift, asOf = new Date()) => {
   const start = parseHm(shift?.startTime) ?? 600;
   const inMin = minutesOfDay(record.punchIn);
   const outMin = minutesOfDay(record.punchOut || asOf);
+  const asOfMin = minutesOfDay(asOf);
   const gross = countedWorkedMinutes(inMin, outMin, start);
-  const breakMinutes = breakMinutesBetween(record.breaks, Math.max(inMin, start), outMin);
+  const breakMinutes = breakMinutesBetween(
+    record.breaks,
+    Math.max(inMin, start),
+    outMin,
+    false,
+    record.punchOut ? null : asOfMin
+  );
   const workedMinutes = Math.max(0, gross - breakMinutes);
   const remainingMinutes = Math.max(0, requiredMinutes - workedMinutes);
   return {
