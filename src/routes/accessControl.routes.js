@@ -116,6 +116,8 @@ router.post(
  *     summary: Create user (Access & Control)
  *     description: |
  *       Lean drawer fields. `official.employeeCode` optional (editable, unique when set).
+ *       `personal.dateOfBirth` **required** — frontend builds password as
+ *       `{employeeCode}` + DOB `ddmmyyyy` (e.g. `TC001` + `15012005`).
  *     security: [{ bearerAuth: [] }]
  *     responses:
  *       201: { description: User created }
@@ -234,6 +236,7 @@ router.get(
  *     summary: Update user (Edit drawer)
  *     description: |
  *       Email + company locked. `official.employeeCode` optional — send to set/clear/edit.
+ *       `personal.dateOfBirth` optional on edit (required on create for password combo).
  *     security: [{ bearerAuth: [] }]
  *     parameters:
  *       - $ref: '#/components/parameters/UserId'

@@ -126,6 +126,9 @@ const createAccessUserAccount = async (req) => {
     const employeeCode = String(officialIn.employeeCode || "")
       .trim()
       .toUpperCase();
+    const dateOfBirth = personalIn.dateOfBirth
+      ? new Date(personalIn.dateOfBirth)
+      : null;
     const mobileNo = String(personalIn.mobileNo || "").trim();
     const city = String(addrIn.city || "").trim();
     const state = String(addrIn.state || "").trim();
@@ -187,15 +190,14 @@ const createAccessUserAccount = async (req) => {
       role: roleName,
       status: status || "Active",
       official,
+      personal: {
+        dateOfBirth,
+        ...(mobileNo ? { mobileNo } : {}),
+        ...(city || state || country
+          ? { presentAddress: { city, state, country } }
+          : {}),
+      },
     };
-
-    if (mobileNo || city || state || country) {
-      createDoc.personal = {};
-      if (mobileNo) createDoc.personal.mobileNo = mobileNo;
-      if (city || state || country) {
-        createDoc.personal.presentAddress = { city, state, country };
-      }
-    }
 
     const user = await User.create(createDoc);
     await grantLeaveBalance(user);
@@ -448,6 +450,11 @@ const updateUser = async (req, res) => {
 
     if (req.body.personal) {
       if (!user.personal) user.personal = {};
+      if (req.body.personal.dateOfBirth !== undefined) {
+        user.personal.dateOfBirth = req.body.personal.dateOfBirth
+          ? new Date(req.body.personal.dateOfBirth)
+          : null;
+      }
       if (req.body.personal.mobileNo !== undefined) {
         const mobile = String(req.body.personal.mobileNo || "").trim();
         if (mobile) {
