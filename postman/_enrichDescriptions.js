@@ -62,7 +62,8 @@ const PARAM_DOCS = {
 
   // ── official / personal (nested) ───────────────────────────────
   "official.officialEmail": "string (email) | required on create | work login email",
-  "official.employeeCode": "string | optional | uppercase code e.g. `EMP-1024`",
+  "official.employeeCode":
+    "string | optional | blank on create = auto `{companyCode}{NNNN}` (GET /api/employees/next-code). Or send e.g. `TCPL0001`",
   "official.company":
     "string | optional | filled from Company.companyName of companyIds[0]",
   "official.companyIds":
@@ -108,7 +109,6 @@ const PARAM_DOCS = {
   "personal.emergencyContact1": "string | optional",
   "personal.emergencyContact2": "string | optional",
   "personal.drivingLicenseNo": "string | optional",
-  "personal.licenseValidUpto": "date|null | optional",
   "personal.passportNo": "string | optional",
   "personal.remarks": "string | optional",
   "personal.presentAddress.address": "string | optional",
@@ -122,8 +122,7 @@ const PARAM_DOCS = {
   "personal.permanentAddress.city": "string | optional",
   "personal.permanentAddress.pincode": "string | optional",
 
-  "other.bloodGroup": "string | optional | Blood Group master",
-  "other.passportExpiry": "string/date | optional",
+  "personal.bloodGroup": "string | optional | Blood Group master",
 
   education: "array<object> | optional | education rows (courseType, courseLevel, …)",
   accounts: "array<object> | optional | bank account rows",
@@ -316,6 +315,13 @@ function contextualDoc(key, ctx) {
   }
   if (key === "decision") {
     return 'string | required | `approve` or `reject` (query and/or body)';
+  }
+
+  if (key === "username" && url.includes("/api/auth/login")) {
+    return "string | required | ONE field for every login id — employee code (`TC005`, case-insensitive), official email, personal email, or mobile (`9876500002`, `+91` ok). Server auto-detects: has `@` → email · 10 digits → mobile · else → employee code";
+  }
+  if (key === "password" && url.includes("/api/auth/login")) {
+    return "string | required | staff = employee code + DOB `ddmmyyyy` (e.g. `TC00515012005`) · Super Admin / Admin = `123456`";
   }
 
   if (key === "role") {
@@ -623,7 +629,7 @@ function enrichRequest(item) {
 /** Folder-level docs (modules) — enums + how fields are used */
 const FOLDER_DOCS = {
   "0. Login & My Account":
-    "Auth + profile. Login returns `token` (store in DB as single session). GET /token-status → `isExpired` / `isReplaced`. Logout clears cookie + DB token.",
+    "Auth + profile. Login body = `{ username, password }` only — `username` is employee code / official or personal email / mobile (auto-detected). Login returns `token` (store in DB as single session). GET /token-status → `isExpired` / `isReplaced`. Logout clears cookie + DB token.",
   "1. ADMIN":
     "Admin catalog. Scope: Super Admin/Admin = all · HR = assigned companies · Reporting Manager = team.",
   "1.2 Masters":
@@ -637,7 +643,7 @@ const FOLDER_DOCS = {
   "1.10 Break":
     "Live board, overage Pending review, Day Break grants, policies. Policy minutes are live (e.g. Lunch 30→45).",
   "2. EMPLOYEE (ESS)":
-    "Employee self-service. Login as Employee first.",
+    "Employee self-service. Login as Employee first (`username`: `TC005` / email / mobile). ID card: `GET /api/employees/me/id-card` (own only).",
   "2.2 Attendance (Punch)":
     "Punch in/out, todayTime ACTIVE/IDLE/BREAK, timesheet, regularize, On Tour/On Duty.",
   "2.4 Leave":

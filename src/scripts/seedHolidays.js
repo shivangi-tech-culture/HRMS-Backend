@@ -3,10 +3,9 @@
  * Upserts by date. Does not delete holidays an admin already added.
  * Assigns each seeded day to every company (adds, does not replace).
  *
- * Run: npm run seed:holiday
+ * Run alone: npm run seed:holiday
+ * Also called from npm run seed.
  */
-require("dotenv").config();
-const connectDB = require("../config/db");
 const Holiday = require("../models/Holiday");
 const Company = require("../models/Company");
 
@@ -31,8 +30,7 @@ const HOLIDAYS_2026 = [
   { name: "Christmas Day", date: "2026-12-25" },
 ];
 
-(async () => {
-  await connectDB();
+const seedHolidays = async () => {
   const companies = await Company.find().select("_id companyName").lean();
   const companyIds = companies.map((row) => row._id);
 
@@ -49,11 +47,23 @@ const HOLIDAYS_2026 = [
     console.log(`Holiday: ${row.name} (${row.date})`);
   }
 
-  console.log(
-    `\nHolidays seeded: ${HOLIDAYS_2026.length} rows, assigned to ${companies.length} ${companies.length === 1 ? "company" : "companies"}.`
-  );
-  process.exit(0);
-})().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+  return { holidays: HOLIDAYS_2026.length, companies: companies.length };
+};
+
+module.exports = { seedHolidays, HOLIDAYS_2026 };
+
+if (require.main === module) {
+  require("dotenv").config();
+  const connectDB = require("../config/db");
+  (async () => {
+    await connectDB();
+    const result = await seedHolidays();
+    console.log(
+      `\nHolidays seeded: ${result.holidays} rows, assigned to ${result.companies} ${result.companies === 1 ? "company" : "companies"}.`
+    );
+    process.exit(0);
+  })().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

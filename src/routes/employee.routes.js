@@ -5,9 +5,11 @@
  */
 const express = require("express");
 const {
+  nextEmployeeCode,
   createEmployee,
   listEmployees,
   exportEmployees,
+  getEmployeeIdCard,
   getEmployee,
   updateEmployee,
   listActivity,
@@ -55,7 +57,10 @@ const router = express.Router();
  *       (Employee → Employee → create). **Employee role cannot create** —
  *       after create, Employee only **edits** own General Info.
  *
- *       Essential: name, password, officialEmail, employeeCode, dateOfBirth.
+ *       Essential: name, password, officialEmail, dateOfBirth.
+ *       `official.employeeCode` optional. Leave it blank and the server assigns
+ *       the next code for that company: company code + 3-digit number (`TC001`).
+ *       Add page preview: `GET /api/employees/next-code?companyId=`.
  *       Welcome email sent after create.
  *     security:
  *       - bearerAuth: []
@@ -73,7 +78,7 @@ const router = express.Router();
  *               status: { type: string, enum: [Active, Inactive] }
  *               official:
  *                 type: object
- *                 required: [officialEmail, employeeCode]
+ *                 required: [officialEmail]
  *               personal:
  *                 type: object
  *                 required: [dateOfBirth]
@@ -130,7 +135,7 @@ router.post(
  *     parameters:
  *       - in: query
  *         name: search
- *         schema: { type: string, example: EMP-1024 }
+ *         schema: { type: string, example: TC001 }
  *         description: Search name, code, email, designation, department
  *       - in: query
  *         name: status
@@ -171,6 +176,58 @@ router.get(
   authorize(...ALL_ACCESS),
   checkPermission("Employee", "Employee", "view"),
   listEmployees
+);
+
+/**
+ * @swagger
+ * /api/employees/next-code:
+ *   get:
+ *     tags: [Admin / Employees]
+ *     summary: Next employee code for a company (Add Employee page)
+ *     description: |
+ *       Call this when the company is selected on the Add Employee page.
+ *       Returns the next code for that company only. It does not reserve the number.
+ *
+ *       Format: `{companyCode}` + 4-digit sequence.
+ *       Company `TC` with no matching codes → `TC001`. Next employee → `TC002`.
+ *       Another company starts again at `001`.
+ *
+ *       `POST /api/employees` with a blank `official.employeeCode` assigns this same next code.
+ *       A code you send yourself is kept (still unique).
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: companyId
+ *         schema: { type: string, example: "674a1b2c3d4e5f6789012345" }
+ *         description: Company `_id` selected on the add page. Send this or `companyCode`.
+ *       - in: query
+ *         name: companyCode
+ *         schema: { type: string, example: TC }
+ *         description: Company code, used when `companyId` is omitted.
+ *     responses:
+ *       200:
+ *         description: Next code for that company
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 companyId: { type: string }
+ *                 companyName: { type: string }
+ *                 companyCode: { type: string, example: TC }
+ *                 sequence: { type: integer, example: 1 }
+ *                 employeeCode: { type: string, example: TC001 }
+ *       400: { description: companyId and companyCode both missing }
+ *       403: { description: Company is not assigned to this login }
+ *       404: { description: Company not found or inactive }
+ */
+router.get(
+  "/next-code",
+  protect,
+  authorize("Super Admin", "Admin", "HR Manager"),
+  checkPermission("Employee", "Employee", "create"),
+  nextEmployeeCode
 );
 
 /**
@@ -311,14 +368,16 @@ router.post(
  *     summary: Upload attachment to Cloudinary
  *     description: |
  *       No user id. Form-data: `document` (file) and `type`
- *       (`education`, `account`, `leave`, `profile`, `regularization`, `onTour`, `onDuty`, or `companyLogo`).
+ *       (`education`, `account`, `leave`, `profile`, `signature`, `regularization`, `onTour`, `onDuty`, or `companyLogo`).
  *       Cloudinary folder is `hrms/<type>`. The same type always uses that same folder.
- *       `profile` and `companyLogo` accept JPEG, PNG, WEBP, or GIF only.
+ *       `profile`, `signature`, and `companyLogo` accept JPEG, PNG, WEBP, or GIF only.
+ *       `signature` — Super Admin / Admin / HR Manager only. Put returned `url` on `signatureUrl`.
  *       Saves nothing in the database. On Submit, put the returned `url` in:
  *       - education → `education[].document`
  *       - account → `accounts[].attachment`
  *       - leave → leave apply `document` (medical and every other leave file)
  *       - profile → employee `profileUrl`
+ *       - signature → HR/Admin `signatureUrl` (ID-card virtual stamp)
  *       - regularization → attendance regularize `document`
  *       - onTour → On Tour `document`
  *       - onDuty → On Duty `document`
@@ -339,8 +398,8 @@ router.post(
  *                 description: PDF, image, or Excel — max 5MB
  *               type:
  *                 type: string
- *                 enum: [education, account, leave, profile, regularization, onTour, onDuty, companyLogo]
- *                 example: profile
+ *                 enum: [education, account, leave, profile, signature, regularization, onTour, onDuty, companyLogo]
+ *                 example: signature
  *     responses:
  *       201:
  *         description: Cloudinary URL only
@@ -357,7 +416,7 @@ router.post(
  *       500:
  *         description: Cloudinary not configured or upload failed
  */
-// UPLOAD ATTACHMENT — Cloudinary; form-data: document + type (education|account|leave|profile|regularization|onTour|onDuty|companyLogo)
+// UPLOAD ATTACHMENT — Cloudinary; form-data: document + type (…|profile|signature|…|companyLogo)
 // Admin: Employee→edit | Employee: Self→General Info→edit
 router.post(
   "/upload",
@@ -380,11 +439,11 @@ router.post(
  * /api/employees/upload:
  *   delete:
  *     tags: [Admin / Employees, Employee / ESS]
- *     summary: Delete a profile image from Cloudinary
+ *     summary: Delete a profile or signature image from Cloudinary
  *     description: |
- *       Body `{ url }` must be a profile image previously uploaded with `type` = `profile`
- *       (folder `hrms/profile`). Education, account, and leave files are not deleted here.
- *       Any employee whose `profileUrl` is this url is cleared.
+ *       Body `{ url }` must be from `type=profile` (`hrms/profile`) or `type=signature`
+ *       (`hrms/signature`). Matching `profileUrl` / `signatureUrl` fields are cleared.
+ *       Signature delete: Super Admin / Admin / HR Manager only.
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -397,12 +456,14 @@ router.post(
  *             properties:
  *               url:
  *                 type: string
- *                 example: https://res.cloudinary.com/demo/image/upload/v1/hrms/profile/photo.jpg
+ *                 example: https://res.cloudinary.com/demo/image/upload/v1/hrms/signature/sign.png
  *     responses:
  *       200:
- *         description: Profile image removed
+ *         description: Image removed
  *       400:
- *         description: Missing url or url is not an app profile image
+ *         description: Missing url or url is not an app profile/signature image
+ *       403:
+ *         description: Role cannot delete signatures
  */
 router.delete(
   "/upload",
@@ -411,6 +472,85 @@ router.delete(
   checkEmployeeProfilePermission("edit"),
   validate(deleteUploadSchema),
   deleteAttachment
+);
+
+/**
+ * @swagger
+ * /api/employees/me/id-card:
+ *   get:
+ *     tags: [Employee / ESS]
+ *     summary: My ID card (Employee self)
+ *     description: |
+ *       Same as `GET /api/employees/{id}/id-card` for the logged-in employee.
+ *       Use this from ESS — no need to pass your own id.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Flat ID card object }
+ *       400: { description: Creating HR unknown or signature not uploaded }
+ *       403: { description: Not allowed }
+ */
+router.get(
+  "/me/id-card",
+  protect,
+  authorize("Employee"),
+  checkPermission("Self", "General Info", "view"),
+  (req, _res, next) => {
+    req.params.id = "me";
+    next();
+  },
+  getEmployeeIdCard
+);
+
+/**
+ * @swagger
+ * /api/employees/{id}/id-card:
+ *   get:
+ *     tags: [Admin / Employees, Employee / ESS]
+ *     summary: Employee ID card (Admin or own)
+ *     description: |
+ *       Flat ID-card payload. **One API for both sides:**
+ *       - **Employee ESS:** only own `:id` (or use `GET /api/employees/me/id-card`)
+ *       - **Admin / HR / Reporting Manager:** any employee in company / team scope
+ *
+ *       **Fields:** `employeeId`, `name`, `profileUrl`, `employeeCode`,
+ *       `dateOfBirth`, `bloodGroup`, `mobileNo`, `employeeType`,
+ *       `department`, `designation`, `hrName`, `hrSignatureUrl`
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/UserId'
+ *     responses:
+ *       200:
+ *         description: Flat ID card object
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 employeeId: { type: string }
+ *                 name: { type: string }
+ *                 profileUrl: { type: string }
+ *                 employeeCode: { type: string, example: TC004 }
+ *                 dateOfBirth: { type: string, example: "2005-01-15" }
+ *                 dateOfJoining: { type: string, example: "2026-10-22", description: Used to compute employeeType }
+ *                 bloodGroup: { type: string, example: B+ }
+ *                 mobileNo: { type: string, example: "9810044556" }
+ *                 employeeType: { type: string, enum: [Permanent, Probation] }
+ *                 department: { type: string }
+ *                 designation: { type: string }
+ *                 hrName: { type: string, example: Anupama }
+ *                 hrSignatureUrl: { type: string, description: HR stamp image URL }
+ *       400: { description: Creating HR unknown or signature not uploaded }
+ *       403: { description: Employee opened someone else's id / out of company scope }
+ *       404: { description: Employee not found }
+ */
+router.get(
+  "/:id/id-card",
+  protect,
+  authorize(...ALL_ACCESS, "Employee"),
+  checkEmployeeProfilePermission("view"),
+  getEmployeeIdCard
 );
 
 /**
@@ -455,7 +595,7 @@ router.get(
  *       **Who:** Admin (any) | Own profile
  *
  *       **Joi:** nested objects only — personal (addresses/emails/phones),
- *       official, other, education, etc. Flat city/company → 400. No contact module.
+ *       official, education, etc. Flat city/company → 400. No contact module.
  *
  *       **Employee can update:** personal.mobileNo, personal.workPhone, personal.workExt
  *       (and other personal fields)
@@ -496,6 +636,7 @@ router.get(
  *                   fatherOrHusbandName: Ramesh Iyer
  *                   panNo: ABCDE1234F
  *                   aadhaarNo: "123456789012"
+ *                   bloodGroup: B+
  *                   personalEmail: shivi.gupta.personal@gmail.com
  *                   mobileNo: "9810044556"
  *                   workPhone: "0120-4000000"
@@ -518,8 +659,8 @@ router.get(
  *                     country: India
  *                     pincode: "201301"
  *                 official:
- *                   employeeCode: EMP-1024
- *                   officialEmail: shivi.gupta@techculture.ai
+ *                   employeeCode: TC001
+ *                   officialEmail: employee@gmail.com
  *                   company: TechCulture.Ai Private Limited
  *                   department: Finance
  *                   designation: Finance Executive
@@ -527,9 +668,6 @@ router.get(
  *                   jobRole: Executive
  *                   dateOfJoining: "2024-01-15"
  *                   grade: G4
- *                 other:
- *                   bloodGroup: B+
- *                   passportExpiry: "2030-12-31"
  *                 education:
  *                   - courseType: Full Time
  *                     courseLevel: Graduation
@@ -580,7 +718,7 @@ router.get(
  *                   bankAccount: "50100123456789"
  *                   ifsc: HDFC0001234
  *             employeeSelf:
- *               summary: Employee — personal / other / arrays only (no official/payroll)
+ *               summary: Employee — personal / arrays only (no official/payroll)
  *               value:
  *                 personal:
  *                   dateOfBirth: "1995-06-15"
@@ -589,6 +727,7 @@ router.get(
  *                   fatherOrHusbandName: Ramesh Iyer
  *                   panNo: ABCDE1234F
  *                   aadhaarNo: "123456789012"
+ *                   bloodGroup: B+
  *                   personalEmail: shivi.gupta.personal@gmail.com
  *                   mobileNo: "9810044556"
  *                   workPhone: "0120-4000000"
@@ -609,9 +748,6 @@ router.get(
  *                     state: DELHI
  *                     country: India
  *                     pincode: "201301"
- *                 other:
- *                   bloodGroup: B+
- *                   passportExpiry: "2030-12-31"
  *                 education:
  *                   - courseType: Full Time
  *                     courseLevel: Graduation

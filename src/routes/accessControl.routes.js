@@ -142,6 +142,8 @@ router.post(
  *       - company / companyId — Company `_id` or exact name
  *         Super Admin/Admin: any company. HR: only assigned companies.
  *       - role, department, status, branch, shift, page, limit
+ *
+ *       Each row includes `employeeCode` (e.g. `TC001`; empty for platform roles).
  *     security: [{ bearerAuth: [] }]
  *     parameters:
  *       - in: query

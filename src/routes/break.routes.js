@@ -10,11 +10,12 @@
  * Admin — Live Break Status
  *   GET    /live               ?search=&department=&shiftId=&status=all|on_break|at_desk|overdue&page=&limit=
  *
- * Admin — Break History / Approvals
- *   GET    /history            ?search=&department=&shiftId=&breakType=&status=&from=&to=&page=&limit=
- *                              status = all | completed | pending | approved | rejected
- *   GET    /approvals          Pending Day Break requests only
+ * Admin — Break History / Pending Review
+ *   GET    /history            Break History (perm: Break History → view)
+ *   GET    /approvals          Pending Review list (perm: Pending Review → view)
  *   POST   /day-request/:id/review  { decision, remarks? }
+ *                              decision=approve → Pending Review → approve
+ *                              decision=reject  → Pending Review → reject
  *
  * Admin — Break Policy (employee sees published ones only)
  *   GET    /policies
@@ -68,6 +69,17 @@ const needBreak = (subModule, action) => (req, res, next) => {
   }
   if (hasAllAccess(req.user) || hasGlobalCompanyAccess(req.user)) return next();
   return checkPermission("Break", subModule, action)(req, res, next);
+};
+
+/** Pending Review → approve / reject by body.decision */
+const needBreakReview = (req, res, next) => {
+  if (employeeSide(req.user)) {
+    return res.status(403).json({ message: "Employees can only start and end their own break" });
+  }
+  if (hasAllAccess(req.user) || hasGlobalCompanyAccess(req.user)) return next();
+  const decision = String(req.body?.decision || "").trim().toLowerCase();
+  const action = decision === "reject" ? "reject" : "approve";
+  return checkPermission("Break", "Pending Review", action)(req, res, next);
 };
 
 /**
@@ -205,14 +217,14 @@ router.delete("/policies/:id", protect, needBreak("Break Policy", "delete"), del
 router.get(
   "/approvals",
   protect,
-  needBreak("Break History", "view"),
+  needBreak("Pending Review", "view"),
   validateQuery(historyQuerySchema),
   pendingBreaks
 );
 router.post(
   "/day-request/:id/review",
   protect,
-  needBreak("Live Break Status", "edit"),
+  needBreakReview,
   validate(reviewSchema),
   reviewDayRequest
 );

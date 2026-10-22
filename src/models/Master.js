@@ -64,6 +64,7 @@ const GENERAL_INFO_DROPDOWNS = {
   personal: {
     gender: "gender",
     maritalStatus: "maritalStatus",
+    bloodGroup: "bloodGroup",
     languageKnown: "language",
   },
   official: {
@@ -75,9 +76,6 @@ const GENERAL_INFO_DROPDOWNS = {
     jobRole: "jobRole",
     branchId: "branch",
     shiftId: "shift",
-  },
-  other: {
-    bloodGroup: "bloodGroup",
   },
   education: {
     courseType: "courseType",

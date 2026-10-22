@@ -42,11 +42,42 @@ async function refreshLockedRole(roleDoc) {
   return roleDoc;
 }
 
-/** Find one user by login email (case-insensitive) */
-const findByOfficialEmail = (officialEmail) =>
-  User.findOne({
-    "official.officialEmail": String(officialEmail).toLowerCase().trim(),
-  });
+/**
+ * Mobile → last 10 digits (accepts +91, spaces, dashes). Null if not a mobile.
+ */
+const asMobile = (value) => {
+  const digits = String(value).replace(/\D/g, "");
+  if (digits.length === 10) return digits;
+  if (digits.length === 12 && digits.startsWith("91")) return digits.slice(2);
+  if (digits.length === 11 && digits.startsWith("0")) return digits.slice(1);
+  return null;
+};
+
+/**
+ * Find user by one `username` value. Type is detected from its shape:
+ * contains "@" → official or personal email · 10-digit number → mobile · else → employee code.
+ */
+const findByUsername = (raw) => {
+  const value = String(raw || "").trim();
+  if (!value) return null;
+
+  if (value.includes("@")) {
+    const email = value.toLowerCase();
+    return User.findOne({
+      $or: [
+        { "official.officialEmail": email },
+        { "personal.personalEmail": email },
+      ],
+    });
+  }
+
+  const mobile = asMobile(value);
+  if (mobile && /^[\d\s+()-]+$/.test(value)) {
+    return User.findOne({ "personal.mobileNo": mobile });
+  }
+
+  return User.findOne({ "official.employeeCode": value.toUpperCase() });
+};
 
 /** Persist latest JWT on the user document (issued / expiry timestamps) */
 const saveAuthTokenOnUser = async (user, token) => {
@@ -106,19 +137,23 @@ const clearAuthTokenOnUser = async (userId) => {
   );
 };
 
-/** LOGIN — POST /api/auth/login (officialEmail + password → JWT cookie + DB) */
+/**
+ * LOGIN — POST /api/auth/login
+ * Body: { username, password } — username = employee code | email | mobile
+ * → JWT cookie + DB
+ */
 const login = async (req, res) => {
   try {
-    const { officialEmail, password } = req.body;
+    const { username, password } = req.body;
 
-    const user = await findByOfficialEmail(officialEmail);
+    const user = await findByUsername(username);
     if (!user) {
-      return res.status(401).json({ message: "Invalid official email or password" });
+      return res.status(401).json({ message: "Invalid username or password" });
     }
 
     const ok = await bcrypt.compare(password, user.password);
     if (!ok) {
-      return res.status(401).json({ message: "Invalid official email or password" });
+      return res.status(401).json({ message: "Invalid username or password" });
     }
 
     if (user.status !== "Active") {

@@ -40,14 +40,20 @@ const description = [
   "",
   "**Custom roles:** pick `catalog` admin|employee → grant modules → `checkPermission` enforces each action.",
   "",
-  "**Seeded logins** (`npm run seed`, password `123456`)",
-  "| Role | Email | Side |",
-  "| --- | --- | --- |",
-  "| Global Admin | `globaladmin@techculture.ai` | Admin |",
-  "| Super Admin | `shivangi@techculture.ai` | Admin |",
-  "| HR Manager | `hr@techculture.ai` | Admin |",
-  "| Manager | `manager@techculture.ai` | Admin |",
-  "| Employee | `shivig5964@gmail.com` | ESS |",
+  "**Seeded logins** (`npm run seed`) — company code `TC`, codes `TC001`…",
+  "| Role | Email | Code | Password |",
+  "| --- | --- | --- | --- |",
+  "| Super Admin | `superadmin@gmail.com` | — | `123456` |",
+  "| Admin | `admin@gmail.com` | — | `123456` |",
+  "| HR | `anupama@techculture.ai` | `TC001` | `TC00115012005` |",
+  "| Manager | `manav@techculture.ai` | `TC002` | `TC00215012005` |",
+  "| Manager | `manoj@techculture.ai` | `TC003` | `TC00315012005` |",
+  "| Employee | `shivangi@techculture.ai` | `TC004` | `TC00415012005` |",
+  "| Employee | `employee@techculture.ai` | `TC005` | `TC00515012005` |",
+  "| Employee | `vivek@techculture.ai` | `TC006` | `TC00615012005` |",
+  "| Employee | `ananya@techculture.ai` | `TC007` | `TC00715012005` |",
+  "",
+  "Staff password = `{employeeCode}` + DOB `ddmmyyyy` (`15012005`). Vivek/employee = Probation; Shivangi/Ananya = Permanent on ID card.",
   "",
   "**Quick start:** Login → Authorize Bearer → open **Admin /** or **Employee /** tags below.",
 ].join("\n");
@@ -141,14 +147,20 @@ module.exports = swaggerJsdoc({
         },
         LoginBody: {
           type: "object",
-          required: ["officialEmail", "password"],
+          required: ["username", "password"],
+          additionalProperties: false,
           properties: {
-            officialEmail: {
+            username: {
               type: "string",
-              example: "shivangi@techculture.ai",
-              description: "Must match official.officialEmail",
+              example: "TC005",
+              description:
+                "One field for everything: employee code (TC005), official or personal email, or mobile number (9876500002). The server detects which one it is.",
             },
-            password: { type: "string", example: "123456" },
+            password: {
+              type: "string",
+              example: "TC00515012005",
+              description: "Staff: code + DOB ddmmyyyy. Platform: 123456",
+            },
           },
         },
         LoginResponse: {
@@ -174,7 +186,7 @@ module.exports = swaggerJsdoc({
               properties: {
                 id: { type: "string" },
                 name: { type: "string", example: "Shivangi Gupta" },
-                officialEmail: { type: "string", example: "shivangi@techculture.ai" },
+                officialEmail: { type: "string", example: "superadmin@gmail.com" },
                 role: { type: "string", example: "Super Admin" },
                 department: { type: "string" },
                 company: { type: "string" },
@@ -333,6 +345,7 @@ module.exports = swaggerJsdoc({
             motherName: { type: "string", example: "Sita Iyer" },
             maritalStatus: { type: "string", example: "Single" },
             spouseName: { type: "string" },
+            bloodGroup: { type: "string", example: "B+" },
             anniversaryDate: {
               type: "string",
               format: "date",
@@ -352,7 +365,6 @@ module.exports = swaggerJsdoc({
               example: "DL-0420110012345",
               description: "Unique when set",
             },
-            licenseValidUpto: { type: "string", format: "date", nullable: true },
             passportNo: {
               type: "string",
               example: "J8765432",
@@ -378,12 +390,13 @@ module.exports = swaggerJsdoc({
           properties: {
             employeeCode: {
               type: "string",
-              example: "EMP-1024",
-              description: "Unique when set",
+              example: "TC001",
+              description:
+                "Unique when set. On create, omit/blank to auto-assign `{companyCode}{NNN}` for that company",
             },
             officialEmail: {
               type: "string",
-              example: "shivi.gupta@techculture.ai",
+              example: "employee@techculture.ai",
               description: "Login ID — unique",
             },
             companyIds: {
@@ -439,19 +452,6 @@ module.exports = swaggerJsdoc({
             calculateSalaryFrom: { type: "string", format: "date", nullable: true },
             dateOfRetirement: { type: "string", format: "date", nullable: true },
             grade: { type: "string", example: "G4" },
-          },
-        },
-        Other: {
-          type: "object",
-          additionalProperties: false,
-          properties: {
-            bloodGroup: { type: "string", example: "B+" },
-            passportExpiry: {
-              type: "string",
-              format: "date",
-              nullable: true,
-              example: "2030-12-31",
-            },
           },
         },
         EducationItem: {
@@ -614,7 +614,6 @@ module.exports = swaggerJsdoc({
                 "officialEmail always. Global Admin: no company. Super Admin: company required (Global) / own (Super). Staff: department required.",
             },
             personal: { $ref: "#/components/schemas/Personal" },
-            other: { $ref: "#/components/schemas/Other" },
             education: {
               type: "array",
               items: { $ref: "#/components/schemas/EducationItem" },
@@ -645,7 +644,7 @@ module.exports = swaggerJsdoc({
         UpdateUserBody: {
           type: "object",
           description:
-            "All nested objects. Admin: full. Employee: personal/other/arrays only (no official/payroll).",
+            "All nested objects. Admin: full. Employee: personal/arrays only (no official/payroll).",
           properties: {
             name: { type: "string", example: "Shivi Gupta" },
             password: {
@@ -660,7 +659,6 @@ module.exports = swaggerJsdoc({
               allOf: [{ $ref: "#/components/schemas/Official" }],
               description: "Admin only",
             },
-            other: { $ref: "#/components/schemas/Other" },
             education: { $ref: "#/components/schemas/ListOrOneEducation" },
             accounts: { $ref: "#/components/schemas/ListOrOneAccount" },
             family: { $ref: "#/components/schemas/ListOrOneFamily" },

@@ -21,14 +21,19 @@ const {
 const { hasAllAccess } = require("../middleware/auth");
 const { queueWelcomeEmail } = require("../utils/mail");
 const { logEmployeeActivity, humanize } = require("../utils/activityLog");
-const { grantLeaveBalance } = require("../utils/leaveBalance");
+const { grantLeaveBalance, probationEndYmd } = require("../utils/leaveBalance");
 const ActivityLog = require("../models/ActivityLog");
+const Company = require("../models/Company");
 const { sendExcel } = require("../utils/excel");
 const {
   uploadToCloudinary,
   UPLOAD_TYPES,
   deleteProfileImage,
+  deleteSignatureImage,
   forgetProfileImage,
+  forgetSignatureImage,
+  isSignatureImageUrl,
+  isProfileImageUrl,
 } = require("../middleware/upload");
 const {
   normalizeSectionUniques,
@@ -43,6 +48,7 @@ const {
   managementCompanyIds,
   findCompany,
   escapeRegex,
+  companyListForUser,
 } = require("../utils/companyScope");
 const {
   assertTeamOrCompanyEmployee,
@@ -64,9 +70,18 @@ const {
   safeUser,
   filterValue,
 } = require("../utils/userAccount");
+const {
+  findActiveCompany,
+  previewEmployeeCode,
+  allocateEmployeeCode,
+} = require("../utils/employeeCode");
 
 /** True for Super Admin / Admin (lean login accounts) */
 const isPlatformAdminRole = (role) => isPlatformRole(role);
+
+/** Roles allowed to upload / save a digital signature (ID-card stamp) */
+const canUseSignature = (role) =>
+  [SUPER_ADMIN, ADMIN, HR].includes(normalizeRoleName(role));
 
 /**
  * After promoting someone to Global / Super Admin, strip heavy HR profile fields.
@@ -74,7 +89,6 @@ const isPlatformAdminRole = (role) => isPlatformRole(role);
  */
 const unsetEmployeeProfileFields = async (userId, roleName) => {
   const unset = {
-    other: 1,
     education: 1,
     accounts: 1,
     family: 1,
@@ -104,7 +118,6 @@ const unsetEmployeeProfileFields = async (userId, roleName) => {
 const PROFILE_KEYS = [
   "personal",
   "official",
-  "other",
   "education",
   "accounts",
   "family",
@@ -131,7 +144,7 @@ const pickProfile = (body = {}) => {
 };
 
 /** These sections are objects (merge fields). */
-const OBJECT_SECTIONS = new Set(["personal", "official", "other"]);
+const OBJECT_SECTIONS = new Set(["personal", "official"]);
 
 /** Lists: one object appends or updates by _id. An array replaces the list. */
 const ARRAY_SECTIONS = new Set([
@@ -282,6 +295,40 @@ const mergeSection = (existing, incoming, sectionKey) => {
 const isOwnRecord = (req, id) => String(req.user._id) === String(id);
 
 /**
+ * NEXT EMPLOYEE CODE — GET /api/employees/next-code
+ * Add Employee page calls this after the company is selected.
+ * Does not reserve the number. Create with a blank employeeCode assigns it.
+ */
+const nextEmployeeCode = async (req, res) => {
+  try {
+    const key = String(req.query.companyId || req.query.companyCode || "").trim();
+    if (!key) {
+      return res.status(400).json({ message: "companyId or companyCode is required" });
+    }
+
+    const company = await findActiveCompany(key);
+    if (!company) {
+      return res.status(404).json({ message: "Company not found or inactive" });
+    }
+
+    if (!hasGlobalCompanyAccess(req.user)) {
+      const allowed = new Set(
+        (await companyListForUser(req.user)).map((row) => String(row.companyId))
+      );
+      if (!allowed.has(String(company._id))) {
+        return res.status(403).json({
+          message: "You can only generate an employee code for your company",
+        });
+      }
+    }
+
+    return res.json(await previewEmployeeCode(company));
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+/**
  * CREATE EMPLOYEE — POST /api/employees
  *
  * Who: Global Admin / Super Admin / HR Manager only (route authorize).
@@ -308,13 +355,22 @@ const createEmployee = async (req, res) => {
     const headErr = await validateReportingHeads(officialIn);
     if (headErr) return res.status(400).json({ message: headErr });
 
+    let employeeCode = officialIn.employeeCode
+      ? String(officialIn.employeeCode).trim().toUpperCase()
+      : "";
+    if (!employeeCode) {
+      const generated = await allocateEmployeeCode(assigned.companyIds[0]);
+      if (!generated.ok) {
+        return res.status(generated.status).json({ message: generated.message });
+      }
+      employeeCode = generated.employeeCode;
+    }
+
     const official = writeCompanyFields(
       normalizeSectionUniques("official", {
         ...officialIn,
         officialEmail: email,
-        employeeCode: officialIn.employeeCode
-          ? String(officialIn.employeeCode).trim().toUpperCase()
-          : "",
+        employeeCode,
         branchId: parseOidOrNull(officialIn.branchId),
         shiftId: parseOidOrNull(officialIn.shiftId),
       }),
@@ -365,8 +421,8 @@ const createEmployee = async (req, res) => {
       status: status || "Active",
       official,
       personal,
+      createdBy: req.user._id,
     };
-    if (req.body.other) createDoc.other = req.body.other;
     for (const key of ARRAY_SECTIONS) {
       if (req.body[key] === undefined) continue;
       const rows = Array.isArray(req.body[key])
@@ -520,6 +576,165 @@ const exportEmployees = async (req, res) => {
   }
 };
 
+/** YYYY-MM-DD in Asia/Kolkata (or empty) */
+const toCardDate = (value) => {
+  if (!value) return "";
+  const raw = String(value);
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
+  const dt = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(dt.getTime())) return "";
+  return dt.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+};
+
+const todayCardDate = () =>
+  new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+
+/**
+ * Permanent | Probation from DOJ + company probation window.
+ * Falls back to official.employeeGroup when DOJ is missing.
+ */
+const resolveEmployeeType = async (employee) => {
+  const group = String(employee.official?.employeeGroup || "").trim();
+  const doj = employee.official?.dateOfJoining;
+  if (!doj) {
+    if (/^permanent$/i.test(group)) return "Permanent";
+    if (/^probation$/i.test(group)) return "Probation";
+    return group || "";
+  }
+
+  const companyId =
+    employee.official?.companyIds?.[0]?._id || employee.official?.companyIds?.[0] || null;
+  let monthStartDay = 1;
+  if (companyId) {
+    const company = await Company.findById(companyId)
+      .select("monthStartDay monthEndDay")
+      .lean();
+    monthStartDay = company?.monthStartDay || 1;
+  }
+
+  const end = probationEndYmd(doj, monthStartDay);
+  if (end && todayCardDate() < end) return "Probation";
+  return "Permanent";
+};
+
+/** Creator HR (createdBy), else first ActivityLog create actor */
+const resolveHrCreator = async (employee) => {
+  let hr = null;
+  if (employee.createdBy) {
+    hr = await User.findById(employee.createdBy)
+      .select(
+        "name role profileUrl signatureUrl official.employeeCode official.designation"
+      )
+      .lean();
+  }
+  if (!hr) {
+    const createLog = await ActivityLog.findOne({
+      "employee.id": employee._id,
+      action: "create",
+    })
+      .sort({ createdAt: 1 })
+      .select("actor")
+      .lean();
+    if (createLog?.actor?.id) {
+      hr = await User.findById(createLog.actor.id)
+        .select(
+          "name role profileUrl signatureUrl official.employeeCode official.designation"
+        )
+        .lean();
+      if (!hr && createLog.actor.name) {
+        return {
+          id: createLog.actor.id,
+          name: createLog.actor.name || "",
+          role: createLog.actor.role || "",
+          signatureUrl: "",
+        };
+      }
+    }
+  }
+  if (!hr) return null;
+  return {
+    id: hr._id,
+    name: String(hr.name || "").trim(),
+    role: hr.role || "",
+    signatureUrl: String(hr.signatureUrl || "").trim(),
+  };
+};
+
+/**
+ * ID CARD — GET /api/employees/:id/id-card  |  GET /api/employees/me/id-card
+ *
+ * Same payload for Admin and Employee.
+ * - Employee: own id only (`me` or own `:id`). Cannot open another person's card.
+ * - Admin / HR / Reporting Manager: any employee in company (or team) scope.
+ */
+const getEmployeeIdCard = async (req, res) => {
+  try {
+    // /me/id-card → always the logged-in user
+    if (String(req.params.id || "").toLowerCase() === "me") {
+      req.params.id = String(req.user._id);
+    }
+
+    if (!hasAllAccess(req.user) && !isOwnRecord(req, req.params.id)) {
+      return res.status(403).json({
+        message: "You can only generate / view your own ID card",
+      });
+    }
+
+    const employee = await User.findById(req.params.id)
+      .select(
+        "name profileUrl createdBy personal.dateOfBirth personal.mobileNo personal.bloodGroup other.bloodGroup official.employeeCode official.employeeGroup official.dateOfJoining official.companyIds official.designation official.department"
+      )
+      .lean();
+    if (!employee) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+
+    if (hasAllAccess(req.user) && !hasGlobalCompanyAccess(req.user)) {
+      const scopeErr = assertTeamOrCompanyEmployee(req.user, employee);
+      if (scopeErr) {
+        return res.status(403).json({ message: scopeErr });
+      }
+    }
+
+    const [employeeType, hr] = await Promise.all([
+      resolveEmployeeType(employee),
+      resolveHrCreator(employee),
+    ]);
+
+    if (!hr) {
+      return res.status(400).json({
+        message:
+          "Cannot build ID card: creating HR is unknown. Recreate is not needed — set createdBy or ensure a create activity log exists.",
+      });
+    }
+    if (!hr.signatureUrl) {
+      return res.status(400).json({
+        message: `Creating HR (${hr.name || "unknown"}) has not uploaded a signature. They must POST /api/employees/upload with type=signature, then save signatureUrl on their account.`,
+        hr: { id: hr.id, name: hr.name, role: hr.role },
+      });
+    }
+
+    // Flat card fields only — no nested duplicates
+    return res.json({
+      employeeId: employee._id,
+      name: employee.name || "",
+      profileUrl: employee.profileUrl || "",
+      employeeCode: employee.official?.employeeCode || "",
+      dateOfBirth: toCardDate(employee.personal?.dateOfBirth),
+      dateOfJoining: toCardDate(employee.official?.dateOfJoining),
+      bloodGroup: employee.personal?.bloodGroup || employee.other?.bloodGroup || "",
+      mobileNo: employee.personal?.mobileNo || "",
+      employeeType,
+      department: employee.official?.department || "",
+      designation: employee.official?.designation || "",
+      hrName: hr.name || "",
+      hrSignatureUrl: hr.signatureUrl,
+    });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
 /**
  * GET ONE — GET /api/employees/:id
  *
@@ -593,6 +808,34 @@ const updateEmployee = async (req, res) => {
       req.body.profileUrl !== undefined ? String(employee.profileUrl || "") : null;
     if (req.body.profileUrl !== undefined) {
       employee.profileUrl = req.body.profileUrl ? String(req.body.profileUrl).trim() : "";
+    }
+
+    const previousSignatureUrl =
+      req.body.signatureUrl !== undefined ? String(employee.signatureUrl || "") : null;
+    if (req.body.signatureUrl !== undefined) {
+      if (!canUseSignature(req.user.role)) {
+        return res.status(403).json({
+          message: "Only Super Admin, Admin, or HR Manager can save a signature",
+        });
+      }
+      const targetRole = normalizeRoleName(employee.role);
+      const self = isOwnRecord(req, employee._id);
+      if (!self && !canUseSignature(targetRole)) {
+        return res.status(403).json({
+          message:
+            "signatureUrl can only be saved on Super Admin, Admin, or HR Manager accounts",
+        });
+      }
+      const nextSig = req.body.signatureUrl
+        ? String(req.body.signatureUrl).trim()
+        : "";
+      if (nextSig && !isSignatureImageUrl(nextSig)) {
+        return res.status(400).json({
+          message:
+            "signatureUrl must be a Cloudinary image from POST /api/employees/upload with type=signature",
+        });
+      }
+      employee.signatureUrl = nextSig;
     }
 
     if (req.body.role !== undefined) {
@@ -815,6 +1058,9 @@ const updateEmployee = async (req, res) => {
     await employee.save();
     if (previousProfileUrl !== null) {
       await forgetProfileImage(previousProfileUrl, employee.profileUrl);
+    }
+    if (previousSignatureUrl !== null) {
+      await forgetSignatureImage(previousSignatureUrl, employee.signatureUrl);
     }
 
     await logEmployeeActivity({ actor: req.user, employee, action: "update", before });
@@ -1083,8 +1329,10 @@ const deleteEmployee = async (req, res) => {
     await logEmployeeActivity({ actor: req.user, employee, action: "delete" });
 
     const profileUrl = employee.profileUrl;
+    const signatureUrl = employee.signatureUrl;
     await employee.deleteOne();
     await forgetProfileImage(profileUrl, "");
+    await forgetSignatureImage(signatureUrl, "");
 
     return res.json({ message: "Employee deleted", id: req.params.id });
   } catch (err) {
@@ -1096,6 +1344,7 @@ const deleteEmployee = async (req, res) => {
  * UPLOAD — POST /api/employees/upload
  * Form-data: document + type. Returns the Cloudinary url only.
  * profile → hrms/profile (images only). Put url on profileUrl.
+ * signature → hrms/signature (images only). Put url on signatureUrl (HR / Admin).
  * companyLogo → hrms/companyLogo (images only). Put url on company logo.
  */
 const uploadAttachment = async (req, res) => {
@@ -1108,9 +1357,18 @@ const uploadAttachment = async (req, res) => {
       });
     }
 
+    if (type === "signature" && !canUseSignature(req.user.role)) {
+      return res.status(403).json({
+        message: "Only Super Admin, Admin, or HR Manager can upload a signature",
+      });
+    }
+
     if (!req.file) {
       return res.status(400).json({
-        message: "Please choose a file (PDF, image, or Excel — max 5MB)",
+        message:
+          type === "signature" || type === "profile" || type === "companyLogo"
+            ? "Please choose an image (JPEG, PNG, WEBP, or GIF — max 5MB)"
+            : "Please choose a file (PDF, image, or Excel — max 5MB)",
       });
     }
 
@@ -1136,7 +1394,8 @@ const uploadAttachment = async (req, res) => {
 
 /**
  * DELETE UPLOAD — DELETE /api/employees/upload
- * Body: { url } of a profile image in hrms/profile. Clears matching profileUrl fields.
+ * Body: { url } of a profile (hrms/profile) or signature (hrms/signature) image.
+ * Clears matching profileUrl / signatureUrl fields.
  */
 const deleteAttachment = async (req, res) => {
   try {
@@ -1145,13 +1404,30 @@ const deleteAttachment = async (req, res) => {
       return res.status(400).json({ message: "File url is required" });
     }
 
-    await deleteProfileImage(url);
-    await User.updateMany({ profileUrl: url }, { $set: { profileUrl: "" } });
+    if (isSignatureImageUrl(url)) {
+      if (!canUseSignature(req.user.role)) {
+        return res.status(403).json({
+          message: "Only Super Admin, Admin, or HR Manager can delete a signature",
+        });
+      }
+      await deleteSignatureImage(url);
+      await User.updateMany({ signatureUrl: url }, { $set: { signatureUrl: "" } });
+      return res.json({ success: true, message: "Signature deleted" });
+    }
 
-    return res.json({ success: true, message: "Profile image deleted" });
+    if (isProfileImageUrl(url)) {
+      await deleteProfileImage(url);
+      await User.updateMany({ profileUrl: url }, { $set: { profileUrl: "" } });
+      return res.json({ success: true, message: "Profile image deleted" });
+    }
+
+    return res.status(400).json({
+      message:
+        "url must be a profile image (type=profile) or signature image (type=signature) uploaded to this app",
+    });
   } catch (err) {
     const status = err.statusCode || 500;
-    if (status >= 500) console.error("Profile image delete failed:", err.message || err);
+    if (status >= 500) console.error("Upload delete failed:", err.message || err);
     return res.status(status).json({ message: err.message || "Delete failed" });
   }
 };
@@ -1328,9 +1604,11 @@ const listActivity = async (req, res) => {
 };
 
 module.exports = {
+  nextEmployeeCode,
   createEmployee,
   listEmployees,
   exportEmployees,
+  getEmployeeIdCard,
   getEmployee,
   updateEmployee,
   listActivity,

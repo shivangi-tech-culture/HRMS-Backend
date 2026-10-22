@@ -16,9 +16,15 @@ const {
   permissionsForRole,
 } = require("../config/permissions");
 const { logEmployeeActivity } = require("../utils/activityLog");
-const { forgetProfileImage } = require("../middleware/upload");
+const {
+  forgetProfileImage,
+  forgetSignatureImage,
+  isSignatureImageUrl,
+} = require("../middleware/upload");
+const { normalizeRoleName, SUPER_ADMIN, ADMIN, HR } = require("../config/roles");
 
 const LOCKED_ROLES = new Set(["Super Admin", "Admin", "Employee"]);
+const SIGNATURE_ROLES = new Set([SUPER_ADMIN, ADMIN, HR]);
 
 const permLabel = (roleDoc) => {
   if (!roleDoc) return "0 of 0";
@@ -64,6 +70,7 @@ const toProfilePayload = async (user, roleDoc) => {
     workPhone: personal.workPhone || "",
     lastLogin: user.lastLogin || null,
     profileUrl: user.profileUrl || null,
+    signatureUrl: user.signatureUrl || null,
     signedInAs: user.name || "",
     permissionCount: permLabel(roleDoc),
     catalog: roleDoc?.catalog || null,
@@ -120,9 +127,32 @@ const updateMyProfile = async (req, res) => {
       user.profileUrl = req.body.profileUrl ? String(req.body.profileUrl).trim() : "";
     }
 
+    const previousSignatureUrl =
+      req.body.signatureUrl !== undefined ? String(user.signatureUrl || "") : null;
+    if (req.body.signatureUrl !== undefined) {
+      if (!SIGNATURE_ROLES.has(normalizeRoleName(user.role))) {
+        return res.status(403).json({
+          message: "Only Super Admin, Admin, or HR Manager can save a signature",
+        });
+      }
+      const nextSig = req.body.signatureUrl
+        ? String(req.body.signatureUrl).trim()
+        : "";
+      if (nextSig && !isSignatureImageUrl(nextSig)) {
+        return res.status(400).json({
+          message:
+            "signatureUrl must be a Cloudinary image from POST /api/employees/upload with type=signature",
+        });
+      }
+      user.signatureUrl = nextSig;
+    }
+
     await user.save();
     if (previousProfileUrl !== null) {
       await forgetProfileImage(previousProfileUrl, user.profileUrl);
+    }
+    if (previousSignatureUrl !== null) {
+      await forgetSignatureImage(previousSignatureUrl, user.signatureUrl);
     }
     await logEmployeeActivity({ actor: req.user, employee: user, action: "update", before });
 

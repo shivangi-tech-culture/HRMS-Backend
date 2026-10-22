@@ -542,6 +542,7 @@ const exportUsers = async (req, res) => {
       const mapped = mapListRow(row);
       return {
         name: mapped.name,
+        employeeCode: mapped.employeeCode,
         email: mapped.email,
         role: mapped.role,
         department: mapped.department,
@@ -560,6 +561,7 @@ const exportUsers = async (req, res) => {
       `access-control-users.xlsx`,
       [
         { header: "User", key: "name", width: 24 },
+        { header: "Employee code", key: "employeeCode", width: 14 },
         { header: "Email", key: "email", width: 28 },
         { header: "Role", key: "role", width: 16 },
         { header: "Department", key: "department", width: 18 },
