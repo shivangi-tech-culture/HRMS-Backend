@@ -4,8 +4,8 @@
  * SAFE: writes Attendance and regularization requests only. Does NOT change company / employee assign.
  *
  * ─── EMPLOYEE (self) ─────────────────────────────────────────
- * POST   /punch-in              { source, latitude, longitude, remarks? }
- * POST   /punch-out             { source, latitude, longitude, remarks? }
+ * POST   /punch-in              { source, latitude, longitude, remarks? }  — within 50m of branch GPS
+ * POST   /punch-out             { source, latitude, longitude, remarks? }  — within 50m of branch GPS
  * GET    /today
  * GET    /punch-status          ?date=   employee + company from login token
  * GET    /web-punches           ?date=&from=&to=&page=&limit=
