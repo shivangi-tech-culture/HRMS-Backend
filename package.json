@@ -14,6 +14,8 @@
     "seed:on-duty": "node src/scripts/seedDutyCategories.js onDuty",
     "seed:on-tour": "node src/scripts/seedDutyCategories.js onTour",
     "sync:break-permissions": "node src/scripts/syncBreakPermissions.js",
+    "sync:admin-permissions": "node src/scripts/syncAdminPermissions.js",
+    "sync:employee-permissions": "node src/scripts/syncEmployeePermissions.js",
     "check:break-permissions": "node src/scripts/checkBreakPermissions.js",
     "backfill:activity": "node src/scripts/backfillActivityCompanies.js"
   },

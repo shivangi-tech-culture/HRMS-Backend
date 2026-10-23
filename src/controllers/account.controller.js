@@ -3,6 +3,7 @@
  * UI: https://hrms-techculture.vercel.app/account/profile
  * Works for Admin + Employee (logged-in user only).
  */
+const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 const Role = require("../models/Role");
 const {
@@ -194,8 +195,47 @@ const getMe = async (req, res) => {
   }
 };
 
+/**
+ * POST /api/account/change-password — employee (any logged-in user) changes own password
+ * Body: { newPassword, confirmPassword }
+ */
+const changePassword = async (req, res) => {
+  try {
+    const { newPassword, confirmPassword } = req.body;
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        message: "New password and confirm password do not match",
+      });
+    }
+
+    const user = await User.findById(req.user._id).select("password status");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    if (user.status !== "Active") {
+      return res.status(401).json({ message: "Account is inactive" });
+    }
+
+    const sameAsOld = await bcrypt.compare(newPassword, user.password);
+    if (sameAsOld) {
+      return res.status(400).json({
+        message: "New password must be different from current password",
+      });
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    return res.json({ message: "Password changed successfully" });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
 module.exports = {
   getMyProfile,
   updateMyProfile,
   getMe,
+  changePassword,
 };

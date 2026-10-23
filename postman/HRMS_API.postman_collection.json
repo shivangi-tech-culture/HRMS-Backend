@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "e76ef156-bb7e-4bd7-b543-75856b8a760e",
     "name": "HRMS ALL APIs",
-    "description": "**How to use**\n**Use with No Environment** (or an environment without baseUrl / token / password / *Id keys) — environment values override these collection variables.\n\n1. **0. Login & My Account → 1. Login** (saves {{token}}; every request sends it as Bearer auth). Body is just `{ \"username\", \"password\" }` — `username` = employee code, official / personal email, or mobile (auto-detected).\n2. **1. ADMIN** = all admin modules, **2. EMPLOYEE (ESS)** = employee self-service (starts with Login as Employee).\n3. Every module folder lists all its APIs: **Create → List → Update → Delete** first, then other routes.\n4. **1.2 Masters**: one folder per master type with Create / List / Get / Update / Delete.\n5. Company / branch / shift / manager / employee ids are auto-filled before send when empty.\n6. **1.5 Employees → Next Employee Code** then **Create Employee** — leave `official.employeeCode` blank; server assigns `{companyCode}{001}` per company.\n\n**Seed** (`npm run seed`):\n| Role | Email | Code | Mobile | Password |\n| --- | --- | --- | --- | --- |\n| Super Admin | superadmin@gmail.com | — | — | 123456 |\n| Admin | admin@gmail.com | — | — | 123456 |\n| HR | anupama@techculture.ai | TC001 | 9876500100 | TC00115012005 |\n| Manager | manav@techculture.ai | TC002 | 9876500201 | TC00215012005 |\n| Manager | manoj@techculture.ai | TC003 | 9876500202 | TC00315012005 |\n| Employee | shivangi@techculture.ai | TC004 | 9876500001 | TC00415012005 |\n| Employee | employee@techculture.ai | TC005 | 9876500002 | TC00515012005 |\n| Employee | vivek@techculture.ai | TC006 | 9876500003 | TC00615012005 |\n| Employee | ananya@techculture.ai | TC007 | 9876500004 | TC00715012005 |\n\nStaff password = `{employeeCode}` + DOB `ddmmyyyy` (`15012005`). Any of Email / Code / Mobile works as `username`.\n`employeeType` on the ID card is automatic from DOJ: TC005 / TC006 = **Probation** (joined on seed day), TC004 / TC007 = **Permanent** (joined 4 months earlier).\n\nPiece seeds: `npm run seed:masters` · `seed:leave` · `seed:holiday` · `seed:on-duty` · `seed:on-tour`\n\n**Employee code:** `GET /api/employees/next-code?companyId=` → preview (does not reserve). Blank code on create → auto `{companyCode}` + 3 digits per company (`TC008` next after seed).\n\n\n**How to read params:** Each request Docs has **Parameters (type + how to send)**. JSON: unquoted numbers/booleans; dates `YYYY-MM-DD`; times `HH:mm`.\n---\n### Sidebar tip\nKeep **1.2 Masters → 2. CRUD by type** collapsed. Windows: **Alt + click** the folder arrow to collapse/expand all.",
+    "description": "**How to use**\n**Use with No Environment** (or an environment without baseUrl / token / password / *Id keys) — environment values override these collection variables.\n\n1. **0. Login & My Account → 1. Login** (saves {{token}}; every request sends it as Bearer auth). Body is just `{ \"username\", \"password\" }` — `username` = employee code, official / personal email, or mobile (auto-detected).\n2. **1. ADMIN** = all admin modules, **2. EMPLOYEE (ESS)** = employee self-service (starts with Login as Employee).\n3. Every module folder lists all its APIs: **Create → List → Update → Delete** first, then other routes.\n4. **1.2 Masters**: one folder per master type with Create / List / Get / Update / Delete.\n5. Company / branch / shift / manager / employee ids are auto-filled before send when empty.\n6. **1.5 Employees → Next Employee Code** then **Create Employee** — leave `official.employeeCode` blank; server assigns `{companyCode}{001}` per company.\n\n**Seed** (`npm run seed`):\n| Role | Email | Code | Mobile | Password |\n| --- | --- | --- | --- | --- |\n| Super Admin | superadmin@gmail.com | — | — | 123456 |\n| Admin | admin@gmail.com | — | — | 123456 |\n| HR | anupama@techculture.ai | TC001 | 9876500100 | TC00115012005 |\n| Manager | manav@techculture.ai | TC002 | 9876500201 | TC00215012005 |\n| Manager | manoj@techculture.ai | TC003 | 9876500202 | TC00315012005 |\n| Employee | shivangi@techculture.ai | TC004 | 9876500001 | TC00415012005 |\n| Employee | employee@techculture.ai | TC005 | 9876500002 | TC00515012005 |\n| Employee | vivek@techculture.ai | TC006 | 9876500003 | TC00615012005 |\n| Employee | ananya@techculture.ai | TC007 | 9876500004 | TC00715012005 |\n\nStaff password = `{employeeCode}` + DOB `ddmmyyyy` (`15012005`). Any of Email / Code / Mobile works as `username`.\n`employeeType` on the ID card is automatic from DOJ: TC005 / TC006 = **Probation** (joined on seed day), TC004 / TC007 = **Permanent** (joined 4 months earlier).\n\nWork: **1.11 Projects** → **1.12 Tasks** (assign) · **2.7 Tasks (To Do)**.\n\nPiece seeds: `npm run seed:masters` · `seed:leave` · `seed:holiday` · `seed:on-duty` · `seed:on-tour`\n\n**Employee code:** `GET /api/employees/next-code?companyId=` → preview (does not reserve). Blank code on create → auto `{companyCode}` + 3 digits per company (`TC008` next after seed).\n\n\n**How to read params:** Each request Docs has **Parameters (type + how to send)**. JSON: unquoted numbers/booleans; dates `YYYY-MM-DD`; times `HH:mm`.\n---\n### Sidebar tip\nKeep **1.2 Masters → 2. CRUD by type** collapsed. Windows: **Alt + click** the folder arrow to collapse/expand all.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -190,6 +190,39 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Super Admin\",\n  \"profileUrl\": \"\",\n  \"signatureUrl\": \"{{signatureUrl}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "3b. Change My Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/account/change-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "account",
+                "change-password"
+              ]
+            },
+            "description": "POST /api/account/change-password — logged-in employee (any role) changes own password.\n\nOnly `newPassword` + `confirmPassword` (no current password). Welcome mail marks the first password as temporary — use this after login.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `newPassword` — string | required | 6–50 chars; must differ from existing password\n- `confirmPassword` — string | required | must match `newPassword`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"newPassword\": \"MyNewPass123\",\n  \"confirmPassword\": \"MyNewPass123\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -5284,7 +5317,7 @@
               }
             },
             {
-              "name": "8. Resend Credentials to User",
+              "name": "8. Send Credentials to Mail",
               "request": {
                 "method": "POST",
                 "header": [],
@@ -5300,7 +5333,41 @@
                     "mail"
                   ]
                 },
-                "description": "Resends login credentials to the user's officialEmail. Only needs `userId` — no body, no cc/bcc.\n\nPassword rebuilt as `{employeeCode}{ddmmyyyy}` (platform roles → `123456`), saved, then welcome mail sent.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}` *(or Cookie `token`)*\n\n**Path**\n- `userId` → {{userId}} — MongoId from create/list\n\n**Body:** none\n---\n"
+                "description": "POST /api/users/{{userId}}/mail — **Send login credentials** to the user's `officialEmail`.\n\nNo body. Rebuilds default password (`{employeeCode}{ddmmyyyy}`, platform → `123456`), saves hash, emails welcome HTML with **temporary password** (you can update password after login).\n\nPermission: Access & Control → email.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `userId` → {{userId}} — string (MongoId / id) | from Create User / List Users\n\n**Body:** none\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+              }
+            },
+            {
+              "name": "8b. Admin Change User Password",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/users/{{userId}}/change-password",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "users",
+                    "{{userId}}",
+                    "change-password"
+                  ]
+                },
+                "description": "POST /api/users/{{userId}}/change-password — **Admin sets a new password** for any Access & Control user (no current password).\n\nWho: Super Admin / Admin / HR Manager (company scope + can manage role).\nPermission: Access & Control → edit.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `userId` → {{userId}} — string (MongoId / id) | from Create User / List Users\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `newPassword` — string | required | 6–50 chars\n- `confirmPassword` — string | required | must match `newPassword`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"newPassword\": \"UserNewPass123\",\n  \"confirmPassword\": \"UserNewPass123\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
               }
             },
             {
@@ -5948,6 +6015,60 @@
                   ]
                 },
                 "description": "Company-wise tracking of every employee change — create / update (field by field) / delete / manager assign.\nUntick `companyId` for all companies (Super Admin / Admin). HR Manager â†’ own companies, Reporting Manager â†’ own team.\nTick `employeeId` for one person's full history (changes made on them OR by them).\nEach log: `at`, `action`, `summary`, `company`, `employee{ id, name, employeeCode, email }` (who was changed), `by{ id, name, role, self }` (who changed it), `changes[{ field, label, from, to }]` — e.g. `{ label: \"Mobile No\", from: \"9810044556\", to: \"9810099999\" }`. Newest first.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `companyId` â†’ {{companyId}} — string (MongoId / id) | set collection variable after create/list\n\n**Query params** *(Params tab — each has description)*\n- `companyId` — string (MongoId 24-hex or company name) | optional | company selected in the UI ({{companyId}}) — untick / omit for all companies\n- `employeeId` — string (MongoId 24-hex) | optional | one person's history — changes made on them OR by them (admin only; Employee always sees own)\n- `action` — string | optional | `create` | `update` | `delete` | `section_update` | `section_delete`\n- `from` — string (YYYY-MM-DD) | optional | range start date\n- `to` — string (YYYY-MM-DD) | optional | range end date\n- `search` — string | optional | employee name / code / email, changed-by name or summary text (admin only)\n- `page` — number | optional | page number, default `1`\n- `limit` — number | optional | rows per page (usually 1â€“200)\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+              }
+            },
+            {
+              "name": "9b. Send Credentials to Mail",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/users/{{employeeId}}/mail",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "users",
+                    "{{employeeId}}",
+                    "mail"
+                  ]
+                },
+                "description": "POST /api/users/{{employeeId}}/mail — **Send login credentials** to the employee's `officialEmail`.\n\nSame API as Access & Control. Uses `{{employeeId}}` from Create / List Employee (employees are User docs).\nNo body. Rebuilds password `{employeeCode}{ddmmyyyy}`, saves hash, emails welcome HTML with **temporary password** (you can update password after login).\n\nPermission: Access & Control → email.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `employeeId` → {{employeeId}} — string (MongoId / id) | from Create Employee / List Employees\n\n**Body:** none\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+              }
+            },
+            {
+              "name": "9c. Admin Change Employee Password",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/employees/{{employeeId}}/change-password",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "employees",
+                    "{{employeeId}}",
+                    "change-password"
+                  ]
+                },
+                "description": "POST /api/employees/{{employeeId}}/change-password — **Admin sets a new password** for any employee (no current password).\n\nWho: Super Admin / Admin / HR Manager (company scope).\nPermission: Employee → edit.\n\nEmployee self-service (own password only) → `2. EMPLOYEE (ESS)` → `5b. Change My Password`.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `employeeId` → {{employeeId}} — string (MongoId / id) | from Create Employee / List Employees\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `newPassword` — string | required | 6–50 chars\n- `confirmPassword` — string | required | must match `newPassword`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"newPassword\": \"EmpNewPass123\",\n  \"confirmPassword\": \"EmpNewPass123\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
               }
             },
             {
@@ -8230,6 +8351,458 @@
               ]
             }
           ]
+        },
+        {
+          "name": "1.11 Projects",
+          "description": "Admin **Work → Projects** — create project under a company first.\n{{companyId}} / {{employeeId1}} auto-fill when empty.\n\n## Standard flow (company checks on every step)\n\n1. **Login** as Admin / HR (0. Login).\n2. **Create Project** for `{{companyId}}` → saves `{{projectId}}`.\n3. *(Optional)* **Assign Project Members** — Employees of that company.\n4. **Create Task** with `projectId` (company comes from project) → saves `{{taskId}}`.\n5. **Assign Task** — `assigneeIds` must be Employees of the **same company**.\n6. Employee login → **My To Do Tasks** / **Mark Done**.\n\n| Field | What it is for |\n|-------|----------------|\n| `companyId` | Company that owns the project (set on Project only). |\n| `projectId` | Project the task belongs to. Required on task create. |\n| `memberIds` / `employeeIds` | Project team (Employees of that company). |\n| `assignees` / `assigneeIds` | Who must do the task (Employees of that company). |\n| `mode` | `add` (default) · `remove` · `replace` on Assign APIs. |\n",
+          "item": [
+            {
+              "name": "1. Create Project",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/projects",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "projects"
+                  ]
+                },
+                "description": "POST /api/projects — create project for one company.\nPermission: **Work → Projects → create**.\nSaves {{projectId}}.\n\n---\n### Parameters\n**Header:** `Authorization: Bearer {{token}}`\n\n**Body**\n- `name` — string | **required** | project name (e.g. HR Ops)\n- `companyId` — MongoId | **required** | company this project belongs to\n- `description` — string | optional\n- `status` — `Active` | `Inactive` | optional (default Active)\n- `memberIds` — MongoId[] | optional | Employees of that company\n\n_Tip: numbers/booleans/null unquoted. Dates = `YYYY-MM-DD`. Ids = 24-char hex._\n---\n",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"HR Ops\",\n  \"description\": \"HR operations checklist project\",\n  \"companyId\": \"{{companyId}}\",\n  \"status\": \"Active\",\n  \"memberIds\": [\n    \"{{employeeId1}}\"\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const j = pm.response.json();",
+                      "const id = (j.data || {})._id;",
+                      "if (id) pm.collectionVariables.set('projectId', id);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "2. List Projects",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/projects?page={{page}}&limit={{limit}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "projects"
+                  ],
+                  "query": [
+                    {
+                      "key": "companyId",
+                      "value": "{{companyId}}",
+                      "description": "MongoId | optional | one company",
+                      "disabled": true
+                    },
+                    {
+                      "key": "status",
+                      "value": "Active",
+                      "description": "Active | Inactive | ALL",
+                      "disabled": true
+                    },
+                    {
+                      "key": "search",
+                      "value": "",
+                      "description": "string | optional | project name",
+                      "disabled": true
+                    },
+                    {
+                      "key": "page",
+                      "value": "{{page}}",
+                      "description": "number | default 1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "{{limit}}",
+                      "description": "number | 1–100"
+                    }
+                  ]
+                },
+                "description": "GET /api/projects — company-scoped list.\nPermission: **Work → Projects → view**.\n\n---\n### Query\n- `companyId` · `status` (Active|Inactive|ALL) · `search` · `page` · `limit`\n---\n"
+              }
+            },
+            {
+              "name": "3. Get Project",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/projects/{{projectId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "projects",
+                    "{{projectId}}"
+                  ]
+                },
+                "description": "GET /api/projects/:id — one project with members.\n{{projectId}} from Create / List."
+              }
+            },
+            {
+              "name": "4. Update Project",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/projects/{{projectId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "projects",
+                    "{{projectId}}"
+                  ]
+                },
+                "description": "PUT /api/projects/:id — name / description / status.\nDoes not change members — use Assign.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"HR Ops\",\n  \"description\": \"Updated notes\",\n  \"status\": \"Active\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "5. Assign Project Members",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/projects/{{projectId}}/assign",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "projects",
+                    "{{projectId}}",
+                    "assign"
+                  ]
+                },
+                "description": "POST /api/projects/:id/assign — add/remove/replace project team.\nPermission: **Work → Projects → assign**.\nEvery id must be an **Employee** of the **same company** as the project.\n\n---\n### Body\n- `employeeIds` — MongoId[] | **required**\n- `mode` — `add` (default) | `remove` | `replace`\n---\n",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"employeeIds\": [\n    \"{{employeeId1}}\",\n    \"{{employeeId2}}\"\n  ],\n  \"mode\": \"add\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "6. Delete Project",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/projects/{{projectId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "projects",
+                    "{{projectId}}"
+                  ]
+                },
+                "description": "DELETE /api/projects/:id\nBlocked (409) while tasks still link to this project."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                      "  pm.collectionVariables.set('projectId', '');",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "1.12 Tasks",
+          "description": "Admin **Work → Tasks** — tasks live under a Project.\nRun **1.11 Projects → 1. Create Project** first (needs {{projectId}}).\n\n## Standard flow (company checks on every step)\n\n1. **Login** as Admin / HR (0. Login).\n2. **Create Project** for `{{companyId}}` → saves `{{projectId}}`.\n3. *(Optional)* **Assign Project Members** — Employees of that company.\n4. **Create Task** with `projectId` (company comes from project) → saves `{{taskId}}`.\n5. **Assign Task** — `assigneeIds` must be Employees of the **same company**.\n6. Employee login → **My To Do Tasks** / **Mark Done**.\n\n| Field | What it is for |\n|-------|----------------|\n| `companyId` | Company that owns the project (set on Project only). |\n| `projectId` | Project the task belongs to. Required on task create. |\n| `memberIds` / `employeeIds` | Project team (Employees of that company). |\n| `assignees` / `assigneeIds` | Who must do the task (Employees of that company). |\n| `mode` | `add` (default) · `remove` · `replace` on Assign APIs. |\n",
+          "item": [
+            {
+              "name": "1. Create Task",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/tasks",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "tasks"
+                  ]
+                },
+                "description": "POST /api/tasks — create under a project.\nPermission: **Work → Tasks → create**.\n`companyId` is taken from the project (optional in body; must match if sent).\n`assignees` optional here — or use **5. Assign Task** after create.\nSaves {{taskId}}.\n\n---\n### Body\n- `title` — string | **required**\n- `projectId` — MongoId | **required** | from 1.11 Create Project\n- `description` — string | optional\n- `companyId` — MongoId | optional | must equal project's company\n- `assignees` — MongoId or MongoId[] | optional | Employees of project company\n- `dueDate` — YYYY-MM-DD | optional\n- `priority` — High | Medium | Low\n- `status` — To Do | In Progress | Completed\n---\n",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"Submit weekly attendance summary\",\n  \"description\": \"Compile last week's attendance and send to HR Desk.\",\n  \"projectId\": \"{{projectId}}\",\n  \"companyId\": \"{{companyId}}\",\n  \"assignees\": [\n    \"{{employeeId1}}\"\n  ],\n  \"dueDate\": \"2026-10-30\",\n  \"priority\": \"High\",\n  \"status\": \"To Do\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const j = pm.response.json();",
+                      "const id = (j.data || {})._id;",
+                      "if (id) pm.collectionVariables.set('taskId', id);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "2. List Tasks",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/tasks?page={{page}}&limit={{limit}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "tasks"
+                  ],
+                  "query": [
+                    {
+                      "key": "companyId",
+                      "value": "{{companyId}}",
+                      "description": "MongoId | optional",
+                      "disabled": true
+                    },
+                    {
+                      "key": "projectId",
+                      "value": "{{projectId}}",
+                      "description": "MongoId | optional | one project",
+                      "disabled": true
+                    },
+                    {
+                      "key": "assignee",
+                      "value": "{{employeeId1}}",
+                      "description": "MongoId | optional | in assignees[]",
+                      "disabled": true
+                    },
+                    {
+                      "key": "status",
+                      "value": "ALL",
+                      "description": "To Do | In Progress | Completed | Over Due | ALL",
+                      "disabled": true
+                    },
+                    {
+                      "key": "priority",
+                      "value": "High",
+                      "description": "High | Medium | Low",
+                      "disabled": true
+                    },
+                    {
+                      "key": "search",
+                      "value": "",
+                      "description": "title / description",
+                      "disabled": true
+                    },
+                    {
+                      "key": "page",
+                      "value": "{{page}}",
+                      "description": "number"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "{{limit}}",
+                      "description": "number"
+                    }
+                  ]
+                },
+                "description": "GET /api/tasks — company-scoped. Filter by projectId / assignee / status.\n\n---\n### Query\n- `companyId` · `projectId` · `assignee` · `status` · `priority` · `search` · `page` · `limit`\n---\n"
+              }
+            },
+            {
+              "name": "3. Get Task",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/tasks/{{taskId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "tasks",
+                    "{{taskId}}"
+                  ]
+                },
+                "description": "GET /api/tasks/:id — project + assignees + company populated."
+              }
+            },
+            {
+              "name": "4. Update Task",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/tasks/{{taskId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "tasks",
+                    "{{taskId}}"
+                  ]
+                },
+                "description": "PUT /api/tasks/:id — title, projectId, assignees, dueDate, priority, status.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"Submit weekly attendance summary (updated)\",\n  \"description\": \"Include late/early counts.\",\n  \"dueDate\": \"2026-10-31\",\n  \"priority\": \"Medium\",\n  \"status\": \"In Progress\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "5. Assign Task",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/tasks/{{taskId}}/assign",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "tasks",
+                    "{{taskId}}",
+                    "assign"
+                  ]
+                },
+                "description": "POST /api/tasks/:id/assign — add/remove/replace assignees.\nPermission: **Work → Tasks → assign**.\nEvery assignee must be Employee of the **task's company** (same as project).\n\n---\n### Body\n- `assigneeIds` — MongoId[] | **required**\n- `mode` — `add` | `remove` | `replace`\n---\n",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"assigneeIds\": [\n    \"{{employeeId1}}\"\n  ],\n  \"mode\": \"replace\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "6. Delete Task",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/tasks/{{taskId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "tasks",
+                    "{{taskId}}"
+                  ]
+                },
+                "description": "DELETE /api/tasks/:id — permanent delete."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                      "  pm.collectionVariables.set('taskId', '');",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
         }
       ]
     },
@@ -8466,6 +9039,39 @@
                       ]
                     },
                     "description": "\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
+                  }
+                },
+                {
+                  "name": "5b. Change My Password",
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/account/change-password",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "account",
+                        "change-password"
+                      ]
+                    },
+                    "description": "POST /api/account/change-password — employee changes own password after login.\n\nOnly `newPassword` + `confirmPassword` (no current password). Welcome mail marks the first password as temporary — use this after **1. Login (Employee)**.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Employee Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `newPassword` — string | required | 6–50 chars; must differ from existing password\n- `confirmPassword` — string | required | must match `newPassword`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"newPassword\": \"MyNewPass123\",\n  \"confirmPassword\": \"MyNewPass123\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    }
                   }
                 },
                 {
@@ -10484,6 +11090,115 @@
               ]
             }
           ]
+        },
+        {
+          "name": "2.7 Tasks (To Do)",
+          "description": "Employee **Tasks → To Do Tasks**.\nShows tasks where you are in `assignees[]`.\nAdmin must Create Project → Create/Assign Task first.\n\n## Standard flow (company checks on every step)\n\n1. **Login** as Admin / HR (0. Login).\n2. **Create Project** for `{{companyId}}` → saves `{{projectId}}`.\n3. *(Optional)* **Assign Project Members** — Employees of that company.\n4. **Create Task** with `projectId` (company comes from project) → saves `{{taskId}}`.\n5. **Assign Task** — `assigneeIds` must be Employees of the **same company**.\n6. Employee login → **My To Do Tasks** / **Mark Done**.\n\n| Field | What it is for |\n|-------|----------------|\n| `companyId` | Company that owns the project (set on Project only). |\n| `projectId` | Project the task belongs to. Required on task create. |\n| `memberIds` / `employeeIds` | Project team (Employees of that company). |\n| `assignees` / `assigneeIds` | Who must do the task (Employees of that company). |\n| `mode` | `add` (default) · `remove` · `replace` on Assign APIs. |\n",
+          "item": [
+            {
+              "name": "1. My To Do Tasks",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/tasks/me?page={{page}}&limit={{limit}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "tasks",
+                    "me"
+                  ],
+                  "query": [
+                    {
+                      "key": "projectId",
+                      "value": "{{projectId}}",
+                      "description": "MongoId | optional",
+                      "disabled": true
+                    },
+                    {
+                      "key": "status",
+                      "value": "ALL",
+                      "description": "To Do | In Progress | Completed | Over Due | ALL",
+                      "disabled": true
+                    },
+                    {
+                      "key": "priority",
+                      "value": "High",
+                      "description": "High | Medium | Low",
+                      "disabled": true
+                    },
+                    {
+                      "key": "search",
+                      "value": "",
+                      "description": "title / description",
+                      "disabled": true
+                    },
+                    {
+                      "key": "page",
+                      "value": "{{page}}",
+                      "description": "number"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "{{limit}}",
+                      "description": "number"
+                    }
+                  ]
+                },
+                "description": "GET /api/tasks/me — only tasks assigned to the logged-in employee.\n`project` field = project name for the UI Project column.\n\n---\n### Query\n- `projectId` · `status` · `priority` · `search` · `page` · `limit`\n---\n"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const j = pm.response.json();",
+                      "const row = (j.data || []).find((r) => r.status !== 'Completed') || (j.data || [])[0];",
+                      "if (row && row._id) pm.collectionVariables.set('taskId', row._id);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "2. Mark Done (Update Status)",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/tasks/me/{{taskId}}/status",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "tasks",
+                    "me",
+                    "{{taskId}}",
+                    "status"
+                  ]
+                },
+                "description": "PATCH /api/tasks/me/:id/status — Done button.\nOnly if you are in assignees[].\n\n---\n### Body\n- `status` — To Do | In Progress | Completed | **required**\n---\n",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"Completed\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            }
+          ]
         }
       ]
     }
@@ -10731,6 +11446,14 @@
     },
     {
       "key": "profileImageUrl",
+      "value": ""
+    },
+    {
+      "key": "taskId",
+      "value": ""
+    },
+    {
+      "key": "projectId",
       "value": ""
     }
   ]

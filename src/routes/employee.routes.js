@@ -12,6 +12,7 @@ const {
   getEmployeeIdCard,
   getEmployee,
   updateEmployee,
+  adminChangePassword,
   listActivity,
   deleteSection,
   deleteEmployee,
@@ -33,8 +34,23 @@ const {
 } = require("../validators/user.validation");
 const { assignReportingManager } = require("../controllers/reportingManager.controller");
 const { assignManagerSchema } = require("../validators/reportingManager.validation");
+const Joi = require("joi");
 
 const router = express.Router();
+
+const adminChangePasswordSchema = Joi.object({
+  newPassword: Joi.string().min(6).max(50).required().messages({
+    "string.min": "New password must be at least 6 characters",
+    "string.max": "New password must be at most 50 characters",
+    "string.empty": "New password is required",
+    "any.required": "New password is required",
+  }),
+  confirmPassword: Joi.string().valid(Joi.ref("newPassword")).required().messages({
+    "any.only": "New password and confirm password do not match",
+    "string.empty": "Confirm password is required",
+    "any.required": "Confirm password is required",
+  }),
+}).unknown(false);
 
 /**
  * @swagger
@@ -567,6 +583,46 @@ router.get(
   authorize(...ALL_ACCESS, "Employee"),
   checkEmployeeProfilePermission("view"),
   getEmployeeIdCard
+);
+
+/**
+ * @swagger
+ * /api/employees/{id}/change-password:
+ *   post:
+ *     tags: [Admin / Employees]
+ *     summary: Admin — change any employee password
+ *     description: |
+ *       Super Admin / Admin / HR Manager set a new password for an employee (company scope).
+ *       Body: `newPassword` + `confirmPassword` only.
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - $ref: '#/components/parameters/UserId'
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [newPassword, confirmPassword]
+ *             properties:
+ *               newPassword: { type: string, minLength: 6, maxLength: 50 }
+ *               confirmPassword: { type: string }
+ *           example:
+ *             newPassword: "EmpNewPass123"
+ *             confirmPassword: "EmpNewPass123"
+ *     responses:
+ *       200: { description: Password changed }
+ *       400: { description: Validation failed }
+ *       403: { description: Out of scope / cannot manage role }
+ *       404: { description: Employee not found }
+ */
+router.post(
+  "/:id/change-password",
+  protect,
+  authorize("Super Admin", "Admin", "HR Manager"),
+  checkPermission("Employee", "Employee", "edit"),
+  validate(adminChangePasswordSchema),
+  adminChangePassword
 );
 
 /**
