@@ -45,7 +45,13 @@ const PARAM_DOCS = {
   source: "string | required for punch | `web` | `mobile` | `biometric`",
   type: "string | depends on API | see request notes / enum in body",
   status:
-    "string | optional | context enum — Active/Inactive OR Present/Absent/Late/… OR Pending/Approved/…",
+    "string | optional | context enum — Active/Inactive OR Present/Absent/Late/… OR Pending/Approved/… OR task To Do/In Progress/Completed/Over Due/ALL",
+  assignee: "string (MongoId 24-hex) | required on create | Employee `_id` who owns the task ({{employeeId1}})",
+  project: "string | optional | Project column label e.g. `HR Ops` / `Onboarding` / `Self Service`",
+  priority: "string | optional | task urgency `High` | `Medium` | `Low`",
+  dueDate: "string (YYYY-MM-DD) | optional | task deadline; empty = no due date; past + not Completed → Over Due",
+  title: "string | required on create | task name shown in To Do list (min 2)",
+  taskId: "string (MongoId 24-hex) | path | task `_id` from Create / List / My To Do Tasks ({{taskId}})",
 
   // ── auth / account ─────────────────────────────────────────────
   officialEmail: "string (email) | required | login email",

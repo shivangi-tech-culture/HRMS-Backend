@@ -302,6 +302,16 @@ Clears the auth cookie.
 │   ├── POST /punch-in | /punch-out | /manual
 │   ├── GET  /today
 │   └── GET  /
+├── /api/projects           ← Work → Projects (company-scoped)
+│   ├── GET/POST /
+│   ├── GET/PUT/DELETE /:id
+│   └── POST /:id/assign    ← project members
+├── /api/tasks              ← Work → Tasks (under project) · ESS To Do
+│   ├── GET/POST /          ← create needs projectId
+│   ├── GET/PUT/DELETE /:id
+│   ├── POST /:id/assign    ← task assignees
+│   ├── GET  /me
+│   └── PATCH /me/:id/status
 └── /api/chat               ← team chat (header X-Company-Id)
     ├── GET  /me | /employees | /conversations
     ├── POST /conversations | /conversations/:id/messages | /conversations/:id/read

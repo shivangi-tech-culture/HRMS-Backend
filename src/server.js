@@ -37,6 +37,8 @@ const chatRoutes = require("./routes/chat.routes");
 const leaveRoutes = require("./routes/leave.routes");
 const holidayRoutes = require("./routes/holiday.routes");
 const breakRoutes = require("./routes/break.routes");
+const projectRoutes = require("./routes/project.routes");
+const taskRoutes = require("./routes/task.routes");
 const { attachChatSocket } = require("./utils/chatSocket");
 
 const app = express();
@@ -235,6 +237,8 @@ app.use("/api/chat", chatRoutes); // team chat (REST) — live updates on Socket
 app.use("/api/leave", leaveRoutes); // types · balance · requests · calendar · policies · history
 app.use("/api/holidays", holidayRoutes); // catalog + company assignment
 app.use("/api/break", breakRoutes); // employee start/end · admin live + history
+app.use("/api/projects", projectRoutes); // company projects + member assign
+app.use("/api/tasks", taskRoutes); // project tasks + assignee assign + employee To Do
 
 /** One HTTP server for the API and Socket.IO (chat) */
 const server = http.createServer(app);

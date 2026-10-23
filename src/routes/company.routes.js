@@ -32,7 +32,7 @@ const canView = [
   authorize(...ALL_ACCESS),
   (req, res, next) =>
     hasGlobalCompanyAccess(req.user)
-      ? checkPermission("Administration", "Company", "view")(req, res, next)
+      ? checkPermission("Administration", "Companies", "view")(req, res, next)
       : next(),
 ];
 
@@ -158,7 +158,7 @@ router.post(
   "/",
   protect,
   authorize(...companyRoles),
-  checkPermission("Administration", "Company", "create"),
+  checkPermission("Administration", "Companies", "create"),
   validate(createCompanySchema),
   createCompany
 );
@@ -221,7 +221,7 @@ router.put(
   "/:id",
   protect,
   authorize(...companyRoles),
-  checkPermission("Administration", "Company", "edit"),
+  checkPermission("Administration", "Companies", "edit"),
   validate(updateCompanySchema),
   updateCompany
 );
@@ -230,7 +230,7 @@ router.delete(
   "/:id",
   protect,
   authorize(...companyRoles),
-  checkPermission("Administration", "Company", "delete"),
+  checkPermission("Administration", "Companies", "delete"),
   deleteCompany
 );
 

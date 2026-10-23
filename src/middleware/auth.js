@@ -24,8 +24,7 @@ const ADMIN_ONLY_MODULES = new Set([
   "Break",
   "Leave",
   "Payroll",
-  "Approvals",
-  "Organization",
+  "Connect",
   "Masters",
   "Work",
   "Reports",
@@ -34,7 +33,7 @@ const ADMIN_ONLY_MODULES = new Set([
 ]);
 
 /** ESS-catalog modules (distinct from admin) */
-const ESS_ONLY_MODULES = new Set(["Self", "Team", "Request", "Tasks"]);
+const ESS_ONLY_MODULES = new Set(["Self", "Team", "Tasks"]);
 
 const ACTION_KEYS = [
   "view",

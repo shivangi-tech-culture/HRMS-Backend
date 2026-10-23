@@ -148,31 +148,10 @@ const ADMIN_TREE = [
     ],
   },
 
-  // Approvals
+  // Connect — top nav CONNECT (was Organization). Team Chat + Mail + org structure.
   {
-    module: "Approvals",
-    heading: "Approvals",
-    subModules: [
-      {
-        name: "Pending Requests",
-        actions: ["view", "approve", "reject", "export", "upload", "print"],
-      },
-      {
-        name: "WFH Requests",
-        actions: ["view", "approve", "reject", "create", "cancel"],
-      },
-      {
-        name: "Permission Requests",
-        actions: ["view", "approve", "reject", "create", "cancel"],
-      },
-      { name: "Request History", actions: ["view", "download", "export"] },
-    ],
-  },
-
-  // Organization
-  {
-    module: "Organization",
-    heading: "Organization",
+    module: "Connect",
+    heading: "Connect",
     subModules: [
       { name: "Departments", actions: CRUD },
       { name: "Designations", actions: CRUD },
@@ -184,8 +163,8 @@ const ADMIN_TREE = [
     ],
   },
 
-  // Masters — /api/masters?type=… (admin CRUD; GET open to Employee for ESS dropdowns)
-  // Covers Official + all General Info dropdowns (9 modules; no Vaccination)
+  // Masters — shown under Administration green bar in UI; own module for Roles matrix
+  // /api/masters?type=… (admin CRUD; GET open to Employee for ESS dropdowns)
   {
     module: "Masters",
     heading: "Masters",
@@ -210,15 +189,28 @@ const ADMIN_TREE = [
       { name: "Language", actions: CRUD },
       { name: "Regularization Reason", actions: CRUD },
       { name: "Mark Attendance Reason", actions: CRUD },
+      { name: "On Tour Category", actions: CRUD },
+      { name: "On Duty Category", actions: CRUD },
     ],
   },
 
-  // Work
+  // Work — top nav WORK
+  // Flow: Projects (company) → Tasks (projectId) → Assign
   {
     module: "Work",
-    heading: "Work Schedule",
+    heading: "Work",
     subModules: [
-      { name: "Weekly Off", actions: ["view", "create", "edit", "delete"] },
+      {
+        name: "Projects",
+        actions: ["view", "create", "edit", "delete", "assign"],
+      },
+      // Admin UI: /work/tasks · Employee ESS: Tasks → To Do Tasks
+      {
+        name: "Tasks",
+        actions: [
+          "view", "create", "edit", "delete", "assign", "share", "download",
+        ],
+      },
     ],
   },
 
@@ -253,8 +245,8 @@ const ADMIN_TREE = [
     ],
   },
 
-  // Administration
-  // Company CRUD is not listed here. Super Admin / Admin get it via PLATFORM_TREE.
+  // Administration — green bar order matches live admin UI
+  // Companies CRUD is not listed here. Super Admin / Admin get it via PLATFORM_TREE.
   {
     module: "Administration",
     heading: "Administration",
@@ -262,16 +254,21 @@ const ADMIN_TREE = [
       // Access & Control: login users of any role (create ≠ Employee Management)
       // assign = Reporting Manager (POST /api/users/assign-manager)
       //        + HR companies (POST /api/users/:id/assign-companies, Super Admin only)
-      { name: "Access & Control", actions: ["view", "create", "edit", "delete", "export", "import", "upload", "download", "email", "assign"] },
+      {
+        name: "Access & Control",
+        actions: [
+          "view", "create", "edit", "delete",
+          "export", "import", "upload", "download", "email", "assign",
+        ],
+      },
+      // Org hierarchy (GET /api/hierarchy)
+      { name: "Hierarchy", actions: ["view"] },
       {
         name: "Roles & Permissions",
         actions: ["view", "create", "edit", "delete", "export"],
       },
-      { name: "System Configuration", actions: VEd },
-      // Org hierarchy (GET /api/hierarchy) — Super Admin / Admin / HR → full org;
-      // Reporting Manager → own team. Assigning managers uses Employee / Access & Control → assign.
-      { name: "Hierarchy", actions: ["view"] },
       { name: "Holiday", actions: ["view", "create", "edit", "delete"] },
+      { name: "System Configuration", actions: VEd },
     ],
   },
 ];
@@ -285,26 +282,28 @@ const ROLE_DEFAULT_LIMITS = {
 };
 
 /**
- * Company org CRUD (/api/companies).
- * Nested under Administration for Super Admin and Admin only.
+ * Companies org CRUD (/api/companies).
+ * Nested under Administration (after Access & Control) for Super Admin / Admin only.
  * Kept out of ADMIN_TREE so HR and custom roles never see it.
+ * UI green bar label: Companies.
  */
-const COMPANY_SUBMODULE = { name: "Company", actions: CRUD };
+const COMPANY_SUBMODULE = { name: "Companies", actions: CRUD };
 
 const withCompanyCrud = (tree) =>
   tree.map((block) => {
     if (block.module !== "Administration") return block;
-    return {
-      ...block,
-      subModules: [...block.subModules, COMPANY_SUBMODULE],
-    };
+    const subs = [...block.subModules];
+    const afterAccess = subs.findIndex((s) => s.name === "Access & Control");
+    const insertAt = afterAccess >= 0 ? afterAccess + 1 : 0;
+    subs.splice(insertAt, 0, COMPANY_SUBMODULE);
+    return { ...block, subModules: subs };
   });
 
-/** Super Admin / Admin matrix = admin catalog + Administration → Company */
+/** Super Admin / Admin matrix = admin catalog + Administration → Companies */
 const PLATFORM_TREE = withCompanyCrud(ADMIN_TREE);
 
 // ESS — Employee only (live UI: hrms-techculture.vercel.app)
-// top nav: Dashboard · Self · Team · Request · Tasks
+// top nav: Dashboard · Self · Team · Tasks
 // green bar = subModules; sidebar sections (Personal Details…) = NOT permissions
 
 const ESS_TREE = [
@@ -332,7 +331,6 @@ const ESS_TREE = [
       { name: "Holiday", actions: V }, // Self → holidays assigned to the employee's company
       { name: "My Web Punches", actions: V },
       { name: "On Tour/On Duty Entries", actions: VCC },
-      { name: "Additional Request", actions: VCC },
       { name: "Offboarding", actions: V },
     ],
   },
@@ -349,32 +347,13 @@ const ESS_TREE = [
     ],
   },
 
-  // Request → Employee Details | Attendance | … | Trip Tracking
-  {
-    module: "Request",
-    heading: "",
-    subModules: [
-      { name: "Employee Details", actions: V },
-      { name: "Attendance", actions: VCC },
-      { name: "Web Punches", actions: V },
-      { name: "On Tour/On Duty", actions: VCC },
-      { name: "On Tour Cancellation", actions: VCC },
-      { name: "Leave Applied", actions: VCC },
-      { name: "Leave Cancellation", actions: VCC },
-      { name: "Additional Request", actions: VCC },
-      { name: "Offboarding Request", actions: VCC },
-      { name: "Trip Tracking", actions: V },
-    ],
-  },
-
-  // Tasks → Dashboard | To Do Tasks | Task Sheet
+  // Tasks → Dashboard | To Do Tasks
   {
     module: "Tasks",
     heading: "",
     subModules: [
       { name: "Dashboard", actions: ["view", "create"] },
       { name: "To Do Tasks", actions: ["view", "create", "edit"] },
-      { name: "Task Sheet", actions: ["view", "create", "edit"] },
     ],
   },
 ];
@@ -454,11 +433,11 @@ function buildFromTree(tree, limits = {}) {
 /** Get default permissions for a role name */
 function permissionsForRole(role) {
   if (role === "Employee") return buildFromTree(ESS_TREE);
-  // Administration → Company: Super Admin and Admin only
+  // Administration → Companies: Super Admin and Admin only
   if (role === "Super Admin" || role === "Admin" || role === "Global Admin") {
     return buildFromTree(PLATFORM_TREE);
   }
-  // HR Manager, Reporting Manager — no Company CRUD
+  // HR Manager, Reporting Manager — no Companies CRUD
   const name = role === "Manager" ? "Reporting Manager" : role;
   return buildFromTree(ADMIN_TREE, ROLE_DEFAULT_LIMITS[name]);
 }

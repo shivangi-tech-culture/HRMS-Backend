@@ -13,6 +13,7 @@ const {
   exportUsers,
   assignHrCompanies,
   sendUserMail,
+  adminChangePassword,
 } = require("../controllers/accessControl.controller");
 const { protect, authorize } = require("../middleware/auth");
 const { checkPermission } = require("../controllers/permission.controller");
@@ -24,8 +25,23 @@ const {
 } = require("../validators/accessControl.validation");
 const { assignReportingManager } = require("../controllers/reportingManager.controller");
 const { assignManagerSchema } = require("../validators/reportingManager.validation");
+const Joi = require("joi");
 
 const router = express.Router();
+
+const adminChangePasswordSchema = Joi.object({
+  newPassword: Joi.string().min(6).max(50).required().messages({
+    "string.min": "New password must be at least 6 characters",
+    "string.max": "New password must be at most 50 characters",
+    "string.empty": "New password is required",
+    "any.required": "New password is required",
+  }),
+  confirmPassword: Joi.string().valid(Joi.ref("newPassword")).required().messages({
+    "any.only": "New password and confirm password do not match",
+    "string.empty": "Confirm password is required",
+    "any.required": "Confirm password is required",
+  }),
+}).unknown(false);
 
 /** System names; custom admin roles also admitted by authorize + checkPermission */
 const ACCESS_ROLES = require("../middleware/auth").ALL_ACCESS;
@@ -249,6 +265,46 @@ router.put(
   checkPermission("Administration", "Access & Control", "edit"),
   validate(updateAccessUserSchema),
   updateUser
+);
+
+/**
+ * @swagger
+ * /api/users/{id}/change-password:
+ *   post:
+ *     tags: [Admin / Users]
+ *     summary: Admin — change any user password
+ *     description: |
+ *       Super Admin / Admin / HR Manager set a new password for any Access & Control user.
+ *       Body: `newPassword` + `confirmPassword` only.
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - $ref: '#/components/parameters/UserId'
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [newPassword, confirmPassword]
+ *             properties:
+ *               newPassword: { type: string, minLength: 6, maxLength: 50 }
+ *               confirmPassword: { type: string }
+ *           example:
+ *             newPassword: "UserNewPass123"
+ *             confirmPassword: "UserNewPass123"
+ *     responses:
+ *       200: { description: Password changed }
+ *       400: { description: Validation failed }
+ *       403: { description: Out of scope / cannot manage role }
+ *       404: { description: User not found }
+ */
+router.post(
+  "/:id/change-password",
+  protect,
+  authorize(...ACCESS_ROLES),
+  checkPermission("Administration", "Access & Control", "edit"),
+  validate(adminChangePasswordSchema),
+  adminChangePassword
 );
 
 /**

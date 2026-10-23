@@ -303,13 +303,16 @@ const listOrOne = (item) =>
 
 /**
  * UPDATE EMPLOYEE / profile — PUT /api/employees/:id
- * companyIds stay immutable. Super Admin / Admin / HR may change officialEmail
- * (controller enforces who, and that the new address is unused).
+ * companyIds / company / companies are stripped (immutable) so a full official
+ * payload from the edit form does not 400 — controller also deletes them.
+ * Super Admin / Admin / HR may change officialEmail and employeeCode.
  */
-const officialUpdateItem = officialItem.fork(
-  ["companyIds"],
-  (schema) => schema.forbidden()
-);
+const officialUpdateItem = officialItem
+  .fork(["companyIds"], (schema) => schema.optional().strip())
+  .keys({
+    company: Joi.any().optional().strip(),
+    companies: Joi.any().optional().strip(),
+  });
 
 const updateUserSchema = Joi.object({
   name: Joi.string().trim().min(2).max(100).optional(),

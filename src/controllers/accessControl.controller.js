@@ -660,6 +660,61 @@ const assignHrCompanies = async (req, res) => {
   }
 };
 
+/**
+ * ADMIN CHANGE PASSWORD — POST /api/users/:id/change-password
+ * Super Admin / Admin / HR Manager set a new password for any user in Access & Control.
+ * Body: { newPassword, confirmPassword }
+ */
+const adminChangePassword = async (req, res) => {
+  try {
+    const { newPassword, confirmPassword } = req.body;
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        message: "New password and confirm password do not match",
+      });
+    }
+
+    const user = await User.findById(req.params.id).select(
+      "name password status role official"
+    );
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (!canManageRole(req.user.role, user.role)) {
+      return res.status(403).json({
+        message: "You cannot change password for this role",
+      });
+    }
+
+    if (!hasGlobalCompanyAccess(req.user)) {
+      const scopeErr = assertTeamOrCompanyEmployee(req.user, user);
+      if (scopeErr) {
+        return res.status(403).json({ message: scopeErr });
+      }
+    }
+
+    const sameAsOld = await bcrypt.compare(newPassword, user.password);
+    if (sameAsOld) {
+      return res.status(400).json({
+        message: "New password must be different from current password",
+      });
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    return res.json({
+      message: "Password changed successfully",
+      userId: user._id,
+      name: user.name || "",
+    });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
 /** Staff login password = employeeCode + DOB as ddmmyyyy (e.g. TC00115012005) */
 const dobToDdmmyyyy = (date) => {
   if (!date) return "";
@@ -764,5 +819,6 @@ module.exports = {
   exportUsers,
   assignHrCompanies,
   sendUserMail,
+  adminChangePassword,
   maxSuperAdmins,
 };
