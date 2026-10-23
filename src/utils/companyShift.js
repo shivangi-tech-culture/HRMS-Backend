@@ -114,8 +114,14 @@ const placedIds = (placed) => ({
 const applyPlacementDetails = (official, placed) => {
   if (!placed?.ok) return;
   if (official.branchId && placed.branch) {
-    const { address = "", city = "", state = "" } = placed.branch;
-    Object.assign(official.branchId, { address, city, state });
+    const {
+      address = "",
+      city = "",
+      state = "",
+      latitude = null,
+      longitude = null,
+    } = placed.branch;
+    Object.assign(official.branchId, { address, city, state, latitude, longitude });
   }
   if (official.shiftId && placed.shift) {
     official.shiftId.monthlySchedule = placed.shift.monthlySchedule || [];

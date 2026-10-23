@@ -3,8 +3,8 @@
  *
  * Employee (login only — same idea as punch in / punch out)
  *   GET    /me                 today's button state
- *   POST   /start              body optional — auto Lunch/Tea remaining, then Day Break if granted
- *   POST   /end                close my open break
+ *   POST   /start              { latitude, longitude } — within 50m of branch; auto Lunch/Tea / Day Break
+ *   POST   /end                { latitude, longitude } — within 50m of branch; close my open break
  *   POST   /day-request        { minutes } — ask for Day Break (after fixed time used)
  *
  * Admin — Live Break Status
@@ -47,6 +47,7 @@ const { normalizeRoleName, EMPLOYEE } = require("../config/roles");
 const { validate, validateQuery } = require("../middleware/validate");
 const {
   startSchema,
+  endSchema,
   dayRequestSchema,
   liveQuerySchema,
   historyQuerySchema,
@@ -107,11 +108,11 @@ const needBreakReview = (req, res, next) => {
  *       - bearerAuth: []
  *     responses:
  *       201: { description: Break started }
- *       400: { description: Not punched in, already on break, or Day Break needs approval }
+ *       400: { description: Not punched in, outside 50m, already on break, or Day Break needs approval }
  * /api/break/end:
  *   post:
  *     tags: [Break]
- *     summary: End my open break
+ *     summary: End my open break (latitude + longitude, within 50m of branch)
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -180,7 +181,7 @@ const needBreakReview = (req, res, next) => {
  */
 router.get("/me", protect, myBreak);
 router.post("/start", protect, validate(startSchema), startBreak);
-router.post("/end", protect, endMyBreak);
+router.post("/end", protect, validate(endSchema), endMyBreak);
 router.post("/day-request", protect, validate(dayRequestSchema), requestDayBreak);
 
 router.get(

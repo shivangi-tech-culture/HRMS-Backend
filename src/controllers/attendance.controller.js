@@ -16,7 +16,14 @@ const User = require("../models/User");
 const Company = require("../models/Company");
 const { getModel } = require("../models/Master");
 const { SELF_SOURCES } = require("../validators/attendance.validation");
-const { resolvePunchLocation } = require("../utils/geocode");
+const {
+  resolvePunchLocation,
+  resolveOfficeLocation,
+} = require("../utils/geocode");
+const {
+  assertWithinPunchRadius,
+  PUNCH_RADIUS_METERS,
+} = require("../utils/geoRadius");
 const {
   todayDate,
   getAssignedShift, // attendance-only read of company/branch/shift
@@ -137,8 +144,15 @@ const applyRemarkOnPunch = (record, text) => {
 };
 
 /** Punch-in / punch-out. Company, branch, shift, location and remarks live only on record. */
-const punchPayload = (message, { company, branch, shift, record }) => ({
+const punchPayload = (message, { company, branch, shift, record, geo }) => ({
   message,
+  ...(geo
+    ? {
+        distanceMeters: geo.distanceMeters ?? null,
+        distanceKm: geo.distanceKm ?? null,
+        allowedRadiusMeters: PUNCH_RADIUS_METERS,
+      }
+    : {}),
   record: formatAttendanceRecord(record, punchExtras({ company, branch, shift })),
 });
 
@@ -189,6 +203,22 @@ const punchIn = async (req, res) => {
       record = new Attendance({ employee: employeeId, date });
     }
 
+    // Geofence: within 50m of branch GPS from address (skipped for On Tour / On Duty)
+    let geoOk = null;
+    if (!isApprovedTourDuty(record)) {
+      const office = await resolveOfficeLocation(branch, { companyId: company._id });
+      const geo = assertWithinPunchRadius(location, office);
+      if (!geo.ok) {
+        return res.status(400).json({
+          message: geo.message,
+          distanceMeters: geo.distanceMeters ?? null,
+          distanceKm: geo.distanceKm ?? null,
+          allowedRadiusMeters: PUNCH_RADIUS_METERS,
+        });
+      }
+      geoOk = geo;
+    }
+
     record.punchIn = now;
     record.punchInSource = source;
     record.punchInLocation = location;
@@ -218,10 +248,12 @@ const punchIn = async (req, res) => {
       EMPLOYEE_CARD_SELECT
     );
 
-    const punchInMessage = "Punched in — Missed punch until punch out";
+    const punchInMessage = geoOk
+      ? `Punched in — Missed punch until punch out (within ${geoOk.distanceMeters} m of office)`
+      : "Punched in — Missed punch until punch out";
 
     return res.status(201).json(
-      punchPayload(punchInMessage, { company, branch, shift, record })
+      punchPayload(punchInMessage, { company, branch, shift, record, geo: geoOk })
     );
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -286,6 +318,22 @@ const punchOut = async (req, res) => {
 
     const location = await resolvePunchLocation(req.body);
 
+    // Geofence: within 50m of branch GPS from address (skipped for On Tour / On Duty)
+    let geoOk = null;
+    if (!isApprovedTourDuty(record)) {
+      const office = await resolveOfficeLocation(branch, { companyId: company._id });
+      const geo = assertWithinPunchRadius(location, office);
+      if (!geo.ok) {
+        return res.status(400).json({
+          message: geo.message,
+          distanceMeters: geo.distanceMeters ?? null,
+          distanceKm: geo.distanceKm ?? null,
+          allowedRadiusMeters: PUNCH_RADIUS_METERS,
+        });
+      }
+      geoOk = geo;
+    }
+
     record.punchOut = now;
     record.punchOutSource = source;
     record.punchOutLocation = location;
@@ -315,7 +363,7 @@ const punchOut = async (req, res) => {
       EMPLOYEE_CARD_SELECT
     );
 
-    const punchOutMessage =
+    let punchOutMessage =
       record.status === "Absent"
         ? "Punched out — Absent (worked less than 5 hours)"
         : record.status === "HalfDay"
@@ -327,9 +375,12 @@ const punchOut = async (req, res) => {
               : windowCheck.isLate
                 ? "Punched out (after shift end — allowed)"
                 : "Punched out successfully";
+    if (geoOk) {
+      punchOutMessage += ` (within ${geoOk.distanceMeters} m of office)`;
+    }
 
     return res.json(
-      punchPayload(punchOutMessage, { company, branch, shift, record })
+      punchPayload(punchOutMessage, { company, branch, shift, record, geo: geoOk })
     );
   } catch (err) {
     return res.status(500).json({ message: err.message });

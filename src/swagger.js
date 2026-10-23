@@ -747,12 +747,14 @@ module.exports = swaggerJsdoc({
             latitude: {
               type: "number",
               example: 28.6301,
-              description: "GPS latitude (pair with longitude)",
+              description:
+                "GPS latitude — must be within 50m of the assigned branch latitude/longitude",
             },
             longitude: {
               type: "number",
               example: 77.2242,
-              description: "GPS longitude (pair with latitude)",
+              description:
+                "GPS longitude — must be within 50m of the assigned branch latitude/longitude",
             },
             remarks: {
               type: "string",

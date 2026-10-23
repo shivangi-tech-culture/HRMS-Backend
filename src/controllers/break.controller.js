@@ -20,6 +20,15 @@ const User = require("../models/User");
 const { getModel } = require("../models/Master");
 const { todayDate, getAssignedShift, workProgress } = require("../utils/shiftTiming");
 const {
+  resolvePunchLocation,
+  resolveOfficeLocation,
+} = require("../utils/geocode");
+const {
+  assertWithinPunchRadius,
+  PUNCH_RADIUS_METERS,
+} = require("../utils/geoRadius");
+const { isApprovedTourDuty } = require("../utils/attendanceDayStatus");
+const {
   companyFilter,
   hasGlobalCompanyAccess,
   userCompanyIds,
@@ -698,8 +707,8 @@ const myBreak = async (req, res) => {
 
 /**
  * POST /api/break/start
- * Body ignored for type — auto-picks next fixed with remaining, then Day Break if granted.
- * Send {} or omit body. breakType in body is ignored.
+ * Body: { latitude, longitude } — must be within 50m of branch (address → lat/long).
+ * Type auto-picked (breakType in body ignored).
  */
 const startBreak = async (req, res) => {
   try {
@@ -717,6 +726,22 @@ const startBreak = async (req, res) => {
     const open = await BreakSession.findOne({ employee: employeeId, endedAt: null }).select("_id");
     if (open) {
       return res.status(400).json({ message: "You are already on a break" });
+    }
+
+    // Same 50m geofence as punch-in / punch-out
+    if (!isApprovedTourDuty(attendance)) {
+      const { company, branch } = await getAssignedShift(employeeId, date);
+      const location = await resolvePunchLocation(req.body);
+      const office = await resolveOfficeLocation(branch, { companyId: company?._id });
+      const geo = assertWithinPunchRadius(location, office);
+      if (!geo.ok) {
+        return res.status(400).json({
+          message: geo.message,
+          distanceMeters: geo.distanceMeters ?? null,
+          distanceKm: geo.distanceKm ?? null,
+          allowedRadiusMeters: PUNCH_RADIUS_METERS,
+        });
+      }
     }
 
     const user = await User.findById(employeeId).select(
@@ -918,7 +943,7 @@ const reviewDayRequest = async (req, res) => {
 
 /**
  * POST /api/break/end
- * Closes the logged-in person's open break.
+ * Body: { latitude, longitude } — must be within 50m of branch. Closes open break.
  */
 const endMyBreak = async (req, res) => {
   try {
@@ -930,12 +955,32 @@ const endMyBreak = async (req, res) => {
       return res.status(400).json({ message: "You are not on a break" });
     }
 
+    const attendance = await Attendance.findOne({
+      employee: req.user._id,
+      date: session.date,
+    });
+    // Same 50m geofence as punch-in / punch-out
+    if (!isApprovedTourDuty(attendance)) {
+      const { company, branch } = await getAssignedShift(req.user._id, session.date);
+      const location = await resolvePunchLocation(req.body);
+      const office = await resolveOfficeLocation(branch, { companyId: company?._id });
+      const geo = assertWithinPunchRadius(location, office);
+      if (!geo.ok) {
+        return res.status(400).json({
+          message: geo.message,
+          distanceMeters: geo.distanceMeters ?? null,
+          distanceKm: geo.distanceKm ?? null,
+          allowedRadiusMeters: PUNCH_RADIUS_METERS,
+        });
+      }
+    }
+
     await finishSession(session, "employee", req.user._id);
     const employee = await User.findById(req.user._id).select(
       "name role official.employeeCode official.officialEmail official.department official.designation official.companyIds"
     );
     await logBreakActivity(req.user, employee, session);
-    const full = await Attendance.findOne({ employee: req.user._id, date: session.date });
+    const full = attendance;
     const { shift } = await getAssignedShift(req.user._id, session.date);
     const progress = workProgress(full, shift);
     if (full && !full.punchOut) {

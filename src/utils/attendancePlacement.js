@@ -97,6 +97,8 @@ const getAttendanceDayPlacement = async (user, dateStr) => {
           address: placed.branch?.address || "",
           city: placed.branch?.city || "",
           state: placed.branch?.state || "",
+          latitude: placed.branch?.latitude ?? null,
+          longitude: placed.branch?.longitude ?? null,
         }
       : null,
     shift: shiftMaster, // { _id, name, code }

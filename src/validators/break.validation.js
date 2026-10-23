@@ -20,10 +20,28 @@ const optionalId = Joi.string()
     return value;
   });
 
-/** POST /start — body optional/ignored; next break is auto-picked (do not send breakType) */
+/** GPS required — same 50m office radius as punch-in / punch-out */
+const latLng = {
+  latitude: Joi.number().min(-90).max(90).required().messages({
+    "any.required": "latitude is required",
+  }),
+  longitude: Joi.number().min(-180).max(180).required().messages({
+    "any.required": "longitude is required",
+  }),
+};
+
+/** POST /start — lat/long required; next break is auto-picked (do not send breakType) */
 const startSchema = Joi.object({
+  ...latLng,
   breakType: Joi.string().trim().min(1).max(60).optional().strip(),
   minutes: Joi.number().integer().min(1).max(180).optional().strip(),
+})
+  .unknown(false)
+  .prefs({ stripUnknown: true });
+
+/** POST /end — lat/long required; within 50m of branch */
+const endSchema = Joi.object({
+  ...latLng,
 })
   .unknown(false)
   .prefs({ stripUnknown: true });
@@ -79,6 +97,7 @@ const reviewSchema = Joi.object({
 
 module.exports = {
   startSchema,
+  endSchema,
   dayRequestSchema,
   liveQuerySchema,
   historyQuerySchema,
