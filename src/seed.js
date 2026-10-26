@@ -397,6 +397,22 @@ const seed = async () => {
       role: EMPLOYEE,
       status: "Active",
       withProfile: true,
+      /** Dummy FCM rows for mobile QA — replace token via POST /api/notifications/token */
+      fcmTokens: [
+        {
+          token:
+            "DUMMY_FCM_ANDROID_SHIVANGI_TEST_REPLACE_WITH_REAL_DEVICE_TOKEN",
+          platform: "android",
+          deviceId: "seed-android-shivangi",
+          updatedAt: new Date(),
+        },
+        {
+          token: "DUMMY_FCM_IOS_SHIVANGI_TEST_REPLACE_WITH_REAL_DEVICE_TOKEN",
+          platform: "ios",
+          deviceId: "seed-ios-shivangi",
+          updatedAt: new Date(),
+        },
+      ],
       personal: {
         dateOfBirth: COMMON_DOB,
         bloodGroup: "A+",
@@ -524,6 +540,10 @@ const seed = async () => {
     }
     if (!platform) {
       doc.personal = u.personal || {};
+    }
+
+    if (Array.isArray(u.fcmTokens) && u.fcmTokens.length) {
+      doc.fcmTokens = u.fcmTokens;
     }
 
     if (u.withProfile) {

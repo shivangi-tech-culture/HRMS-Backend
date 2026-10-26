@@ -22,6 +22,7 @@ const {
 } = require("../utils/companyScope");
 const { signToken, decodeToken, JWT_EXPIRES_IN } = require("../utils/jwt");
 const { inspectSessionToken } = require("../middleware/auth");
+const { saveFcmTokenOnUser } = require("../utils/fcmToken");
 
 const LOCKED_ROLES = new Set(["Super Admin", "Admin", "Employee"]);
 
@@ -139,12 +140,13 @@ const clearAuthTokenOnUser = async (userId) => {
 
 /**
  * LOGIN — POST /api/auth/login
- * Body: { username, password } — username = employee code | email | mobile
- * → JWT cookie + DB
+ * Body: { username, password, fcmToken?, platform?, deviceId? }
+ * Response: JWT only (auth). FCM is saved on the user when fcmToken is sent
+ * (web/app: one login call — no separate register required on each login).
  */
 const login = async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, password, fcmToken, platform, deviceId } = req.body;
 
     const user = await findByUsername(username);
     if (!user) {
@@ -158,6 +160,16 @@ const login = async (req, res) => {
 
     if (user.status !== "Active") {
       return res.status(401).json({ message: "Account is inactive" });
+    }
+
+    // Optional: save FCM on same login request (web / android / ios)
+    if (fcmToken && String(fcmToken).trim()) {
+      saveFcmTokenOnUser(user, {
+        token: fcmToken,
+        platform: platform || "web",
+        deviceId: deviceId || "",
+      });
+      await user.save();
     }
 
     let roleDoc = await Role.findOne({ name: user.role });
@@ -174,7 +186,7 @@ const login = async (req, res) => {
 
     return res.json({
       message: "Login successful",
-      token, // optional: cookie is primary; Bearer still works for Swagger
+      token, // JWT only — FCM is not returned
       tokenExpiresAt: user.tokenExpiresAt,
       tokenExpiresIn: user.tokenExpiresIn,
       user: {

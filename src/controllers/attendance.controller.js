@@ -64,8 +64,16 @@ const {
   normalizeRoleName,
   EMPLOYEE,
   isTeamScopedRole,
+  isPlatformRole,
 } = require("../config/roles");
 const { resolveDisplayedStatus, isApprovedTourDuty } = require("../utils/attendanceDayStatus");
+const {
+  computeProfileCompletion,
+  REMINDER_THRESHOLD,
+} = require("../utils/profileCompletion");
+const { notifyUser } = require("../utils/notify");
+const { sendToTokens, isFcmReady } = require("../utils/fcm");
+const Notification = require("../models/Notification");
 
 /**
  * Who can approve/reject attendance remarks:
@@ -157,14 +165,121 @@ const punchPayload = (message, { company, branch, shift, record, geo }) => ({
 });
 
 /**
+ * Profile must be ≥ 70% (personal + documents + official mandatory) before punch-in.
+ * Super Admin / Admin (lean platform accounts) are skipped.
+ * Below 70% → block punch-in + FCM/web alert + list of fields still needed.
+ */
+const assertProfileReadyForPunchIn = async (req) => {
+  if (isPlatformRole(req.user?.role)) return null;
+
+  const user =
+    (await User.findById(req.user._id)
+      .select(
+        "name role profileUrl personal official education accounts family nominees experience"
+      )
+      .lean()) || req.user;
+
+  const completion = computeProfileCompletion(user);
+  if (completion.consideredComplete) return null;
+
+  /** Simple checklist UI can show to reach 70% */
+  const completeThese = (completion.missingMandatory || []).map((m) => ({
+    key: m.key,
+    label: m.label,
+    section: m.section,
+  }));
+  const labels = completeThese.map((m) => m.label);
+  const preview = labels.slice(0, 6).join(", ");
+
+  const title = "Complete your profile to punch in";
+  const body = preview
+    ? `Profile ${completion.percentage}% (need ${REMINDER_THRESHOLD}%). Complete: ${preview}${labels.length > 6 ? "…" : ""}. Punch-in blocked.`
+    : `Profile ${completion.percentage}%. Reach ${REMINDER_THRESHOLD}% to punch in.`;
+
+  const payload = {
+    percentage: completion.percentage,
+    reminderThreshold: REMINDER_THRESHOLD,
+    punchBlocked: true,
+    completeThese,
+  };
+
+  // One unread row (update if exists); always FCM / socket so web + app alert again
+  const existing = await Notification.findOne({
+    userId: user._id,
+    type: "PROFILE_COMPLETION",
+    read: false,
+  });
+
+  if (existing) {
+    existing.title = title;
+    existing.body = body;
+    existing.data = payload;
+    await existing.save();
+
+    const u = await User.findById(user._id).select("fcmTokens").lean();
+    const tokens = (u?.fcmTokens || []).map((t) => t.token).filter(Boolean);
+    if (tokens.length && isFcmReady()) {
+      await sendToTokens({
+        tokens,
+        title,
+        body,
+        data: {
+          type: "PROFILE_COMPLETION",
+          notificationId: String(existing._id),
+          percentage: String(completion.percentage),
+          needPercentage: String(REMINDER_THRESHOLD),
+        },
+      });
+    }
+    const io = req.app.get("io");
+    if (io) {
+      io.to(`user:${String(user._id)}`).emit("notification:new", {
+        id: existing._id,
+        type: "PROFILE_COMPLETION",
+        title,
+        body,
+        data: payload,
+        read: false,
+        createdAt: existing.createdAt,
+      });
+    }
+  } else {
+    await notifyUser({
+      userId: user._id,
+      title,
+      body,
+      type: "PROFILE_COMPLETION",
+      data: payload,
+      io: req.app.get("io"),
+    });
+  }
+
+  return {
+    success: false,
+    message: body,
+    code: "PROFILE_INCOMPLETE",
+    percentage: completion.percentage,
+    needPercentage: REMINDER_THRESHOLD,
+    /** Fill these to reach 70% and unlock punch-in */
+    completeThese,
+  };
+};
+
+/**
  * PUNCH IN — POST /api/attendance/punch-in
  * Body: { source, latitude, longitude, remarks? }
  * Reads assignment for display only — never changes User company/branch/shift.
+ * Blocked when profile completion &lt; 70% (alert sent via notification / FCM).
  */
 const punchIn = async (req, res) => {
   try {
     const sourceErr = assertSelfSource(req.body.source);
     if (sourceErr) return res.status(403).json({ message: sourceErr });
+
+    const profileBlock = await assertProfileReadyForPunchIn(req);
+    if (profileBlock) {
+      return res.status(403).json(profileBlock);
+    }
 
     const employeeId = req.user._id;
     const date = today();

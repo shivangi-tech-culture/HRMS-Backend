@@ -152,7 +152,11 @@ const needTourDutyReview = (req, res, next) => {
 };
 
 // ─── Employee self punch ─────────────────────────────────────
-
+/**
+ * Punch-in blocked when profile % < 70.
+ * 403 body: { success:false, code:"PROFILE_INCOMPLETE", percentage, needPercentage:70, completeThese[], message }
+ * Also creates/updates PROFILE_COMPLETION notification + FCM push (if token registered after login).
+ */
 router.post("/punch-in", protect, validate(punchSchema), punchIn);
 router.post("/punch-out", protect, validate(punchSchema), punchOut);
 router.get("/today", protect, myToday);

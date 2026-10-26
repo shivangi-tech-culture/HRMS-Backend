@@ -117,10 +117,10 @@
                 "login"
               ]
             },
-            "description": "Login as **Super Admin**. Saves {{token}} (Bearer for every request) and {{myId}}.\n\nSeed: `superadmin@gmail.com` / `123456`.\n\nBody: **`username`** + **`password`** only.\n`username` = employee code / official email / personal email / mobile (auto-detected).\n\n**Use local after seed:** collection {{baseUrl}} = `http://localhost:9001` and **No Environment**.\n\n---\n### Parameters (type + how to send)\n**Body (JSON raw)** — `Content-Type: application/json`\n- `username` — string | required | employee code OR email OR mobile\n- `password` — string | required | staff = code + DOB `15012005`; Super Admin / Admin = `123456`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---",
+            "description": "Login as **Super Admin**. Saves {{token}} and {{myId}}.\n\nSeed: `superadmin@gmail.com` / `123456`.\n\n### Body fields\n| Field | Required | Use |\n|-------|----------|-----|\n| `username` | yes | email / employee code / mobile |\n| `password` | yes | login password |\n| `fcmToken` | no | Firebase device token — saved on `User.fcmTokens` in **same** login |\n| `platform` | no | `web` \\| `android` \\| `ios` (default `web`) |\n| `deviceId` | no | stable device id (same id replaces old token) |\n\n### What returns\n- Response = **JWT only** (`token`, user, …). FCM is **not** returned.\n- If `fcmToken` was sent → it is stored in DB for push.\n\n### Two ways to save FCM\n1. **Preferred:** send `fcmToken` on login (one call).\n2. **Optional later:** `POST /api/notifications/token` if Firebase refreshes the token while still logged in.\n\n**Use local after seed:** `{{baseUrl}}` = `http://localhost:9001`, No Environment.\n\n---\n_Tip: numbers/booleans/null unquoted. Dates `YYYY-MM-DD`. ids = 24-char hex._\n---",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"superadmin@gmail.com\",\n  \"password\": \"123456\"\n}",
+              "raw": "{\n  \"username\": \"superadmin@gmail.com\",\n  \"password\": \"123456\",\n  \"fcmToken\": \"{{fcmToken}}\",\n  \"platform\": \"android\",\n  \"deviceId\": \"device-1\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -164,6 +164,27 @@
             },
             "description": "GET /api/account/me — logged-in user profile + permissions.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n"
           }
+        },
+        {
+          "name": "2b. My Profile Completion %",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/account/profile/completion",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "account",
+                "profile",
+                "completion"
+              ]
+            },
+            "description": "## GET `/api/account/profile/completion`\nOwn %. **70%** unlocks punch-in. Use `completeThese` for UI checklist.\n\n---\n**Header:** `Authorization: Bearer {{token}}` *(JWT from Login)*\n---"
+          },
+          "response": []
         },
         {
           "name": "3. Update My Account",
@@ -280,7 +301,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"admin@gmail.com\",\n  \"password\": \"{{password}}\"\n}",
+              "raw": "{\n  \"username\": \"admin@gmail.com\",\n  \"password\": \"{{password}}\",\n  \"fcmToken\": \"{{fcmToken}}\",\n  \"platform\": \"android\",\n  \"deviceId\": \"device-1\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -298,7 +319,7 @@
                 "login"
               ]
             },
-            "description": "Login as **Admin**. Saves {{token}} (Bearer for every request) and {{myId}}.\n\nSeed: `admin@gmail.com` / `123456`.\n\nBody: **`username`** + **`password`** only.\n`username` = employee code / official email / personal email / mobile (auto-detected).\n\n**Use local after seed:** collection {{baseUrl}} = `http://localhost:9001` and **No Environment**.\n\n---\n### Parameters (type + how to send)\n**Body (JSON raw)** — `Content-Type: application/json`\n- `username` — string | required | employee code OR email OR mobile\n- `password` — string | required | staff = code + DOB `15012005`; Super Admin / Admin = `123456`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---"
+            "description": "Login as **Admin**. Saves {{token}} and {{myId}}.\n\nSeed: `admin@gmail.com` / `123456`.\n\n### Body fields\n| Field | Required | Use |\n|-------|----------|-----|\n| `username` | yes | email / employee code / mobile |\n| `password` | yes | login password |\n| `fcmToken` | no | Firebase device token — saved on `User.fcmTokens` in **same** login |\n| `platform` | no | `web` \\| `android` \\| `ios` (default `web`) |\n| `deviceId` | no | stable device id (same id replaces old token) |\n\n### What returns\n- Response = **JWT only** (`token`, user, …). FCM is **not** returned.\n- If `fcmToken` was sent → it is stored in DB for push.\n\n### Two ways to save FCM\n1. **Preferred:** send `fcmToken` on login (one call).\n2. **Optional later:** `POST /api/notifications/token` if Firebase refreshes the token while still logged in.\n\n**Use local after seed:** `{{baseUrl}}` = `http://localhost:9001`, No Environment.\n\n---\n_Tip: numbers/booleans/null unquoted. Dates `YYYY-MM-DD`. ids = 24-char hex._\n---"
           },
           "response": []
         },
@@ -330,7 +351,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"anupama@techculture.ai\",\n  \"password\": \"TC00115012005\"\n}",
+              "raw": "{\n  \"username\": \"anupama@techculture.ai\",\n  \"password\": \"TC00115012005\",\n  \"fcmToken\": \"{{fcmToken}}\",\n  \"platform\": \"android\",\n  \"deviceId\": \"device-1\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -348,7 +369,7 @@
                 "login"
               ]
             },
-            "description": "Login as **HR Manager**. Saves {{token}} (Bearer for every request) and {{myId}}.\n\nSeed: `anupama@techculture.ai` / `TC001` / `9876500100` / password `TC00115012005`.\n\nBody: **`username`** + **`password`** only.\n`username` = employee code / official email / personal email / mobile (auto-detected).\n\n**Use local after seed:** collection {{baseUrl}} = `http://localhost:9001` and **No Environment**.\n\n---\n### Parameters (type + how to send)\n**Body (JSON raw)** — `Content-Type: application/json`\n- `username` — string | required | employee code OR email OR mobile\n- `password` — string | required | staff = code + DOB `15012005`; Super Admin / Admin = `123456`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---"
+            "description": "Login as **HR Manager**. Saves {{token}} and {{myId}}.\n\nSeed: `anupama@techculture.ai` / `TC00115012005`.\n\n### Body fields\n| Field | Required | Use |\n|-------|----------|-----|\n| `username` | yes | email / employee code / mobile |\n| `password` | yes | login password |\n| `fcmToken` | no | Firebase device token — saved on `User.fcmTokens` in **same** login |\n| `platform` | no | `web` \\| `android` \\| `ios` (default `web`) |\n| `deviceId` | no | stable device id (same id replaces old token) |\n\n### What returns\n- Response = **JWT only** (`token`, user, …). FCM is **not** returned.\n- If `fcmToken` was sent → it is stored in DB for push.\n\n### Two ways to save FCM\n1. **Preferred:** send `fcmToken` on login (one call).\n2. **Optional later:** `POST /api/notifications/token` if Firebase refreshes the token while still logged in.\n\n**Use local after seed:** `{{baseUrl}}` = `http://localhost:9001`, No Environment.\n\n---\n_Tip: numbers/booleans/null unquoted. Dates `YYYY-MM-DD`. ids = 24-char hex._\n---"
           },
           "response": []
         },
@@ -380,7 +401,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"manav@techculture.ai\",\n  \"password\": \"TC00215012005\"\n}",
+              "raw": "{\n  \"username\": \"manav@techculture.ai\",\n  \"password\": \"TC00215012005\",\n  \"fcmToken\": \"{{fcmToken}}\",\n  \"platform\": \"android\",\n  \"deviceId\": \"device-1\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -398,7 +419,7 @@
                 "login"
               ]
             },
-            "description": "Login as **Reporting Manager**. Saves {{token}} (Bearer for every request) and {{myId}}.\n\nSeed: `manav@techculture.ai` / `TC002` / `9876500201` / password `TC00215012005`.\n\nBody: **`username`** + **`password`** only.\n`username` = employee code / official email / personal email / mobile (auto-detected).\n\n**Use local after seed:** collection {{baseUrl}} = `http://localhost:9001` and **No Environment**.\n\n---\n### Parameters (type + how to send)\n**Body (JSON raw)** — `Content-Type: application/json`\n- `username` — string | required | employee code OR email OR mobile\n- `password` — string | required | staff = code + DOB `15012005`; Super Admin / Admin = `123456`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---"
+            "description": "Login as **Reporting Manager**. Saves {{token}} and {{myId}}.\n\nSeed: `manav@techculture.ai` / `TC00215012005`.\n\n### Body fields\n| Field | Required | Use |\n|-------|----------|-----|\n| `username` | yes | email / employee code / mobile |\n| `password` | yes | login password |\n| `fcmToken` | no | Firebase device token — saved on `User.fcmTokens` in **same** login |\n| `platform` | no | `web` \\| `android` \\| `ios` (default `web`) |\n| `deviceId` | no | stable device id (same id replaces old token) |\n\n### What returns\n- Response = **JWT only** (`token`, user, …). FCM is **not** returned.\n- If `fcmToken` was sent → it is stored in DB for push.\n\n### Two ways to save FCM\n1. **Preferred:** send `fcmToken` on login (one call).\n2. **Optional later:** `POST /api/notifications/token` if Firebase refreshes the token while still logged in.\n\n**Use local after seed:** `{{baseUrl}}` = `http://localhost:9001`, No Environment.\n\n---\n_Tip: numbers/booleans/null unquoted. Dates `YYYY-MM-DD`. ids = 24-char hex._\n---"
           },
           "response": []
         },
@@ -430,7 +451,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"employee@techculture.ai\",\n  \"password\": \"TC00515012005\"\n}",
+              "raw": "{\n  \"username\": \"employee@techculture.ai\",\n  \"password\": \"TC00515012005\",\n  \"fcmToken\": \"{{fcmToken}}\",\n  \"platform\": \"android\",\n  \"deviceId\": \"device-1\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -448,7 +469,7 @@
                 "login"
               ]
             },
-            "description": "Login as **Employee**. Saves {{token}} (Bearer for every request) and {{myId}}.\n\nSeed: `employee@techculture.ai` / `TC005` / `9876500002` / password `TC00515012005`.\n\nBody: **`username`** + **`password`** only.\n`username` = employee code / official email / personal email / mobile (auto-detected).\n\n**Use local after seed:** collection {{baseUrl}} = `http://localhost:9001` and **No Environment**.\n\n---\n### Parameters (type + how to send)\n**Body (JSON raw)** — `Content-Type: application/json`\n- `username` — string | required | employee code OR email OR mobile\n- `password` — string | required | staff = code + DOB `15012005`; Super Admin / Admin = `123456`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---"
+            "description": "Login as **Employee**. Saves {{token}} and {{myId}}.\n\nSeed: `employee@techculture.ai` / `TC00515012005` (or Shivangi `TC00415012005`).\n\n### Body fields\n| Field | Required | Use |\n|-------|----------|-----|\n| `username` | yes | email / employee code / mobile |\n| `password` | yes | login password |\n| `fcmToken` | no | Firebase device token — saved on `User.fcmTokens` in **same** login |\n| `platform` | no | `web` \\| `android` \\| `ios` (default `web`) |\n| `deviceId` | no | stable device id (same id replaces old token) |\n\n### What returns\n- Response = **JWT only** (`token`, user, …). FCM is **not** returned.\n- If `fcmToken` was sent → it is stored in DB for push.\n\n### Two ways to save FCM\n1. **Preferred:** send `fcmToken` on login (one call).\n2. **Optional later:** `POST /api/notifications/token` if Firebase refreshes the token while still logged in.\n\n**Use local after seed:** `{{baseUrl}}` = `http://localhost:9001`, No Environment.\n\n---\n_Tip: numbers/booleans/null unquoted. Dates `YYYY-MM-DD`. ids = 24-char hex._\n---"
           },
           "response": []
         },
@@ -555,10 +576,10 @@
                     "companies"
                   ]
                 },
-                "description": "POST /api/companies. Saves {{newCompanyId}}.\n`branchId` / `shiftId` = Branch / Shift **master** ids (auto-filled before send if empty).\n`monthlySchedule` = week 1â€“5 pattern; each week needs all 7 days. Working day needs startTime + endTime; `isOff: true` = off day.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `companyName` — string | required on create | company display name (min 2)\n- `companyCode` — string | required on create | unique code, stored uppercase e.g. `ABC`\n- `isActive` — boolean | optional | `true` keeps the company active\n- `logo` — string (URL) | optional | Cloudinary `url` from POST /api/employees/upload with `type` = `companyLogo` (saved as {{companyLogoUrl}}). JPEG, PNG, WEBP, or GIF. Send `\"\"` to clear\n- `foundedYear` — number | optional | year founded, e.g. `2015` (1800 through the current year). Send `null` to clear\n- `branches` — array<object> | optional | company branches — branchId (master), address, shifts[].shiftId + monthlySchedule. Update replaces the whole list\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                "description": "POST /api/companies. Saves {{newCompanyId}}.\n`branchId` / `shiftId` = Branch / Shift **master** ids (auto-filled before send if empty).\n`monthlySchedule` = week 1â€“5 pattern; each week needs all 7 days. Working day needs startTime + endTime; `isOff: true` = off day.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `companyName` — string | required on create | company display name (min 2)\n- `companyCode` — string | required on create | unique code, stored uppercase e.g. `ABC`\n- `isActive` — boolean | optional | `true` keeps the company active\n- `logo` — string (URL) | optional | Cloudinary `url` from POST /api/employees/upload with `type` = `companyLogo` (saved as {{companyLogoUrl}}). JPEG, PNG, WEBP, or GIF. Send `\"\"` to clear\n- `foundedYear` — number | optional | year founded, e.g. `2015` (1800 through the current year). Send `null` to clear\n- `branches` — array<object> | optional | company branches — branchId (master), address, shifts[].shiftId + monthlySchedule. Update replaces the whole list\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n\n\n### Branch GPS (50 m punch/break geofence)\n- `branches[].latitude` / `longitude` — optional numbers; if omitted, server geocodes from `address`+`city`+`state`+`pincode`.\n- Sample uses **Kailash Building** coords for TechCulture-style tests.",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"companyName\": \"ABC Technologies {{rndNo}}\",\n  \"companyCode\": \"ABC{{rndNo}}\",\n  \"isActive\": true,\n  \"logo\": \"{{companyLogoUrl}}\",\n  \"foundedYear\": 2015,\n  \"branches\": [\n    {\n      \"branchId\": \"{{branchId}}\",\n      \"address\": \"Tower A, Sector 62\",\n      \"city\": \"Noida\",\n      \"state\": \"Uttar Pradesh\",\n      \"isActive\": true,\n      \"shifts\": [\n        {\n          \"shiftId\": \"{{shiftId}}\",\n          \"isActive\": true,\n          \"monthlySchedule\": [\n            {\n              \"weekNumber\": 1,\n              \"days\": [\n                {\n                  \"day\": \"monday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"tuesday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"wednesday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"thursday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"friday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"saturday\",\n                  \"isOff\": false,\n                  \"startTime\": \"10:00\",\n                  \"endTime\": \"14:00\",\n                  \"breakStartTime\": \"\",\n                  \"breakEndTime\": \"\"\n                },\n                {\n                  \"day\": \"sunday\",\n                  \"isOff\": true,\n                  \"startTime\": \"\",\n                  \"endTime\": \"\",\n                  \"breakStartTime\": \"\",\n                  \"breakEndTime\": \"\"\n                }\n              ]\n            }\n          ]\n        },\n        {\n          \"shiftId\": \"{{shiftId2}}\",\n          \"isActive\": true,\n          \"monthlySchedule\": []\n        }\n      ]\n    },\n    {\n      \"branchId\": \"{{branchId2}}\",\n      \"address\": \"Connaught Place\",\n      \"city\": \"New Delhi\",\n      \"state\": \"Delhi\",\n      \"isActive\": true,\n      \"shifts\": [\n        {\n          \"shiftId\": \"{{shiftId}}\",\n          \"isActive\": true,\n          \"monthlySchedule\": []\n        }\n      ]\n    }\n  ]\n}",
+                  "raw": "{\n  \"companyName\": \"ABC Technologies {{rndNo}}\",\n  \"companyCode\": \"ABC{{rndNo}}\",\n  \"isActive\": true,\n  \"logo\": \"{{companyLogoUrl}}\",\n  \"foundedYear\": 2015,\n  \"branches\": [\n    {\n      \"branchId\": \"{{branchId}}\",\n      \"address\": \"1212 KAILASH BUILDING KG MARG NEW DELHI CENTRAL DELHI DELHI 110001 INDIA\",\n      \"city\": \"New Delhi\",\n      \"state\": \"Delhi\",\n      \"isActive\": true,\n      \"shifts\": [\n        {\n          \"shiftId\": \"{{shiftId}}\",\n          \"isActive\": true,\n          \"monthlySchedule\": [\n            {\n              \"weekNumber\": 1,\n              \"days\": [\n                {\n                  \"day\": \"monday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"tuesday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"wednesday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"thursday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"friday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"saturday\",\n                  \"isOff\": false,\n                  \"startTime\": \"10:00\",\n                  \"endTime\": \"14:00\",\n                  \"breakStartTime\": \"\",\n                  \"breakEndTime\": \"\"\n                },\n                {\n                  \"day\": \"sunday\",\n                  \"isOff\": true,\n                  \"startTime\": \"\",\n                  \"endTime\": \"\",\n                  \"breakStartTime\": \"\",\n                  \"breakEndTime\": \"\"\n                }\n              ]\n            }\n          ]\n        },\n        {\n          \"shiftId\": \"{{shiftId2}}\",\n          \"isActive\": true,\n          \"monthlySchedule\": []\n        }\n      ],\n      \"pincode\": \"110001\",\n      \"latitude\": 28.6294351,\n      \"longitude\": 77.2222984\n    },\n    {\n      \"branchId\": \"{{branchId2}}\",\n      \"address\": \"Connaught Place\",\n      \"city\": \"New Delhi\",\n      \"state\": \"Delhi\",\n      \"isActive\": true,\n      \"shifts\": [\n        {\n          \"shiftId\": \"{{shiftId}}\",\n          \"isActive\": true,\n          \"monthlySchedule\": []\n        }\n      ],\n      \"pincode\": \"110001\",\n      \"latitude\": 28.6294351,\n      \"longitude\": 77.2222984\n    }\n  ]\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -662,10 +683,10 @@
                     "{{newCompanyId}}"
                   ]
                 },
-                "description": "PUT /api/companies/{{newCompanyId}} — send only the fields you want to change. `branches` **replaces** the whole branch list.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `newCompanyId` â†’ {{newCompanyId}} — string (MongoId / id) | set collection variable after create/list\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `companyName` — string | required on create | company display name (min 2)\n- `companyCode` — string | required on create | unique code, stored uppercase e.g. `ABC`\n- `isActive` — boolean | optional | `true` keeps the company active\n- `logo` — string (URL) | optional | Cloudinary `url` from POST /api/employees/upload with `type` = `companyLogo` (saved as {{companyLogoUrl}}). JPEG, PNG, WEBP, or GIF. Send `\"\"` to clear\n- `foundedYear` — number | optional | year founded, e.g. `2015` (1800 through the current year). Send `null` to clear\n- `branches` — array<object> | optional | company branches — branchId (master), address, shifts[].shiftId + monthlySchedule. Update replaces the whole list\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n",
+                "description": "PUT /api/companies/{{newCompanyId}} — send only the fields you want to change. `branches` **replaces** the whole branch list.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(string JWT — from Login)*\n\n**Path / URL variables**\n- `newCompanyId` â†’ {{newCompanyId}} — string (MongoId / id) | set collection variable after create/list\n\n**Body (JSON raw)** — `Content-Type: application/json`\n- `companyName` — string | required on create | company display name (min 2)\n- `companyCode` — string | required on create | unique code, stored uppercase e.g. `ABC`\n- `isActive` — boolean | optional | `true` keeps the company active\n- `logo` — string (URL) | optional | Cloudinary `url` from POST /api/employees/upload with `type` = `companyLogo` (saved as {{companyLogoUrl}}). JPEG, PNG, WEBP, or GIF. Send `\"\"` to clear\n- `foundedYear` — number | optional | year founded, e.g. `2015` (1800 through the current year). Send `null` to clear\n- `branches` — array<object> | optional | company branches — branchId (master), address, shifts[].shiftId + monthlySchedule. Update replaces the whole list\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---\n\n\n### Branch GPS (50 m punch/break geofence)\n- `branches[].latitude` / `longitude` — optional numbers; if omitted, server geocodes from `address`+`city`+`state`+`pincode`.\n- Sample uses **Kailash Building** coords for TechCulture-style tests.",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"companyName\": \"ABC Technologies {{rndNo}} Updated\",\n  \"companyCode\": \"ABC{{rndNo}}\",\n  \"isActive\": true,\n  \"logo\": \"{{companyLogoUrl}}\",\n  \"foundedYear\": 2015,\n  \"branches\": [\n    {\n      \"branchId\": \"{{branchId}}\",\n      \"address\": \"Tower B, Sector 63\",\n      \"city\": \"Noida\",\n      \"state\": \"Uttar Pradesh\",\n      \"isActive\": true,\n      \"shifts\": [\n        {\n          \"shiftId\": \"{{shiftId}}\",\n          \"isActive\": true,\n          \"monthlySchedule\": [\n            {\n              \"weekNumber\": 1,\n              \"days\": [\n                {\n                  \"day\": \"monday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"tuesday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"wednesday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"thursday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"friday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"saturday\",\n                  \"isOff\": false,\n                  \"startTime\": \"10:00\",\n                  \"endTime\": \"14:00\",\n                  \"breakStartTime\": \"\",\n                  \"breakEndTime\": \"\"\n                },\n                {\n                  \"day\": \"sunday\",\n                  \"isOff\": true,\n                  \"startTime\": \"\",\n                  \"endTime\": \"\",\n                  \"breakStartTime\": \"\",\n                  \"breakEndTime\": \"\"\n                }\n              ]\n            }\n          ]\n        }\n      ]\n    }\n  ]\n}",
+                  "raw": "{\n  \"companyName\": \"ABC Technologies {{rndNo}} Updated\",\n  \"companyCode\": \"ABC{{rndNo}}\",\n  \"isActive\": true,\n  \"logo\": \"{{companyLogoUrl}}\",\n  \"foundedYear\": 2015,\n  \"branches\": [\n    {\n      \"branchId\": \"{{branchId}}\",\n      \"address\": \"1212 KAILASH BUILDING KG MARG NEW DELHI CENTRAL DELHI DELHI 110001 INDIA\",\n      \"city\": \"New Delhi\",\n      \"state\": \"Delhi\",\n      \"isActive\": true,\n      \"shifts\": [\n        {\n          \"shiftId\": \"{{shiftId}}\",\n          \"isActive\": true,\n          \"monthlySchedule\": [\n            {\n              \"weekNumber\": 1,\n              \"days\": [\n                {\n                  \"day\": \"monday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"tuesday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"wednesday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"thursday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"friday\",\n                  \"isOff\": false,\n                  \"startTime\": \"09:30\",\n                  \"endTime\": \"18:30\",\n                  \"breakStartTime\": \"13:30\",\n                  \"breakEndTime\": \"14:00\"\n                },\n                {\n                  \"day\": \"saturday\",\n                  \"isOff\": false,\n                  \"startTime\": \"10:00\",\n                  \"endTime\": \"14:00\",\n                  \"breakStartTime\": \"\",\n                  \"breakEndTime\": \"\"\n                },\n                {\n                  \"day\": \"sunday\",\n                  \"isOff\": true,\n                  \"startTime\": \"\",\n                  \"endTime\": \"\",\n                  \"breakStartTime\": \"\",\n                  \"breakEndTime\": \"\"\n                }\n              ]\n            }\n          ]\n        }\n      ],\n      \"pincode\": \"110001\",\n      \"latitude\": 28.6294351,\n      \"longitude\": 77.2222984\n    }\n  ]\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -5619,6 +5640,27 @@
               "response": []
             },
             {
+              "name": "3c. Get Profile Completion %",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/employees/{{employeeId}}/profile-completion",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "employees",
+                    "{{employeeId}}",
+                    "profile-completion"
+                  ]
+                },
+                "description": "## GET `/api/employees/{{employeeId}}/profile-completion`\nOne employee (or `me`). Includes `completeThese`.\n\n---\n**Header:** `Authorization: Bearer {{token}}` *(JWT from Login)*\n---"
+              },
+              "response": []
+            },
+            {
               "name": "4. Update Employee",
               "request": {
                 "method": "PUT",
@@ -6102,6 +6144,124 @@
                   }
                 }
               ]
+            }
+          ]
+        },
+        {
+          "name": "1.12 Notifications (FCM)",
+          "description": "## Notifications (Admin / HR / RM)\n\n**Preferred:** send `fcmToken` + `platform` + `deviceId` on **login** (JWT response unchanged; token saved in DB).\n\n| # | API | When |\n|---|-----|------|\n| 1 | `POST /token` | Optional — refresh FCM without re-login |\n| 2 | `GET /` | List (company / team / all scoped) |\n| 3 | `PUT /:id/read` | Mark read |\n\nPunch-in `% < 70` → `403 PROFILE_INCOMPLETE` + push if FCM was saved.",
+          "item": [
+            {
+              "name": "1. Register FCM Token (optional refresh)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/notifications/token",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "notifications",
+                    "token"
+                  ]
+                },
+                "description": "## POST `/api/notifications/token`\n**Optional refresh API.** Prefer sending `fcmToken` on **login**.\n\nUse this when Firebase gives a **new** device token while the user is already logged in.\n\nSaves on `User.fcmTokens[]` (max 10). Same `deviceId` replaces previous row.\n\n### Body\n| Field | Required |\n|-------|----------|\n| `token` | yes |\n| `platform` | no (`web`\\|`android`\\|`ios`) |\n| `deviceId` | no |\n\n---\n**Header:** `Authorization: Bearer {{token}}` *(JWT from Login)*\n\n_Tip: numbers/booleans/null unquoted. Dates `YYYY-MM-DD`. ids = 24-char hex._\n---",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"token\": \"{{fcmToken}}\",\n  \"platform\": \"android\",\n  \"deviceId\": \"device-1\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "2. List Notifications",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const j = pm.response.json();",
+                      "const row = j.notifications && j.notifications[0];",
+                      "if (row && row.id) pm.collectionVariables.set('notificationId', row.id);"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/notifications?page=1&limit=20",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "notifications"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    },
+                    {
+                      "key": "unread",
+                      "value": "true",
+                      "disabled": true
+                    },
+                    {
+                      "key": "type",
+                      "value": "PROFILE_COMPLETION",
+                      "disabled": true
+                    },
+                    {
+                      "key": "userId",
+                      "value": "{{employeeId}}",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "## GET `/api/notifications`\nBell / admin list. Saves `{{notificationId}}` from first row.\n\n| Role | Sees |\n|------|------|\n| Employee | Own |\n| Reporting Manager | Self + team |\n| HR | Assigned companies |\n| Super Admin / Admin | All |\n\n`?userId=` only if in scope (else 403).\n\n---\n**Header:** `Authorization: Bearer {{token}}` *(JWT from Login)*\n\n_Tip: numbers/booleans/null unquoted. Dates `YYYY-MM-DD`. ids = 24-char hex._\n---"
+              },
+              "response": []
+            },
+            {
+              "name": "3. Mark Read",
+              "request": {
+                "method": "PUT",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/notifications/{{notificationId}}/read",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "notifications",
+                    "{{notificationId}}",
+                    "read"
+                  ]
+                },
+                "description": "## PUT `/api/notifications/:id/read`\nOwn OK. Admin/HR/RM only if notification user is in company/team scope.\n\n---\n**Header:** `Authorization: Bearer {{token}}` *(JWT from Login)*\n\n**Path:** `{{notificationId}}`\n---"
+              },
+              "response": []
             }
           ]
         },
@@ -8808,7 +8968,7 @@
     },
     {
       "name": "2. EMPLOYEE (ESS)",
-      "description": "Employee self-service. Start with **2.1 My Profile → 1. Login (Employee)** — `username` = `employee@techculture.ai` / `TC005` / mobile, password `TC00515012005`.\nOwn ID card: **Get My ID Card**.\nUse local baseUrl after seed. Switch back to **0. Login** (Super Admin) before **1. ADMIN**.",
+      "description": "Employee self-service. Start **2.1 My Profile → Login**.\nSeed: `employee@techculture.ai` / `TC00515012005` or `shivangi@techculture.ai` / `TC00415012005`.\n\n**Notifications:** Login body mein optional `fcmToken` bhejo (preferred).\nPhir **2.1b** → My Notifications / Mark Read. Register Token = optional refresh only.\n\nSwitch to **0. Login** (Super Admin) before **1. ADMIN**.",
       "item": [
         {
           "name": "2.1 My Profile",
@@ -8839,10 +8999,10 @@
                         "login"
                       ]
                     },
-                    "description": "Login as **Employee**. Saves {{token}} (Bearer for every request) and {{myId}}.\n\nSeed: `employee@techculture.ai` / `TC005` / `9876500002` / password `TC00515012005`.\n\nBody: **`username`** + **`password`** only.\n`username` = employee code / official email / personal email / mobile (auto-detected).\n\n**Use local after seed:** collection {{baseUrl}} = `http://localhost:9001` and **No Environment**.\n\n---\n### Parameters (type + how to send)\n**Body (JSON raw)** — `Content-Type: application/json`\n- `username` — string | required | employee code OR email OR mobile\n- `password` — string | required | staff = code + DOB `15012005`; Super Admin / Admin = `123456`\n\n_Tip: numbers/booleans/null in JSON must be unquoted (`28.6`, `true`, `null`). Dates = `YYYY-MM-DD`, times = `HH:mm`, month = `YYYY-MM`, ids = 24-char hex._\n---",
+                    "description": "Login as **Employee**. Saves {{token}} and {{myId}}.\n\nSeed: `employee@techculture.ai` / `TC00515012005` (or Shivangi `TC00415012005`).\n\n### Body fields\n| Field | Required | Use |\n|-------|----------|-----|\n| `username` | yes | email / employee code / mobile |\n| `password` | yes | login password |\n| `fcmToken` | no | Firebase device token — saved on `User.fcmTokens` in **same** login |\n| `platform` | no | `web` \\| `android` \\| `ios` (default `web`) |\n| `deviceId` | no | stable device id (same id replaces old token) |\n\n### What returns\n- Response = **JWT only** (`token`, user, …). FCM is **not** returned.\n- If `fcmToken` was sent → it is stored in DB for push.\n\n### Two ways to save FCM\n1. **Preferred:** send `fcmToken` on login (one call).\n2. **Optional later:** `POST /api/notifications/token` if Firebase refreshes the token while still logged in.\n\n**Use local after seed:** `{{baseUrl}}` = `http://localhost:9001`, No Environment.\n\n---\n_Tip: numbers/booleans/null unquoted. Dates `YYYY-MM-DD`. ids = 24-char hex._\n---",
                     "body": {
                       "mode": "raw",
-                      "raw": "{\n  \"username\": \"employee@techculture.ai\",\n  \"password\": \"TC00515012005\"\n}",
+                      "raw": "{\n  \"username\": \"employee@techculture.ai\",\n  \"password\": \"TC00515012005\",\n  \"fcmToken\": \"{{fcmToken}}\",\n  \"platform\": \"android\",\n  \"deviceId\": \"device-1\"\n}",
                       "options": {
                         "raw": {
                           "language": "json"
@@ -8905,6 +9065,27 @@
                       ]
                     },
                     "description": "GET /api/employees/me/id-card — **Virtual ID card** for the logged-in employee. One request. The URL has no id — the token is the employee.\n\nSame card as admin **1.5 Employees → 3b. Get Employee ID Card**. This call is only the **own card** option.\n\n### What this feature does\nReturns one flat object: name, photo, employee code, date of birth, date of joining, blood group, mobile, department, designation, `employeeType` (`Permanent` or `Probation`), and the creating HR's name plus signature.\n\n### How it works\n1. Run **1. Login (Employee)** first. Seed: `employee@techculture.ai` or `TC005`, password `TC00515012005`. That saves `{{token}}`.\n2. Send this request. Seed TC005 joined on the seed day, so `employeeType` is **Probation**.\n3. `employeeType` is calculated from date of joining: **Probation** for 3 company months, then **Permanent**. You do not send it.\n4. `hrName` and `hrSignatureUrl` come from the HR who created this employee. If that HR has no signature, the API returns **400** (upload with type `signature`, then save `signatureUrl` on the HR account).\n\n### Options\n| Option | How | Result |\n| --- | --- | --- |\n| Own card | This request, after employee login | 200, your card. Seed TC005 → Probation |\n| Someone else's card | Employee token on `GET /api/employees/{{employeeId}}/id-card` with another id | 403 `You can only generate / view your own ID card` |\n| Any employee's card | Switch to **0. Login** (admin), set `{{employeeId}}`, use **3b. Get Employee ID Card** | 200. TC004 / TC007 → Permanent. TC005 / TC006 → Probation |\n\n### Sample 200 (seed TC005, Probation)\n```json\n{\n  \"name\": \"Employee\",\n  \"employeeCode\": \"TC005\",\n  \"dateOfBirth\": \"2005-01-15\",\n  \"dateOfJoining\": \"2026-10-22\",\n  \"bloodGroup\": \"B+\",\n  \"mobileNo\": \"9876500002\",\n  \"employeeType\": \"Probation\",\n  \"department\": \"Engineering\",\n  \"designation\": \"Software Engineer\",\n  \"hrName\": \"Anupama\"\n}\n```\n`employeeId`, `profileUrl`, and `hrSignatureUrl` are also returned. `profileUrl` is the Cloudinary photo. `hrSignatureUrl` is the HR stamp.\n\nNeeds **Self → General Info → view**.\n\n---\n### Parameters (type + how to send)\n**Header:** `Authorization: Bearer {{token}}` *(Employee login)*\n\nNo query and no body. Path is fixed: `/api/employees/me/id-card`.\n---\n"
+                  },
+                  "response": []
+                },
+                {
+                  "name": "2c. My Profile Completion %",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/api/employees/me/profile-completion",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "employees",
+                        "me",
+                        "profile-completion"
+                      ]
+                    },
+                    "description": "## GET `/api/employees/me/profile-completion`\nESS own %. Punch-in needs `percentage >= 70`.\n\n---\n**Header:** `Authorization: Bearer {{token}}` *(JWT from Login)*\n---"
                   },
                   "response": []
                 },
@@ -9148,6 +9329,119 @@
           ]
         },
         {
+          "name": "2.1b Notifications (accept web + app)",
+          "description": "## Employee — enable notifications (web + app)\n\n1. Get FCM token from Firebase SDK (user taps Allow)\n2. **Login** with `username`, `password`, **`fcmToken`**, `platform`, `deviceId`\n3. JWT comes in response; FCM is saved on user in DB\n4. **My Notifications** / **Mark Read** below\n\n| Platform | `platform` |\n|----------|------------|\n| Browser | `web` |\n| Android | `android` |\n| iOS | `ios` |\n\nOptional: Register Token API only if token refreshes without new login.\nSeed: `shivangi@techculture.ai` / `TC00415012005`.",
+          "item": [
+            {
+              "name": "1. Register FCM Token (optional refresh)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/notifications/token",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "notifications",
+                    "token"
+                  ]
+                },
+                "description": "## POST `/api/notifications/token`\n**Optional refresh API.** Prefer sending `fcmToken` on **login**.\n\nUse this when Firebase gives a **new** device token while the user is already logged in.\n\nSaves on `User.fcmTokens[]` (max 10). Same `deviceId` replaces previous row.\n\n### Body\n| Field | Required |\n|-------|----------|\n| `token` | yes |\n| `platform` | no (`web`\\|`android`\\|`ios`) |\n| `deviceId` | no |\n\n---\n**Header:** `Authorization: Bearer {{token}}` *(JWT from Login)*\n\n_Tip: numbers/booleans/null unquoted. Dates `YYYY-MM-DD`. ids = 24-char hex._\n---",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"token\": \"{{fcmToken}}\",\n  \"platform\": \"android\",\n  \"deviceId\": \"employee-phone-1\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "2. My Notifications",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const j = pm.response.json();",
+                      "const row = j.notifications && j.notifications[0];",
+                      "if (row && row.id) pm.collectionVariables.set('notificationId', row.id);"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/notifications?page=1&limit=20",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "notifications"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    },
+                    {
+                      "key": "unread",
+                      "value": "true",
+                      "disabled": true
+                    },
+                    {
+                      "key": "type",
+                      "value": "PROFILE_COMPLETION",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "## GET `/api/notifications` — Employee (own only)\nBell list. After blocked punch-in see `type: PROFILE_COMPLETION`.\n\n---\n**Header:** `Authorization: Bearer {{token}}` *(JWT from Login)*\n---"
+              },
+              "response": []
+            },
+            {
+              "name": "3. Mark Read",
+              "request": {
+                "method": "PUT",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/notifications/{{notificationId}}/read",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "notifications",
+                    "{{notificationId}}",
+                    "read"
+                  ]
+                },
+                "description": "## PUT `/api/notifications/:id/read`\nOwn OK. Admin/HR/RM only if notification user is in company/team scope.\n\n---\n**Header:** `Authorization: Bearer {{token}}` *(JWT from Login)*\n\n**Path:** `{{notificationId}}`\n---"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
           "name": "2.2 Attendance (Punch)",
           "description": "## Employee Attendance (self)\nLogin as **Employee** first (folder 2.1 â†’ Login).\nAll requests need `Authorization: Bearer {{token}}` (or cookie `token`).\n\n### Flow\n1. **Punch In** â†’ day becomes **MissedPunch** until punch-out.\n2. **Punch Out** â†’ day scored vs shift â†’ Present / Late / HalfDay / Absent.\n3. **My Time Sheet** â†’ month grid; use `canApply` to know if regularize is allowed.\n4. Regularize:\n   - **6** = missed punch (send missing `HH:mm`)\n   - **6b** = Late day already punched (date + reason only)\n   - **6c** = break forgot / too long\n5. Manager/HR/Super Admin approve in **1.7 â†’ 4. Attendance Regularization** (not here).\n\n### Day status codes (timesheet `status`)\n| Code | statusLabel | When |\n|------|-------------|------|\n| `P` | Present | Full day ok vs shift |\n| `L` | Late | Punch-in after grace; both punches present |\n| `A` | Absent | No usable attendance / too short |\n| `MP` | MissedPunch | Punch-in only, no punch-out |\n| `HD` | HalfDay | Left early / half leave + work |\n| `WO` | WeeklyOff | Off day, no work punch |\n| `H` | Holiday | Holiday |\n| `ELE` | EarlyLeave | Left before shift end (when scored) |\n| `Pending` | Pending | Regularization waiting review |\n| `Rejected` | Rejected | Regularization rejected |\n| leave code | leave name | Approved leave, no punch |\n| `OnDuty` / `OnTour` | Present display | Duty approved days show Present |",
           "item": [
@@ -9176,10 +9470,10 @@
                         "punch-in"
                       ]
                     },
-                    "description": "## POST `/api/attendance/punch-in`\nStart the work day for the **logged-in employee** (company/branch/shift from profile).\n\n### When to use\nEmployee reaches office / starts WFH and taps **In**.\n\n### Body fields\n| Field | Type | Required | Use |\n|-------|------|----------|-----|\n| `source` | string | yes | Where punch came from: `web` \\| `mobile` \\| `biometric` |\n| `latitude` | number | yes | GPS lat (âˆ’90â€¦90). Address is resolved server-side via Map API |\n| `longitude` | number | yes | GPS lng (âˆ’180â€¦180) |\n| `remarks` | string | no | Optional note (max 500), e.g. â€œReached officeâ€ |\n\n### Result / status\n- Day status stays **`MissedPunch`** until punch-out.\n- `attendanceStatus`: **Early** (before shift start), **On time** (start â†’ grace), or **Late** (after grace).\n- Early minutes before shift start are **not** counted in worked hours.\n- Saves `{{attendanceId}}` from response.\n\n### Auth\n`Authorization: Bearer {{token}}`\n\n\n_Tip: dates = `YYYY-MM-DD`, times = `HH:mm` (24h), month = `YYYY-MM`, ids = 24-char hex. Numbers/booleans/null unquoted._",
+                    "description": "## POST `/api/attendance/punch-in`\nStart the work day. GPS must be **within 50 m** of the assigned branch office.\n\n### Profile gate (70%) — error shape\nIf profile **&lt; 70%** → HTTP **`403`**:\n\n```json\n{\n  \"success\": false,\n  \"message\": \"Profile 45% (need 70%). Complete: …. Punch-in blocked.\",\n  \"code\": \"PROFILE_INCOMPLETE\",\n  \"percentage\": 45,\n  \"needPercentage\": 70,\n  \"completeThese\": [\n    { \"key\": \"personal.mobileNo\", \"label\": \"Mobile number\", \"section\": \"personal\" }\n  ]\n}\n```\n\nAlso creates/updates `PROFILE_COMPLETION` notification + **FCM push** if device token was saved (login or Register Token).\n\n### Body\n| Field | Type | Required |\n|-------|------|----------|\n| `source` | string | yes (`web`\\|`mobile`\\|`biometric`) |\n| `latitude` | number | yes |\n| `longitude` | number | yes |\n| `remarks` | string | no |\n\n### Geofence\nWithin 50 m of branch GPS. Sample Kailash: `28.6294351, 77.2222984`.\n\n---\n**Header:** `Authorization: Bearer {{token}}` *(JWT from Login)*\n\n_Tip: numbers/booleans/null unquoted. Dates `YYYY-MM-DD`. ids = 24-char hex._\n---",
                     "body": {
                       "mode": "raw",
-                      "raw": "{\n  \"source\": \"web\",\n  \"latitude\": 28.6301,\n  \"longitude\": 77.2242,\n  \"remarks\": \"Reached office\"\n}",
+                      "raw": "{\n  \"source\": \"web\",\n  \"latitude\": 28.6294351,\n  \"longitude\": 77.2222984,\n  \"remarks\": \"Reached office\"\n}",
                       "options": {
                         "raw": {
                           "language": "json"
@@ -9222,10 +9516,10 @@
                         "punch-out"
                       ]
                     },
-                    "description": "## POST `/api/attendance/punch-out`\nEnd the work day. **Status is calculated from the assigned shift**, not from a fixed early-exit rule alone.\n\n### When to use\nEmployee leaves / ends work for the day (must already be punched in).\n\n### Body fields\n| Field | Type | Required | Use |\n|-------|------|----------|-----|\n| `source` | string | yes | `web` \\| `mobile` \\| `biometric` |\n| `latitude` | number | yes | GPS lat |\n| `longitude` | number | yes | GPS lng |\n| `remarks` | string | no | Optional note |\n\n### Example (shift 10:00â€“19:00)\n| In | Out | Result |\n|----|-----|--------|\n| 08:00 | 19:00 | **Present** (hours count from shift start 10:00) |\n| 11:00 / 12:00 | 19:00 | **Late** |\n| 08:00 | 18:00 | **HalfDay** (left before shift end) |\n| in then out in first half (e.g. 2 min) | | **Absent** |\n| in only, no out | | stays **MissedPunch** |\n\n### Other fields returned\n- `workingHours` / overtime: overtime only **after** shift end.\n- `lateByMinutes` / `earlyByMinutes` vs shift window.\n\n\n_Tip: dates = `YYYY-MM-DD`, times = `HH:mm` (24h), month = `YYYY-MM`, ids = 24-char hex. Numbers/booleans/null unquoted._",
+                    "description": "## POST `/api/attendance/punch-out`\nEnd the work day. Same **50 m** geofence as punch-in.\n\n### Body\n| Field | Type | Required | Use |\n|-------|------|----------|-----|\n| `source` | string | yes | `web` \\| `mobile` \\| `biometric` |\n| `latitude` | number | yes | Device GPS lat |\n| `longitude` | number | yes | Device GPS lng |\n| `remarks` | string | no | Optional note |\n\n### Geofence\nMust be within **50 m** of branch office GPS (Kailash sample coords in body).\nReject payload includes meters + km. Success includes distance used.\n\nMust already be punched in. End open break before punch-out.\n\nHeader: `Authorization: Bearer {{token}}`",
                     "body": {
                       "mode": "raw",
-                      "raw": "{\n  \"source\": \"web\",\n  \"latitude\": 28.6301,\n  \"longitude\": 77.2242,\n  \"remarks\": \"\"\n}",
+                      "raw": "{\n  \"source\": \"web\",\n  \"latitude\": 28.6294351,\n  \"longitude\": 77.2222984,\n  \"remarks\": \"\"\n}",
                       "options": {
                         "raw": {
                           "language": "json"
@@ -10997,10 +11291,10 @@
                         "start"
                       ]
                     },
-                    "description": "## POST /api/break/start\n\nBody: `{}` — **do not send breakType** (ignored). Auto order: next fixed with remainingMinutes > 0 â†’ Day Break if grant Approved.\n\n| Response field | Use |\n|----------------|-----|\n| `message` | Toast e.g. Break started (Tea Break). |\n| Same as /me | `canStart` false, `canEnd` true, `break` filled (On Break + approvalStatus). |\n\nErrors: not punched in; already on break; Day Break needs `POST /day-request` first.",
+                    "description": "## POST `/api/break/start`\nStart next break (auto type). **latitude + longitude required** — same **50 m** office radius as punch.\n\n### Body\n```json\n{\n  \"latitude\": 28.6294351,\n  \"longitude\": 77.2222984\n}\n```\n- Do **not** send `breakType` (ignored; auto Lunch/Tea → Day Break if granted).\n- Outside 50 m → same distance error as punch.\n\nPunch in first. One open break at a time. Saves `{{breakId}}`.",
                     "body": {
                       "mode": "raw",
-                      "raw": "{}",
+                      "raw": "{\n  \"latitude\": 28.6294351,\n  \"longitude\": 77.2222984\n}",
                       "options": {
                         "raw": {
                           "language": "json"
@@ -11072,7 +11366,12 @@
                   "name": "4. End My Break",
                   "request": {
                     "method": "POST",
-                    "header": [],
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      }
+                    ],
                     "url": {
                       "raw": "{{baseUrl}}/api/break/end",
                       "host": [
@@ -11084,7 +11383,16 @@
                         "end"
                       ]
                     },
-                    "description": "## POST /api/break/end\n\nNo body. Ends open break â†’ `status` Completed (even if was Overdue while open). No RM overage approve — use regularization if needed.\n\nResponse: same shape as /me + optional `attendance` worked/required/remaining."
+                    "description": "## POST `/api/break/end`\nEnd open break. **latitude + longitude required** — within **50 m** of branch office.\n\n### Body\n```json\n{\n  \"latitude\": 28.6294351,\n  \"longitude\": 77.2222984\n}\n```\n\nResponse: break minutes + attendance worked / required / remaining.",
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"latitude\": 28.6294351,\n  \"longitude\": 77.2222984\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    }
                   }
                 }
               ]
@@ -11454,6 +11762,28 @@
     },
     {
       "key": "projectId",
+      "value": ""
+    },
+    {
+      "key": "officeLatitude",
+      "value": "28.6294351",
+      "description": "Kailash Building lat — punch/break within 50m"
+    },
+    {
+      "key": "officeLongitude",
+      "value": "77.2222984",
+      "description": "Kailash Building lng — punch/break within 50m"
+    },
+    {
+      "key": "fcmToken",
+      "value": ""
+    },
+    {
+      "key": "notificationId",
+      "value": ""
+    },
+    {
+      "key": "notificationCronSecret",
       "value": ""
     }
   ]
