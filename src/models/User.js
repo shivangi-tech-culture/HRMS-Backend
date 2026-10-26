@@ -75,6 +75,25 @@ const userSchema = new mongoose.Schema(
       default: null,
     },
 
+    /**
+     * FCM device tokens — web + Android + iOS.
+     * Client registers after login: POST /api/notifications/token
+     */
+    fcmTokens: [
+      {
+        token: { type: String, required: true, trim: true },
+        /** web | android | ios */
+        platform: {
+          type: String,
+          enum: ["web", "android", "ios"],
+          default: "web",
+        },
+        /** Optional browser / device id so same device updates one row */
+        deviceId: { type: String, default: "", trim: true },
+        updatedAt: { type: Date, default: Date.now },
+      },
+    ],
+
     // 1. PERSONAL — employee can update (phones, emails, addresses, IDs)
 
     personal: {

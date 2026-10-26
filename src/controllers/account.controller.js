@@ -23,6 +23,7 @@ const {
   isSignatureImageUrl,
 } = require("../middleware/upload");
 const { normalizeRoleName, SUPER_ADMIN, ADMIN, HR } = require("../config/roles");
+const { computeProfileCompletion } = require("../utils/profileCompletion");
 
 const LOCKED_ROLES = new Set(["Super Admin", "Admin", "Employee"]);
 const SIGNATURE_ROLES = new Set([SUPER_ADMIN, ADMIN, HR]);
@@ -96,6 +97,28 @@ const getMyProfile = async (req, res) => {
     return res.json({
       message: "My Profile",
       data: await toProfilePayload(user, roleDoc),
+    });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+/**
+ * GET /api/account/profile/completion — own profile % (Employee / HR / Manager / Admin)
+ * Returns filled count, remaining mandatory, section-wise breakdown.
+ */
+const getMyProfileCompletion = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id)
+      .select("-password -token -emailAppPassword")
+      .lean();
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    return res.json({
+      message: "Profile completion",
+      data: computeProfileCompletion(user),
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -235,6 +258,7 @@ const changePassword = async (req, res) => {
 
 module.exports = {
   getMyProfile,
+  getMyProfileCompletion,
   updateMyProfile,
   getMe,
   changePassword,

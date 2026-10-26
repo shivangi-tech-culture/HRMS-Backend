@@ -11,6 +11,7 @@ const {
   exportEmployees,
   getEmployeeIdCard,
   getEmployee,
+  getEmployeeProfileCompletion,
   updateEmployee,
   adminChangePassword,
   listActivity,
@@ -583,6 +584,34 @@ router.get(
   authorize(...ALL_ACCESS, "Employee"),
   checkEmployeeProfilePermission("view"),
   getEmployeeIdCard
+);
+
+/**
+ * @swagger
+ * /api/employees/{id}/profile-completion:
+ *   get:
+ *     tags: [Admin / Employees, Employee / ESS]
+ *     summary: Profile completion %
+ *     description: |
+ *       How complete a profile is — overall %, filled / remaining counts,
+ *       mandatory missing fields, and section-wise breakdown.
+ *
+ *       **Who:** Employee (own / `me`) | HR / Reporting Manager / Admin (company or team scope).
+ *       Use `me` instead of an id for the logged-in user.
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - $ref: '#/components/parameters/UserId'
+ *     responses:
+ *       200: { description: Completion summary }
+ *       403: { description: Not own profile / out of company or team scope }
+ *       404: { description: Employee not found }
+ */
+router.get(
+  "/:id/profile-completion",
+  protect,
+  authorize(...ALL_ACCESS, "Employee"),
+  checkEmployeeProfilePermission("view"),
+  getEmployeeProfileCompletion
 );
 
 /**

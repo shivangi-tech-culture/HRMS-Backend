@@ -75,6 +75,7 @@ const {
   previewEmployeeCode,
   allocateEmployeeCode,
 } = require("../utils/employeeCode");
+const { computeProfileCompletion } = require("../utils/profileCompletion");
 
 /** True for Super Admin / Admin (lean login accounts) */
 const isPlatformAdminRole = (role) => isPlatformRole(role);
@@ -765,6 +766,51 @@ const getEmployee = async (req, res) => {
     }
 
     return res.json({ employee: await safeUser(employee) });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+/**
+ * PROFILE COMPLETION — GET /api/employees/:id/profile-completion
+ *                        GET /api/employees/me/profile-completion
+ *
+ * Same access as getEmployee / id-card:
+ * - Employee → own id / `me` only
+ * - HR / Reporting Manager / Admin → company (or team) scope
+ *
+ * Returns % complete, filled vs remaining, mandatory missing, section breakdown.
+ */
+const getEmployeeProfileCompletion = async (req, res) => {
+  try {
+    if (String(req.params.id || "").toLowerCase() === "me") {
+      req.params.id = String(req.user._id);
+    }
+
+    if (!hasAllAccess(req.user) && !isOwnRecord(req, req.params.id)) {
+      return res.status(403).json({
+        message: "You can only view your own profile completion",
+      });
+    }
+
+    const employee = await User.findById(req.params.id)
+      .select("-password -token -emailAppPassword")
+      .lean();
+    if (!employee) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+
+    if (hasAllAccess(req.user) && !hasGlobalCompanyAccess(req.user)) {
+      const scopeErr = assertTeamOrCompanyEmployee(req.user, employee);
+      if (scopeErr) {
+        return res.status(403).json({ message: scopeErr });
+      }
+    }
+
+    return res.json({
+      message: "Profile completion",
+      data: computeProfileCompletion(employee),
+    });
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
@@ -1665,6 +1711,7 @@ module.exports = {
   exportEmployees,
   getEmployeeIdCard,
   getEmployee,
+  getEmployeeProfileCompletion,
   updateEmployee,
   adminChangePassword,
   listActivity,

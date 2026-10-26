@@ -187,8 +187,10 @@ const PARAM_DOCS = {
   workMode: "string | optional | `WFO` | `WFH` | `Hybrid` | `ALL`",
   attendanceDate: "string (YYYY-MM-DD) | optional | day for daily / late-early lists",
   attendanceMonth: "string (YYYY-MM) | optional | calendar month e.g. `2026-10`",
-  latitude: "number | required | GPS latitude (-90…90) — send as number, not string",
-  longitude: "number | required | GPS longitude (-180…180) — send as number, not string",
+  latitude:
+    "number | required | GPS latitude (−90…90). Must be within 50 m of company branch office (lat/long from branch address)",
+  longitude:
+    "number | required | GPS longitude (−180…180). Pair with latitude — 50 m office geofence on punch + break",
   remarks: "string | optional | max ~500 chars",
   reason: "string | required on review/regularize | why approve/reject or regularization reason",
   breakType: "string | optional on auto-start | e.g. `Lunch Break` | `Tea Break` | `Day Break` (omit on POST /break/start — auto-picked)",
@@ -478,7 +480,7 @@ function enumsBlock(ctx) {
 
   if (url.includes("/punch-in") || url.includes("/punch-out")) {
     blocks.push(
-      "**Punch body:** `source`=`web`\\|`mobile`\\|`biometric`; `latitude`/`longitude` numbers; optional `remarks`. After in-only: day `status`=`MissedPunch`, `attendanceStatus`=`Early`\\|`On time`\\|`Late`."
+      "**Punch body:** `source`=`web`\\|`mobile`\\|`biometric`; `latitude`/`longitude` numbers (**within 50 m** of branch office); optional `remarks`. Outside radius → `distanceMeters` / `distanceKm`. After in-only: day `status`=`MissedPunch`, `attendanceStatus`=`Early`\\|`On time`\\|`Late`."
     );
   }
 

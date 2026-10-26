@@ -104,14 +104,17 @@ const employeeBreakFolder = {
         description: [
           "POST /api/break/start — **no breakType needed**.",
           "",
-          "Auto order: next fixed with remaining (policy minutes − used) → then Day Break if granted.",
-          "Punch in first. One open break at a time.",
-          "Response includes **todayTime** (active / idle / break).",
-          "Saves {{breakId}}.",
+          "**Body:** `latitude` + `longitude` required (within **50 m** of branch office).",
+          "Auto order: next fixed with remaining → then Day Break if granted.",
+          "Punch in first. One open break at a time. Saves {{breakId}}.",
         ].join("\n"),
         body: {
           mode: "raw",
-          raw: "{}",
+          raw: JSON.stringify(
+            { latitude: 28.6294351, longitude: 77.2222984 },
+            null,
+            2
+          ),
           options: { raw: { language: "json" } },
         },
       },
@@ -143,13 +146,22 @@ const employeeBreakFolder = {
       name: "4. End My Break",
       request: {
         method: "POST",
-        header: [],
+        header: [{ key: "Content-Type", value: "application/json" }],
         url: urlOf("{{baseUrl}}/api/break/end"),
         description: [
           "POST /api/break/end",
-          "Ends open break. Within allowed → Completed; over → Pending (manager review on overage).",
+          "**Body:** `latitude` + `longitude` required (within **50 m** of branch).",
           "Response: break minutes + attendance worked / required / remaining.",
         ].join("\n"),
+        body: {
+          mode: "raw",
+          raw: JSON.stringify(
+            { latitude: 28.6294351, longitude: 77.2222984 },
+            null,
+            2
+          ),
+          options: { raw: { language: "json" } },
+        },
       },
     },
   ],

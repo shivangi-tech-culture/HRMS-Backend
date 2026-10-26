@@ -5,6 +5,7 @@
 const express = require("express");
 const {
   getMyProfile,
+  getMyProfileCompletion,
   updateMyProfile,
   getMe,
   changePassword,
@@ -55,6 +56,24 @@ const changePasswordSchema = Joi.object({
  *         description: Profile cards — name, email, role, company, department, status
  */
 router.get("/profile", protect, getMyProfile);
+
+/**
+ * @swagger
+ * /api/account/profile/completion:
+ *   get:
+ *     tags: [Account / My Profile]
+ *     summary: My profile completion %
+ *     description: |
+ *       How complete the logged-in user's profile is (Employee, HR, Manager, Admin).
+ *       Returns overall %, filled vs remaining counts, mandatory missing list, and section breakdown.
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200:
+ *         description: Completion summary
+ *       404:
+ *         description: User not found
+ */
+router.get("/profile/completion", protect, getMyProfileCompletion);
 
 /**
  * @swagger
