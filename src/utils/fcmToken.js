@@ -2,9 +2,7 @@
  * Save / replace an FCM device token on a User document (in-memory).
  * Caller must `await user.save()` afterwards.
  *
- * Used by:
- *   - POST /api/auth/login (optional body.fcmToken)
- *   - POST /api/notifications/token
+ * Used by: POST /api/notifications/token
  */
 const PLATFORMS = new Set(["web", "android", "ios"]);
 

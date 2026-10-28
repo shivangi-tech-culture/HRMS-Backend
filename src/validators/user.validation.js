@@ -341,11 +341,9 @@ const deleteUploadSchema = Joi.object({
 
 /**
  * LOGIN body — POST /api/auth/login
- * Auth: username + password → JWT only in response.
- * Optional FCM (web/app): send with login so device token is saved in same call
- * (no need for a separate register call on every login).
- *   { "username": "TC005", "password": "TC00515012005",
- *     "fcmToken": "...", "platform": "android", "deviceId": "phone-1" }
+ * Auth: username + password → JWT.
+ * FCM: use POST /api/notifications/token after login (not accepted here).
+ *   { "username": "TC005", "password": "TC00515012005" }
  */
 const loginSchema = Joi.object({
   username: Joi.string().trim().min(1).max(254).required().messages({
@@ -356,10 +354,6 @@ const loginSchema = Joi.object({
     "string.empty": "Password is required",
     "any.required": "Password is required",
   }),
-  /** Firebase device token — saved on User.fcmTokens when present */
-  fcmToken: Joi.string().trim().min(20).max(4096).optional().allow(""),
-  platform: Joi.string().valid("web", "android", "ios").default("web"),
-  deviceId: Joi.string().trim().max(200).allow("").optional(),
 }).unknown(false);
 /** Same row checks as update, keyed by the list name in the URL path */
 const ARRAY_ITEM_SCHEMAS = {

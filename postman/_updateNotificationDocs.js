@@ -1,6 +1,6 @@
 /**
  * Sync Postman docs with current FCM + punch-in behaviour.
- * Login: username + password (+ optional fcmToken/platform/deviceId).
+ * Login: username + password only. FCM via POST /api/notifications/token.
  * Run: node postman/_updateNotificationDocs.js
  */
 const fs = require("fs");
@@ -14,23 +14,18 @@ const AUTH =
 const TIP =
   "_Tip: numbers/booleans/null unquoted. Dates `YYYY-MM-DD`. ids = 24-char hex._";
 
-const LOGIN_FCM_BLOCK = [
+const LOGIN_BODY_BLOCK = [
   "### Body fields",
   "| Field | Required | Use |",
   "|-------|----------|-----|",
   "| `username` | yes | email / employee code / mobile |",
   "| `password` | yes | login password |",
-  "| `fcmToken` | no | Firebase device token — saved on `User.fcmTokens` in **same** login |",
-  "| `platform` | no | `web` \\| `android` \\| `ios` (default `web`) |",
-  "| `deviceId` | no | stable device id (same id replaces old token) |",
   "",
   "### What returns",
-  "- Response = **JWT only** (`token`, user, …). FCM is **not** returned.",
-  "- If `fcmToken` was sent → it is stored in DB for push.",
+  "- Response = **JWT** (`token`, user, …).",
   "",
-  "### Two ways to save FCM",
-  "1. **Preferred:** send `fcmToken` on login (one call).",
-  "2. **Optional later:** `POST /api/notifications/token` if Firebase refreshes the token while still logged in.",
+  "### FCM (push)",
+  "Not on login. After login call `POST /api/notifications/token` with `token`, `platform`, `deviceId`.",
 ].join("\n");
 
 const PUNCH_IN_DOC = [
@@ -53,7 +48,7 @@ const PUNCH_IN_DOC = [
   "}",
   "```",
   "",
-  "Also creates/updates `PROFILE_COMPLETION` notification + **FCM push** if device token was saved (login or Register Token).",
+  "Also creates/updates `PROFILE_COMPLETION` notification + **FCM push** if device token was registered via `POST /api/notifications/token`.",
   "",
   "### Body",
   "| Field | Type | Required |",
@@ -75,11 +70,10 @@ const PUNCH_IN_DOC = [
 
 const REGISTER_DOC = [
   "## POST `/api/notifications/token`",
-  "**Optional refresh API.** Prefer sending `fcmToken` on **login**.",
-  "",
-  "Use this when Firebase gives a **new** device token while the user is already logged in.",
+  "Register / refresh FCM device token **after login**.",
   "",
   "Saves on `User.fcmTokens[]` (max 10). Same `deviceId` replaces previous row.",
+  "Call again when Firebase refreshes the token while still logged in.",
   "",
   "### Body",
   "| Field | Required |",
@@ -186,7 +180,7 @@ function patchLoginDescription(oldDesc, roleLabel, seedLine) {
     "",
     seedLine,
     "",
-    LOGIN_FCM_BLOCK,
+    LOGIN_BODY_BLOCK,
     "",
     "**Use local after seed:** `{{baseUrl}}` = `http://localhost:9001`, No Environment.",
     "",
@@ -201,19 +195,19 @@ const adminNotif = {
   description: [
     "## Notifications (Admin / HR / RM)",
     "",
-    "**Preferred:** send `fcmToken` + `platform` + `deviceId` on **login** (JWT response unchanged; token saved in DB).",
+    "After login, register FCM via `POST /token`, then list / mark read.",
     "",
     "| # | API | When |",
     "|---|-----|------|",
-    "| 1 | `POST /token` | Optional — refresh FCM without re-login |",
+    "| 1 | `POST /token` | Register / refresh FCM (required for push) |",
     "| 2 | `GET /` | List (company / team / all scoped) |",
     "| 3 | `PUT /:id/read` | Mark read |",
     "",
-    "Punch-in `% < 70` → `403 PROFILE_INCOMPLETE` + push if FCM was saved.",
+    "Punch-in `% < 70` → `403 PROFILE_INCOMPLETE` + push if FCM was registered.",
   ].join("\n"),
   item: [
     {
-      name: "1. Register FCM Token (optional refresh)",
+      name: "1. Register FCM Token",
       request: {
         method: "POST",
         header: [{ key: "Content-Type", value: "application/json" }],
@@ -291,9 +285,9 @@ const essNotif = {
   description: [
     "## Employee — enable notifications (web + app)",
     "",
-    "1. Get FCM token from Firebase SDK (user taps Allow)",
-    "2. **Login** with `username`, `password`, **`fcmToken`**, `platform`, `deviceId`",
-    "3. JWT comes in response; FCM is saved on user in DB",
+    "1. Login (`username` + `password`) → JWT",
+    "2. Get FCM token from Firebase SDK (user taps Allow)",
+    "3. **Register Token** `POST /api/notifications/token`",
     "4. **My Notifications** / **Mark Read** below",
     "",
     "| Platform | `platform` |",
@@ -302,12 +296,11 @@ const essNotif = {
     "| Android | `android` |",
     "| iOS | `ios` |",
     "",
-    "Optional: Register Token API only if token refreshes without new login.",
     "Seed: `shivangi@techculture.ai` / `TC00415012005`.",
   ].join("\n"),
   item: [
     {
-      name: "1. Register FCM Token (optional refresh)",
+      name: "1. Register FCM Token",
       request: {
         method: "POST",
         header: [{ key: "Content-Type", value: "application/json" }],
@@ -409,8 +402,7 @@ if (ess?.item) {
     "Employee self-service. Start **2.1 My Profile → Login**.",
     "Seed: `employee@techculture.ai` / `TC00515012005` or `shivangi@techculture.ai` / `TC00415012005`.",
     "",
-    "**Notifications:** Login body mein optional `fcmToken` bhejo (preferred).",
-    "Phir **2.1b** → My Notifications / Mark Read. Register Token = optional refresh only.",
+    "**Notifications:** Login ke baad **2.1b** → Register FCM Token, phir My Notifications / Mark Read.",
     "",
     "Switch to **0. Login** (Super Admin) before **1. ADMIN**.",
   ].join("\n");
@@ -466,20 +458,20 @@ walk(c.item, (it) => {
       meta.seed
     );
   }
-  // ensure sample body has optional FCM fields
-  if (body && body.includes("username") && !body.includes("fcmToken")) {
+  // login body = username + password only (no FCM)
+  if (body && body.includes("username")) {
     try {
       const parsed = JSON.parse(body);
-      parsed.fcmToken = "{{fcmToken}}";
-      parsed.platform = parsed.platform || "android";
-      parsed.deviceId = parsed.deviceId || "device-1";
+      delete parsed.fcmToken;
+      delete parsed.platform;
+      delete parsed.deviceId;
       it.request.body.raw = JSON.stringify(parsed, null, 2);
     } catch {
       /* keep */
     }
   }
 });
-console.log("Login docs synced (JWT + optional FCM)");
+console.log("Login docs synced (JWT only; FCM via /notifications/token)");
 
 walk(c.item, (it) => {
   if (it.name === "1. Punch In" && it.request?.url?.raw?.includes("punch-in")) {
