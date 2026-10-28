@@ -117,10 +117,10 @@
                 "login"
               ]
             },
-            "description": "Login as **Super Admin**. Saves {{token}} and {{myId}}.\n\nSeed: `superadmin@gmail.com` / `123456`.\n\n### Body fields\n| Field | Required | Use |\n|-------|----------|-----|\n| `username` | yes | email / employee code / mobile |\n| `password` | yes | login password |\n| `fcmToken` | no | Firebase device token — saved on `User.fcmTokens` in **same** login |\n| `platform` | no | `web` \\| `android` \\| `ios` (default `web`) |\n| `deviceId` | no | stable device id (same id replaces old token) |\n\n### What returns\n- Response = **JWT only** (`token`, user, …). FCM is **not** returned.\n- If `fcmToken` was sent → it is stored in DB for push.\n\n### Two ways to save FCM\n1. **Preferred:** send `fcmToken` on login (one call).\n2. **Optional later:** `POST /api/notifications/token` if Firebase refreshes the token while still logged in.\n\n**Use local after seed:** `{{baseUrl}}` = `http://localhost:9001`, No Environment.\n\n---\n_Tip: numbers/booleans/null unquoted. Dates `YYYY-MM-DD`. ids = 24-char hex._\n---",
+            "description": "Login as **Super Admin**. Saves {{token}} and {{myId}}.\n\nSeed: `superadmin@gmail.com` / `123456`.\n\n### Body fields\n| Field | Required | Use |\n|-------|----------|-----|\n| `username` | yes | email / employee code / mobile |\n| `password` | yes | login password |\n\nLogin returns JWT only. Register FCM after login via `POST /api/notifications/token`.\n\n**Use local after seed:** `{{baseUrl}}` = `http://localhost:9001`, No Environment.\n\n---\n_Tip: numbers/booleans/null unquoted. Dates `YYYY-MM-DD`. ids = 24-char hex._\n---",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"superadmin@gmail.com\",\n  \"password\": \"123456\",\n  \"fcmToken\": \"{{fcmToken}}\",\n  \"platform\": \"android\",\n  \"deviceId\": \"device-1\"\n}",
+              "raw": "{\n  \"username\": \"superadmin@gmail.com\",\n  \"password\": \"123456\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -301,7 +301,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"admin@gmail.com\",\n  \"password\": \"{{password}}\",\n  \"fcmToken\": \"{{fcmToken}}\",\n  \"platform\": \"android\",\n  \"deviceId\": \"device-1\"\n}",
+              "raw": "{\n  \"username\": \"admin@gmail.com\",\n  \"password\": \"{{password}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -319,7 +319,7 @@
                 "login"
               ]
             },
-            "description": "Login as **Admin**. Saves {{token}} and {{myId}}.\n\nSeed: `admin@gmail.com` / `123456`.\n\n### Body fields\n| Field | Required | Use |\n|-------|----------|-----|\n| `username` | yes | email / employee code / mobile |\n| `password` | yes | login password |\n| `fcmToken` | no | Firebase device token — saved on `User.fcmTokens` in **same** login |\n| `platform` | no | `web` \\| `android` \\| `ios` (default `web`) |\n| `deviceId` | no | stable device id (same id replaces old token) |\n\n### What returns\n- Response = **JWT only** (`token`, user, …). FCM is **not** returned.\n- If `fcmToken` was sent → it is stored in DB for push.\n\n### Two ways to save FCM\n1. **Preferred:** send `fcmToken` on login (one call).\n2. **Optional later:** `POST /api/notifications/token` if Firebase refreshes the token while still logged in.\n\n**Use local after seed:** `{{baseUrl}}` = `http://localhost:9001`, No Environment.\n\n---\n_Tip: numbers/booleans/null unquoted. Dates `YYYY-MM-DD`. ids = 24-char hex._\n---"
+            "description": "Login as **Admin**. Saves {{token}} and {{myId}}.\n\nSeed: `admin@gmail.com` / `123456`.\n\n### Body fields\n| Field | Required | Use |\n|-------|----------|-----|\n| `username` | yes | email / employee code / mobile |\n| `password` | yes | login password |\n\nLogin returns JWT only. Register FCM after login via `POST /api/notifications/token`.\n\n**Use local after seed:** `{{baseUrl}}` = `http://localhost:9001`, No Environment.\n\n---\n_Tip: numbers/booleans/null unquoted. Dates `YYYY-MM-DD`. ids = 24-char hex._\n---"
           },
           "response": []
         },
@@ -351,7 +351,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"anupama@techculture.ai\",\n  \"password\": \"TC00115012005\",\n  \"fcmToken\": \"{{fcmToken}}\",\n  \"platform\": \"android\",\n  \"deviceId\": \"device-1\"\n}",
+              "raw": "{\n  \"username\": \"anupama@techculture.ai\",\n  \"password\": \"TC00115012005\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -369,7 +369,7 @@
                 "login"
               ]
             },
-            "description": "Login as **HR Manager**. Saves {{token}} and {{myId}}.\n\nSeed: `anupama@techculture.ai` / `TC00115012005`.\n\n### Body fields\n| Field | Required | Use |\n|-------|----------|-----|\n| `username` | yes | email / employee code / mobile |\n| `password` | yes | login password |\n| `fcmToken` | no | Firebase device token — saved on `User.fcmTokens` in **same** login |\n| `platform` | no | `web` \\| `android` \\| `ios` (default `web`) |\n| `deviceId` | no | stable device id (same id replaces old token) |\n\n### What returns\n- Response = **JWT only** (`token`, user, …). FCM is **not** returned.\n- If `fcmToken` was sent → it is stored in DB for push.\n\n### Two ways to save FCM\n1. **Preferred:** send `fcmToken` on login (one call).\n2. **Optional later:** `POST /api/notifications/token` if Firebase refreshes the token while still logged in.\n\n**Use local after seed:** `{{baseUrl}}` = `http://localhost:9001`, No Environment.\n\n---\n_Tip: numbers/booleans/null unquoted. Dates `YYYY-MM-DD`. ids = 24-char hex._\n---"
+            "description": "Login as **HR Manager**. Saves {{token}} and {{myId}}.\n\nSeed: `anupama@techculture.ai` / `TC00115012005`.\n\n### Body fields\n| Field | Required | Use |\n|-------|----------|-----|\n| `username` | yes | email / employee code / mobile |\n| `password` | yes | login password |\n\nLogin returns JWT only. Register FCM after login via `POST /api/notifications/token`.\n\n**Use local after seed:** `{{baseUrl}}` = `http://localhost:9001`, No Environment.\n\n---\n_Tip: numbers/booleans/null unquoted. Dates `YYYY-MM-DD`. ids = 24-char hex._\n---"
           },
           "response": []
         },
@@ -401,7 +401,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"manav@techculture.ai\",\n  \"password\": \"TC00215012005\",\n  \"fcmToken\": \"{{fcmToken}}\",\n  \"platform\": \"android\",\n  \"deviceId\": \"device-1\"\n}",
+              "raw": "{\n  \"username\": \"manav@techculture.ai\",\n  \"password\": \"TC00215012005\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -419,7 +419,7 @@
                 "login"
               ]
             },
-            "description": "Login as **Reporting Manager**. Saves {{token}} and {{myId}}.\n\nSeed: `manav@techculture.ai` / `TC00215012005`.\n\n### Body fields\n| Field | Required | Use |\n|-------|----------|-----|\n| `username` | yes | email / employee code / mobile |\n| `password` | yes | login password |\n| `fcmToken` | no | Firebase device token — saved on `User.fcmTokens` in **same** login |\n| `platform` | no | `web` \\| `android` \\| `ios` (default `web`) |\n| `deviceId` | no | stable device id (same id replaces old token) |\n\n### What returns\n- Response = **JWT only** (`token`, user, …). FCM is **not** returned.\n- If `fcmToken` was sent → it is stored in DB for push.\n\n### Two ways to save FCM\n1. **Preferred:** send `fcmToken` on login (one call).\n2. **Optional later:** `POST /api/notifications/token` if Firebase refreshes the token while still logged in.\n\n**Use local after seed:** `{{baseUrl}}` = `http://localhost:9001`, No Environment.\n\n---\n_Tip: numbers/booleans/null unquoted. Dates `YYYY-MM-DD`. ids = 24-char hex._\n---"
+            "description": "Login as **Reporting Manager**. Saves {{token}} and {{myId}}.\n\nSeed: `manav@techculture.ai` / `TC00215012005`.\n\n### Body fields\n| Field | Required | Use |\n|-------|----------|-----|\n| `username` | yes | email / employee code / mobile |\n| `password` | yes | login password |\n\nLogin returns JWT only. Register FCM after login via `POST /api/notifications/token`.\n\n**Use local after seed:** `{{baseUrl}}` = `http://localhost:9001`, No Environment.\n\n---\n_Tip: numbers/booleans/null unquoted. Dates `YYYY-MM-DD`. ids = 24-char hex._\n---"
           },
           "response": []
         },
@@ -451,7 +451,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"employee@techculture.ai\",\n  \"password\": \"TC00515012005\",\n  \"fcmToken\": \"{{fcmToken}}\",\n  \"platform\": \"android\",\n  \"deviceId\": \"device-1\"\n}",
+              "raw": "{\n  \"username\": \"employee@techculture.ai\",\n  \"password\": \"TC00515012005\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -469,7 +469,7 @@
                 "login"
               ]
             },
-            "description": "Login as **Employee**. Saves {{token}} and {{myId}}.\n\nSeed: `employee@techculture.ai` / `TC00515012005` (or Shivangi `TC00415012005`).\n\n### Body fields\n| Field | Required | Use |\n|-------|----------|-----|\n| `username` | yes | email / employee code / mobile |\n| `password` | yes | login password |\n| `fcmToken` | no | Firebase device token — saved on `User.fcmTokens` in **same** login |\n| `platform` | no | `web` \\| `android` \\| `ios` (default `web`) |\n| `deviceId` | no | stable device id (same id replaces old token) |\n\n### What returns\n- Response = **JWT only** (`token`, user, …). FCM is **not** returned.\n- If `fcmToken` was sent → it is stored in DB for push.\n\n### Two ways to save FCM\n1. **Preferred:** send `fcmToken` on login (one call).\n2. **Optional later:** `POST /api/notifications/token` if Firebase refreshes the token while still logged in.\n\n**Use local after seed:** `{{baseUrl}}` = `http://localhost:9001`, No Environment.\n\n---\n_Tip: numbers/booleans/null unquoted. Dates `YYYY-MM-DD`. ids = 24-char hex._\n---"
+            "description": "Login as **Employee**. Saves {{token}} and {{myId}}.\n\nSeed: `employee@techculture.ai` / `TC00515012005` (or Shivangi `TC00415012005`).\n\n### Body fields\n| Field | Required | Use |\n|-------|----------|-----|\n| `username` | yes | email / employee code / mobile |\n| `password` | yes | login password |\n\nLogin returns JWT only. Register FCM after login via `POST /api/notifications/token`.\n\n**Use local after seed:** `{{baseUrl}}` = `http://localhost:9001`, No Environment.\n\n---\n_Tip: numbers/booleans/null unquoted. Dates `YYYY-MM-DD`. ids = 24-char hex._\n---"
           },
           "response": []
         },
@@ -6149,10 +6149,10 @@
         },
         {
           "name": "1.12 Notifications (FCM)",
-          "description": "## Notifications (Admin / HR / RM)\n\n**Preferred:** send `fcmToken` + `platform` + `deviceId` on **login** (JWT response unchanged; token saved in DB).\n\n| # | API | When |\n|---|-----|------|\n| 1 | `POST /token` | Optional — refresh FCM without re-login |\n| 2 | `GET /` | List (company / team / all scoped) |\n| 3 | `PUT /:id/read` | Mark read |\n\nPunch-in `% < 70` → `403 PROFILE_INCOMPLETE` + push if FCM was saved.",
+          "description": "## Notifications\n\n1. Login → JWT\n2. `POST /token` — register FCM (required for push)\n3. `GET /` list (scoped)\n4. `PUT /:id/read`\n\nPunch-in `< 70%` → `403 PROFILE_INCOMPLETE` + FCM if token was registered.",
           "item": [
             {
-              "name": "1. Register FCM Token (optional refresh)",
+              "name": "1. Register FCM Token",
               "request": {
                 "method": "POST",
                 "header": [
@@ -6172,7 +6172,7 @@
                     "token"
                   ]
                 },
-                "description": "## POST `/api/notifications/token`\n**Optional refresh API.** Prefer sending `fcmToken` on **login**.\n\nUse this when Firebase gives a **new** device token while the user is already logged in.\n\nSaves on `User.fcmTokens[]` (max 10). Same `deviceId` replaces previous row.\n\n### Body\n| Field | Required |\n|-------|----------|\n| `token` | yes |\n| `platform` | no (`web`\\|`android`\\|`ios`) |\n| `deviceId` | no |\n\n---\n**Header:** `Authorization: Bearer {{token}}` *(JWT from Login)*\n\n_Tip: numbers/booleans/null unquoted. Dates `YYYY-MM-DD`. ids = 24-char hex._\n---",
+                "description": "## POST `/api/notifications/token`\nRegister / refresh FCM device token **after login**.\n\nSaves on `User.fcmTokens[]` (max 10). Same `deviceId` replaces previous row.\nCall again when Firebase refreshes the token while still logged in.\n\n### Body\n| Field | Required |\n|-------|----------|\n| `token` | yes |\n| `platform` | no (`web`\\|`android`\\|`ios`) |\n| `deviceId` | no |\n\n---\n**Header:** `Authorization: Bearer {{token}}` *(JWT from Login)*\n\n_Tip: numbers/booleans/null unquoted. Dates `YYYY-MM-DD`. ids = 24-char hex._\n---",
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"token\": \"{{fcmToken}}\",\n  \"platform\": \"android\",\n  \"deviceId\": \"device-1\"\n}",
@@ -8968,7 +8968,7 @@
     },
     {
       "name": "2. EMPLOYEE (ESS)",
-      "description": "Employee self-service. Start **2.1 My Profile → Login**.\nSeed: `employee@techculture.ai` / `TC00515012005` or `shivangi@techculture.ai` / `TC00415012005`.\n\n**Notifications:** Login body mein optional `fcmToken` bhejo (preferred).\nPhir **2.1b** → My Notifications / Mark Read. Register Token = optional refresh only.\n\nSwitch to **0. Login** (Super Admin) before **1. ADMIN**.",
+      "description": "Employee self-service. Start **2.1 My Profile → Login**.\nSeed: `employee@techculture.ai` / `TC00515012005` or `shivangi@techculture.ai` / `TC00415012005`.\n\n**Notifications:** Login ke baad **2.1b** → Register FCM Token, phir My Notifications / Mark Read.\n\nSwitch to **0. Login** (Super Admin) before **1. ADMIN**.",
       "item": [
         {
           "name": "2.1 My Profile",
@@ -8999,10 +8999,10 @@
                         "login"
                       ]
                     },
-                    "description": "Login as **Employee**. Saves {{token}} and {{myId}}.\n\nSeed: `employee@techculture.ai` / `TC00515012005` (or Shivangi `TC00415012005`).\n\n### Body fields\n| Field | Required | Use |\n|-------|----------|-----|\n| `username` | yes | email / employee code / mobile |\n| `password` | yes | login password |\n| `fcmToken` | no | Firebase device token — saved on `User.fcmTokens` in **same** login |\n| `platform` | no | `web` \\| `android` \\| `ios` (default `web`) |\n| `deviceId` | no | stable device id (same id replaces old token) |\n\n### What returns\n- Response = **JWT only** (`token`, user, …). FCM is **not** returned.\n- If `fcmToken` was sent → it is stored in DB for push.\n\n### Two ways to save FCM\n1. **Preferred:** send `fcmToken` on login (one call).\n2. **Optional later:** `POST /api/notifications/token` if Firebase refreshes the token while still logged in.\n\n**Use local after seed:** `{{baseUrl}}` = `http://localhost:9001`, No Environment.\n\n---\n_Tip: numbers/booleans/null unquoted. Dates `YYYY-MM-DD`. ids = 24-char hex._\n---",
+                    "description": "Login as **Employee**. Saves {{token}} and {{myId}}.\n\nSeed: `employee@techculture.ai` / `TC00515012005` (or Shivangi `TC00415012005`).\n\n### Body fields\n| Field | Required | Use |\n|-------|----------|-----|\n| `username` | yes | email / employee code / mobile |\n| `password` | yes | login password |\n\nLogin returns JWT only. Register FCM after login via `POST /api/notifications/token`.\n\n**Use local after seed:** `{{baseUrl}}` = `http://localhost:9001`, No Environment.\n\n---\n_Tip: numbers/booleans/null unquoted. Dates `YYYY-MM-DD`. ids = 24-char hex._\n---",
                     "body": {
                       "mode": "raw",
-                      "raw": "{\n  \"username\": \"employee@techculture.ai\",\n  \"password\": \"TC00515012005\",\n  \"fcmToken\": \"{{fcmToken}}\",\n  \"platform\": \"android\",\n  \"deviceId\": \"device-1\"\n}",
+                      "raw": "{\n  \"username\": \"employee@techculture.ai\",\n  \"password\": \"TC00515012005\"\n}",
                       "options": {
                         "raw": {
                           "language": "json"
@@ -9330,10 +9330,10 @@
         },
         {
           "name": "2.1b Notifications (accept web + app)",
-          "description": "## Employee — enable notifications (web + app)\n\n1. Get FCM token from Firebase SDK (user taps Allow)\n2. **Login** with `username`, `password`, **`fcmToken`**, `platform`, `deviceId`\n3. JWT comes in response; FCM is saved on user in DB\n4. **My Notifications** / **Mark Read** below\n\n| Platform | `platform` |\n|----------|------------|\n| Browser | `web` |\n| Android | `android` |\n| iOS | `ios` |\n\nOptional: Register Token API only if token refreshes without new login.\nSeed: `shivangi@techculture.ai` / `TC00415012005`.",
+          "description": "## Employee — enable notifications (web + app)\n\n1. Login (`username` + `password`) → JWT\n2. Firebase SDK → get FCM token (user allows notifications)\n3. **Register Token** `POST /api/notifications/token`\n4. **My Notifications** / **Mark Read** below\n\n| Platform | platform value |\n|----------|----------------|\n| Browser | `web` |\n| Android | `android` |\n| iOS | `ios` |\n\nSeed: `shivangi@techculture.ai` / `TC00415012005`.",
           "item": [
             {
-              "name": "1. Register FCM Token (optional refresh)",
+              "name": "1. Register FCM Token",
               "request": {
                 "method": "POST",
                 "header": [
@@ -9353,7 +9353,7 @@
                     "token"
                   ]
                 },
-                "description": "## POST `/api/notifications/token`\n**Optional refresh API.** Prefer sending `fcmToken` on **login**.\n\nUse this when Firebase gives a **new** device token while the user is already logged in.\n\nSaves on `User.fcmTokens[]` (max 10). Same `deviceId` replaces previous row.\n\n### Body\n| Field | Required |\n|-------|----------|\n| `token` | yes |\n| `platform` | no (`web`\\|`android`\\|`ios`) |\n| `deviceId` | no |\n\n---\n**Header:** `Authorization: Bearer {{token}}` *(JWT from Login)*\n\n_Tip: numbers/booleans/null unquoted. Dates `YYYY-MM-DD`. ids = 24-char hex._\n---",
+                "description": "## POST `/api/notifications/token`\nCall **after login** to save the device FCM token on `User.fcmTokens`.\n\nSame `deviceId` replaces the previous token for that device.\n\n---\n**Header:** `Authorization: Bearer {{token}}`\n**Body:** `token`, `platform`, `deviceId`\n---",
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"token\": \"{{fcmToken}}\",\n  \"platform\": \"android\",\n  \"deviceId\": \"employee-phone-1\"\n}",
@@ -9470,7 +9470,7 @@
                         "punch-in"
                       ]
                     },
-                    "description": "## POST `/api/attendance/punch-in`\nStart the work day. GPS must be **within 50 m** of the assigned branch office.\n\n### Profile gate (70%) — error shape\nIf profile **&lt; 70%** → HTTP **`403`**:\n\n```json\n{\n  \"success\": false,\n  \"message\": \"Profile 45% (need 70%). Complete: …. Punch-in blocked.\",\n  \"code\": \"PROFILE_INCOMPLETE\",\n  \"percentage\": 45,\n  \"needPercentage\": 70,\n  \"completeThese\": [\n    { \"key\": \"personal.mobileNo\", \"label\": \"Mobile number\", \"section\": \"personal\" }\n  ]\n}\n```\n\nAlso creates/updates `PROFILE_COMPLETION` notification + **FCM push** if device token was saved (login or Register Token).\n\n### Body\n| Field | Type | Required |\n|-------|------|----------|\n| `source` | string | yes (`web`\\|`mobile`\\|`biometric`) |\n| `latitude` | number | yes |\n| `longitude` | number | yes |\n| `remarks` | string | no |\n\n### Geofence\nWithin 50 m of branch GPS. Sample Kailash: `28.6294351, 77.2222984`.\n\n---\n**Header:** `Authorization: Bearer {{token}}` *(JWT from Login)*\n\n_Tip: numbers/booleans/null unquoted. Dates `YYYY-MM-DD`. ids = 24-char hex._\n---",
+                    "description": "## POST `/api/attendance/punch-in`\nStart the work day. GPS must be **within 50 m** of the assigned branch office.\n\n### Profile gate (70%) — error shape\nIf profile **&lt; 70%** → HTTP **`403`**:\n\n```json\n{\n  \"success\": false,\n  \"message\": \"Profile 45% (need 70%). Complete: …. Punch-in blocked.\",\n  \"code\": \"PROFILE_INCOMPLETE\",\n  \"percentage\": 45,\n  \"needPercentage\": 70,\n  \"completeThese\": [\n    { \"key\": \"personal.mobileNo\", \"label\": \"Mobile number\", \"section\": \"personal\" }\n  ]\n}\n```\n\nAlso creates/updates `PROFILE_COMPLETION` notification + **FCM push** if device token was registered via `POST /api/notifications/token`.\n\n### Body\n| Field | Type | Required |\n|-------|------|----------|\n| `source` | string | yes (`web`\\|`mobile`\\|`biometric`) |\n| `latitude` | number | yes |\n| `longitude` | number | yes |\n| `remarks` | string | no |\n\n### Geofence\nWithin 50 m of branch GPS. Sample Kailash: `28.6294351, 77.2222984`.\n\n---\n**Header:** `Authorization: Bearer {{token}}` *(JWT from Login)*\n\n_Tip: numbers/booleans/null unquoted. Dates `YYYY-MM-DD`. ids = 24-char hex._\n---",
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"source\": \"web\",\n  \"latitude\": 28.6294351,\n  \"longitude\": 77.2222984,\n  \"remarks\": \"Reached office\"\n}",
