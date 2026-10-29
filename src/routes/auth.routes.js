@@ -1,13 +1,37 @@
 /**
  * AUTH ROUTES → /api/auth
- * POST /login (public) · POST /logout (public) · GET /token-status (public)
+ * POST /login · POST /logout · GET /token-status
+ * POST /forgot-password · POST /reset-password (public)
+ * Forgot / reset live only here (not mounted separately in server.js).
  */
 const express = require("express");
-const { login, logout, tokenStatus } = require("../controllers/auth.controller");
+const rateLimit = require("express-rate-limit");
+const {
+  login,
+  logout,
+  tokenStatus,
+  forgotPassword,
+  resetPassword,
+} = require("../controllers/auth.controller");
 const { validate } = require("../middleware/validate");
-const { loginSchema } = require("../validators/user.validation");
+const {
+  loginSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+} = require("../validators/user.validation");
 
 const router = express.Router();
+
+/** Same window/max as login — stops reset-email spam */
+const authSensitiveLimiter = rateLimit({
+  windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
+  max: Number(process.env.RATE_LIMIT_LOGIN_MAX) || 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    message: "Too many attempts. Please try again later.",
+  },
+});
 
 /**
  * @swagger
@@ -114,5 +138,76 @@ router.post("/logout", logout);
  *         description: token missing from header
  */
 router.get("/token-status", tokenStatus);
+
+/**
+ * @swagger
+ * /api/auth/forgot-password:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Forgot password (send reset email)
+ *     description: |
+ *       Public. Body: `{ "email": "shivangi@techculture.ai" }`.
+ *       Looks up official or personal email. Always returns the same success message
+ *       (does not reveal whether the account exists).
+ *       Email contains a one-time link valid for **1 hour**.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email]
+ *             properties:
+ *               email: { type: string, format: email }
+ *           example:
+ *             email: shivangi@techculture.ai
+ *     responses:
+ *       200:
+ *         description: Generic success message
+ *       400:
+ *         description: Validation failed
+ */
+// FORGOT PASSWORD — public; body: { email }
+router.post(
+  "/forgot-password",
+  authSensitiveLimiter,
+  validate(forgotPasswordSchema),
+  forgotPassword
+);
+
+/**
+ * @swagger
+ * /api/auth/reset-password:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Reset password with email token
+ *     description: |
+ *       Public. Body: `{ "token", "newPassword", "confirmPassword" }`.
+ *       `token` comes from the forgot-password email link (`?token=`).
+ *       On success the session JWT is cleared — user must log in again.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [token, newPassword, confirmPassword]
+ *             properties:
+ *               token: { type: string }
+ *               newPassword: { type: string, minLength: 6, maxLength: 50 }
+ *               confirmPassword: { type: string }
+ *     responses:
+ *       200:
+ *         description: Password updated
+ *       400:
+ *         description: Invalid/expired token or validation error
+ */
+// RESET PASSWORD — public; body: { token, newPassword, confirmPassword }
+router.post(
+  "/reset-password",
+  authSensitiveLimiter,
+  validate(resetPasswordSchema),
+  resetPassword
+);
 
 module.exports = router;

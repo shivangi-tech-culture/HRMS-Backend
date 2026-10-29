@@ -1,7 +1,8 @@
 /**
  * AUTH CONTROLLER — /api/auth
- * POST /login · POST /logout · GET /token-status (JWT httpOnly cookie)
+ * POST /login · POST /logout · GET /token-status · forgot/reset password
  */
+const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 const Role = require("../models/Role");
@@ -22,6 +23,64 @@ const {
 } = require("../utils/companyScope");
 const { signToken, decodeToken, JWT_EXPIRES_IN } = require("../utils/jwt");
 const { inspectSessionToken } = require("../middleware/auth");
+const {
+  sendEmail,
+  wrapEmailLayout,
+  escapeHtml,
+} = require("../utils/mail");
+
+/** Public message — same whether the email exists (do not leak accounts). */
+const FORGOT_OK_MESSAGE =
+  "If an account exists for that email, a password reset link has been sent.";
+
+/** Reset token lifetime (1 hour). */
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
+
+const hashResetToken = (raw) =>
+  crypto.createHash("sha256").update(String(raw)).digest("hex");
+
+const buildResetEmailHtml = ({ name, resetUrl, brand }) => {
+  const safeName = escapeHtml(name || "there");
+  const safeUrl = escapeHtml(resetUrl);
+  const bodyHtml = `
+<p style="margin:0 0 14px;font-size:14px;line-height:1.6;color:#334155;">Hi ${safeName},</p>
+<p style="margin:0 0 14px;font-size:13px;line-height:1.6;color:#334155;">
+  We received a request to reset your HRMS password. Click the button below — this link expires in <strong>1 hour</strong>.
+</p>
+<p style="margin:22px 0;text-align:center;">
+  <a href="${safeUrl}" style="display:inline-block;padding:12px 22px;background:#0f172a;color:#fff;text-decoration:none;border-radius:8px;font-size:13px;font-weight:600;">
+    Reset password
+  </a>
+</p>
+<p style="margin:0 0 10px;font-size:12px;line-height:1.55;color:#64748b;">
+  Or paste this link in your browser:<br/>
+  <a href="${safeUrl}" style="color:#2563eb;word-break:break-all;">${safeUrl}</a>
+</p>
+<p style="margin:16px 0 0;font-size:12px;line-height:1.55;color:#64748b;">
+  If you did not ask for this, you can ignore this email — your password will stay the same.
+</p>`;
+  return wrapEmailLayout({
+    brand,
+    title: "Reset your HRMS password",
+    headerTitle: "Password reset",
+    headerSub: "Secure link · expires in 1 hour",
+    bodyHtml,
+  });
+};
+
+/** Queue reset mail — never blocks the API response. */
+const queueResetEmail = (payload) => {
+  setImmediate(() => {
+    sendEmail({
+      to: payload.to,
+      subject: "Reset your HRMS password",
+      body: buildResetEmailHtml(payload),
+      isHtml: true,
+    }).catch((err) => {
+      console.error("Password reset email failed →", payload.to, err.message);
+    });
+  });
+};
 
 const LOCKED_ROLES = new Set(["Super Admin", "Admin", "Employee"]);
 
@@ -239,4 +298,124 @@ const tokenStatus = async (req, res) => {
   }
 };
 
-module.exports = { login, logout, tokenStatus };
+/**
+ * FORGOT PASSWORD — POST /api/auth/forgot-password
+ * Body: { email }
+ * Always returns the same success message (does not reveal whether the email exists).
+ */
+const forgotPassword = async (req, res) => {
+  try {
+    const email = String(req.body.email || "")
+      .trim()
+      .toLowerCase();
+
+    const user = await User.findOne({
+      $or: [
+        { "official.officialEmail": email },
+        { "personal.personalEmail": email },
+      ],
+    }).select(
+      "name status official.officialEmail personal.personalEmail resetPasswordToken resetPasswordExpires"
+    );
+
+    if (user && user.status === "Active") {
+      const rawToken = crypto.randomBytes(32).toString("hex");
+      const hashed = hashResetToken(rawToken);
+      const expires = new Date(Date.now() + RESET_TOKEN_TTL_MS);
+
+      await User.updateOne(
+        { _id: user._id },
+        {
+          $set: {
+            resetPasswordToken: hashed,
+            resetPasswordExpires: expires,
+          },
+        }
+      );
+
+      const appUrl = (
+        process.env.APP_URL || "https://hrms-techculture.vercel.app"
+      ).replace(/\/$/, "");
+      const resetUrl = `${appUrl}/reset-password?token=${rawToken}`;
+      const brand = process.env.DEFAULT_COMPANY || "TechCulture.Ai";
+      const to =
+        user.official?.officialEmail ||
+        user.personal?.personalEmail ||
+        email;
+
+      queueResetEmail({
+        to,
+        name: user.name || "there",
+        resetUrl,
+        brand,
+      });
+    }
+
+    return res.json({ message: FORGOT_OK_MESSAGE });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+/**
+ * RESET PASSWORD — POST /api/auth/reset-password
+ * Body: { token, newPassword, confirmPassword }
+ * Clears reset fields + active session token so the user must log in again.
+ */
+const resetPassword = async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+    const hashed = hashResetToken(token);
+
+    const user = await User.findOne({
+      resetPasswordToken: hashed,
+      resetPasswordExpires: { $gt: new Date() },
+    }).select("password status resetPasswordToken resetPasswordExpires");
+
+    if (!user) {
+      return res.status(400).json({
+        message: "Reset link is invalid or has expired. Please request a new one.",
+      });
+    }
+    if (user.status !== "Active") {
+      return res.status(401).json({ message: "Account is inactive" });
+    }
+
+    const sameAsOld = await bcrypt.compare(newPassword, user.password || "");
+    if (sameAsOld) {
+      return res.status(400).json({
+        message: "New password must be different from current password",
+      });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await User.updateOne(
+      { _id: user._id },
+      {
+        $set: {
+          password: passwordHash,
+          resetPasswordToken: "",
+          resetPasswordExpires: null,
+          token: "",
+          tokenIssuedAt: null,
+          tokenExpiresAt: null,
+          tokenExpiresIn: "",
+        },
+      }
+    );
+
+    return res.json({
+      message: "Password reset successful. Please log in with your new password.",
+    });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+module.exports = {
+  login,
+  logout,
+  tokenStatus,
+  forgotPassword,
+  resetPassword,
+};
