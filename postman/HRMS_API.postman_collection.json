@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "e76ef156-bb7e-4bd7-b543-75856b8a760e",
     "name": "HRMS ALL APIs",
-    "description": "**How to use**\n**Use with No Environment** (or an environment without baseUrl / token / password / *Id keys) — environment values override these collection variables.\n\n1. **0. Login & My Account → 1. Login** (saves {{token}}; every request sends it as Bearer auth). Body is just `{ \"username\", \"password\" }` — `username` = employee code, official / personal email, or mobile (auto-detected).\n2. **1. ADMIN** = all admin modules, **2. EMPLOYEE (ESS)** = employee self-service (starts with Login as Employee).\n3. Every module folder lists all its APIs: **Create → List → Update → Delete** first, then other routes.\n4. **1.2 Masters**: one folder per master type with Create / List / Get / Update / Delete.\n5. Company / branch / shift / manager / employee ids are auto-filled before send when empty.\n6. **1.5 Employees → Next Employee Code** then **Create Employee** — leave `official.employeeCode` blank; server assigns `{companyCode}{001}` per company.\n\n**Seed** (`npm run seed`):\n| Role | Email | Code | Mobile | Password |\n| --- | --- | --- | --- | --- |\n| Super Admin | superadmin@gmail.com | — | — | 123456 |\n| Admin | admin@gmail.com | — | — | 123456 |\n| HR | anupama@techculture.ai | TC001 | 9876500100 | TC00115012005 |\n| Manager | manav@techculture.ai | TC002 | 9876500201 | TC00215012005 |\n| Manager | manoj@techculture.ai | TC003 | 9876500202 | TC00315012005 |\n| Employee | shivangi@techculture.ai | TC004 | 9876500001 | TC00415012005 |\n| Employee | employee@techculture.ai | TC005 | 9876500002 | TC00515012005 |\n| Employee | vivek@techculture.ai | TC006 | 9876500003 | TC00615012005 |\n| Employee | ananya@techculture.ai | TC007 | 9876500004 | TC00715012005 |\n\nStaff password = `{employeeCode}` + DOB `ddmmyyyy` (`15012005`). Any of Email / Code / Mobile works as `username`.\n`employeeType` on the ID card is automatic from DOJ: TC005 / TC006 = **Probation** (joined on seed day), TC004 / TC007 = **Permanent** (joined 4 months earlier).\n\nWork: **1.11 Projects** → **1.12 Tasks** (assign) · **2.7 Tasks (To Do)**.\n\nPiece seeds: `npm run seed:masters` · `seed:leave` · `seed:holiday` · `seed:on-duty` · `seed:on-tour`\n\n**Employee code:** `GET /api/employees/next-code?companyId=` → preview (does not reserve). Blank code on create → auto `{companyCode}` + 3 digits per company (`TC008` next after seed).\n\n\n**How to read params:** Each request Docs has **Parameters (type + how to send)**. JSON: unquoted numbers/booleans; dates `YYYY-MM-DD`; times `HH:mm`.\n---\n### Sidebar tip\nKeep **1.2 Masters → 2. CRUD by type** collapsed. Windows: **Alt + click** the folder arrow to collapse/expand all.",
+    "description": "**How to use**\n**Use with No Environment** (or an environment without baseUrl / token / password / *Id keys) — environment values override these collection variables.\n\n1. **0. Login & My Account → 1. Login** (saves {{token}}; every request sends it as Bearer auth). Body is just `{ \"username\", \"password\" }` — `username` = employee code, official / personal email, or mobile (auto-detected).\n2. **1. ADMIN** = all admin modules, **2. EMPLOYEE (ESS)** = employee self-service (starts with Login as Employee).\n3. Every module folder lists all its APIs: **Create → List → Update → Delete** first, then other routes.\n4. **1.2 Masters**: one folder per master type with Create / List / Get / Update / Delete.\n5. Company / branch / shift / manager / employee ids are auto-filled before send when empty.\n6. **1.5 Employees → Next Employee Code** then **Create Employee** — leave `official.employeeCode` blank; server assigns `{companyCode}{001}` per company.\n\n**Seed** (`npm run seed`):\n| Role | Email | Code | Mobile | Password |\n| --- | --- | --- | --- | --- |\n| Super Admin | superadmin@gmail.com | — | — | 123456 |\n| Admin | admin@gmail.com | — | — | 123456 |\n| HR | anupama@techculture.ai | TC001 | 9876500100 | TC00115012005 |\n| Manager | manav@techculture.ai | TC002 | 9876500201 | TC00215012005 |\n| Manager | manoj@techculture.ai | TC003 | 9876500202 | TC00315012005 |\n| Employee | shivangi@techculture.ai | TC004 | 9876500001 | TC00415012005 |\n| Employee | employee@techculture.ai | TC005 | 9876500002 | TC00515012005 |\n| Employee | vivek@techculture.ai | TC006 | 9876500003 | TC00615012005 |\n| Employee | ananya@techculture.ai | TC007 | 9876500004 | TC00715012005 |\n\nStaff password = `{employeeCode}` + DOB `ddmmyyyy` (`15012005`). Any of Email / Code / Mobile works as `username`.\n`employeeType` on the ID card is automatic from DOJ: TC005 / TC006 = **Probation** (joined on seed day), TC004 / TC007 = **Permanent** (joined 4 months earlier).\n\nWork: **1.11 Projects** → **1.12 Tasks** (assign) · **2.7 Tasks (To Do)**.\n\nAuth: **Forgot / Reset password** (0. Login → 3c / 3d).\nESS: **2.0 Dashboard (My Home)** · **2.7 Tasks** includes Task Dashboard.\n\nPiece seeds: `npm run seed:masters` · `seed:leave` · `seed:holiday` · `seed:on-duty` · `seed:on-tour`\n\n**Employee code:** `GET /api/employees/next-code?companyId=` → preview (does not reserve). Blank code on create → auto `{companyCode}` + 3 digits per company (`TC008` next after seed).\n\n\n**How to read params:** Each request Docs has **Parameters (type + how to send)**. JSON: unquoted numbers/booleans; dates `YYYY-MM-DD`; times `HH:mm`.\n---\n### Sidebar tip\nKeep **1.2 Masters → 2. CRUD by type** collapsed. Windows: **Alt + click** the folder arrow to collapse/expand all.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -94,7 +94,7 @@
   "item": [
     {
       "name": "0. Login & My Account",
-      "description": "Login first — every other request uses {{token}}.\nBody: `{ \"username\", \"password\" }` — username = code / email / mobile.\nUse local baseUrl after `npm run seed`. Super Admin / Admin = `123456`; staff = code + DOB `15012005`.\n\n**Module notes:** Auth + profile. Login returns `token` (single session). GET /token-status → `isExpired` / `isReplaced`. Logout clears cookie + DB token.",
+      "description": "Login first — every other request uses {{token}}.\nBody: `{ \"username\", \"password\" }` — username = code / email / mobile.\nUse local baseUrl after `npm run seed`. Super Admin / Admin = `123456`; staff = code + DOB `15012005`.\n\n**Module notes:** Auth + profile. Login returns `token` (single session). GET /token-status → `isExpired` / `isReplaced`. Logout clears cookie + DB token.\n**Forgot password:** `3c` sends email · `3d` sets new password with email token (public).\n",
       "item": [
         {
           "name": "1. Login (Super Admin)",
@@ -249,6 +249,78 @@
                   "language": "json"
                 }
               }
+            }
+          }
+        },
+        {
+          "name": "3c. Forgot Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/forgot-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "forgot-password"
+              ]
+            },
+            "description": "## POST `/api/auth/forgot-password`\nPublic — no Bearer token.\n\nSends a **1-hour** password reset link to the official or personal email.\nResponse message is always the same (does **not** reveal whether the email exists).\n\n---\n### Body\n| Field | Type | Required | Notes |\n|-------|------|----------|-------|\n| `email` | string (email) | yes | official or personal email |\n\n**Seed example:** `shivangi@techculture.ai` (TC004) or `employee@techculture.ai` (TC005).\n\nFrontend link format: `{APP_URL}/reset-password?token=<rawToken>`\n(set `APP_URL` in `.env`, default `https://hrms-techculture.vercel.app`).\n\n_Tip: numbers/booleans/null unquoted. Dates = `YYYY-MM-DD`. Ids = 24-char hex._\n---\n",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"shivangi@techculture.ai\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "3d. Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/reset-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "reset-password"
+              ]
+            },
+            "description": "## POST `/api/auth/reset-password`\nPublic — no Bearer token.\n\nUse the `token` query value from the forgot-password email.\nOn success the previous session JWT is cleared — user must **login** again.\n\n---\n### Body\n| Field | Type | Required | Notes |\n|-------|------|----------|-------|\n| `token` | string | yes | raw token from email link |\n| `newPassword` | string | yes | 6–50 chars; must differ from old |\n| `confirmPassword` | string | yes | must match `newPassword` |\n\n_Tip: numbers/booleans/null unquoted. Dates = `YYYY-MM-DD`. Ids = 24-char hex._\n---\n",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{resetToken}}\",\n  \"newPassword\": \"MyNewPass123\",\n  \"confirmPassword\": \"MyNewPass123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
             }
           }
         },
@@ -8971,6 +9043,31 @@
       "description": "Employee self-service. Start **2.1 My Profile → Login**.\nSeed: `employee@techculture.ai` / `TC00515012005` or `shivangi@techculture.ai` / `TC00415012005`.\n\n**Notifications:** Login ke baad **2.1b** → Register FCM Token, phir My Notifications / Mark Read.\n\nSwitch to **0. Login** (Super Admin) before **1. ADMIN**.",
       "item": [
         {
+          "name": "2.0 Dashboard (My Home)",
+          "description": "Employee **Dashboard → My Home** (UI `/employee`).\nOne aggregate API for greeting, summary counts, today attendance, monthly/weekly stats, pending tasks, leaves/holidays, events, notifications, profile %.\nPermission: **Dashboard → My Home → view**.\nLogin as Employee first (e.g. TC004 / TC005).\n",
+          "item": [
+            {
+              "name": "1. Employee Dashboard",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/dashboard/employee",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "dashboard",
+                    "employee"
+                  ]
+                },
+                "description": "## GET `/api/dashboard/employee`\nESS home widgets for the logged-in employee.\n\nPermission: **Dashboard → My Home → view** (Employee only).\n\n---\n### Response `data` (high level)\n| Key | UI widget |\n|-----|-----------|\n| `greeting` | Good morning/afternoon, {name} |\n| `summary` | Attendance / On Tour / Leaves / Others counts |\n| `attendanceToday` | Punch card — hours, late/early |\n| `monthlyStats` | Work days, absent, late, OT, early |\n| `weeklyWorkingHours` | Week 1…5 hours bars |\n| `pendingTasks` | Pending Tasks list + count |\n| `leavesHolidays` | Approved leaves + upcoming holidays |\n| `events` | Birthdays / work anniversaries |\n| `notifications.unreadCount` | Bell badge |\n| `profileCompletion` | Profile % |\n| `importantLinks` | Quick links |\n\n**Header:** `Authorization: Bearer {{token}}`\n\n_Tip: numbers/booleans/null unquoted. Dates = `YYYY-MM-DD`. Ids = 24-char hex._\n---\n"
+              }
+            }
+          ]
+        },
+        {
           "name": "2.1 My Profile",
           "description": "Step 1 logs in as Employee (employee@gmail.com / TC004 / 123456) — every request in 2. EMPLOYEE uses that token. Login as admin again (0. Login) afterwards.",
           "item": [
@@ -11401,7 +11498,7 @@
         },
         {
           "name": "2.7 Tasks (To Do)",
-          "description": "Employee **Tasks → To Do Tasks**.\nShows tasks where you are in `assignees[]`.\nAdmin must Create Project → Create/Assign Task first.\n\n## Standard flow (company checks on every step)\n\n1. **Login** as Admin / HR (0. Login).\n2. **Create Project** for `{{companyId}}` → saves `{{projectId}}`.\n3. *(Optional)* **Assign Project Members** — Employees of that company.\n4. **Create Task** with `projectId` (company comes from project) → saves `{{taskId}}`.\n5. **Assign Task** — `assigneeIds` must be Employees of the **same company**.\n6. Employee login → **My To Do Tasks** / **Mark Done**.\n\n| Field | What it is for |\n|-------|----------------|\n| `companyId` | Company that owns the project (set on Project only). |\n| `projectId` | Project the task belongs to. Required on task create. |\n| `memberIds` / `employeeIds` | Project team (Employees of that company). |\n| `assignees` / `assigneeIds` | Who must do the task (Employees of that company). |\n| `mode` | `add` (default) · `remove` · `replace` on Assign APIs. |\n",
+          "description": "Employee **Tasks → To Do Tasks** + **Tasks → Dashboard**.\nShows tasks where you are in `assignees[]`.\nAdmin must Create Project → Create/Assign Task first (or employee **Add Task** via Dashboard create).\n",
           "item": [
             {
               "name": "1. My To Do Tasks",
@@ -11455,7 +11552,7 @@
                     }
                   ]
                 },
-                "description": "GET /api/tasks/me — only tasks assigned to the logged-in employee.\n`project` field = project name for the UI Project column.\n\n---\n### Query\n- `projectId` · `status` · `priority` · `search` · `page` · `limit`\n---\n"
+                "description": "GET /api/tasks/me — only tasks assigned to the logged-in employee.\nPermission: **Tasks → To Do Tasks → view**.\n\n---\n### Query\n- `projectId` · `status` · `priority` · `search` · `page` · `limit`\n`status`: To Do | In Progress | Completed | Over Due | ALL\n---\n"
               },
               "event": [
                 {
@@ -11466,6 +11563,96 @@
                       "const j = pm.response.json();",
                       "const row = (j.data || []).find((r) => r.status !== 'Completed') || (j.data || [])[0];",
                       "if (row && row._id) pm.collectionVariables.set('taskId', row._id);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "1b. Task Dashboard",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/tasks/me/dashboard?days=15&category=ALL",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "tasks",
+                    "me",
+                    "dashboard"
+                  ],
+                  "query": [
+                    {
+                      "key": "days",
+                      "value": "15",
+                      "description": "number | 7–90 | Task Progress window"
+                    },
+                    {
+                      "key": "category",
+                      "value": "ALL",
+                      "description": "ALL or project name"
+                    },
+                    {
+                      "key": "projectId",
+                      "value": "{{projectId}}",
+                      "description": "MongoId | optional",
+                      "disabled": true
+                    },
+                    {
+                      "key": "listLimit",
+                      "value": "10",
+                      "description": "number | task list size",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "## GET `/api/tasks/me/dashboard`\nEmployee **Tasks → Dashboard** (UI `/employee/tasks`).\n\nPermission: **Tasks → Dashboard → view**.\n\n---\n### Query\n| Param | Type | Default | Notes |\n|-------|------|---------|-------|\n| `days` | number 7–90 | 15 | Task Progress window |\n| `category` | string | ALL | Project name filter (or ALL) |\n| `projectId` | MongoId | — | optional exact project |\n| `listLimit` | number 1–50 | 10 | Task list size |\n\n### Response `data`\n| Key | Chart / widget |\n|-----|----------------|\n| `taskProgress` | W1…W5 completed counts |\n| `dueTaskSummary` | Donut — before / after / onTime / inProcess / pending |\n| `overallHealth` | total · completed · onGoing · pending · dueTask |\n| `workload` | Per project — completed / overDue / remaining |\n| `criticalHealth` | Max assign + max due (company peers) |\n| `taskList` | Cards — title, dueDate, priority, displayStatus |\n| `categories` | Dropdown values for category filter |\n\n**Statuses in list:** `To Do` · `In Progress` · `Completed` · display `Over Due` when past due.\n**Priority:** High · Medium · Low\n\n_Tip: numbers/booleans/null unquoted. Dates = `YYYY-MM-DD`. Ids = 24-char hex._\n---\n"
+              }
+            },
+            {
+              "name": "1c. Add a New Task (Employee)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/tasks/me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "tasks",
+                    "me"
+                  ]
+                },
+                "description": "## POST `/api/tasks/me`\nEmployee **Tasks → Dashboard → create** (`+ Add a New Task`).\nCreates a task under `projectId` and auto-assigns the logged-in employee.\nProject must belong to the employee's company.\n\nPermission: **Tasks → Dashboard → create**.\n\n---\n### Body\n| Field | Type | Required | Notes |\n|-------|------|----------|-------|\n| `title` | string | yes | min 2 |\n| `projectId` | MongoId | yes | from Admin Projects |\n| `description` | string | no | |\n| `dueDate` | YYYY-MM-DD | no | |\n| `priority` | High\\|Medium\\|Low | no | default Medium |\n\n_Tip: numbers/booleans/null unquoted. Dates = `YYYY-MM-DD`. Ids = 24-char hex._\n---\n",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"Submit weekly attendance summary\",\n  \"description\": \"Self-created from Task Dashboard\",\n  \"projectId\": \"{{projectId}}\",\n  \"dueDate\": \"2026-10-31\",\n  \"priority\": \"High\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const j = pm.response.json();",
+                      "const id = (j.data || {})._id;",
+                      "if (id) pm.collectionVariables.set('taskId', id);"
                     ]
                   }
                 }
@@ -11494,7 +11681,7 @@
                     "status"
                   ]
                 },
-                "description": "PATCH /api/tasks/me/:id/status — Done button.\nOnly if you are in assignees[].\n\n---\n### Body\n- `status` — To Do | In Progress | Completed | **required**\n---\n",
+                "description": "PATCH /api/tasks/me/:id/status — Done button.\nOnly if you are in assignees[].\nPermission: **Tasks → To Do Tasks → edit**.\n\n---\n### Body\n- `status` — To Do | In Progress | Completed | **required**\n---\n",
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"status\": \"Completed\"\n}",
@@ -11785,6 +11972,11 @@
     {
       "key": "notificationCronSecret",
       "value": ""
+    },
+    {
+      "key": "resetToken",
+      "value": "",
+      "description": "Paste raw token from forgot-password email link"
     }
   ]
 }

@@ -355,6 +355,40 @@ const loginSchema = Joi.object({
     "any.required": "Password is required",
   }),
 }).unknown(false);
+
+/**
+ * FORGOT PASSWORD — POST /api/auth/forgot-password
+ * Body: { email } — official or personal email.
+ */
+const forgotPasswordSchema = Joi.object({
+  email: Joi.string().trim().email().required().messages({
+    "string.email": "Enter a valid email address",
+    "string.empty": "Email is required",
+    "any.required": "Email is required",
+  }),
+}).unknown(false);
+
+/**
+ * RESET PASSWORD — POST /api/auth/reset-password
+ * Body: { token, newPassword, confirmPassword }
+ */
+const resetPasswordSchema = Joi.object({
+  token: Joi.string().trim().min(32).max(128).required().messages({
+    "string.empty": "Reset token is required",
+    "any.required": "Reset token is required",
+  }),
+  newPassword: Joi.string().min(6).max(50).required().messages({
+    "string.min": "New password must be at least 6 characters",
+    "string.max": "New password must be at most 50 characters",
+    "string.empty": "New password is required",
+    "any.required": "New password is required",
+  }),
+  confirmPassword: Joi.string().valid(Joi.ref("newPassword")).required().messages({
+    "any.only": "New password and confirm password do not match",
+    "string.empty": "Confirm password is required",
+    "any.required": "Confirm password is required",
+  }),
+}).unknown(false);
 /** Same row checks as update, keyed by the list name in the URL path */
 const ARRAY_ITEM_SCHEMAS = {
   education: educationItem,
@@ -397,6 +431,8 @@ module.exports = {
   updateUserSchema,
   deleteUploadSchema,
   loginSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
   validateSectionDelete,
   ARRAY_ITEM_SCHEMAS,
 };

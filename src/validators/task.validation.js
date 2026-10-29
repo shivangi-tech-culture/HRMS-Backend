@@ -89,6 +89,25 @@ const myTaskQuerySchema = Joi.object({
   limit: Joi.number().integer().min(1).max(100).default(20),
 }).unknown(true);
 
+/** Task Dashboard widgets — days window + optional project/category filter. */
+const myTaskDashboardQuerySchema = Joi.object({
+  days: Joi.number().integer().min(7).max(90).default(15),
+  category: Joi.string().trim().allow("").default("ALL"),
+  projectId: objectId.optional(),
+  listLimit: Joi.number().integer().min(1).max(50).default(10),
+}).unknown(true);
+
+/** Employee creates a task under a company project (auto-assigns self). */
+const createMyTaskSchema = Joi.object({
+  title: Joi.string().trim().min(2).max(200).required(),
+  description: Joi.string().trim().allow("").max(2000).default(""),
+  projectId: objectId.required(),
+  dueDate: dueDateField.allow("").default(""),
+  priority: Joi.string()
+    .valid(...PRIORITIES)
+    .default("Medium"),
+}).unknown(false);
+
 const employeeStatusSchema = Joi.object({
   status: Joi.string()
     .valid(...STATUSES)
@@ -105,6 +124,8 @@ module.exports = {
   updateTaskSchema,
   listTaskQuerySchema,
   myTaskQuerySchema,
+  myTaskDashboardQuerySchema,
+  createMyTaskSchema,
   employeeStatusSchema,
   assignTaskSchema,
 };

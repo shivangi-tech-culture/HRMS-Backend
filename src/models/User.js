@@ -57,6 +57,13 @@ const userSchema = new mongoose.Schema(
     tokenExpiresAt: { type: Date, default: null },
     /** Configured lifetime string used at issue time (e.g. "7d") */
     tokenExpiresIn: { type: String, default: "" },
+    /**
+     * Forgot-password: sha256 hash of the one-time reset token emailed to the user.
+     * Cleared after a successful reset (or when a newer reset is requested).
+     */
+    resetPasswordToken: { type: String, default: "" },
+    /** When the reset token stops working (UTC). Null when no reset is pending. */
+    resetPasswordExpires: { type: Date, default: null },
     /** Profile photo URL from Cloudinary folder hrms/profile */
     profileUrl: { type: String, default: "" },
     /**
