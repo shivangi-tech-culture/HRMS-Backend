@@ -291,7 +291,6 @@ const buildListQuery = async (req, { forceRole, roleScope } = {}) => {
 const mapListRow = (row) => ({
   _id: row._id,
   name: row.name || "",
-  employeeCode: row.official?.employeeCode || "",
   email: row.official?.officialEmail || "",
   role: row.role || "",
   department: row.official?.department || "",
@@ -315,12 +314,13 @@ const mapEmployeeListRow = (row) => ({
   shift: row.official?.shiftId?.name || "",
   status: row.status || "",
   email: row.official?.officialEmail || "",
+  profileUrl: row.profileUrl || "",
   reportingHead1: headRef(row.official?.reportingHead1),
   reportingHead2: headRef(row.official?.reportingHead2),
 });
 
 const LIST_SELECT =
-  "name role status lastLogin official.officialEmail official.employeeCode official.department official.designation official.companyIds official.branchId official.shiftId personal.gender";
+  "name role status lastLogin profileUrl official.officialEmail official.employeeCode official.department official.designation official.companyIds official.branchId official.shiftId personal.gender";
 
 module.exports = {
   safeUser,
