@@ -1,17 +1,19 @@
-/**
+﻿/**
  * PROFILE COMPLETION (weighted) — Employee / HR / Manager
  *
  * Section weights (sum = 100):
- *   official (professional, HR/Manager fills)  30%
- *   personal                                   25%
- *   documents                                  15%
+ *   official (professional, HR/Manager fills)  20%
+ *   personal                                   20%
+ *   documents                                  10%
  *   accounts (bank)                            10%
- *   education / family / nominees / experience  5% each
+ *   education                                  10%
+ *   family / nominees / experience             10% each
  *
- * Official + Personal + Documents = 70% → profile “ready”; no completion reminder.
+ * Official + Personal + Documents + Accounts + Education = 70%
+ * → profile “ready” / punch unlock. Education + bank are required for 70%.
  * Below 70% → shouldSendReminder = true.
  *
- * Mandatory checklist lives only in personal + documents + official.
+ * Mandatory checklist: personal + documents + official + accounts + education.
  */
 const { normalizeRoleName } = require("../config/roles");
 
@@ -20,17 +22,17 @@ const REMINDER_THRESHOLD = 70;
 
 /**
  * Max points each section can contribute to overall %.
- * official + personal + documents = 70 (reminder cutoff).
+ * official + personal + documents + accounts + education = 70 (reminder cutoff).
  */
 const SECTION_WEIGHTS = {
-  official: 30,
-  personal: 25,
-  documents: 15,
+  official: 20,
+  personal: 20,
+  documents: 10,
   accounts: 10,
-  education: 5,
-  family: 5,
-  nominees: 5,
-  experience: 5,
+  education: 10,
+  family: 10,
+  nominees: 10,
+  experience: 10,
 };
 
 const SECTION_LABELS = {
@@ -93,7 +95,8 @@ const listHasDocument = (rows, docKey) => {
 
 /**
  * Checklist fields.
- * mandatory: true → only personal / documents / official (reminder + identity).
+ * mandatory: true → personal / documents / official / accounts / education
+ * (needed to reach 70% and unlock punch-in).
  * kind: "list" | "listDoc" → special fill checks.
  */
 const PROFILE_FIELDS = [
@@ -264,21 +267,23 @@ const PROFILE_FIELDS = [
   },
   { key: "official.grade", label: "Grade", section: "official", mandatory: false },
 
-  // —— EXTRA SECTIONS (5–10% each; push above 70%) ——
+  // —— ACCOUNTS + EDUCATION (required for 70%) ——
   {
     key: "accounts",
     label: "Bank account (at least 1)",
     section: "accounts",
-    mandatory: false,
+    mandatory: true,
     kind: "list",
   },
   {
     key: "education",
     label: "Education (at least 1)",
     section: "education",
-    mandatory: false,
+    mandatory: true,
     kind: "list",
   },
+
+  // —— EXTRA SECTIONS (push above 70%) ——
   {
     key: "family",
     label: "Family (at least 1)",
@@ -356,11 +361,17 @@ const computeProfileCompletion = (user) => {
 
   /**
    * Weighted section scores.
-   * Core sections (personal / documents / official): earn weight from
-   * **mandatory fields only** — so filling all mandatory there = exactly 70%.
-   * Extra sections (bank / family / …): earn weight from their checklist item(s).
+   * Core sections (personal / documents / official / accounts / education):
+   * earn weight from **mandatory fields only** — all mandatory filled = exactly 70%.
+   * Extra sections (family / nominees / experience): earn weight from checklist item(s).
    */
-  const CORE_SECTIONS = new Set(["personal", "documents", "official"]);
+  const CORE_SECTIONS = new Set([
+    "personal",
+    "documents",
+    "official",
+    "accounts",
+    "education",
+  ]);
   const sectionKeys = Object.keys(SECTION_WEIGHTS);
   let earnedPoints = 0;
 
@@ -436,8 +447,14 @@ const computeProfileCompletion = (user) => {
       filled: mandatoryFilled,
       remaining: mandatoryRemaining,
       complete: mandatoryRemaining === 0,
-      /** Only personal + documents + official */
-      sections: ["personal", "documents", "official"],
+      /** personal + documents + official + accounts + education */
+      sections: [
+        "personal",
+        "documents",
+        "official",
+        "accounts",
+        "education",
+      ],
       missing: missingMandatory,
     },
     optional: {
