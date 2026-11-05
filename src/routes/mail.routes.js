@@ -1,6 +1,6 @@
 /**
  * MAIL ROUTES → /api/mail
- * POST /send — Organization → Mail
+ * POST /send — Connect → Mail
  */
 const express = require("express");
 const { sendMail } = require("../controllers/mail.controller");
@@ -15,7 +15,7 @@ const router = express.Router();
  * @swagger
  * tags:
  *   - name: Admin / Mail
- *     description: Send email (Organization → Mail)
+ *     description: Send email (Connect → Mail)
  */
 
 /**
@@ -27,7 +27,7 @@ const router = express.Router();
  *     description: |
  *       Sends email via Zoho SMTP (same env as welcome mail).
  *       **Who:** Global Admin, Super Admin, HR Manager, Manager
- *       (needs Organization → Mail → `email` or `create` permission; Super/Global skip check).
+ *       (needs Connect → Mail → `email` or `create` permission; Super/Global skip check).
  *
  *       `to` / `cc` / `bcc` = one email string or an array.
  *       `isHtml: true` → `body` treated as HTML; otherwise plain text.
@@ -102,7 +102,7 @@ router.post(
   "/send",
   protect,
   authorize(...ALL_ACCESS),
-  checkPermission("Organization", "Mail", "email"),
+  checkPermission("Connect", "Mail", "email"),
   validate(sendMailSchema),
   sendMail
 );

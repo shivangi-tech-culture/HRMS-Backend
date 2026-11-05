@@ -7,19 +7,24 @@ const mongoose = require("mongoose");
 
 /**
  * Saved on the break row.
- * On Break / Overdue = still open.
- * Completed = ended inside today's remaining balance.
- * Pending / Approved / Rejected = ended past the balance; reporting manager reviews it.
+ * On Break / Overdue = still open (Overdue = past allowed while still open).
+ * Completed = ended within (or equal to) allowedMinutes.
+ * Exceeded = ended past allowedMinutes (no RM approve — employee just ended).
+ * Pending / Approved / Rejected = legacy only.
  * At Desk is not stored — it means the person has no open break.
  */
 const STORED_STATUSES = [
   "On Break",
   "Overdue",
   "Completed",
+  "Exceeded",
   "Pending",
   "Approved",
   "Rejected",
 ];
+
+/** Separate from break status (On Break / Overdue / Completed / Exceeded). */
+const APPROVAL_STATUSES = ["Idle", "Pending", "Approved", "Rejected"];
 
 const breakSessionSchema = new mongoose.Schema(
   {
@@ -47,13 +52,33 @@ const breakSessionSchema = new mongoose.Schema(
     allowedMinutes: { type: Number, default: null },
     durationMinutes: { type: Number, default: 0 },
     /**
-     * On Break — open, still inside the balance this break started with.
-     * Overdue — open Lunch Break after 30 minutes. Written on the row.
-     * Completed — ended inside the remaining daily balance.
-     * Pending — ended past the balance, waiting for the reporting manager.
-     * Approved / Rejected — manager decision on a Pending break.
+     * On Break — open, still inside allowed minutes.
+     * Overdue — open past allowed (live board only).
+     * Completed — ended within allowed.
+     * Exceeded — ended past allowed (no approval flow).
+     * Pending / Approved / Rejected — legacy rows only.
      */
     status: { type: String, enum: STORED_STATUSES, default: "On Break" },
+    /**
+     * Idle — no approval (normal Lunch/Tea).
+     * Approved — Day Break started after grant (or legacy overage approved).
+     * Pending / Rejected — legacy overage review only.
+     */
+    approvalStatus: {
+      type: String,
+      enum: APPROVAL_STATUSES,
+      default: "Idle",
+    },
+    /**
+     * Approval trail (Day Break grant, or legacy overage review).
+     * Copied from BreakDayGrant on start so history keeps who/when.
+     */
+    dayGrantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "BreakDayGrant",
+      default: null,
+    },
+    approvalRequestedAt: { type: Date, default: null },
     reviewNote: { type: String, default: "" },
     reviewedBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -85,3 +110,4 @@ const BreakSession = mongoose.model("BreakSession", breakSessionSchema, "breakse
 
 module.exports = BreakSession;
 module.exports.STORED_STATUSES = STORED_STATUSES;
+module.exports.APPROVAL_STATUSES = APPROVAL_STATUSES;

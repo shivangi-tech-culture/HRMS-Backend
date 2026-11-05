@@ -13,6 +13,7 @@ const {
   exportUsers,
   assignHrCompanies,
   sendUserMail,
+  adminChangePassword,
 } = require("../controllers/accessControl.controller");
 const { protect, authorize } = require("../middleware/auth");
 const { checkPermission } = require("../controllers/permission.controller");
@@ -20,13 +21,27 @@ const { validate } = require("../middleware/validate");
 const {
   createAccessUserSchema,
   updateAccessUserSchema,
-  accessSendMailSchema,
   assignHrCompaniesSchema,
 } = require("../validators/accessControl.validation");
 const { assignReportingManager } = require("../controllers/reportingManager.controller");
 const { assignManagerSchema } = require("../validators/reportingManager.validation");
+const Joi = require("joi");
 
 const router = express.Router();
+
+const adminChangePasswordSchema = Joi.object({
+  newPassword: Joi.string().min(6).max(50).required().messages({
+    "string.min": "New password must be at least 6 characters",
+    "string.max": "New password must be at most 50 characters",
+    "string.empty": "New password is required",
+    "any.required": "New password is required",
+  }),
+  confirmPassword: Joi.string().valid(Joi.ref("newPassword")).required().messages({
+    "any.only": "New password and confirm password do not match",
+    "string.empty": "Confirm password is required",
+    "any.required": "Confirm password is required",
+  }),
+}).unknown(false);
 
 /** System names; custom admin roles also admitted by authorize + checkPermission */
 const ACCESS_ROLES = require("../middleware/auth").ALL_ACCESS;
@@ -116,6 +131,8 @@ router.post(
  *     summary: Create user (Access & Control)
  *     description: |
  *       Lean drawer fields. `official.employeeCode` optional (editable, unique when set).
+ *       `personal.dateOfBirth` **required** — frontend builds password as
+ *       `{employeeCode}` + DOB `ddmmyyyy` (e.g. `TC001` + `15012005`).
  *     security: [{ bearerAuth: [] }]
  *     responses:
  *       201: { description: User created }
@@ -142,6 +159,8 @@ router.post(
  *       - company / companyId — Company `_id` or exact name
  *         Super Admin/Admin: any company. HR: only assigned companies.
  *       - role, department, status, branch, shift, page, limit
+ *
+ *       Each row includes `employeeCode` (e.g. `TC001`; empty for platform roles).
  *     security: [{ bearerAuth: [] }]
  *     parameters:
  *       - in: query
@@ -232,6 +251,7 @@ router.get(
  *     summary: Update user (Edit drawer)
  *     description: |
  *       Email + company locked. `official.employeeCode` optional — send to set/clear/edit.
+ *       `personal.dateOfBirth` optional on edit (required on create for password combo).
  *     security: [{ bearerAuth: [] }]
  *     parameters:
  *       - $ref: '#/components/parameters/UserId'
@@ -249,11 +269,13 @@ router.put(
 
 /**
  * @swagger
- * /api/users/{id}/mail:
+ * /api/users/{id}/change-password:
  *   post:
  *     tags: [Admin / Users]
- *     summary: Send mail to user (row mail icon)
- *     description: Uses user's officialEmail. Permission Access & Control → email
+ *     summary: Admin — change any user password
+ *     description: |
+ *       Super Admin / Admin / HR Manager set a new password for any Access & Control user.
+ *       Body: `newPassword` + `confirmPassword` only.
  *     security: [{ bearerAuth: [] }]
  *     parameters:
  *       - $ref: '#/components/parameters/UserId'
@@ -263,20 +285,51 @@ router.put(
  *         application/json:
  *           schema:
  *             type: object
- *             required: [subject, body]
+ *             required: [newPassword, confirmPassword]
  *             properties:
- *               subject: { type: string }
- *               body: { type: string }
- *               isHtml: { type: boolean, default: false }
+ *               newPassword: { type: string, minLength: 6, maxLength: 50 }
+ *               confirmPassword: { type: string }
+ *           example:
+ *             newPassword: "UserNewPass123"
+ *             confirmPassword: "UserNewPass123"
  *     responses:
- *       200: { description: Email sent }
+ *       200: { description: Password changed }
+ *       400: { description: Validation failed }
+ *       403: { description: Out of scope / cannot manage role }
+ *       404: { description: User not found }
+ */
+router.post(
+  "/:id/change-password",
+  protect,
+  authorize(...ACCESS_ROLES),
+  checkPermission("Administration", "Access & Control", "edit"),
+  validate(adminChangePasswordSchema),
+  adminChangePassword
+);
+
+/**
+ * @swagger
+ * /api/users/{id}/mail:
+ *   post:
+ *     tags: [Admin / Users]
+ *     summary: Resend login credentials to user
+ *     description: |
+ *       Only needs user id in the URL — no body, no cc/bcc.
+ *       Rebuilds default password (`employeeCode` + DOB `ddmmyyyy`, or `123456` for platform),
+ *       saves it, and emails credentials to `officialEmail`.
+ *       Permission: Access & Control → email
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - $ref: '#/components/parameters/UserId'
+ *     responses:
+ *       200: { description: Credentials emailed }
+ *       400: { description: Missing email / employee code / DOB }
  */
 router.post(
   "/:id/mail",
   protect,
   authorize(...ACCESS_ROLES),
   checkPermission("Administration", "Access & Control", "email"),
-  validate(accessSendMailSchema),
   sendUserMail
 );
 

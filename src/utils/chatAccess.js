@@ -13,7 +13,7 @@
  * their contacts, but only members can send.
  */
 const User = require("../models/User");
-const { verifyToken } = require("./jwt");
+const { inspectSessionToken } = require("../middleware/auth");
 const {
   SUPER_ADMIN,
   ADMIN,
@@ -80,20 +80,14 @@ const chatUserFor = async (user, requestedCompanyId) => {
 
 /** Socket handshake: same JWT + Active check as protect() */
 const loadLoginUser = async (token) => {
-  if (!token) throw chatError(401, "Login token is required");
-  let decoded;
-  try {
-    decoded = verifyToken(token);
-  } catch {
-    throw chatError(401, "Login token is invalid or expired");
+  const check = await inspectSessionToken(token, {
+    select:
+      "name role status token official.companyIds official.reportingHead1 official.reportingHead2",
+  });
+  if (!check.ok) {
+    throw chatError(401, check.message);
   }
-  const user = await User.findById(decoded.id)
-    .select("name role status official.companyIds official.reportingHead1 official.reportingHead2")
-    .lean();
-  if (!user || user.status !== "Active") {
-    throw chatError(401, "User not found or inactive");
-  }
-  return user;
+  return check.user.toObject ? check.user.toObject() : check.user;
 };
 
 /** Contact card shown in the chat people list */

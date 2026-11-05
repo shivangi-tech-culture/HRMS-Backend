@@ -1,6 +1,7 @@
 /**
  * USER MODEL — login account + employee profile (one document per person)
- * Login: official.officialEmail + password. Validation → user.validation.js (Joi).
+ * Login: employeeCode | officialEmail | personalEmail + password.
+ * Validation → user.validation.js (Joi).
  * Unique when set: officialEmail, employeeCode, mobileNo, personalEmail, pan, aadhaar, DL, passport.
  */
 const mongoose = require("mongoose");
@@ -45,8 +46,60 @@ const userSchema = new mongoose.Schema(
     status: { type: String, default: "Active" },
     /** Updated on every successful login */
     lastLogin: { type: Date, default: null },
+    /**
+     * Latest JWT from login — stored on every successful login.
+     * Cleared on logout. Named `token` so it shows clearly in Compass.
+     */
+    token: { type: String, default: "" },
+    /** When this token was issued (login time) */
+    tokenIssuedAt: { type: Date, default: null },
+    /** When this token expires (from JWT exp) */
+    tokenExpiresAt: { type: Date, default: null },
+    /** Configured lifetime string used at issue time (e.g. "7d") */
+    tokenExpiresIn: { type: String, default: "" },
+    /**
+     * Forgot-password: sha256 hash of the one-time reset token emailed to the user.
+     * Cleared after a successful reset (or when a newer reset is requested).
+     */
+    resetPasswordToken: { type: String, default: "" },
+    /** When the reset token stops working (UTC). Null when no reset is pending. */
+    resetPasswordExpires: { type: Date, default: null },
     /** Profile photo URL from Cloudinary folder hrms/profile */
     profileUrl: { type: String, default: "" },
+    /**
+     * Digital signature image URL from Cloudinary folder hrms/signature.
+     * HR / Admin upload their own signature; ID card pulls it from `createdBy`.
+     */
+    signatureUrl: { type: String, default: "" },
+    /**
+     * User who created this employee (usually HR Manager).
+     * ID card uses that user's `signatureUrl` as the virtual HR signature.
+
+    */
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+
+    /**
+     * FCM device tokens — web + Android + iOS.
+     * Client registers after login: POST /api/notifications/token
+     */
+    fcmTokens: [
+      {
+        token: { type: String, required: true, trim: true },
+        /** web | android | ios */
+        platform: {
+          type: String,
+          enum: ["web", "android", "ios"],
+          default: "web",
+        },
+        /** Optional browser / device id so same device updates one row */
+        deviceId: { type: String, default: "", trim: true },
+        updatedAt: { type: Date, default: Date.now },
+      },
+    ],
 
     // 1. PERSONAL — employee can update (phones, emails, addresses, IDs)
 
@@ -63,19 +116,20 @@ const userSchema = new mongoose.Schema(
       motherName: { type: String, default: "" },
       maritalStatus: { type: String, default: "" },
       spouseName: { type: String, default: "" },
+      /** Blood group master name (e.g. B+) — same style as other personal fields */
+      bloodGroup: { type: String, default: "" },
       /**
        * Next work-anniversary date (auto from official.dateOfJoining).
        * Do not trust a client-supplied value — pre-save hook overwrites it.
        */
       anniversaryDate: { type: Date, default: null },
-      /** Unique when set — not used as login id */
+      /** Unique when set — also accepted as login id */
       personalEmail: { type: String, default: "" },
       languageKnown: { type: String, default: "" },
       emergencyContact1: { type: String, default: "" },
       emergencyContact2: { type: String, default: "" },
       /** Unique when set */
       drivingLicenseNo: { type: String, default: "" },
-      licenseValidUpto: { type: Date, default: null },
       /** Unique when set */
       passportNo: { type: String, default: "" },
       remarks: { type: String, default: "" },
@@ -93,10 +147,10 @@ const userSchema = new mongoose.Schema(
     // 2. OFFICIAL — admin only (employee cannot change these)
 
     official: {
-      /** Unique when set (e.g. EMP-1024) */
+      /** Unique when set (e.g. TC001) — also accepted as login id */
       employeeCode: { type: String, default: "" },
       /**
-       * LOGIN ID — unique when set.
+       * Official / work email — unique when set; also a login id.
        * Stored lowercase; used by auth + uniqueFields helpers.
        */
       officialEmail: {
@@ -154,13 +208,7 @@ const userSchema = new mongoose.Schema(
       dateOfRetirement: { type: Date, default: null },
       grade: { type: String, default: "" },
     },
-    // 3. OTHER — extra personal details
-
-    other: {
-      bloodGroup: { type: String, default: "" },
-      passportExpiry: { type: Date, default: null },
-    },
-    // 4. EDUCATION — list of courses (array)
+    // 3. EDUCATION — list of courses (array)
 
     education: [
       {

@@ -85,11 +85,11 @@ punchFolder.item = [
   postJson(
     "1. Punch In",
     "{{baseUrl}}/api/attendance/punch-in",
-    "Punch in. Returns company + branch + shift + remarks.\n\n**Body:** `source` (web|mobile|biometric), `latitude`, `longitude`, optional `remarks` or `reason` (same field).",
+    "Punch in. Within **50 m** of branch office GPS.\n\n**Body:** `source` (web|mobile|biometric), `latitude`, `longitude`, optional `remarks`.\nSample = Kailash Building ~10 m (accept).",
     {
       source: "web",
-      latitude: 28.6301,
-      longitude: 77.2242,
+      latitude: 28.6294351,
+      longitude: 77.2222984,
       remarks: "Reached office",
     },
     saveAttendanceId
@@ -97,11 +97,11 @@ punchFolder.item = [
   postJson(
     "2. Punch Out",
     "{{baseUrl}}/api/attendance/punch-out",
-    "Punch out. Computes Present/HalfDay, late/early, overtime (over 9h). If remarks pending → status stays Pending for admin approve/reject.",
+    "Punch out. Same **50 m** geofence. Computes Present/HalfDay, late/early, overtime.",
     {
       source: "web",
-      latitude: 28.6301,
-      longitude: 77.2242,
+      latitude: 28.6294351,
+      longitude: 77.2222984,
       remarks: "",
     },
     saveAttendanceId

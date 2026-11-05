@@ -3,6 +3,7 @@
  * UI: https://hrms-techculture.vercel.app/account/profile
  * Works for Admin + Employee (logged-in user only).
  */
+const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 const Role = require("../models/Role");
 const {
@@ -16,9 +17,16 @@ const {
   permissionsForRole,
 } = require("../config/permissions");
 const { logEmployeeActivity } = require("../utils/activityLog");
-const { forgetProfileImage } = require("../middleware/upload");
+const {
+  forgetProfileImage,
+  forgetSignatureImage,
+  isSignatureImageUrl,
+} = require("../middleware/upload");
+const { normalizeRoleName, SUPER_ADMIN, ADMIN, HR } = require("../config/roles");
+const { computeProfileCompletion } = require("../utils/profileCompletion");
 
 const LOCKED_ROLES = new Set(["Super Admin", "Admin", "Employee"]);
+const SIGNATURE_ROLES = new Set([SUPER_ADMIN, ADMIN, HR]);
 
 const permLabel = (roleDoc) => {
   if (!roleDoc) return "0 of 0";
@@ -64,6 +72,7 @@ const toProfilePayload = async (user, roleDoc) => {
     workPhone: personal.workPhone || "",
     lastLogin: user.lastLogin || null,
     profileUrl: user.profileUrl || null,
+    signatureUrl: user.signatureUrl || null,
     signedInAs: user.name || "",
     permissionCount: permLabel(roleDoc),
     catalog: roleDoc?.catalog || null,
@@ -88,6 +97,28 @@ const getMyProfile = async (req, res) => {
     return res.json({
       message: "My Profile",
       data: await toProfilePayload(user, roleDoc),
+    });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+/**
+ * GET /api/account/profile/completion — own profile % (Employee / HR / Manager / Admin)
+ * Returns filled count, remaining mandatory, section-wise breakdown.
+ */
+const getMyProfileCompletion = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id)
+      .select("-password -token -emailAppPassword")
+      .lean();
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    return res.json({
+      message: "Profile completion",
+      data: computeProfileCompletion(user),
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -120,9 +151,32 @@ const updateMyProfile = async (req, res) => {
       user.profileUrl = req.body.profileUrl ? String(req.body.profileUrl).trim() : "";
     }
 
+    const previousSignatureUrl =
+      req.body.signatureUrl !== undefined ? String(user.signatureUrl || "") : null;
+    if (req.body.signatureUrl !== undefined) {
+      if (!SIGNATURE_ROLES.has(normalizeRoleName(user.role))) {
+        return res.status(403).json({
+          message: "Only Super Admin, Admin, or HR Manager can save a signature",
+        });
+      }
+      const nextSig = req.body.signatureUrl
+        ? String(req.body.signatureUrl).trim()
+        : "";
+      if (nextSig && !isSignatureImageUrl(nextSig)) {
+        return res.status(400).json({
+          message:
+            "signatureUrl must be a Cloudinary image from POST /api/employees/upload with type=signature",
+        });
+      }
+      user.signatureUrl = nextSig;
+    }
+
     await user.save();
     if (previousProfileUrl !== null) {
       await forgetProfileImage(previousProfileUrl, user.profileUrl);
+    }
+    if (previousSignatureUrl !== null) {
+      await forgetSignatureImage(previousSignatureUrl, user.signatureUrl);
     }
     await logEmployeeActivity({ actor: req.user, employee: user, action: "update", before });
 
@@ -164,8 +218,48 @@ const getMe = async (req, res) => {
   }
 };
 
+/**
+ * POST /api/account/change-password — employee (any logged-in user) changes own password
+ * Body: { newPassword, confirmPassword }
+ */
+const changePassword = async (req, res) => {
+  try {
+    const { newPassword, confirmPassword } = req.body;
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        message: "New password and confirm password do not match",
+      });
+    }
+
+    const user = await User.findById(req.user._id).select("password status");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    if (user.status !== "Active") {
+      return res.status(401).json({ message: "Account is inactive" });
+    }
+
+    const sameAsOld = await bcrypt.compare(newPassword, user.password);
+    if (sameAsOld) {
+      return res.status(400).json({
+        message: "New password must be different from current password",
+      });
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    return res.json({ message: "Password changed successfully" });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
 module.exports = {
   getMyProfile,
+  getMyProfileCompletion,
   updateMyProfile,
   getMe,
+  changePassword,
 };

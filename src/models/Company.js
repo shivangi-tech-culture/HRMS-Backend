@@ -69,6 +69,9 @@ const branchSchema = new mongoose.Schema(
     city: { type: String, default: "" },
     state: { type: String, default: "" },
     pincode: { type: String, default: "", trim: true },
+    /** Office GPS — auto-filled from address via Map API; punch/break within 50m */
+    latitude: { type: Number, default: null },
+    longitude: { type: Number, default: null },
     isActive: { type: Boolean, default: true },
     shifts: { type: [shiftSchema], default: [] },
   },

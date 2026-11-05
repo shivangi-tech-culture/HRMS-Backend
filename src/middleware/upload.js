@@ -1,10 +1,10 @@
 /**
  * UPLOAD MIDDLEWARE — multer (memory) → Cloudinary secure URL
  * Field "document", max 5 MB.
- * Types: education | account | leave | profile | regularization | onTour | onDuty | companyLogo → hrms/<type>.
+ * Types: education | account | leave | profile | signature | regularization | onTour | onDuty | companyLogo → hrms/<type>.
  * Allowed files: PDF, JPEG, PNG, WEBP, GIF, and Excel (.xls / .xlsx).
  * The check uses file bytes, not the name the browser sends.
- * profile and companyLogo accept images only. Macro Excel is rejected.
+ * profile, signature, and companyLogo accept images only. Macro Excel is rejected.
  */
 const multer = require("multer");
 const path = require("path");
@@ -27,6 +27,7 @@ const UPLOAD_TYPES = [
   "account",
   "leave",
   "profile",
+  "signature",
   "regularization",
   "onTour",
   "onDuty",
@@ -34,7 +35,7 @@ const UPLOAD_TYPES = [
 ];
 
 /** Images only. PDF and Excel are rejected for these types. */
-const IMAGE_ONLY_TYPES = new Set(["profile", "companyLogo"]);
+const IMAGE_ONLY_TYPES = new Set(["profile", "signature", "companyLogo"]);
 
 const IMAGE_KINDS = new Set(["jpg", "png", "gif", "webp"]);
 
@@ -140,12 +141,12 @@ const rejectFile = (message) => {
   return err;
 };
 
-/** Cloudinary folder: hrms/<type>, including hrms/profile and hrms/companyLogo */
+/** Cloudinary folder: hrms/<type>, including hrms/profile, hrms/signature, hrms/companyLogo */
 const folderFor = (type) => {
   const configured = (process.env.CLOUDINARY_FOLDER || "hrms").replace(/\/+$/, "");
   const root =
     configured.replace(
-      /\/(education|account|leave|profile|regularization|onTour|onDuty|companyLogo)$/,
+      /\/(education|account|leave|profile|signature|regularization|onTour|onDuty|companyLogo)$/,
       ""
     ) || "hrms";
   return `${root}/${type}`;
@@ -162,7 +163,12 @@ const uploadOptionsFor = (file, type = "education") => {
   }
 
   if (IMAGE_ONLY_TYPES.has(type) && !IMAGE_KINDS.has(kind)) {
-    const label = type === "companyLogo" ? "Company logo" : "Profile image";
+    const label =
+      type === "companyLogo"
+        ? "Company logo"
+        : type === "signature"
+          ? "Signature"
+          : "Profile image";
     throw rejectFile(`${label} must be JPEG, PNG, WEBP, or GIF`);
   }
 
@@ -247,26 +253,39 @@ const isProfileImageUrl = (url) => {
   return Boolean(publicId && publicId.startsWith(`${folderFor("profile")}/`));
 };
 
-/** Remove one profile image from Cloudinary. Other folders are rejected. */
-const deleteProfileImage = async (url) => {
+/** True when the URL is an image we stored under hrms/signature */
+const isSignatureImageUrl = (url) => {
+  const publicId = publicIdFromUrl(url);
+  return Boolean(publicId && publicId.startsWith(`${folderFor("signature")}/`));
+};
+
+const destroyImageInFolder = async (url, folderPrefix, label) => {
   if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY) {
     throw new Error(
       "Cloudinary not configured. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET in .env"
     );
   }
   const publicId = publicIdFromUrl(url);
-  if (!publicId || !publicId.startsWith(`${folderFor("profile")}/`)) {
-    throw rejectFile("Only a profile image uploaded to this app can be deleted");
+  if (!publicId || !publicId.startsWith(`${folderPrefix}/`)) {
+    throw rejectFile(`Only a ${label} uploaded to this app can be deleted`);
   }
   const result = await cloudinary.uploader.destroy(publicId, {
     resource_type: "image",
     invalidate: true,
   });
   if (result?.result !== "ok" && result?.result !== "not found") {
-    throw new Error("Could not delete profile image");
+    throw new Error(`Could not delete ${label}`);
   }
   return { publicId };
 };
+
+/** Remove one profile image from Cloudinary. Other folders are rejected. */
+const deleteProfileImage = async (url) =>
+  destroyImageInFolder(url, folderFor("profile"), "profile image");
+
+/** Remove one signature image from Cloudinary. Other folders are rejected. */
+const deleteSignatureImage = async (url) =>
+  destroyImageInFolder(url, folderFor("signature"), "signature");
 
 /**
  * After profileUrl is replaced or cleared, drop the previous Cloudinary file.
@@ -283,6 +302,21 @@ const forgetProfileImage = async (previous, next = "") => {
   }
 };
 
+/**
+ * After signatureUrl is replaced or cleared, drop the previous Cloudinary file.
+ * A failed delete does not fail the profile save.
+ */
+const forgetSignatureImage = async (previous, next = "") => {
+  const prev = String(previous || "").trim();
+  const nxt = String(next || "").trim();
+  if (!prev || prev === nxt || !isSignatureImageUrl(prev)) return;
+  try {
+    await deleteSignatureImage(prev);
+  } catch (err) {
+    console.error("Signature image delete failed:", err.message || err);
+  }
+};
+
 module.exports = {
   UPLOAD_TYPES,
   ALLOWED_MESSAGE,
@@ -290,8 +324,11 @@ module.exports = {
   uploadFile,
   uploadToCloudinary,
   deleteProfileImage,
+  deleteSignatureImage,
   forgetProfileImage,
+  forgetSignatureImage,
   isProfileImageUrl,
+  isSignatureImageUrl,
   folderFor,
   cloudinary,
 };

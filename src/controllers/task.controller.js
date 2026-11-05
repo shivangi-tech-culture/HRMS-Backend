@@ -6,10 +6,12 @@
 const mongoose = require("mongoose");
 const Task = require("../models/Task");
 const Project = require("../models/Project");
+const User = require("../models/User");
 const {
   escapeRegex,
   hasGlobalCompanyAccess,
   managementCompanyIds,
+  userCompanyIds,
 } = require("../utils/companyScope");
 const {
   denyCompany,
@@ -370,6 +372,304 @@ const myTasks = async (req, res) => {
   }
 };
 
+const completedYmd = (row) => {
+  if (!row.completedAt) return "";
+  const d = new Date(row.completedAt);
+  if (Number.isNaN(d.getTime())) return "";
+  return todayYmdFromDate(d);
+};
+
+const todayYmdFromDate = (d) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
+const addDaysYmd = (ymdStr, days) => {
+  const [y, m, d] = String(ymdStr).split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d + days));
+  return todayYmdFromDate(
+    new Date(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate())
+  );
+};
+
+const weekBucketIndex = (completedDate, windowStart, days) => {
+  const [ys, ms, ds] = windowStart.split("-").map(Number);
+  const [yc, mc, dc] = completedDate.split("-").map(Number);
+  const start = Date.UTC(ys, ms - 1, ds);
+  const cur = Date.UTC(yc, mc - 1, dc);
+  const diffDays = Math.floor((cur - start) / 86400000);
+  if (diffDays < 0 || diffDays >= days) return -1;
+  const weekSize = Math.max(1, Math.ceil(days / 5));
+  return Math.min(4, Math.floor(diffDays / weekSize));
+};
+
+/**
+ * GET /api/tasks/me/dashboard
+ * Employee Tasks → Dashboard widgets (progress, due summary, health, workload, critical).
+ */
+const myTaskDashboard = async (req, res) => {
+  try {
+    const days = Number(req.query.days) || 15;
+    const listLimit = Number(req.query.listLimit) || 10;
+    const categoryRaw = String(req.query.category || "ALL").trim();
+    const category =
+      !categoryRaw || categoryRaw.toUpperCase() === "ALL" ? "ALL" : categoryRaw;
+    const today = todayYmd();
+    const windowStart = addDaysYmd(today, -(days - 1));
+
+    const base = { assignees: req.user._id };
+    if (req.query.projectId) base.projectId = req.query.projectId;
+
+    const myRows = await populateTask(
+      Task.find(base).sort({ dueDate: 1, createdAt: -1 })
+    ).lean();
+
+    const filtered =
+      category === "ALL"
+        ? myRows
+        : myRows.filter((row) => {
+            const name =
+              row.projectId && typeof row.projectId === "object"
+                ? row.projectId.name || ""
+                : "";
+            return name.toLowerCase() === category.toLowerCase();
+          });
+
+    const progress = [0, 0, 0, 0, 0];
+    for (const row of filtered) {
+      if (row.status !== "Completed") continue;
+      const done = completedYmd(row) || (row.updatedAt ? todayYmdFromDate(new Date(row.updatedAt)) : "");
+      if (!done || done < windowStart || done > today) continue;
+      const idx = weekBucketIndex(done, windowStart, days);
+      if (idx >= 0) progress[idx] += 1;
+    }
+    const taskProgress = progress.map((count, i) => ({
+      week: `W${i + 1}`,
+      weekNo: i + 1,
+      completed: count,
+    }));
+
+    const dueSummary = {
+      before: 0,
+      after: 0,
+      onTime: 0,
+      inProcess: 0,
+      pending: 0,
+    };
+    for (const row of filtered) {
+      if (row.status === "In Progress") {
+        dueSummary.inProcess += 1;
+        continue;
+      }
+      if (row.status === "To Do") {
+        dueSummary.pending += 1;
+        continue;
+      }
+      if (row.status === "Completed" && row.dueDate) {
+        const done = completedYmd(row) || row.dueDate;
+        if (done < row.dueDate) dueSummary.before += 1;
+        else if (done > row.dueDate) dueSummary.after += 1;
+        else dueSummary.onTime += 1;
+      }
+    }
+    const dueTotal =
+      dueSummary.before +
+      dueSummary.after +
+      dueSummary.onTime +
+      dueSummary.inProcess +
+      dueSummary.pending;
+
+    let completed = 0;
+    let onGoing = 0;
+    let pending = 0;
+    let dueTask = 0;
+    for (const row of filtered) {
+      if (row.status === "Completed") completed += 1;
+      else if (row.status === "In Progress") onGoing += 1;
+      else pending += 1;
+      if (row.status !== "Completed" && row.dueDate && row.dueDate < today) {
+        dueTask += 1;
+      }
+    }
+    const overallHealth = {
+      totalTasks: filtered.length,
+      completed,
+      onGoing,
+      pending,
+      dueTask,
+    };
+
+    const workloadMap = new Map();
+    for (const row of filtered) {
+      const name =
+        row.projectId && typeof row.projectId === "object"
+          ? row.projectId.name || "Other"
+          : "Other";
+      if (!workloadMap.has(name)) {
+        workloadMap.set(name, { category: name, completed: 0, overDue: 0, remaining: 0 });
+      }
+      const bucket = workloadMap.get(name);
+      if (row.status === "Completed") bucket.completed += 1;
+      else if (row.dueDate && row.dueDate < today) bucket.overDue += 1;
+      else bucket.remaining += 1;
+    }
+    const workload = [...workloadMap.values()].sort((a, b) =>
+      a.category.localeCompare(b.category)
+    );
+
+    const companyId =
+      filtered[0]?.companyId?._id ||
+      filtered[0]?.companyId ||
+      (req.user.official?.companyIds || [])[0] ||
+      null;
+
+    let criticalHealth = { maxAssignTask: [], maxDueTask: [] };
+    if (companyId) {
+      const companyTasks = await Task.find({ companyId })
+        .select("assignees status dueDate")
+        .lean();
+      const assignCount = new Map();
+      const dueCount = new Map();
+      for (const row of companyTasks) {
+        for (const aid of row.assignees || []) {
+          const key = String(aid);
+          assignCount.set(key, (assignCount.get(key) || 0) + 1);
+          if (row.status !== "Completed" && row.dueDate && row.dueDate < today) {
+            dueCount.set(key, (dueCount.get(key) || 0) + 1);
+          }
+        }
+      }
+      const ids = [...new Set([...assignCount.keys(), ...dueCount.keys()])];
+      const users = ids.length
+        ? await User.find({ _id: { $in: ids }, role: "Employee" })
+            .select("name official.employeeCode")
+            .lean()
+        : [];
+      const nameOf = new Map(
+        users.map((u) => [
+          String(u._id),
+          {
+            _id: u._id,
+            name: u.name || "",
+            employeeCode: u.official?.employeeCode || "",
+            shortName: shortName(u.name || ""),
+          },
+        ])
+      );
+      const rank = (map) =>
+        [...map.entries()]
+          .map(([id, count]) => ({ ...(nameOf.get(id) || { _id: id, name: "", shortName: "" }), count }))
+          .filter((row) => row.name)
+          .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+          .slice(0, 5);
+      criticalHealth = {
+        maxAssignTask: rank(assignCount),
+        maxDueTask: rank(dueCount),
+      };
+    }
+
+    const taskList = filtered.slice(0, listLimit).map((row) => {
+      const mapped = mapTask(row);
+      return {
+        _id: mapped._id,
+        title: mapped.title,
+        dueDate: mapped.dueDate,
+        priority: mapped.priority,
+        status: mapped.status,
+        displayStatus: mapped.displayStatus,
+        project: mapped.projectId?.name || "",
+      };
+    });
+
+    const categories = [
+      "ALL",
+      ...new Set(
+        myRows
+          .map((row) =>
+            row.projectId && typeof row.projectId === "object"
+              ? row.projectId.name || ""
+              : ""
+          )
+          .filter(Boolean)
+      ),
+    ];
+
+    return res.json({
+      message: "Task dashboard",
+      data: {
+        filters: { days, category, projectId: req.query.projectId || null },
+        categories,
+        taskProgress,
+        dueTaskSummary: {
+          totalDue: dueTotal,
+          before: dueSummary.before,
+          after: dueSummary.after,
+          onTime: dueSummary.onTime,
+          inProcess: dueSummary.inProcess,
+          pending: dueSummary.pending,
+        },
+        overallHealth,
+        workload,
+        criticalHealth,
+        taskList,
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+const shortName = (full) => {
+  const parts = String(full || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!parts.length) return "";
+  if (parts.length === 1) return parts[0];
+  return `${parts[0]} ${parts[parts.length - 1][0]}.`;
+};
+
+/**
+ * POST /api/tasks/me — Employee Tasks → Dashboard → create
+ * Creates a task on a project and assigns the logged-in employee.
+ */
+const createMyTask = async (req, res) => {
+  try {
+    const { title, description, projectId, dueDate, priority } = req.body;
+    const project = await Project.findById(projectId);
+    if (!project) return res.status(404).json({ message: "Project not found" });
+
+    const mine = new Set(userCompanyIds(req.user));
+    if (!mine.has(String(project.companyId))) {
+      return res.status(403).json({
+        message: "You can only create tasks for projects in your company",
+      });
+    }
+
+    const row = await Task.create({
+      title,
+      description: description || "",
+      projectId: project._id,
+      companyId: project.companyId,
+      assignees: [req.user._id],
+      assignedBy: req.user._id,
+      dueDate: dueDate || "",
+      priority: priority || "Medium",
+      status: "To Do",
+    });
+
+    const populated = await populateTask(Task.findById(row._id)).lean();
+    return res.status(201).json({
+      message: "Task created",
+      data: mapTask(populated),
+    });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
 const updateMyTaskStatus = async (req, res) => {
   try {
     if (!okId(req.params.id)) {
@@ -404,5 +704,7 @@ module.exports = {
   deleteTask,
   assignTask,
   myTasks,
+  myTaskDashboard,
+  createMyTask,
   updateMyTaskStatus,
 };

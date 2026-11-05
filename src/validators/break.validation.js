@@ -20,11 +20,37 @@ const optionalId = Joi.string()
     return value;
   });
 
-const startSchema = Joi.object({
-  breakType: Joi.string().trim().min(1).max(60).required().messages({
-    "any.required": "breakType is required",
+/** GPS required — same 50m office radius as punch-in / punch-out */
+const latLng = {
+  latitude: Joi.number().min(-90).max(90).required().messages({
+    "any.required": "latitude is required",
   }),
-  minutes: Joi.number().integer().min(1).max(180).optional(),
+  longitude: Joi.number().min(-180).max(180).required().messages({
+    "any.required": "longitude is required",
+  }),
+};
+
+/** POST /start — lat/long required; next break is auto-picked (do not send breakType) */
+const startSchema = Joi.object({
+  ...latLng,
+  breakType: Joi.string().trim().min(1).max(60).optional().strip(),
+  minutes: Joi.number().integer().min(1).max(180).optional().strip(),
+})
+  .unknown(false)
+  .prefs({ stripUnknown: true });
+
+/** POST /end — lat/long required; within 50m of branch */
+const endSchema = Joi.object({
+  ...latLng,
+})
+  .unknown(false)
+  .prefs({ stripUnknown: true });
+
+/** POST /day-request — employee asks for Day Break minutes */
+const dayRequestSchema = Joi.object({
+  minutes: Joi.number().integer().min(1).max(180).required().messages({
+    "any.required": "minutes is required",
+  }),
 }).unknown(false);
 
 const policySchema = Joi.object({
@@ -43,10 +69,7 @@ const policyUpdateSchema = Joi.object({
   flexible: Joi.boolean().optional(),
   minutes: Joi.number().integer().min(1).max(180).optional(),
   description: Joi.string().trim().allow("").max(300).optional(),
-}).unknown(false);
-
-const publishSchema = Joi.object({
-  published: Joi.boolean().required(),
+  published: Joi.boolean().optional(),
 }).unknown(false);
 
 const liveQuerySchema = Joi.object({
@@ -74,10 +97,11 @@ const reviewSchema = Joi.object({
 
 module.exports = {
   startSchema,
+  endSchema,
+  dayRequestSchema,
   liveQuerySchema,
   historyQuerySchema,
   reviewSchema,
   policySchema,
   policyUpdateSchema,
-  publishSchema,
 };

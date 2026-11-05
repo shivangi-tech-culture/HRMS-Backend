@@ -2,6 +2,7 @@
  * TASK ROUTES → /api/tasks
  * Admin: Work → Tasks → view | create | edit | delete | assign
  * Employee: Tasks → To Do Tasks → view | edit (own status)
+ * Employee: Tasks → Dashboard → view | create
  * Flow: Project exists → create task (projectId) → Assign assignees.
  */
 const express = require("express");
@@ -13,6 +14,8 @@ const {
   deleteTask,
   assignTask,
   myTasks,
+  myTaskDashboard,
+  createMyTask,
   updateMyTaskStatus,
 } = require("../controllers/task.controller");
 const { protect, authorize, ALL_ACCESS } = require("../middleware/auth");
@@ -24,6 +27,8 @@ const {
   updateTaskSchema,
   listTaskQuerySchema,
   myTaskQuerySchema,
+  myTaskDashboardQuerySchema,
+  createMyTaskSchema,
   employeeStatusSchema,
   assignTaskSchema,
 } = require("../validators/task.validation");
@@ -50,8 +55,27 @@ const employeeOnly = (req, res, next) => {
  *     description: |
  *       Tasks belong to a Project (company-scoped).
  *       Create with projectId; use POST /:id/assign for assignees.
- *       Employee: GET /me + PATCH /me/:id/status.
+ *       Employee: GET /me + PATCH /me/:id/status + GET /me/dashboard.
  */
+
+/** Must be registered before /me/:id so "dashboard" is not treated as an id. */
+router.get(
+  "/me/dashboard",
+  protect,
+  employeeOnly,
+  checkPermission("Tasks", "Dashboard", "view"),
+  validateQuery(myTaskDashboardQuerySchema),
+  myTaskDashboard
+);
+
+router.post(
+  "/me",
+  protect,
+  employeeOnly,
+  checkPermission("Tasks", "Dashboard", "create"),
+  validate(createMyTaskSchema),
+  createMyTask
+);
 
 router.get(
   "/me",

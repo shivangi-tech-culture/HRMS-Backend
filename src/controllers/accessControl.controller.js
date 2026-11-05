@@ -15,7 +15,7 @@ const {
   isPlatformRole,
   isMultiCompanyRole,
 } = require("../config/roles");
-const { queueWelcomeEmail, sendEmail } = require("../utils/mail");
+const { queueWelcomeEmail, sendWelcomeEmailSafe } = require("../utils/mail");
 const { sendExcel } = require("../utils/excel");
 const {
   findUniqueConflict,
@@ -126,6 +126,9 @@ const createAccessUserAccount = async (req) => {
     const employeeCode = String(officialIn.employeeCode || "")
       .trim()
       .toUpperCase();
+    const dateOfBirth = personalIn.dateOfBirth
+      ? new Date(personalIn.dateOfBirth)
+      : null;
     const mobileNo = String(personalIn.mobileNo || "").trim();
     const city = String(addrIn.city || "").trim();
     const state = String(addrIn.state || "").trim();
@@ -187,15 +190,14 @@ const createAccessUserAccount = async (req) => {
       role: roleName,
       status: status || "Active",
       official,
+      personal: {
+        dateOfBirth,
+        ...(mobileNo ? { mobileNo } : {}),
+        ...(city || state || country
+          ? { presentAddress: { city, state, country } }
+          : {}),
+      },
     };
-
-    if (mobileNo || city || state || country) {
-      createDoc.personal = {};
-      if (mobileNo) createDoc.personal.mobileNo = mobileNo;
-      if (city || state || country) {
-        createDoc.personal.presentAddress = { city, state, country };
-      }
-    }
 
     const user = await User.create(createDoc);
     await grantLeaveBalance(user);
@@ -448,6 +450,11 @@ const updateUser = async (req, res) => {
 
     if (req.body.personal) {
       if (!user.personal) user.personal = {};
+      if (req.body.personal.dateOfBirth !== undefined) {
+        user.personal.dateOfBirth = req.body.personal.dateOfBirth
+          ? new Date(req.body.personal.dateOfBirth)
+          : null;
+      }
       if (req.body.personal.mobileNo !== undefined) {
         const mobile = String(req.body.personal.mobileNo || "").trim();
         if (mobile) {
@@ -542,6 +549,7 @@ const exportUsers = async (req, res) => {
       const mapped = mapListRow(row);
       return {
         name: mapped.name,
+        employeeCode: mapped.employeeCode,
         email: mapped.email,
         role: mapped.role,
         department: mapped.department,
@@ -560,6 +568,7 @@ const exportUsers = async (req, res) => {
       `access-control-users.xlsx`,
       [
         { header: "User", key: "name", width: 24 },
+        { header: "Employee code", key: "employeeCode", width: 14 },
         { header: "Email", key: "email", width: 28 },
         { header: "Role", key: "role", width: 16 },
         { header: "Department", key: "department", width: 18 },
@@ -651,10 +660,81 @@ const assignHrCompanies = async (req, res) => {
   }
 };
 
+/**
+ * ADMIN CHANGE PASSWORD — POST /api/users/:id/change-password
+ * Super Admin / Admin / HR Manager set a new password for any user in Access & Control.
+ * Body: { newPassword, confirmPassword }
+ */
+const adminChangePassword = async (req, res) => {
+  try {
+    const { newPassword, confirmPassword } = req.body;
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        message: "New password and confirm password do not match",
+      });
+    }
+
+    const user = await User.findById(req.params.id).select(
+      "name password status role official"
+    );
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (!canManageRole(req.user.role, user.role)) {
+      return res.status(403).json({
+        message: "You cannot change password for this role",
+      });
+    }
+
+    if (!hasGlobalCompanyAccess(req.user)) {
+      const scopeErr = assertTeamOrCompanyEmployee(req.user, user);
+      if (scopeErr) {
+        return res.status(403).json({ message: scopeErr });
+      }
+    }
+
+    const sameAsOld = await bcrypt.compare(newPassword, user.password);
+    if (sameAsOld) {
+      return res.status(400).json({
+        message: "New password must be different from current password",
+      });
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    return res.json({
+      message: "Password changed successfully",
+      userId: user._id,
+      name: user.name || "",
+    });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+/** Staff login password = employeeCode + DOB as ddmmyyyy (e.g. TC00115012005) */
+const dobToDdmmyyyy = (date) => {
+  if (!date) return "";
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return "";
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const yyyy = String(d.getUTCFullYear());
+  return `${dd}${mm}${yyyy}`;
+};
+
+/**
+ * Resend login credentials to user's officialEmail.
+ * POST /api/users/:id/mail — only needs user id (no subject / body / cc).
+ * Rebuilds default password, saves hash, sends welcome mail.
+ */
 const sendUserMail = async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select(
-      "name role official.officialEmail official.companyIds official.reportingHead1 official.reportingHead2"
+      "name role official.officialEmail official.employeeCode official.companyIds official.department official.reportingHead1 official.reportingHead2 personal.dateOfBirth"
     );
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -678,20 +758,51 @@ const sendUserMail = async (req, res) => {
       return res.status(400).json({ message: "User has no official email" });
     }
 
-    const { subject, body, isHtml } = req.body;
-    const result = await sendEmail({
-      to,
-      subject,
-      body,
-      isHtml: Boolean(isHtml),
+    let password;
+    if (isPlatformRole(user.role)) {
+      password = process.env.DEFAULT_PLATFORM_PASSWORD || "123456";
+    } else {
+      const code = String(user.official?.employeeCode || "")
+        .trim()
+        .toUpperCase();
+      const dobPart = dobToDdmmyyyy(user.personal?.dateOfBirth);
+      if (!code || !dobPart) {
+        return res.status(400).json({
+          message:
+            "Cannot build credentials — employee code and date of birth are required",
+        });
+      }
+      password = `${code}${dobPart}`;
+    }
+
+    user.password = await bcrypt.hash(password, 10);
+    await user.save();
+
+    const companyLabel = isPlatformRole(user.role)
+      ? "All companies"
+      : process.env.DEFAULT_COMPANY || "TechCulture.Ai";
+
+    const mail = await sendWelcomeEmailSafe({
+      name: user.name,
+      email: to,
+      password,
+      role: user.role,
+      company: companyLabel,
+      department: user.official?.department || "",
     });
 
+    if (!mail.emailSent) {
+      return res.status(502).json({
+        message: "Credentials reset but email failed to send",
+        to,
+        emailError: mail.emailError,
+      });
+    }
+
     return res.json({
-      message: "Email sent",
+      message: "Welcome email sent with login credentials",
       to,
-      messageId: result.messageId,
-      accepted: result.accepted,
-      rejected: result.rejected,
+      emailSent: true,
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -708,5 +819,6 @@ module.exports = {
   exportUsers,
   assignHrCompanies,
   sendUserMail,
+  adminChangePassword,
   maxSuperAdmins,
 };

@@ -39,7 +39,19 @@ const officialStaff = only({
   shiftId: Joi.string().hex().length(24).allow("", null).optional(),
 });
 
-const personalAccessLean = only({
+/** DOB required on create — frontend builds password as empCode + DOB (ddmmyyyy) */
+const personalAccessCreate = only({
+  dateOfBirth: Joi.date().required(),
+  mobileNo: phoneOpt(),
+  presentAddress: only({
+    city: str(),
+    state: str(),
+    country: str(),
+  }).optional(),
+});
+
+const personalAccessUpdate = only({
+  dateOfBirth: Joi.date().optional(),
   mobileNo: phoneOpt(),
   presentAddress: only({
     city: str(),
@@ -58,7 +70,7 @@ const createAccessUserSchema = Joi.object({
     then: officialPlatform.required(),
     otherwise: officialStaff.required(),
   }),
-  personal: personalAccessLean.optional(),
+  personal: personalAccessCreate.required(),
 }).unknown(false);
 
 const updateAccessUserSchema = Joi.object({
@@ -73,16 +85,16 @@ const updateAccessUserSchema = Joi.object({
     branchId: Joi.string().hex().length(24).allow("", null).optional(),
     shiftId: Joi.string().hex().length(24).allow("", null).optional(),
   }).optional(),
-  personal: personalAccessLean.optional(),
+  personal: personalAccessUpdate.optional(),
 })
   .min(1)
   .unknown(false);
 
-const accessSendMailSchema = Joi.object({
-  subject: Joi.string().trim().min(1).max(200).required(),
-  body: Joi.string().trim().min(1).max(20000).required(),
-  isHtml: Joi.boolean().default(false),
-}).unknown(false);
+/**
+ * Resend login credentials — body optional / empty.
+ * Password is rebuilt as employeeCode + DOB (ddmmyyyy), then emailed.
+ */
+const accessSendMailSchema = Joi.object({}).unknown(false).default({});
 
 /** Super Admin assigns the full company list on an HR Manager. */
 const assignHrCompaniesSchema = Joi.object({

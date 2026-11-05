@@ -244,6 +244,304 @@ const escapeHtml = (value) =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 
+const FONT =
+  "-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif";
+const FONT_MONO = "Consolas,Monaco,'Courier New',monospace";
+
+/** Brand greens — same as HRMS / Swagger UI (#1f6b4a, #143028) */
+const GREEN = "#1f6b4a";
+const GREEN_DARK = "#143028";
+const GREEN_SOFT = "#e8f5ef";
+const GREEN_MID = "#2d8f63";
+
+/**
+ * Shared branded email shell (HRMS green, mobile-safe table layout).
+ */
+function wrapEmailLayout({
+  brand,
+  title,
+  headerTitle,
+  headerSub,
+  bodyHtml,
+  footerNote,
+}) {
+  const safeBrand = escapeHtml(brand || "TechCulture.Ai");
+  const safeTitle = escapeHtml(title || headerTitle || "HRMS");
+  const safeHeader = escapeHtml(headerTitle || "");
+  const safeSub = escapeHtml(headerSub || "");
+  const safeFooter =
+    footerNote ||
+    `Automated message from ${safeBrand} HRMS · Please do not reply`;
+
+  return `<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <title>${safeTitle}</title>
+  <style type="text/css">
+    @media only screen and (max-width:600px){
+      .em-pad{padding-left:16px !important;padding-right:16px !important;}
+      .em-hero{padding:22px 16px !important;}
+      .em-title{font-size:18px !important;line-height:1.3 !important;}
+    }
+  </style>
+</head>
+<body style="margin:0;padding:0;background-color:#eef5f1;width:100% !important;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
+  <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${safeSub || safeHeader}</div>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#eef5f1;border-collapse:collapse;">
+    <tr>
+      <td align="center" style="padding:20px 10px;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:520px;width:100%;background-color:#ffffff;border-collapse:collapse;">
+          <tr>
+            <td class="em-pad" style="background-color:${GREEN_DARK};padding:18px 22px;">
+              <p style="margin:0 0 4px;font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:#86efac;font-family:${FONT};font-weight:700;">${safeBrand}</p>
+              <h1 class="em-title" style="margin:0;font-size:18px;line-height:1.3;color:#ffffff;font-family:${FONT};font-weight:700;">${safeHeader}</h1>
+              ${safeSub ? `<p style="margin:6px 0 0;font-size:12px;line-height:1.45;color:#bbf7d0;font-family:${FONT};">${safeSub}</p>` : ""}
+            </td>
+          </tr>
+          <tr>
+            <td class="em-pad" style="padding:22px 22px 18px;background-color:#ffffff;font-family:${FONT};">${bodyHtml}</td>
+          </tr>
+          <tr>
+            <td style="padding:12px 22px;background-color:#0d1f18;text-align:center;">
+              <p style="margin:0;font-size:10px;line-height:1.5;color:#94a3b8;font-family:${FONT};">${safeFooter}</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+/**
+ * Welcome / credentials email — matches TechCulture design (mobile + smaller type).
+ */
+function buildWelcomeEmailHtml({
+  name,
+  email,
+  password,
+  role,
+  brand,
+  companyLabel,
+  department,
+  fromName,
+  appUrl,
+}) {
+  const safe = {
+    name: escapeHtml(name),
+    email: escapeHtml(email),
+    password: escapeHtml(password),
+    role: escapeHtml(role),
+    brand: escapeHtml(brand || "TechCulture.Ai"),
+    company: escapeHtml(companyLabel || brand || "TechCulture.Ai"),
+    dept: escapeHtml(department || ""),
+    fromName: escapeHtml(fromName),
+    appUrl: escapeHtml(appUrl),
+  };
+
+  const deptRow = department
+    ? `<tr>
+        <td style="padding:8px 0 0;font-size:11px;color:#64748b;font-family:${FONT};width:88px;vertical-align:middle;">Department</td>
+        <td style="padding:8px 0 0;font-size:12px;color:#0f172a;font-family:${FONT};font-weight:600;">${safe.dept}</td>
+      </tr>`
+    : "";
+
+  return `<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <title>Welcome to HRMS — ${safe.brand}</title>
+  <style type="text/css">
+    @media only screen and (max-width:600px){
+      .em-wrap{width:100% !important;}
+      .em-pad{padding-left:14px !important;padding-right:14px !important;}
+      .em-hero{padding:20px 14px !important;}
+      .em-title{font-size:17px !important;}
+      .em-btn a{padding:11px 18px !important;font-size:12px !important;}
+    }
+  </style>
+</head>
+<body style="margin:0;padding:0;background-color:#eef5f1;width:100% !important;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
+  <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">Welcome to HRMS — your login and temporary password are inside.</div>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#eef5f1;border-collapse:collapse;">
+    <tr>
+      <td align="center" style="padding:16px 8px;">
+        <!--[if mso]><table role="presentation" width="520" cellspacing="0" cellpadding="0" border="0"><tr><td><![endif]-->
+        <table role="presentation" class="em-wrap" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:520px;width:100%;background-color:#ffffff;border-collapse:collapse;border-radius:10px;overflow:hidden;">
+
+          <!-- Top bar: brand + HR -->
+          <tr>
+            <td class="em-pad" style="padding:14px 18px;border-bottom:1px solid #e2e8f0;background-color:#ffffff;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;">
+                <tr>
+                  <td style="vertical-align:middle;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;">
+                      <tr>
+                        <td style="width:28px;height:28px;background-color:${GREEN};border-radius:6px;text-align:center;vertical-align:middle;font-family:${FONT};font-size:14px;font-weight:800;color:#ffffff;line-height:28px;">T</td>
+                        <td style="padding-left:8px;vertical-align:middle;">
+                          <p style="margin:0;font-size:13px;font-weight:700;color:#0f172a;font-family:${FONT};line-height:1.2;">${safe.brand}</p>
+                          <p style="margin:1px 0 0;font-size:9px;color:#94a3b8;font-family:${FONT};letter-spacing:0.02em;">Technology · Innovation · Growth</p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                  <td align="right" style="vertical-align:middle;">
+                    <p style="margin:0;font-size:10px;color:${GREEN};font-family:${FONT};font-weight:600;">HRMS</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Hero -->
+          <tr>
+            <td class="em-hero" style="background-color:${GREEN};background:linear-gradient(135deg,${GREEN_DARK} 0%,${GREEN} 55%,${GREEN_MID} 100%);padding:26px 18px;">
+              <p style="margin:0 0 6px;font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:#bbf7d0;font-family:${FONT};font-weight:700;">Human Resource Management System</p>
+              <h1 class="em-title" style="margin:0;font-size:20px;line-height:1.3;color:#ffffff;font-family:${FONT};font-weight:700;">Welcome to HRMS</h1>
+              <p style="margin:10px 0 0;font-size:12px;line-height:1.55;color:#dcfce7;font-family:${FONT};max-width:380px;">Hi ${safe.name} — your HRMS account at ${safe.company} is ready. Attendance, leave, payroll, profile, and more — all in one place.</p>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td class="em-pad" style="padding:20px 18px 8px;background-color:#ffffff;">
+              <p style="margin:0 0 4px;font-size:14px;color:${GREEN};font-family:${FONT};font-weight:700;">Hi ${safe.name},</p>
+              <p style="margin:0 0 10px;font-size:12px;line-height:1.6;color:#64748b;font-family:${FONT};">
+                Welcome to <strong style="color:#0f172a;">${safe.company}</strong> HRMS. Your employee account is active — use the login details below for your first sign-in.
+              </p>
+              <p style="margin:0 0 14px;font-size:12px;line-height:1.55;color:#64748b;font-family:${FONT};">
+                With HRMS you can mark attendance, apply for leave, view payroll, update your profile, and manage day-to-day HR tasks from one secure dashboard.
+              </p>
+
+              <!-- Temp password notice -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 12px;border-collapse:collapse;background-color:#fff7ed;border:1px solid #fed7aa;border-radius:8px;">
+                <tr>
+                  <td style="padding:10px 14px;">
+                    <p style="margin:0 0 4px;font-size:12px;line-height:1.45;color:#9a3412;font-family:${FONT};font-weight:700;">
+                      Temporary password
+                    </p>
+                    <p style="margin:0;font-size:11px;line-height:1.5;color:#c2410c;font-family:${FONT};">
+                      Keep this password private. After you log in, you can update it anytime from your account for better security.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Credentials -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;">
+                <tr>
+                  <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;">
+                    <p style="margin:0;font-size:11px;font-weight:700;color:#0f172a;font-family:${FONT};">HRMS login details</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:4px 14px 12px;">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;">
+                      <tr>
+                        <td style="padding:10px 0 8px;border-bottom:1px solid #e2e8f0;font-size:11px;color:#64748b;font-family:${FONT};width:110px;vertical-align:top;">Work email</td>
+                        <td style="padding:10px 0 8px;border-bottom:1px solid #e2e8f0;font-size:12px;color:#0f172a;font-family:${FONT_MONO};font-weight:600;word-break:break-all;">${safe.email}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:8px 0;border-bottom:1px solid #e2e8f0;font-size:11px;color:#64748b;font-family:${FONT};width:110px;vertical-align:top;">Temp password</td>
+                        <td style="padding:8px 0;border-bottom:1px solid #e2e8f0;font-size:12px;color:#0f172a;font-family:${FONT_MONO};font-weight:600;">${safe.password}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:8px 0 ${department ? "8px" : "0"};${department ? "border-bottom:1px solid #e2e8f0;" : ""}font-size:11px;color:#64748b;font-family:${FONT};width:110px;vertical-align:middle;">Role</td>
+                        <td style="padding:8px 0 ${department ? "8px" : "0"};${department ? "border-bottom:1px solid #e2e8f0;" : ""}">
+                          <span style="display:inline-block;background-color:${GREEN_SOFT};color:${GREEN};padding:2px 8px;font-size:11px;font-weight:700;font-family:${FONT};border-radius:999px;">${safe.role}</span>
+                        </td>
+                      </tr>
+                      ${deptRow}
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Steps -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:14px 0 0;border-collapse:collapse;background-color:${GREEN_SOFT};border-radius:8px;">
+                <tr>
+                  <td style="padding:12px 14px;">
+                    <p style="margin:0 0 8px;font-size:11px;font-weight:700;color:#0f172a;font-family:${FONT};">Get started with HRMS</p>
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;">
+                      <tr>
+                        <td style="width:20px;vertical-align:top;padding:0 0 6px;">
+                          <span style="display:inline-block;width:16px;height:16px;line-height:16px;text-align:center;background-color:${GREEN};color:#ffffff;border-radius:50%;font-size:9px;font-weight:700;font-family:${FONT};">1</span>
+                        </td>
+                        <td style="padding:0 0 6px 6px;font-size:11px;line-height:1.45;color:#475569;font-family:${FONT};">Open HRMS using the button below</td>
+                      </tr>
+                      <tr>
+                        <td style="width:20px;vertical-align:top;padding:0 0 6px;">
+                          <span style="display:inline-block;width:16px;height:16px;line-height:16px;text-align:center;background-color:${GREEN};color:#ffffff;border-radius:50%;font-size:9px;font-weight:700;font-family:${FONT};">2</span>
+                        </td>
+                        <td style="padding:0 0 6px 6px;font-size:11px;line-height:1.45;color:#475569;font-family:${FONT};">Sign in with your work email and temporary password</td>
+                      </tr>
+                      <tr>
+                        <td style="width:20px;vertical-align:top;">
+                          <span style="display:inline-block;width:16px;height:16px;line-height:16px;text-align:center;background-color:${GREEN};color:#ffffff;border-radius:50%;font-size:9px;font-weight:700;font-family:${FONT};">3</span>
+                        </td>
+                        <td style="padding:0 0 0 6px;font-size:11px;line-height:1.45;color:#475569;font-family:${FONT};"><strong>Update your password</strong> after login, then explore your HRMS dashboard</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- CTA -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" class="em-btn" style="margin:18px 0 8px;border-collapse:collapse;">
+                <tr>
+                  <td align="center">
+                    <a href="${safe.appUrl}" target="_blank" style="display:inline-block;padding:12px 24px;font-size:12px;font-weight:700;color:#ffffff;text-decoration:none;font-family:${FONT};background-color:${GREEN};border-radius:8px;">
+                      Open HRMS &rarr;
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0 0 16px;font-size:10px;line-height:1.45;color:#94a3b8;font-family:${FONT};text-align:center;">
+                Button not working? Paste this link in your browser:<br/>
+                <a href="${safe.appUrl}" style="color:${GREEN};word-break:break-all;font-size:10px;">${safe.appUrl}</a>
+              </p>
+
+              <!-- Sign-off -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;border-top:1px solid #e2e8f0;">
+                <tr>
+                  <td style="padding:12px 0 4px;font-size:11px;line-height:1.5;color:#64748b;font-family:${FONT};">
+                    Need help with HRMS login or your profile? Contact your HR team — we're here to help.
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:0 0 4px;font-size:12px;line-height:1.5;color:#64748b;font-family:${FONT};">
+                    Welcome to HRMS,<br/>
+                    <span style="color:#0f172a;font-weight:700;">${safe.fromName}</span><br/>
+                    <span style="color:#94a3b8;font-size:10px;">HRMS · ${safe.company}</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer bar -->
+          <tr>
+            <td style="padding:10px 14px;background-color:#0d1f18;text-align:center;">
+              <p style="margin:0;font-size:9px;line-height:1.45;color:#94a3b8;font-family:${FONT};">
+                Automated message from ${safe.company} HRMS · Please do not reply to this email
+              </p>
+            </td>
+          </tr>
+        </table>
+        <!--[if mso]></td></tr></table><![endif]-->
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
 /**
  * Welcome email after user create (includes login credentials).
  * Throws if SMTP/API rejects or env is missing — callers should catch.
@@ -266,139 +564,27 @@ const sendWelcomeEmail = async ({
   const { fromName, from } = fromAddress();
   const appUrl = process.env.APP_URL || "https://hrms-techculture.vercel.app";
   const roleLabel = role || "Employee";
-  const brand = company || "TechCulture.Ai";
+  const brandName = "TechCulture.Ai";
+  const companyLabel = company || process.env.DEFAULT_COMPANY || brandName;
 
-  const safe = {
-    name: escapeHtml(name),
-    email: escapeHtml(to),
-    password: escapeHtml(password),
-    role: escapeHtml(roleLabel),
-    brand: escapeHtml(brand),
-    dept: escapeHtml(department),
-    fromName: escapeHtml(fromName),
-    appUrl: escapeHtml(appUrl),
-  };
-
-  const deptLine = department
-    ? `<p style="margin:16px 0 0;font-size:13px;color:#64748b;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;">Department · <strong style="color:#0f172a;">${safe.dept}</strong></p>`
-    : "";
-
-  const html = `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Welcome</title>
-</head>
-<body style="margin:0;padding:0;background:#e8eef5;-webkit-font-smoothing:antialiased;">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#e8eef5;padding:40px 16px;">
-    <tr>
-      <td align="center">
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 12px 40px rgba(15,23,42,0.12);">
-          <tr>
-            <td style="background:linear-gradient(135deg,#0b3d4a 0%,#0f766e 55%,#14b8a6 100%);padding:36px 36px 32px;">
-              <p style="margin:0 0 10px;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:rgba(255,255,255,0.72);font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-weight:600;">
-                ${safe.brand}
-              </p>
-              <h1 style="margin:0;font-size:26px;line-height:1.25;color:#ffffff;font-family:Georgia,'Times New Roman',serif;font-weight:700;">
-                Welcome to your HR portal
-              </h1>
-              <p style="margin:10px 0 0;font-size:15px;line-height:1.5;color:rgba(255,255,255,0.88);font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
-                Your account is ready — sign in with the details below
-              </p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:36px 36px 28px;">
-              <p style="margin:0 0 12px;font-size:16px;color:#0f172a;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
-                Hi <strong>${safe.name}</strong>,
-              </p>
-              <p style="margin:0 0 20px;font-size:15px;line-height:1.65;color:#475569;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
-                Welcome to <strong style="color:#0f172a;">${safe.brand}</strong>${department ? ` (${safe.dept})` : ""}.
-                Your login is ready. Use these details to open the HR portal for the first time:
-              </p>
-              <p style="margin:0 0 16px;font-size:13px;line-height:1.6;color:#64748b;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
-                <strong style="color:#0f172a;">How to sign in</strong><br/>
-                1. Open the HR portal (button below)<br/>
-                2. Enter your email and password<br/>
-                3. Change your password after first login
-              </p>
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
-                <tr>
-                  <td style="padding:14px 20px;background:#0f172a;">
-                    <p style="margin:0;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:#94a3b8;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-weight:600;">
-                      Your login details
-                    </p>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding:4px 20px 8px;">
-                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
-                      <tr>
-                        <td style="padding:14px 0;border-bottom:1px solid #e2e8f0;font-size:12px;color:#64748b;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;width:88px;vertical-align:top;">Email</td>
-                        <td style="padding:14px 0;border-bottom:1px solid #e2e8f0;font-size:14px;color:#0f172a;font-family:Consolas,Monaco,monospace;font-weight:600;word-break:break-all;">${safe.email}</td>
-                      </tr>
-                      <tr>
-                        <td style="padding:14px 0;border-bottom:1px solid #e2e8f0;font-size:12px;color:#64748b;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;width:88px;vertical-align:top;">Password</td>
-                        <td style="padding:14px 0;border-bottom:1px solid #e2e8f0;font-size:14px;color:#0f172a;font-family:Consolas,Monaco,monospace;font-weight:600;">${safe.password}</td>
-                      </tr>
-                      <tr>
-                        <td style="padding:14px 0;font-size:12px;color:#64748b;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;width:88px;vertical-align:top;">Your role</td>
-                        <td style="padding:14px 0;">
-                          <span style="display:inline-block;background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;border-radius:999px;padding:4px 12px;font-size:12px;font-weight:700;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;">${safe.role}</span>
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-              </table>
-              ${deptLine}
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:24px 0 28px;">
-                <tr>
-                  <td style="padding:14px 16px;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;font-size:13px;line-height:1.55;color:#92400e;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
-                    <strong style="color:#78350f;">Keep it safe:</strong> After you sign in, please change this password. Do not share your email or password with anyone.
-                  </td>
-                </tr>
-              </table>
-              <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 32px;">
-                <tr>
-                  <td align="center" style="border-radius:10px;background:#0f766e;">
-                    <a href="${safe.appUrl}" target="_blank" style="display:inline-block;padding:14px 28px;font-size:14px;font-weight:700;color:#ffffff;text-decoration:none;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;letter-spacing:0.02em;">
-                      Open HR Portal →
-                    </a>
-                  </td>
-                </tr>
-              </table>
-              <p style="margin:0;font-size:14px;line-height:1.6;color:#64748b;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
-                Need help? Contact your HR team.<br/><br/>
-                Warm regards,<br/>
-                <span style="color:#0f172a;font-weight:700;">${safe.fromName}</span><br/>
-                <span style="color:#94a3b8;font-size:13px;">${safe.brand}</span>
-              </p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:18px 36px;background:#f1f5f9;border-top:1px solid #e2e8f0;text-align:center;">
-              <p style="margin:0;font-size:11px;line-height:1.5;color:#94a3b8;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
-                Automated message from ${safe.brand} HRMS · Please do not reply
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-  `;
+  const html = buildWelcomeEmailHtml({
+    name,
+    email: to,
+    password,
+    role: roleLabel,
+    brand: brandName,
+    companyLabel,
+    department,
+    fromName,
+    appUrl,
+  });
 
   const info = await sendMailWithFallback({
     from,
     to,
     replyTo: process.env.EMAIL_REPLY_TO || process.env.EMAIL_USER_EZ,
-    subject: `[HRMS] Your login for ${brand}`,
-    text: `Hi ${name},\n\nWelcome to your HR portal at ${brand}. Your account is ready.\n\nHow to sign in:\n1. Open ${appUrl}\n2. Email: ${to}\n3. Password: ${password}\n4. Your role: ${roleLabel}\n\nPlease change your password after first login.\n\nRegards,\n${fromName}`,
+    subject: `[HRMS] Welcome to ${companyLabel} — your account is ready`,
+    text: `Hi ${name},\n\nWelcome to HRMS at ${companyLabel}. Your Human Resource Management System account is ready — attendance, leave, payroll, profile, and more in one place.\n\nIMPORTANT: The password below is temporary. Keep it private. After you log in, you can update it anytime from your account.\n\nHRMS login details:\n1. Open ${appUrl}\n2. Work email: ${to}\n3. Temporary password: ${password}\n4. Role: ${roleLabel}\n\nGet started with HRMS:\n1. Open HRMS\n2. Sign in with your work email and temporary password\n3. Update your password, then explore your HRMS dashboard\n\nNeed help? Contact your HR team.\n\nWelcome to HRMS,\n${fromName}\nHRMS · ${companyLabel}`,
     html,
     headers: {
       "X-Priority": "1",
@@ -455,9 +641,10 @@ const sendWelcomeEmailSafe = async (payload) => {
   }
 };
 
-/** Generic send used by POST /api/mail/send */
+/** Generic send used by POST /api/mail/send and access-control mail */
 const sendEmail = async ({ to, subject, body, cc, bcc, isHtml = false, replyTo, attachments }) => {
   const { fromName, from } = fromAddress();
+  const brand = process.env.DEFAULT_COMPANY || "TechCulture.Ai";
 
   const text = isHtml
     ? String(body || "")
@@ -466,10 +653,34 @@ const sendEmail = async ({ to, subject, body, cc, bcc, isHtml = false, replyTo, 
         .trim()
     : String(body || "");
 
-  const html = isHtml
-    ? String(body || "")
-    : `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#111;line-height:1.6;white-space:pre-wrap;">${escapeHtml(body)}</div>
-       <p style="font-size:12px;color:#94a3b8;margin-top:24px;">Sent via ${escapeHtml(fromName)}</p>`;
+  let html;
+  if (isHtml) {
+    // Caller already sent a full document — use as-is; otherwise wrap fragment
+    const raw = String(body || "");
+    html = /<!DOCTYPE|<html[\s>]/i.test(raw)
+      ? raw
+      : wrapEmailLayout({
+          brand,
+          title: subject,
+          headerTitle: subject,
+          headerSub: "Message from HR",
+          bodyHtml: raw,
+        });
+  } else {
+    const bodyHtml = `
+<p style="margin:0 0 14px;font-size:13px;line-height:1.6;color:#334155;font-family:${FONT};white-space:pre-wrap;">${escapeHtml(body)}</p>
+<p style="margin:18px 0 0;font-size:12px;line-height:1.55;color:#64748b;font-family:${FONT};">
+  Warm regards,<br/>
+  <span style="color:#0f172a;font-weight:700;">${escapeHtml(fromName)}</span>
+</p>`;
+    html = wrapEmailLayout({
+      brand,
+      title: subject,
+      headerTitle: subject,
+      headerSub: "Message from HR",
+      bodyHtml,
+    });
+  }
 
   const info = await sendMailWithFallback({
     from,
@@ -496,4 +707,7 @@ module.exports = {
   queueWelcomeEmail,
   sendEmail,
   createTransporter,
+  wrapEmailLayout,
+  buildWelcomeEmailHtml,
+  escapeHtml,
 };

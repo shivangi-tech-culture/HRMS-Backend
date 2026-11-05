@@ -7,20 +7,28 @@
  * On Duty  (GET /api/masters?type=onDutyCategory)
  *   Client Site, Bank Work, Field Visit, Office Duty
  *
- * Run: npm run seed:duty-categories
+ * Run alone:
+ *   npm run seed:on-tour
+ *   npm run seed:on-duty
+ * Both are also included in npm run seed and npm run seed:masters.
  */
-require("dotenv").config();
-const connectDB = require("../config/db");
 const { getModel, COLLECTION_BY_TYPE } = require("../models/Master");
 const { ATTENDANCE_DROPDOWNS } = require("../config/generalInfoMasters");
 
-const TYPES = ["onTourCategory", "onDutyCategory"];
+const TYPES = {
+  onTour: "onTourCategory",
+  onDuty: "onDutyCategory",
+};
 
-(async () => {
-  await connectDB();
+const seedDutyCategories = async (which) => {
+  const key = String(which || "").trim();
+  const types = key ? [TYPES[key]] : Object.values(TYPES);
+  if (types.some((type) => !type)) {
+    throw new Error("Pass onTour or onDuty");
+  }
 
   let count = 0;
-  for (const type of TYPES) {
+  for (const type of types) {
     const Model = getModel(type);
     for (const name of ATTENDANCE_DROPDOWNS[type]) {
       await Model.updateOne(
@@ -32,10 +40,24 @@ const TYPES = ["onTourCategory", "onDutyCategory"];
       console.log(`${type} (${COLLECTION_BY_TYPE[type]}): ${name}`);
     }
   }
+  return { count, types };
+};
 
-  console.log(`\nDuty categories seeded: ${count} rows. Other masters were not changed.`);
-  process.exit(0);
-})().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+module.exports = { seedDutyCategories };
+
+if (require.main === module) {
+  require("dotenv").config();
+  const connectDB = require("../config/db");
+  const which = process.argv[2];
+  (async () => {
+    await connectDB();
+    const result = await seedDutyCategories(which);
+    console.log(
+      `\nSeeded ${result.count} ${result.types.join(", ")} rows. Other masters were not changed.`
+    );
+    process.exit(0);
+  })().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

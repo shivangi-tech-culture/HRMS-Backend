@@ -17,6 +17,7 @@ const {
 } = require("../utils/companyScope");
 const { MANAGER_ROLES } = require("../utils/teamScope");
 const { normalizeDayClock } = require("../utils/shiftTiming");
+const { enrichBranchesFromAddress } = require("../utils/geocode");
 
 const { MASTER_POPULATE } = Company;
 
@@ -121,7 +122,7 @@ const listCompanies = async (req, res) => {
       Company.countDocuments(filter),
       Company.find(filter)
         .select(
-          "companyName companyCode isActive logo foundedYear monthStartDay monthEndDay branches.branchId branches.address branches.city branches.state branches.pincode branches.isActive branches.shifts.shiftId branches.shifts.isActive"
+          "companyName companyCode isActive logo foundedYear monthStartDay monthEndDay branches.branchId branches.address branches.city branches.state branches.pincode branches.latitude branches.longitude branches.isActive branches.shifts.shiftId branches.shifts.isActive"
         )
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -169,6 +170,8 @@ const getCompanyBranches = async (req, res) => {
         city: branch.city || "",
         state: branch.state || "",
         pincode: branch.pincode || "",
+        latitude: branch.latitude ?? null,
+        longitude: branch.longitude ?? null,
         shifts: (branch.shifts || [])
           .filter((shift) => shift.isActive !== false && shift.shiftId?._id)
           .map((shift) => ({
@@ -247,6 +250,9 @@ const createCompany = async (req, res) => {
     const month = pairMonthDays(req.body.monthStartDay, req.body.monthEndDay);
     if (month.error) return res.status(400).json({ message: month.error });
 
+    const branches = await enrichBranchesFromAddress(
+      normalizeBranches(req.body.branches || [])
+    );
     const row = await Company.create({
       companyName,
       companyCode,
@@ -255,7 +261,7 @@ const createCompany = async (req, res) => {
       foundedYear: req.body.foundedYear == null ? null : req.body.foundedYear,
       monthStartDay: month.monthStartDay,
       monthEndDay: month.monthEndDay,
-      branches: normalizeBranches(req.body.branches || []),
+      branches,
     });
     await row.populate(MASTER_POPULATE);
 
@@ -313,7 +319,9 @@ const updateCompany = async (req, res) => {
     if (req.body.branches !== undefined) {
       const missing = await missingMasters(req.body.branches);
       if (missing) return res.status(400).json({ message: missing });
-      row.branches = normalizeBranches(req.body.branches);
+      row.branches = await enrichBranchesFromAddress(
+        normalizeBranches(req.body.branches)
+      );
     }
 
     await row.save();

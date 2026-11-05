@@ -74,13 +74,13 @@ const personalItem = only({
   motherName: str(),
   maritalStatus: str(),
   spouseName: str(),
+  bloodGroup: str(),
   anniversaryDate: date(), // ignored in controller (auto-calculated)
   personalEmail: emailOpt(),
   languageKnown: str(),
   emergencyContact1: str(),
   emergencyContact2: str(),
   drivingLicenseNo: str(),
-  licenseValidUpto: date(),
   passportNo: str(),
   remarks: str(),
   presentAddress: address.optional(),
@@ -117,12 +117,6 @@ const officialItem = only({
   calculateSalaryFrom: date(),
   dateOfRetirement: date(),
   grade: str(),
-});
-
-/** other{} — blood group and passport expiry */
-const otherItem = only({
-  bloodGroup: str(),
-  passportExpiry: date(),
 });
 
 /**
@@ -251,7 +245,8 @@ const payrollItem = only({
 
 /**
  * CREATE EMPLOYEE — POST /api/employees (Employee Management)
- * Essential: name, password, status, officialEmail, employeeCode, dateOfBirth
+ * Essential: name, password, status, officialEmail, dateOfBirth
+ * employeeCode optional — blank → {companyCode}{0001} for that company
  * Optional: department, designation, address (country/state/city), rest of profile
  */
 const createEmployeeSchema = Joi.object({
@@ -262,7 +257,7 @@ const createEmployeeSchema = Joi.object({
   official: officialItem
     .keys({
       officialEmail: Joi.string().trim().email().required(),
-      employeeCode: Joi.string().trim().uppercase().min(2).required(),
+      employeeCode: Joi.string().trim().uppercase().min(2).allow("").optional(),
       companyIds: Joi.array().items(companyObjectId).length(1).required(),
       department: Joi.string().trim().allow("").optional(),
     })
@@ -291,7 +286,6 @@ const createEmployeeSchema = Joi.object({
         }),
     })
     .required(),
-  other: otherItem.optional(),
   education: Joi.array().items(educationItem).optional(),
   accounts: Joi.array().items(accountItem).optional(),
   family: Joi.array().items(familyItem).optional(),
@@ -300,6 +294,7 @@ const createEmployeeSchema = Joi.object({
   visas: Joi.array().items(visaItem).optional(),
   payroll: payrollItem.optional(),
   profileUrl: Joi.string().trim().uri().allow("", null).optional(),
+  signatureUrl: Joi.string().trim().uri().allow("", null).optional(),
 }).unknown(false);
 
 /** One new/edited row, or the full list (replace). Used on update for array sections. */
@@ -308,13 +303,16 @@ const listOrOne = (item) =>
 
 /**
  * UPDATE EMPLOYEE / profile — PUT /api/employees/:id
- * companyIds stay immutable. Super Admin / Admin / HR may change officialEmail
- * (controller enforces who, and that the new address is unused).
+ * companyIds / company / companies are stripped (immutable) so a full official
+ * payload from the edit form does not 400 — controller also deletes them.
+ * Super Admin / Admin / HR may change officialEmail and employeeCode.
  */
-const officialUpdateItem = officialItem.fork(
-  ["companyIds"],
-  (schema) => schema.forbidden()
-);
+const officialUpdateItem = officialItem
+  .fork(["companyIds"], (schema) => schema.optional().strip())
+  .keys({
+    company: Joi.any().optional().strip(),
+    companies: Joi.any().optional().strip(),
+  });
 
 const updateUserSchema = Joi.object({
   name: Joi.string().trim().min(2).max(100).optional(),
@@ -323,7 +321,6 @@ const updateUserSchema = Joi.object({
   status: Joi.string().valid("Active", "Inactive").optional(),
   personal: personalItem.optional(),
   official: officialUpdateItem.optional(),
-  other: otherItem.optional(),
   education: listOrOne(educationItem).optional(),
   accounts: listOrOne(accountItem).optional(),
   family: listOrOne(familyItem).optional(),
@@ -332,6 +329,7 @@ const updateUserSchema = Joi.object({
   visas: listOrOne(visaItem).optional(),
   payroll: payrollItem.optional(),
   profileUrl: Joi.string().trim().uri().allow("", null).optional(),
+  signatureUrl: Joi.string().trim().uri().allow("", null).optional(),
 })
   .min(1)
   .unknown(false);
@@ -343,13 +341,54 @@ const deleteUploadSchema = Joi.object({
 
 /**
  * LOGIN body — POST /api/auth/login
- * Example: { "officialEmail": "hr@techculture.ai", "password": "123456" }
+ * Auth: username + password → JWT.
+ * FCM: use POST /api/notifications/token after login (not accepted here).
+ *   { "username": "TC005", "password": "TC00515012005" }
  */
 const loginSchema = Joi.object({
-  officialEmail: Joi.string().trim().email().required(),
-  password: Joi.string().required(),
+  username: Joi.string().trim().min(1).max(254).required().messages({
+    "string.empty": "Username is required",
+    "any.required": "Username is required",
+  }),
+  password: Joi.string().required().messages({
+    "string.empty": "Password is required",
+    "any.required": "Password is required",
+  }),
 }).unknown(false);
 
+/**
+ * FORGOT PASSWORD — POST /api/auth/forgot-password
+ * Body: { email } — official or personal email.
+ */
+const forgotPasswordSchema = Joi.object({
+  email: Joi.string().trim().email().required().messages({
+    "string.email": "Enter a valid email address",
+    "string.empty": "Email is required",
+    "any.required": "Email is required",
+  }),
+}).unknown(false);
+
+/**
+ * RESET PASSWORD — POST /api/auth/reset-password
+ * Body: { token, newPassword, confirmPassword }
+ */
+const resetPasswordSchema = Joi.object({
+  token: Joi.string().trim().min(32).max(128).required().messages({
+    "string.empty": "Reset token is required",
+    "any.required": "Reset token is required",
+  }),
+  newPassword: Joi.string().min(6).max(50).required().messages({
+    "string.min": "New password must be at least 6 characters",
+    "string.max": "New password must be at most 50 characters",
+    "string.empty": "New password is required",
+    "any.required": "New password is required",
+  }),
+  confirmPassword: Joi.string().valid(Joi.ref("newPassword")).required().messages({
+    "any.only": "New password and confirm password do not match",
+    "string.empty": "Confirm password is required",
+    "any.required": "Confirm password is required",
+  }),
+}).unknown(false);
 /** Same row checks as update, keyed by the list name in the URL path */
 const ARRAY_ITEM_SCHEMAS = {
   education: educationItem,
@@ -392,6 +431,8 @@ module.exports = {
   updateUserSchema,
   deleteUploadSchema,
   loginSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
   validateSectionDelete,
   ARRAY_ITEM_SCHEMAS,
 };

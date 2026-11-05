@@ -3,7 +3,16 @@
  * Formats punch / daily / calendar rows for the API.
  * Pure formatting — does not touch User or Company assignment.
  */
-const { formatPunchStamp, minutesOfDay, parseHm, punchInWindow, graceMinutesOf, overtimeAfterShiftEnd, requiredWorkMinutes } = require("./shiftTiming");
+const {
+  formatPunchStamp,
+  minutesOfDay,
+  parseHm,
+  punchInWindow,
+  graceMinutesOf,
+  overtimeAfterShiftEnd,
+  requiredWorkMinutes,
+  workProgress,
+} = require("./shiftTiming");
 
 const oid = (value) => {
   if (value === undefined || value === null || value === "") return "";
@@ -63,6 +72,62 @@ const formatDurationLabel = (mins) => {
   return `${h}h ${m}m`;
 };
 
+const pad2 = (n) => String(Math.max(0, Math.floor(Number(n) || 0))).padStart(2, "0");
+
+/** 125 mins → "02:05:00" (desktop ACTIVE / IDLE / BREAK style) */
+const formatClockHms = (mins) => {
+  const total = Math.max(0, Math.floor(Number(mins) || 0));
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return `${pad2(h)}:${pad2(m)}:00`;
+};
+
+/** One bucket for frontend: minutes + HH:mm:ss + "Xh Ym" */
+const timeBucket = (mins) => {
+  const minutes = Math.max(0, Math.floor(Number(mins) || 0));
+  return {
+    minutes,
+    clock: formatClockHms(minutes),
+    label: formatDurationLabel(minutes),
+  };
+};
+
+/**
+ * Today's Time — ACTIVE / IDLE / BREAK.
+ * slim:true → only status + clock strings (break /me / start / end).
+ */
+const todayTimeCard = (record, shift, { onBreak = false, slim = false } = {}) => {
+  const progress = workProgress(record, shift);
+  const punchedIn = Boolean(record?.punchIn);
+  const punchedOut = Boolean(record?.punchOut);
+  let status = "Not Clocked In";
+  if (punchedOut) status = "Clocked Out";
+  else if (onBreak) status = "On Break";
+  else if (punchedIn) status = "Working";
+
+  if (slim) {
+    return {
+      status,
+      active: formatClockHms(progress.workedMinutes),
+      idle: formatClockHms(0),
+      break: formatClockHms(progress.breakMinutes),
+    };
+  }
+
+  return {
+    status,
+    active: timeBucket(progress.workedMinutes),
+    idle: timeBucket(0),
+    break: timeBucket(progress.breakMinutes),
+    required: timeBucket(progress.requiredMinutes),
+    remaining: timeBucket(progress.remainingMinutes),
+    punchedIn,
+    punchedOut,
+    onBreak: Boolean(onBreak),
+    asOf: new Date().toISOString(),
+  };
+};
+
 /**
  * Clean attendance row for punch / daily / calendar UIs.
  * Keeps live client shape: employee.official.employeeCode, etc.
@@ -104,10 +169,20 @@ const formatAttendanceRecord = (record, extras = {}) => {
   const earlyBy = Number(r.earlyByMinutes) || 0;
   const isLate = r.punchOut ? r.status === "Late" : lateBy > 0;
   const isEarly = Boolean(r.punchOut) && r.status === "EarlyLeave";
+  /**
+   * attendanceStatus = punch-in timing (Early / On time / Late), or manager review.
+   * Open day (no punch-out) still shows Late/On time/Early — not null.
+   * Day status (MissedPunch / Present / …) is separate in `status`.
+   */
   let attendanceStatus = r.attendanceStatus || null;
   if (attendanceStatus !== "Approved" && attendanceStatus !== "Rejected") {
-    if (!r.punchIn || !r.punchOut) attendanceStatus = null;
-    else if (r.status === "Late") attendanceStatus = "Late";
+    if (!r.punchIn) {
+      attendanceStatus = null;
+    } else if (!r.punchOut) {
+      if (lateBy > 0) attendanceStatus = "Late";
+      else if (window?.isEarly) attendanceStatus = "Early";
+      else attendanceStatus = "On time";
+    } else if (r.status === "Late") attendanceStatus = "Late";
     else if (r.status === "EarlyLeave") attendanceStatus = "Early";
     else if (r.status === "Present") attendanceStatus = "On time";
     else attendanceStatus = null;
@@ -179,5 +254,8 @@ module.exports = {
   branchSummary,
   shiftDbId,
   formatDurationLabel,
+  formatClockHms,
+  timeBucket,
+  todayTimeCard,
   formatAttendanceRecord,
 };

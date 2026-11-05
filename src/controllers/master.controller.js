@@ -31,7 +31,6 @@ const listMasterMeta = async (_req, res) => {
       generalInfoModules: [
         "personal",
         "official",
-        "other",
         "education",
         "accounts",
         "family",

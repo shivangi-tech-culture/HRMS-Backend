@@ -1,10 +1,8 @@
 /**
- * Two published breaks: Lunch (fixed minutes) and a flexible break with no daily count.
- * Any other policy stays hidden until it is published, and only 2 can be published.
+ * Break policies: Lunch (fixed minutes) and flexible breaks with no daily count.
+ * Employees only see published policies. Any number can be published.
  */
 const BreakPolicy = require("../models/BreakPolicy");
-
-const MAX_PUBLISHED = 2;
 
 const DEFAULTS = [
   {
@@ -12,14 +10,23 @@ const DEFAULTS = [
     minutes: 30,
     flexible: false,
     published: true,
-    description: "Fixed lunch time. Unused minutes stay and can be taken later the same day.",
+    description:
+      "Fixed minutes from policy (change anytime, e.g. 30 → 45). Remaining = policy minutes − used today.",
+  },
+  {
+    name: "Tea Break",
+    minutes: 15,
+    flexible: false,
+    published: true,
+    description: "Fixed tea minutes from policy. Used after Lunch remaining is 0.",
   },
   {
     name: "Day Break",
     minutes: null,
     flexible: true,
     published: true,
-    description: "Take 5 or 10 minutes whenever needed. No limit on how many times.",
+    description:
+      "Needs RM/HR approval first (day-request). Approved minutes (10/15/…) then employee can start.",
   },
 ];
 
@@ -48,7 +55,6 @@ const seedBreakPolicies = async () => {
 const publishedPolicies = () =>
   BreakPolicy.find({ companyId: null, published: true, name: { $nin: [null, ""] } })
     .sort({ flexible: 1, name: 1 })
-    .limit(MAX_PUBLISHED)
     .lean();
 
 const findPublishedByName = (name) => {
@@ -61,16 +67,8 @@ const findPublishedByName = (name) => {
   });
 };
 
-const publishedCount = (exceptId) => {
-  const filter = { companyId: null, published: true, name: { $nin: [null, ""] } };
-  if (exceptId) filter._id = { $ne: exceptId };
-  return BreakPolicy.countDocuments(filter);
-};
-
 module.exports = {
-  MAX_PUBLISHED,
   seedBreakPolicies,
   publishedPolicies,
   findPublishedByName,
-  publishedCount,
 };

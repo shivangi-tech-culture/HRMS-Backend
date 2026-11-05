@@ -9,9 +9,14 @@
     "seed": "node src/seed.js",
     "seed:masters": "node src/scripts/seedMasters.js",
     "seed:language": "node src/scripts/seedLanguages.js",
-    "seed:duty-categories": "node src/scripts/seedDutyCategories.js",
     "seed:leave": "node src/scripts/seedLeave.js",
     "seed:holiday": "node src/scripts/seedHolidays.js",
+    "seed:on-duty": "node src/scripts/seedDutyCategories.js onDuty",
+    "seed:on-tour": "node src/scripts/seedDutyCategories.js onTour",
+    "sync:break-permissions": "node src/scripts/syncBreakPermissions.js",
+    "sync:admin-permissions": "node src/scripts/syncAdminPermissions.js",
+    "sync:employee-permissions": "node src/scripts/syncEmployeePermissions.js",
+    "check:break-permissions": "node src/scripts/checkBreakPermissions.js",
     "backfill:activity": "node src/scripts/backfillActivityCompanies.js"
   },
   "dependencies": {
@@ -24,6 +29,7 @@
     "exceljs": "^4.4.0",
     "express": "^4.21.0",
     "express-rate-limit": "^8.7.0",
+    "firebase-admin": "^14.5.0",
     "helmet": "^8.3.0",
     "imapflow": "^2.4.0",
     "joi": "^18.2.9",

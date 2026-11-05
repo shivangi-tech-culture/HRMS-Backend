@@ -37,7 +37,12 @@ const chatRoutes = require("./routes/chat.routes");
 const leaveRoutes = require("./routes/leave.routes");
 const holidayRoutes = require("./routes/holiday.routes");
 const breakRoutes = require("./routes/break.routes");
+const projectRoutes = require("./routes/project.routes");
+const taskRoutes = require("./routes/task.routes");
+const notificationRoutes = require("./routes/notification.routes");
+const dashboardRoutes = require("./routes/dashboard.routes");
 const { attachChatSocket } = require("./utils/chatSocket");
+const { initFirebase } = require("./utils/fcm");
 
 const app = express();
 
@@ -219,7 +224,7 @@ if (NODE_ENV !== "production") {
 /** Mount APIs under /api/* */
 app.use("/api/health", healthRoutes); // public health check (API + MongoDB)
 app.use("/api/auth/login", loginLimiter); // count login attempts (max 20 / window)
-app.use("/api/auth", authRoutes); // login / logout
+app.use("/api/auth", authRoutes); // login / logout / forgot / reset password
 app.use("/api/account", accountRoutes); // My Profile (admin + ESS)
 app.use("/api/roles", roleRoutes); // role CRUD + permission matrix
 app.use("/api/hierarchy", hierarchyRoutes); // org hierarchy tree
@@ -235,6 +240,10 @@ app.use("/api/chat", chatRoutes); // team chat (REST) — live updates on Socket
 app.use("/api/leave", leaveRoutes); // types · balance · requests · calendar · policies · history
 app.use("/api/holidays", holidayRoutes); // catalog + company assignment
 app.use("/api/break", breakRoutes); // employee start/end · admin live + history
+app.use("/api/projects", projectRoutes); // company projects + member assign
+app.use("/api/tasks", taskRoutes); // project tasks + assignee assign + employee To Do
+app.use("/api/dashboard", dashboardRoutes); // ESS employee home dashboard
+app.use("/api/notifications", notificationRoutes); // FCM web/mobile + in-app bell
 
 /** One HTTP server for the API and Socket.IO (chat) */
 const server = http.createServer(app);
@@ -254,6 +263,16 @@ connectDB().then(async () => {
   purgeImportedMail()
     .then((count) => count && console.log(`Removed ${count} copied mailbox mails`))
     .catch((err) => console.error("Mailbox copy cleanup failed:", err.message));
+  const fcmOk = initFirebase();
+  if (fcmOk) {
+    console.log(chalk.green("  ✓  Firebase FCM ready (web + mobile push)"));
+  } else {
+    console.log(
+      chalk.yellow(
+        "  ⚠  Firebase FCM not configured — set FIREBASE_* in .env (notifications still save in DB)"
+      )
+    );
+  }
   server.listen(PORT, () => {
     const pad = (s, n = 72) => s.padEnd(n);
     console.log("");

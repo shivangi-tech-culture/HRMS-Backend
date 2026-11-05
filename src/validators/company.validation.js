@@ -150,6 +150,8 @@ const branchSchema = Joi.object({
   city: Joi.string().trim().allow("").max(80).default(""),
   state: Joi.string().trim().allow("").max(80).default(""),
   pincode: Joi.string().trim().allow("").max(12).default(""),
+  latitude: Joi.number().min(-90).max(90).allow(null).optional(),
+  longitude: Joi.number().min(-180).max(180).allow(null).optional(),
   shifts: Joi.array()
     .items(shiftSchema)
     .custom(uniqueBy("shiftId"))

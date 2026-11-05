@@ -4,8 +4,8 @@
  * SAFE: writes Attendance and regularization requests only. Does NOT change company / employee assign.
  *
  * ─── EMPLOYEE (self) ─────────────────────────────────────────
- * POST   /punch-in              { source, latitude, longitude, remarks? }
- * POST   /punch-out             { source, latitude, longitude, remarks? }
+ * POST   /punch-in              { source, latitude, longitude, remarks? }  — within 50m of branch GPS
+ * POST   /punch-out             { source, latitude, longitude, remarks? }  — within 50m of branch GPS
  * GET    /today
  * GET    /punch-status          ?date=   employee + company from login token
  * GET    /web-punches           ?date=&from=&to=&page=&limit=
@@ -152,7 +152,11 @@ const needTourDutyReview = (req, res, next) => {
 };
 
 // ─── Employee self punch ─────────────────────────────────────
-
+/**
+ * Punch-in blocked when profile % < 70.
+ * 403 body: { success:false, code:"PROFILE_INCOMPLETE", percentage, needPercentage:70, completeThese[], message }
+ * Also creates/updates PROFILE_COMPLETION notification + FCM push (if token registered after login).
+ */
 router.post("/punch-in", protect, validate(punchSchema), punchIn);
 router.post("/punch-out", protect, validate(punchSchema), punchOut);
 router.get("/today", protect, myToday);

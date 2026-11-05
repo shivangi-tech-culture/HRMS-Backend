@@ -3,23 +3,24 @@
  *
  * Employee (login only — same idea as punch in / punch out)
  *   GET    /me                 today's button state
- *   POST   /start              { breakType: "Lunch Break" | "Day Break" }
- *   POST   /end                close my open break
+ *   POST   /start              { latitude, longitude } — within 50m of branch; auto Lunch/Tea / Day Break
+ *   POST   /end                { latitude, longitude } — within 50m of branch; close my open break
+ *   POST   /day-request        { minutes } — ask for Day Break (after fixed time used)
  *
  * Admin — Live Break Status
  *   GET    /live               ?search=&department=&shiftId=&status=all|on_break|at_desk|overdue&page=&limit=
  *
- * Admin — Break History
- *   GET    /history            ?search=&department=&shiftId=&breakType=&status=&from=&to=&page=&limit=
- *                              status = all | completed | pending | approved | rejected
- *   GET    /approvals          breaks waiting for the reporting manager
- *   POST   /:id/review         { decision: "approve" | "reject", remarks? }
+ * Admin — Break History / Pending Review
+ *   GET    /history            Break History (perm: Break History → view)
+ *   GET    /approvals          Pending Review list (perm: Pending Review → view)
+ *   POST   /day-request/:id/review  { decision, remarks? }
+ *                              decision=approve → Pending Review → approve
+ *                              decision=reject  → Pending Review → reject
  *
- * Admin — Break Policy (employee sees published ones only, max 2)
+ * Admin — Break Policy (employee sees published ones only)
  *   GET    /policies
  *   POST   /policies           unpublished until publish
- *   PUT    /policies/:id
- *   PATCH  /policies/:id/publish
+ *   PUT    /policies/:id       includes published true or false
  *   DELETE /policies/:id
  *
  * Scope: Super Admin / Admin = all · HR = assigned companies · Manager = team.
@@ -29,14 +30,14 @@ const {
   myBreak,
   startBreak,
   endMyBreak,
+  requestDayBreak,
+  reviewDayRequest,
   liveBreaks,
   breakHistory,
   pendingBreaks,
-  reviewBreak,
   listPolicies,
   createPolicy,
   updatePolicy,
-  publishPolicy,
   deletePolicy,
 } = require("../controllers/break.controller");
 const { protect, hasAllAccess } = require("../middleware/auth");
@@ -46,12 +47,13 @@ const { normalizeRoleName, EMPLOYEE } = require("../config/roles");
 const { validate, validateQuery } = require("../middleware/validate");
 const {
   startSchema,
+  endSchema,
+  dayRequestSchema,
   liveQuerySchema,
   historyQuerySchema,
   reviewSchema,
   policySchema,
   policyUpdateSchema,
-  publishSchema,
 } = require("../validators/break.validation");
 
 const router = express.Router();
@@ -70,6 +72,17 @@ const needBreak = (subModule, action) => (req, res, next) => {
   return checkPermission("Break", subModule, action)(req, res, next);
 };
 
+/** Pending Review → approve / reject by body.decision */
+const needBreakReview = (req, res, next) => {
+  if (employeeSide(req.user)) {
+    return res.status(403).json({ message: "Employees can only start and end their own break" });
+  }
+  if (hasAllAccess(req.user) || hasGlobalCompanyAccess(req.user)) return next();
+  const decision = String(req.body?.decision || "").trim().toLowerCase();
+  const action = decision === "reject" ? "reject" : "approve";
+  return checkPermission("Break", "Pending Review", action)(req, res, next);
+};
+
 /**
  * @swagger
  * tags:
@@ -86,27 +99,20 @@ const needBreak = (subModule, action) => (req, res, next) => {
  * /api/break/start:
  *   post:
  *     tags: [Break]
- *     summary: Start my break
+ *     summary: Start my break (auto next type)
+ *     description: |
+ *       No breakType needed. Picks next fixed policy with remaining minutes
+ *       (Lunch → Tea…). After fixed time is used, Day Break needs prior
+ *       approval via POST /api/break/day-request.
  *     security:
  *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [breakType]
- *             properties:
- *               breakType:
- *                 type: string
- *                 enum: [Lunch Break, Day Break]
  *     responses:
  *       201: { description: Break started }
- *       400: { description: Not punched in, already on break, or daily limit }
+ *       400: { description: Not punched in, outside 50m, already on break, or Day Break needs approval }
  * /api/break/end:
  *   post:
  *     tags: [Break]
- *     summary: End my open break
+ *     summary: End my open break (latitude + longitude, within 50m of branch)
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -175,7 +181,8 @@ const needBreak = (subModule, action) => (req, res, next) => {
  */
 router.get("/me", protect, myBreak);
 router.post("/start", protect, validate(startSchema), startBreak);
-router.post("/end", protect, endMyBreak);
+router.post("/end", protect, validate(endSchema), endMyBreak);
+router.post("/day-request", protect, validate(dayRequestSchema), requestDayBreak);
 
 router.get(
   "/live",
@@ -206,28 +213,21 @@ router.put(
   validate(policyUpdateSchema),
   updatePolicy
 );
-router.patch(
-  "/policies/:id/publish",
-  protect,
-  needBreak("Break Policy", "edit"),
-  validate(publishSchema),
-  publishPolicy
-);
 router.delete("/policies/:id", protect, needBreak("Break Policy", "delete"), deletePolicy);
 
 router.get(
   "/approvals",
   protect,
-  needBreak("Break History", "view"),
+  needBreak("Pending Review", "view"),
   validateQuery(historyQuerySchema),
   pendingBreaks
 );
 router.post(
-  "/:id/review",
+  "/day-request/:id/review",
   protect,
-  needBreak("Live Break Status", "edit"),
+  needBreakReview,
   validate(reviewSchema),
-  reviewBreak
+  reviewDayRequest
 );
 
 module.exports = router;

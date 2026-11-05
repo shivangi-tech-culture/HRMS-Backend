@@ -15,8 +15,8 @@ const Company = require("../models/Company");
 const User = require("../models/User");
 const { userCompanyIds } = require("./companyScope");
 
-const SIMPLE_FIELDS = ["name", "role", "status", "profileUrl"];
-const OBJECT_SECTIONS = ["personal", "official", "other", "payroll"];
+const SIMPLE_FIELDS = ["name", "role", "status", "profileUrl", "signatureUrl"];
+const OBJECT_SECTIONS = ["personal", "official", "payroll"];
 const LIST_SECTIONS = ["education", "accounts", "family", "nominees", "experience", "visas"];
 /** First non-empty key used as the row title when a list row is added / removed */
 const ROW_TITLE_KEYS = ["courseName", "bankName", "name", "organization", "nomineeName", "countryName", "accountNo"];
