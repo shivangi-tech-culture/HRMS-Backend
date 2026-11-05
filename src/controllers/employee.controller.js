@@ -985,6 +985,11 @@ const updateEmployee = async (req, res) => {
 
       profile.official = normalizeSectionUniques("official", profile.official);
 
+      // Never wipe an assigned employee code with a blank value from the client.
+      if (!String(profile.official.employeeCode || "").trim()) {
+        delete profile.official.employeeCode;
+      }
+
       const headErr = await validateReportingHeads(profile.official);
       if (headErr) return res.status(400).json({ message: headErr });
       const nextHead = (key) =>
