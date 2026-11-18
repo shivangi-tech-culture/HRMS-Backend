@@ -188,6 +188,9 @@ const experienceItem = only({
   experience: str(),
   experienceUnit: Joi.string().valid("Years", "Months", "").optional(),
   lastSalaryDrawn: str(),
+  lastSalaryUnit: Joi.string()
+    .valid("Per Annum", "Per Month", "")
+    .optional(),
   description: str(),
   remarks: str(),
   document: str(), // Cloudinary URL only

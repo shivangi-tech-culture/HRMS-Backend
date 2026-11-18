@@ -295,6 +295,8 @@ const userSchema = new mongoose.Schema(
         /** Years | Months — unit for experience duration */
         experienceUnit: { type: String, default: "Years" },
         lastSalaryDrawn: { type: String, default: "" },
+        /** Per Annum | Per Month — unit for lastSalaryDrawn */
+        lastSalaryUnit: { type: String, default: "Per Annum" },
         description: { type: String, default: "" },
         remarks: { type: String, default: "" },
         /** Cloudinary URL from POST /api/employees/upload type=experience */
