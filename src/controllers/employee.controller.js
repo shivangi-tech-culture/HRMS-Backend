@@ -414,12 +414,23 @@ const createEmployee = async (req, res) => {
       return res.status(400).json({ message: "Role not found or inactive" });
     }
 
+    const nextStatus = status || "Active";
+    const isDraft = nextStatus === "Draft";
+    const draftStepRaw = req.body.draftStep;
+    const draftStep =
+      isDraft && draftStepRaw !== undefined && draftStepRaw !== null
+        ? Math.min(2, Math.max(0, Number(draftStepRaw) || 0))
+        : isDraft
+          ? 1
+          : null;
+
     // Build create document (optional profile sections)
     const createDoc = {
       name,
       password: hashedPassword,
       role: "Employee",
-      status: status || "Active",
+      status: nextStatus,
+      draftStep,
       official,
       personal,
       createdBy: req.user._id,
@@ -439,28 +450,36 @@ const createEmployee = async (req, res) => {
 
     // 4. Create User with role Employee (password already hashed above)
     const employee = await User.create(createDoc);
-    await grantLeaveBalance(employee);
+    // Drafts are incomplete — leave balance + welcome mail only when Active
+    if (!isDraft) {
+      await grantLeaveBalance(employee);
+    }
 
     await logEmployeeActivity({ actor: req.user, employee, action: "create" });
 
     // 5. Welcome email in background (Render SMTP timeouts must not block create)
-    const mail = queueWelcomeEmail({
-      name,
-      email,
-      password,
-      role: "Employee",
-      company: assigned.company || "",
-      department: String(official.department || "").trim(),
-    });
+    let mail = { emailTo: email };
+    if (!isDraft) {
+      mail = queueWelcomeEmail({
+        name,
+        email,
+        password,
+        role: "Employee",
+        company: assigned.company || "",
+        department: String(official.department || "").trim(),
+      });
+    }
 
     // 6. Return employee without password
     const fresh = await User.findById(employee._id)
       .select("-password")
       ;
     return res.status(201).json({
-      message: `Employee created. Welcome email queued for ${mail.emailTo}.`,
-      emailQueued: true,
-      emailTo: mail.emailTo || email,
+      message: isDraft
+        ? "Employee draft saved"
+        : `Employee created. Welcome email queued for ${mail.emailTo}.`,
+      emailQueued: !isDraft,
+      emailTo: isDraft ? undefined : mail.emailTo || email,
       employee: await safeUser(fresh),
     });
   } catch (err) {
@@ -849,6 +868,20 @@ const updateEmployee = async (req, res) => {
     // --- name / status / role / password ---
     if (req.body.name !== undefined) employee.name = req.body.name;
     if (req.body.status !== undefined && isAdmin) employee.status = req.body.status;
+    if (req.body.draftStep !== undefined && isAdmin) {
+      if (req.body.draftStep === null || req.body.draftStep === "") {
+        employee.draftStep = null;
+      } else {
+        employee.draftStep = Math.min(
+          2,
+          Math.max(0, Number(req.body.draftStep) || 0),
+        );
+      }
+    }
+    // Active / Inactive employees are not wizard drafts
+    if (employee.status !== "Draft") {
+      employee.draftStep = null;
+    }
 
     const previousProfileUrl =
       req.body.profileUrl !== undefined ? String(employee.profileUrl || "") : null;
@@ -1107,6 +1140,10 @@ const updateEmployee = async (req, res) => {
 
     // --- save + response ---
     await employee.save();
+    // Draft → Active: grant leave the same way as a fresh create
+    if (before.status === "Draft" && employee.status === "Active") {
+      await grantLeaveBalance(employee);
+    }
     if (previousProfileUrl !== null) {
       await forgetProfileImage(previousProfileUrl, employee.profileUrl);
     }
