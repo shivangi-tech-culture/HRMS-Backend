@@ -29,6 +29,7 @@
  * GET    /tour-duty            own list. status, month=YYYY-MM
  * GET    /tour-duty/:id
  * POST   /tour-duty/:id/cancel pending only
+ * POST   /tour-duties          Attendance → assign for an employee (auto-approved)
  * GET    /tour-duties          Attendance → On Tour/On Duty queue
  * POST   /tour-duties/:id/review?decision=approve|reject
  *
@@ -62,6 +63,7 @@ const {
   myTourDuty,
   getTourDuty,
   cancelTourDuty,
+  assignTourDuty,
   listTourDuty,
   reviewTourDuty,
 } = require("../controllers/tourDuty.controller");
@@ -87,6 +89,7 @@ const {
   myRegularizeQuerySchema,
   regularizationListQuerySchema,
   tourDutySchema,
+  assignTourDutySchema,
   myTourDutyQuerySchema,
   tourDutyListQuerySchema,
 } = require("../validators/attendance.validation");
@@ -287,6 +290,14 @@ router.post(
   protect,
   needSelfTourDuty("cancel"),
   cancelTourDuty
+);
+
+router.post(
+  "/tour-duties",
+  protect,
+  validate(assignTourDutySchema),
+  needAttendance("On Tour/On Duty", "create"),
+  assignTourDuty
 );
 
 router.get(

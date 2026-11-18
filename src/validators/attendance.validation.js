@@ -228,6 +228,13 @@ const tourDutySchema = Joi.object({
   document: Joi.string().trim().allow("").max(500).optional(),
 }).unknown(false);
 
+/** POST /api/attendance/tour-duties — admin assigns for an employee (auto-approved) */
+const assignTourDutySchema = tourDutySchema.keys({
+  employeeId: objectId.required().messages({
+    "any.required": "employeeId is required",
+  }),
+});
+
 /** GET /api/attendance/tour-duty — own requests */
 const myTourDutyQuerySchema = Joi.object({
   status: requestStatus,
@@ -268,6 +275,7 @@ module.exports = {
   myRegularizeQuerySchema,
   regularizationListQuerySchema,
   tourDutySchema,
+  assignTourDutySchema,
   myTourDutyQuerySchema,
   tourDutyListQuerySchema,
   SELF_SOURCES,

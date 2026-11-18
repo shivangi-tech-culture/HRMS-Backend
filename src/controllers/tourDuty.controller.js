@@ -8,6 +8,7 @@
  *   POST /api/attendance/tour-duty/:id/cancel
  *
  * Attendance admin (Attendance → On Tour/On Duty)
+ *   POST /api/attendance/tour-duties          assign for an employee (auto-approved)
  *   GET  /api/attendance/tour-duties
  *   POST /api/attendance/tour-duties/:id/review?decision=approve|reject
  *
@@ -286,61 +287,81 @@ const saveRejectedDays = async (request, actorId) => {
   }
 };
 
+/** Shared create payload checks for self-apply and admin assign. */
+const buildTourDutyPayload = async (body) => {
+  const fromTime = normalizeHm(body.fromTime);
+  const toTime = normalizeHm(body.toTime);
+  if (!fromTime || !toTime) {
+    return { error: "fromTime and toTime must look like 09:00", status: 400 };
+  }
+  const { fromDate, toDate, dutyType } = body;
+  if (fromDate > toDate) {
+    return { error: "From date cannot be after to date", status: 400 };
+  }
+  if (fromDate === toDate && toTime <= fromTime) {
+    return { error: "To time must be after from time", status: 400 };
+  }
+  const days = inclusiveDays(fromDate, toDate);
+  if (days > MAX_DAYS) {
+    return { error: `Date range cannot be longer than ${MAX_DAYS} days`, status: 400 };
+  }
+  const category = await loadCategory(dutyType, body.tourCategory);
+  if (!category) {
+    return {
+      error:
+        dutyType === "On Tour"
+          ? "tourCategory must be an active On Tour category id"
+          : "tourCategory must be an active On Duty category id",
+      status: 400,
+    };
+  }
+  return {
+    fromTime,
+    toTime,
+    fromDate,
+    toDate,
+    dutyType,
+    category,
+    reason: String(body.reason || "").trim(),
+    remarks: String(body.remarks || "").trim(),
+    document: String(body.document || "").trim(),
+  };
+};
+
 /** POST /api/attendance/tour-duty */
 const requestTourDuty = async (req, res) => {
   try {
     if (normalizeRoleName(req.user.role) !== EMPLOYEE) {
       return res.status(403).json({ message: "Only an employee can apply On Tour or On Duty" });
     }
-    const fromTime = normalizeHm(req.body.fromTime);
-    const toTime = normalizeHm(req.body.toTime);
-    if (!fromTime || !toTime) {
-      return res.status(400).json({ message: "fromTime and toTime must look like 09:00" });
-    }
-    const { fromDate, toDate, dutyType } = req.body;
-    if (fromDate > toDate) {
-      return res.status(400).json({ message: "From date cannot be after to date" });
-    }
-    if (fromDate === toDate && toTime <= fromTime) {
-      return res.status(400).json({ message: "To time must be after from time" });
-    }
-    const days = inclusiveDays(fromDate, toDate);
-    if (days > MAX_DAYS) {
-      return res.status(400).json({ message: `Date range cannot be longer than ${MAX_DAYS} days` });
-    }
-    const category = await loadCategory(dutyType, req.body.tourCategory);
-    if (!category) {
-      return res.status(400).json({
-        message:
-          dutyType === "On Tour"
-            ? "tourCategory must be an active On Tour category id"
-            : "tourCategory must be an active On Duty category id",
-      });
+    const payload = await buildTourDutyPayload(req.body);
+    if (payload.error) {
+      return res.status(payload.status).json({ message: payload.error });
     }
 
     const employee = await User.findById(req.user._id).select(CARD);
     if (!employee || employee.status === "Deleted") {
       return res.status(404).json({ message: "Employee not found" });
     }
-    if (await leaveConflict(employee._id, fromDate, toDate)) {
+    if (await leaveConflict(employee._id, payload.fromDate, payload.toDate)) {
       return res.status(400).json({ message: "These dates already have a leave request" });
     }
-    if (await overlapConflict(employee._id, fromDate, toDate)) {
+    if (await overlapConflict(employee._id, payload.fromDate, payload.toDate)) {
       return res.status(400).json({ message: "These dates already have an On Tour or On Duty request" });
     }
 
     const doc = await TourDuty.create({
       employee: employee._id,
       companyId: userCompanyIds(employee)[0] || null,
-      dutyType,
-      tourCategory: category._id,
-      fromDate,
-      fromTime,
-      toDate,
-      toTime,
-      reason: String(req.body.reason || "").trim(),
-      remarks: String(req.body.remarks || "").trim(),
-      document: String(req.body.document || "").trim(),
+      dutyType: payload.dutyType,
+      tourCategory: payload.category._id,
+      fromDate: payload.fromDate,
+      fromTime: payload.fromTime,
+      toDate: payload.toDate,
+      toTime: payload.toTime,
+      reason: payload.reason,
+      remarks: payload.remarks,
+      document: payload.document,
     });
     return res.status(201).json({
       message: "Request sent. It stays Pending until approved. Attendance updates after approval.",
@@ -398,6 +419,76 @@ const cancelTourDuty = async (req, res) => {
     doc.status = "Cancelled";
     await doc.save();
     return res.json({ message: "Request cancelled", request: await rowWithCategory(doc) });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+/** POST /api/attendance/tour-duties — HR / admin assigns On Tour or On Duty for an employee. */
+const assignTourDuty = async (req, res) => {
+  try {
+    const role = normalizeRoleName(req.user.role);
+    if (role === EMPLOYEE) {
+      return res.status(403).json({ message: "Employees cannot assign On Tour / On Duty" });
+    }
+    if (!REVIEW_ROLES.has(role)) {
+      return res.status(403).json({
+        message: "Only a Reporting Manager, HR, or Super Admin can assign On Tour / On Duty",
+      });
+    }
+    const payload = await buildTourDutyPayload(req.body);
+    if (payload.error) {
+      return res.status(payload.status).json({ message: payload.error });
+    }
+    const employee = await User.findById(req.body.employeeId).select(CARD);
+    if (!employee || employee.status === "Deleted") {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+    if (normalizeRoleName(employee.role) !== EMPLOYEE) {
+      return res.status(400).json({ message: "On Tour / On Duty can only be assigned to employees" });
+    }
+    const scopeErr = assertTeamOrCompanyEmployee(req.user, employee);
+    if (scopeErr) return res.status(403).json({ message: scopeErr });
+    if (await leaveConflict(employee._id, payload.fromDate, payload.toDate)) {
+      return res.status(400).json({ message: "These dates already have a leave request" });
+    }
+    if (await overlapConflict(employee._id, payload.fromDate, payload.toDate)) {
+      return res.status(400).json({ message: "These dates already have an On Tour or On Duty request" });
+    }
+
+    const doc = await TourDuty.create({
+      employee: employee._id,
+      companyId: userCompanyIds(employee)[0] || null,
+      dutyType: payload.dutyType,
+      tourCategory: payload.category._id,
+      fromDate: payload.fromDate,
+      fromTime: payload.fromTime,
+      toDate: payload.toDate,
+      toTime: payload.toTime,
+      reason: payload.reason,
+      remarks: payload.remarks,
+      document: payload.document,
+      status: "Pending",
+    });
+
+    const saved = await saveApprovedDays(doc, req.user._id);
+    if (saved.error) {
+      await TourDuty.deleteOne({ _id: doc._id });
+      return res.status(400).json({ message: saved.error });
+    }
+    doc.status = "Approved";
+    doc.reviewedBy = req.user._id;
+    doc.reviewedAt = new Date();
+    doc.reviewReason = "Assigned by admin";
+    await doc.save();
+
+    const fresh = await TourDuty.findById(doc._id)
+      .populate("employee", CARD)
+      .populate("reviewedBy", "name role official.officialEmail official.employeeCode official.department");
+    return res.status(201).json({
+      message: "Assigned and approved. Attendance for these days is Present.",
+      request: await rowWithCategory(fresh),
+    });
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
@@ -494,6 +585,7 @@ module.exports = {
   myTourDuty,
   getTourDuty,
   cancelTourDuty,
+  assignTourDuty,
   listTourDuty,
   reviewTourDuty,
 };

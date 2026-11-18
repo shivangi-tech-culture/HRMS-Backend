@@ -81,7 +81,7 @@ const ADMIN_TREE = [
       { name: "Late & Early Departures", actions: VE },
       {
         name: "On Tour/On Duty",
-        actions: ["view", "approve", "reject"],
+        actions: ["view", "create", "approve", "reject"],
       },
     ],
   },
