@@ -1,4 +1,4 @@
-﻿/**
+/**
  * PROFILE COMPLETION (weighted) — Employee / HR / Manager
  *
  * Section weights (sum = 100):
@@ -133,8 +133,8 @@ const PROFILE_FIELDS = [
   },
   { key: "personal.bloodGroup", label: "Blood group", section: "personal", mandatory: false },
   {
-    key: "personal.emergencyContact1",
-    label: "Emergency contact 1",
+    key: "personal.emergencyContact2",
+    label: "Emergency contact",
     section: "personal",
     mandatory: true,
   },

@@ -78,7 +78,6 @@ const personalItem = only({
   anniversaryDate: date(), // ignored in controller (auto-calculated)
   personalEmail: emailOpt(),
   languageKnown: str(),
-  emergencyContact1: str(),
   emergencyContact2: str(),
   drivingLicenseNo: str(),
   passportNo: str(),
@@ -253,7 +252,9 @@ const createEmployeeSchema = Joi.object({
   name: Joi.string().trim().min(2).max(100).required(),
   password: Joi.string().min(6).max(50).required(),
   role: Joi.string().valid("Employee").default("Employee"),
-  status: Joi.string().valid("Active", "Inactive").default("Active"),
+  status: Joi.string().valid("Active", "Inactive", "Draft").default("Active"),
+  /** Wizard step (0–2) for incomplete Add Employee drafts */
+  draftStep: Joi.number().integer().min(0).max(2).allow(null).optional(),
   official: officialItem
     .keys({
       officialEmail: Joi.string().trim().email().required(),
@@ -318,7 +319,8 @@ const updateUserSchema = Joi.object({
   name: Joi.string().trim().min(2).max(100).optional(),
   password: Joi.string().min(6).max(50).optional(),
   role: Joi.string().trim().optional(),
-  status: Joi.string().valid("Active", "Inactive").optional(),
+  status: Joi.string().valid("Active", "Inactive", "Draft").optional(),
+  draftStep: Joi.number().integer().min(0).max(2).allow(null).optional(),
   personal: personalItem.optional(),
   official: officialUpdateItem.optional(),
   education: listOrOne(educationItem).optional(),

@@ -745,8 +745,7 @@ router.get(
  *                   drivingLicenseNo: DL-0420110012345
  *                   passportNo: J8765432
  *                   languageKnown: Hindi, English
- *                   emergencyContact1: Neha - 9876543210
- *                   emergencyContact2: ""
+ *                   emergencyContact2: "9876543210"
  *                   presentAddress:
  *                     address: Sector 62
  *                     city: Noida
@@ -836,7 +835,7 @@ router.get(
  *                   drivingLicenseNo: DL-0420110012345
  *                   passportNo: J8765432
  *                   languageKnown: Hindi, English
- *                   emergencyContact1: Neha - 9876543210
+ *                   emergencyContact2: "9876543210"
  *                   presentAddress:
  *                     address: Sector 62
  *                     city: Noida

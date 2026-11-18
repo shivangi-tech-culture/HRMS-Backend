@@ -358,8 +358,11 @@ module.exports = swaggerJsdoc({
               description: "Unique when set",
             },
             languageKnown: { type: "string", example: "Hindi, English" },
-            emergencyContact1: { type: "string", example: "Neha - 9876543210" },
-            emergencyContact2: { type: "string" },
+            emergencyContact2: {
+              type: "string",
+              example: "9876543210",
+              description: "Emergency contact mobile",
+            },
             drivingLicenseNo: {
               type: "string",
               example: "DL-0420110012345",

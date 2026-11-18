@@ -42,8 +42,13 @@ const userSchema = new mongoose.Schema(
       default: "Employee",
       trim: true,
     },
-    /** Active = can login; Inactive = blocked by protect() */
+    /** Active = can login; Inactive / Draft = blocked by protect() */
     status: { type: String, default: "Active" },
+    /**
+     * Add-Employee wizard step index (0–2) while status is Draft.
+     * Cleared when the employee is activated.
+     */
+    draftStep: { type: Number, default: null },
     /** Updated on every successful login */
     lastLogin: { type: Date, default: null },
     /**
@@ -126,7 +131,6 @@ const userSchema = new mongoose.Schema(
       /** Unique when set — also accepted as login id */
       personalEmail: { type: String, default: "" },
       languageKnown: { type: String, default: "" },
-      emergencyContact1: { type: String, default: "" },
       emergencyContact2: { type: String, default: "" },
       /** Unique when set */
       drivingLicenseNo: { type: String, default: "" },
