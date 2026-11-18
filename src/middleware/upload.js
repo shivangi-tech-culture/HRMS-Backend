@@ -25,6 +25,7 @@ const allowedExt = new Set([".pdf", ".jpg", ".jpeg", ".png", ".webp", ".gif", ".
 const UPLOAD_TYPES = [
   "education",
   "account",
+  "experience",
   "leave",
   "profile",
   "signature",
@@ -146,7 +147,7 @@ const folderFor = (type) => {
   const configured = (process.env.CLOUDINARY_FOLDER || "hrms").replace(/\/+$/, "");
   const root =
     configured.replace(
-      /\/(education|account|leave|profile|signature|regularization|onTour|onDuty|companyLogo)$/,
+      /\/(education|account|experience|leave|profile|signature|regularization|onTour|onDuty|companyLogo)$/,
       ""
     ) || "hrms";
   return `${root}/${type}`;

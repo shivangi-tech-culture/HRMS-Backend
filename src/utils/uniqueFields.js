@@ -82,9 +82,32 @@ const normalizeSectionUniques = (sectionName, data = {}) => {
   return out;
 };
 
+/** Compare two values the same way uniqueness does (case / trim / etc.). */
+const sameUniqueValue = (path, a, b) => {
+  const f = byPath[path];
+  const left = String(a ?? "").trim();
+  const right = String(b ?? "").trim();
+  if (!left && !right) return true;
+  if (!f) return left === right;
+  return f.normalize(left) === f.normalize(right);
+};
+
 /** Return friendly error if any unique value already exists; else null */
 const findUniqueConflict = async (values = {}, excludeId = null) => {
   const checks = [];
+  let exclude = null;
+  if (excludeId) {
+    const raw = String(excludeId);
+    try {
+      const { Types } = require("mongoose");
+      exclude =
+        typeof Types.ObjectId.createFromHexString === "function"
+          ? Types.ObjectId.createFromHexString(raw)
+          : new Types.ObjectId(raw);
+    } catch {
+      exclude = excludeId;
+    }
+  }
 
   for (const f of UNIQUE_FIELDS) {
     const raw = values[f.path];
@@ -94,7 +117,7 @@ const findUniqueConflict = async (values = {}, excludeId = null) => {
     if (!value) continue; // empty → skip (not unique)
 
     const filter = { [f.path]: value };
-    if (excludeId) filter._id = { $ne: excludeId }; // allow keeping own value
+    if (exclude) filter._id = { $ne: exclude }; // allow keeping own value
 
     checks.push(
       User.findOne(filter)
@@ -120,6 +143,7 @@ const duplicateKeyMessage = (err) => {
 module.exports = {
   UNIQUE_FIELDS,
   normalizeSectionUniques,
+  sameUniqueValue,
   findUniqueConflict,
   duplicateKeyMessage,
 };

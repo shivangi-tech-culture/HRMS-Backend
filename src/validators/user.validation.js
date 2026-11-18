@@ -185,9 +185,12 @@ const experienceItem = only({
   location: str(),
   fromDate: date(),
   toDate: date(),
+  experience: str(),
+  experienceUnit: Joi.string().valid("Years", "Months", "").optional(),
   lastSalaryDrawn: str(),
   description: str(),
   remarks: str(),
+  document: str(), // Cloudinary URL only
 });
 
 /** visas[] row — travel / work visas */

@@ -37,6 +37,7 @@ const {
 } = require("../middleware/upload");
 const {
   normalizeSectionUniques,
+  sameUniqueValue,
   findUniqueConflict,
   duplicateKeyMessage,
 } = require("../utils/uniqueFields");
@@ -1045,7 +1046,8 @@ const updateEmployee = async (req, res) => {
       if (nextVal === undefined || nextVal === null) return;
       const n = String(nextVal).trim();
       if (!n) return;
-      if (n === String(currentVal || "").trim()) return;
+      // Draft reopen / case-only changes must not count as a new conflict
+      if (sameUniqueValue(path, n, currentVal)) return;
       uniqueCheck[path] = n;
     };
 

@@ -290,9 +290,15 @@ const userSchema = new mongoose.Schema(
         location: { type: String, default: "" },
         fromDate: { type: Date, default: null },
         toDate: { type: Date, default: null },
+        /** Duration amount, e.g. "6" or "2.5" */
+        experience: { type: String, default: "" },
+        /** Years | Months — unit for experience duration */
+        experienceUnit: { type: String, default: "Years" },
         lastSalaryDrawn: { type: String, default: "" },
         description: { type: String, default: "" },
         remarks: { type: String, default: "" },
+        /** Cloudinary URL from POST /api/employees/upload type=experience */
+        document: { type: String, default: "" },
       },
     ],
     // 9. VISAS — list (array)
