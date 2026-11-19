@@ -74,12 +74,11 @@ const adminChangePasswordSchema = Joi.object({
  *       (Employee → Employee → create). **Employee role cannot create** —
  *       after create, Employee only **edits** own General Info.
  *
- *       Essential: name, password, dateOfBirth.
- *       `official.officialEmail` optional (login also via employeeCode).
+ *       Essential: name, password, officialEmail, dateOfBirth.
  *       `official.employeeCode` optional. Leave it blank and the server assigns
  *       the next code for that company: company code + 3-digit number (`TC001`).
  *       Add page preview: `GET /api/employees/next-code?companyId=`.
- *       Welcome email sent after create when officialEmail is set.
+ *       Welcome email sent after create.
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -96,6 +95,7 @@ const adminChangePasswordSchema = Joi.object({
  *               status: { type: string, enum: [Active, Inactive] }
  *               official:
  *                 type: object
+ *                 required: [officialEmail]
  *               personal:
  *                 type: object
  *                 required: [dateOfBirth]

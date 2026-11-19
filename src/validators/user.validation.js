@@ -250,8 +250,7 @@ const payrollItem = only({
 
 /**
  * CREATE EMPLOYEE — POST /api/employees (Employee Management)
- * Essential: name, password, status, dateOfBirth
- * officialEmail optional — when set must be a valid email (login also via employeeCode)
+ * Essential: name, password, status, officialEmail, dateOfBirth
  * employeeCode optional — blank → {companyCode}{0001} for that company
  * Optional: department, designation, address (country/state/city), rest of profile
  */
@@ -264,7 +263,7 @@ const createEmployeeSchema = Joi.object({
   draftStep: Joi.number().integer().min(0).max(2).allow(null).optional(),
   official: officialItem
     .keys({
-      officialEmail: emailOpt(),
+      officialEmail: Joi.string().trim().email().required(),
       employeeCode: Joi.string().trim().uppercase().min(2).allow("").optional(),
       companyIds: Joi.array().items(companyObjectId).length(1).required(),
       department: Joi.string().trim().allow("").optional(),
