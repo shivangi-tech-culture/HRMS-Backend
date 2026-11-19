@@ -458,9 +458,10 @@ const createEmployee = async (req, res) => {
 
     await logEmployeeActivity({ actor: req.user, employee, action: "create" });
 
-    // 5. Welcome email in background (Render SMTP timeouts must not block create)
-    let mail = { emailTo: email };
-    if (!isDraft) {
+    // 5. Welcome email in background when official email is set
+    // (Render SMTP timeouts must not block create)
+    let mail = { emailTo: email, emailQueued: false };
+    if (!isDraft && email) {
       mail = queueWelcomeEmail({
         name,
         email,
@@ -478,9 +479,11 @@ const createEmployee = async (req, res) => {
     return res.status(201).json({
       message: isDraft
         ? "Employee draft saved"
-        : `Employee created. Welcome email queued for ${mail.emailTo}.`,
-      emailQueued: !isDraft,
-      emailTo: isDraft ? undefined : mail.emailTo || email,
+        : email
+          ? `Employee created. Welcome email queued for ${mail.emailTo}.`
+          : "Employee created. No welcome email — official email was not provided.",
+      emailQueued: Boolean(!isDraft && email && mail.emailQueued !== false),
+      emailTo: isDraft || !email ? undefined : mail.emailTo || email,
       employee: await safeUser(fresh),
     });
   } catch (err) {

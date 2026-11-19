@@ -218,7 +218,7 @@ const PROFILE_FIELDS = [
     key: "official.officialEmail",
     label: "Official email",
     section: "official",
-    mandatory: true,
+    mandatory: false,
   },
   {
     key: "official.companyIds",
